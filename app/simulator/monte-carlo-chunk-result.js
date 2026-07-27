@@ -134,7 +134,10 @@ export const MONTE_CARLO_BUFFER_FIELDS = Object.freeze({
     stress_recoveryYears: Float32Array,
     realWithdrawalP10RealEur: Float64Array,
     realWithdrawalObservationCount: Uint32Array,
-    realWithdrawalP10Missingness: Uint8Array
+    realWithdrawalP10Missingness: Uint8Array,
+    meanWithdrawalRateRatio: Float64Array,
+    withdrawalRateObservationCount: Uint32Array,
+    meanWithdrawalRateMissingness: Uint8Array
 });
 
 export const MONTE_CARLO_COUNTER_FIELDS = Object.freeze([
@@ -201,6 +204,8 @@ export const MONTE_CARLO_PATH_SUMMARY_FIELDS = Object.freeze({
     cutYearShareRatio: Float32Array,
     realWithdrawalP10RealEur: Float64Array,
     realWithdrawalObservationCount: Uint32Array,
+    meanWithdrawalRateRatio: Float64Array,
+    withdrawalRateObservationCount: Uint32Array,
     p1CareEntryAge: Uint16Array,
     p2CareEntryAge: Uint16Array,
     p1CareYears: Uint16Array,
@@ -229,6 +234,7 @@ export const MONTE_CARLO_PATH_MISSINGNESS_FIELDS = Object.freeze({
     path: Uint8Array,
     cutYearShareRatio: Uint8Array,
     realWithdrawalP10RealEur: Uint8Array,
+    meanWithdrawalRateRatio: Uint8Array,
     stressRealWithdrawalP10RealEur: Uint8Array,
     p1CareEntryAge: Uint8Array,
     p2CareEntryAge: Uint8Array,
@@ -282,6 +288,9 @@ function ensureWithdrawalBuffers(buffers, runCount) {
         realWithdrawalP10RealEur: Float64Array,
         realWithdrawalObservationCount: Uint32Array,
         realWithdrawalP10Missingness: Uint8Array,
+        meanWithdrawalRateRatio: Float64Array,
+        withdrawalRateObservationCount: Uint32Array,
+        meanWithdrawalRateMissingness: Uint8Array,
         stress_realWithdrawalObservationCount: Uint32Array,
         stress_realWithdrawalP10Missingness: Uint8Array
     };
@@ -312,11 +321,14 @@ export function createMonteCarloPathSummaryV1(runCount, {
         pathSummaries.cutYearShareRatio = buffers.cutYearShareRatio;
         pathSummaries.realWithdrawalP10RealEur = buffers.realWithdrawalP10RealEur;
         pathSummaries.realWithdrawalObservationCount = buffers.realWithdrawalObservationCount;
+        pathSummaries.meanWithdrawalRateRatio = buffers.meanWithdrawalRateRatio;
+        pathSummaries.withdrawalRateObservationCount = buffers.withdrawalRateObservationCount;
     }
     const pathMissingness = createTypedFields(MONTE_CARLO_PATH_MISSINGNESS_FIELDS, runCount);
     if (buffers) {
         pathMissingness.cutYearShareRatio = buffers.cutYearShareMissingness;
         pathMissingness.realWithdrawalP10RealEur = buffers.realWithdrawalP10Missingness;
+        pathMissingness.meanWithdrawalRateRatio = buffers.meanWithdrawalRateMissingness;
         pathMissingness.stressRealWithdrawalP10RealEur = buffers.stress_realWithdrawalP10Missingness;
     }
     if (buffers && attachTransferBuffers) {
@@ -350,6 +362,8 @@ export function recordMonteCarloPathSummaryV1({
     cutYearsDenominator = 0,
     realWithdrawalP10RealEur = null,
     realWithdrawalObservationCount = 0,
+    meanWithdrawalRateRatio = null,
+    withdrawalRateObservationCount = 0,
     p1CareEntryAge = null,
     p2CareEntryAge = null,
     p1CareYears = 0,
@@ -414,6 +428,17 @@ export function recordMonteCarloPathSummaryV1({
         pathMissingness.realWithdrawalP10RealEur,
         localIndex,
         pathSummaries.realWithdrawalObservationCount[localIndex] > 0 ? realWithdrawalP10RealEur : null,
+        outcomeCode === MONTE_CARLO_OUTCOME_CODE.ALL_DEAD
+            ? MONTE_CARLO_MISSINGNESS_CODE.DIED_BEFORE_FIRST_OBLIGATION
+            : MONTE_CARLO_MISSINGNESS_CODE.NO_OBSERVATIONS
+    );
+    assertNonNegativeInteger(withdrawalRateObservationCount, 'withdrawalRateObservationCount');
+    pathSummaries.withdrawalRateObservationCount[localIndex] = withdrawalRateObservationCount;
+    setOptionalValue(
+        pathSummaries.meanWithdrawalRateRatio,
+        pathMissingness.meanWithdrawalRateRatio,
+        localIndex,
+        withdrawalRateObservationCount > 0 ? meanWithdrawalRateRatio : null,
         outcomeCode === MONTE_CARLO_OUTCOME_CODE.ALL_DEAD
             ? MONTE_CARLO_MISSINGNESS_CODE.DIED_BEFORE_FIRST_OBLIGATION
             : MONTE_CARLO_MISSINGNESS_CODE.NO_OBSERVATIONS
@@ -726,6 +751,28 @@ export function assertMonteCarloChunkResultV1(result, {
             } else if (withdrawalMissingness !== MONTE_CARLO_MISSINGNESS_CODE.OBSERVED
                 || result.pathSummaries.realWithdrawalP10RealEur[localIndex] < 0) {
                 throw contractError(`financial path ${globalIndex} has an invalid observed withdrawal summary.`);
+            }
+
+            const rateCount = result.pathSummaries.withdrawalRateObservationCount[localIndex];
+            const rateMissingness = result.pathMissingness.meanWithdrawalRateRatio[localIndex];
+            if (rateCount === 0) {
+                const allowedMissingness = outcomeCode === MONTE_CARLO_OUTCOME_CODE.ALL_DEAD
+                    ? MONTE_CARLO_MISSINGNESS_CODE.DIED_BEFORE_FIRST_OBLIGATION
+                    : MONTE_CARLO_MISSINGNESS_CODE.NO_OBSERVATIONS;
+                if (rateMissingness !== allowedMissingness
+                    || result.pathSummaries.meanWithdrawalRateRatio[localIndex] !== 0) {
+                    throw contractError(`financial path ${globalIndex} has inconsistent withdrawal-rate missingness.`);
+                }
+            } else if (rateMissingness !== MONTE_CARLO_MISSINGNESS_CODE.OBSERVED
+                || !Number.isFinite(result.pathSummaries.meanWithdrawalRateRatio[localIndex])) {
+                throw contractError(`financial path ${globalIndex} has an invalid observed withdrawal-rate summary.`);
+            }
+            if (!Object.is(
+                result.buffers.meanWithdrawalRateRatio[localIndex],
+                result.pathSummaries.meanWithdrawalRateRatio[localIndex]
+            ) || result.buffers.withdrawalRateObservationCount[localIndex] !== rateCount
+                || result.buffers.meanWithdrawalRateMissingness[localIndex] !== rateMissingness) {
+                throw contractError(`financial path ${globalIndex} has divergent withdrawal-rate buffer and summary values.`);
             }
 
             const stressCount = result.buffers.stress_realWithdrawalObservationCount[localIndex];

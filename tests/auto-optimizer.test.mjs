@@ -73,7 +73,11 @@ try {
         createAutoOptimizeRequestFingerprint,
         isAutoOptimizeCandidateValid: isValidCandidate
     } = await import('../app/simulator/auto-optimize-param-meta.js');
-    const { checkConstraints, getObjectiveValue } = await import('../app/simulator/auto-optimize-metrics.js');
+    const {
+        AUTO_OPTIMIZE_METRIC_RESULT_VERSION,
+        checkConstraints,
+        getObjectiveValue
+    } = await import('../app/simulator/auto-optimize-metrics.js');
     const { CandidateCache, tieBreaker } = await import('../app/simulator/auto-optimize-utils.js');
     const { applyChampionToForm } = await import('../app/simulator/auto-optimize-apply.js');
     const { readAutoOptimizeConfigFromUI } = await import('../app/simulator/auto-optimize-config-ui.js');
@@ -84,6 +88,16 @@ try {
     } = await import('../app/simulator/auto-optimize-renderer.js');
     const { rng } = await import('../app/simulator/simulator-utils.js');
     const { runAutoOptimize } = await import('../app/simulator/auto_optimize.js');
+    const createVersionedMetricResult = (overrides = {}) => ({
+        metricContract: { schemaVersion: AUTO_OPTIMIZE_METRIC_RESULT_VERSION },
+        medianEndWealth: 500000,
+        successProbFloor: 1,
+        depletionRate: 0,
+        worst5Drawdown: 0,
+        timeShareWRgt45: 0,
+        medianWithdrawalRate: 0,
+        ...overrides
+    });
 
     // ========== Auto-Optimize UI Helper Tests ==========
 
@@ -529,8 +543,8 @@ try {
     // Test 20: tieBreaker - Höhere Success Rate gewinnt
     console.log('Test 20: tieBreaker - Höhere Success Rate');
     {
-        const a = { results: { successProbFloor: 0.95 } };
-        const b = { results: { successProbFloor: 0.99 } };
+        const a = { results: createVersionedMetricResult({ successProbFloor: 0.95 }) };
+        const b = { results: createVersionedMetricResult({ successProbFloor: 0.99 }) };
 
         const result = tieBreaker(a, b);
 
@@ -541,8 +555,8 @@ try {
     // Test 21: tieBreaker - Niedrigerer Drawdown bei gleicher SR
     console.log('Test 21: tieBreaker - Niedrigerer Drawdown');
     {
-        const a = { results: { successProbFloor: 0.99, drawdown: { p90: 0.4 } } };
-        const b = { results: { successProbFloor: 0.99, drawdown: { p90: 0.3 } } };
+        const a = { results: createVersionedMetricResult({ successProbFloor: 0.99, worst5Drawdown: 0.4 }) };
+        const b = { results: createVersionedMetricResult({ successProbFloor: 0.99, worst5Drawdown: 0.3 }) };
 
         const result = tieBreaker(a, b);
 
@@ -553,8 +567,20 @@ try {
     // Test 22: tieBreaker - Gleiche Werte
     console.log('Test 22: tieBreaker - Gleiche Werte');
     {
-        const a = { results: { successProbFloor: 0.99, drawdown: { p90: 0.3 }, timeShareWRgt45: 0.01 } };
-        const b = { results: { successProbFloor: 0.99, drawdown: { p90: 0.3 }, timeShareWRgt45: 0.01 } };
+        const a = {
+            results: createVersionedMetricResult({
+                successProbFloor: 0.99,
+                worst5Drawdown: 0.3,
+                timeShareWRgt45: 0.01
+            })
+        };
+        const b = {
+            results: createVersionedMetricResult({
+                successProbFloor: 0.99,
+                worst5Drawdown: 0.3,
+                timeShareWRgt45: 0.01
+            })
+        };
 
         const result = tieBreaker(a, b);
 
@@ -572,13 +598,10 @@ try {
                 ? candidate.targetEq
                 : (Number.isFinite(baseInputs?.targetEq) ? baseInputs.targetEq : 60);
             const score = 1000 - Math.pow(targetEq - 60, 2);
-            return {
+            return createVersionedMetricResult({
                 medianEndWealth: score,
-                successProbFloor: 1,
-                worst5Drawdown: 0,
-                timeShareWRgt45: 0,
                 medianWithdrawalRate: 0.03
-            };
+            });
         };
 
         const result = await runAutoOptimize({
@@ -648,12 +671,9 @@ try {
                 maxDauer: 20,
                 evaluateCandidateFn: async () => {
                     evaluations++;
-                    return {
+                    return createVersionedMetricResult({
                         medianEndWealth: 1,
-                        successProbFloor: 1,
-                        worst5Drawdown: 0,
-                        timeShareWRgt45: 0
-                    };
+                    });
                 }
             });
         } catch (error) {
@@ -676,12 +696,9 @@ try {
             const band = candidate.rebalBand ?? 5;
             // Optimum bei targetEq=50, rebalBand=4
             const score = 1000 - Math.pow(eq - 50, 2) - Math.pow(band - 4, 2) * 10;
-            return {
+            return createVersionedMetricResult({
                 medianEndWealth: Math.max(0, score),
-                successProbFloor: 1,
-                worst5Drawdown: 0,
-                timeShareWRgt45: 0
-            };
+            });
         };
 
         const result = await runAutoOptimize({
@@ -708,12 +725,7 @@ try {
     console.log('Test 25: runAutoOptimize - Stability-Metrik');
     {
         const mockEvaluate = async (candidate) => {
-            return {
-                medianEndWealth: 500000,
-                successProbFloor: 1,
-                worst5Drawdown: 0.2,
-                timeShareWRgt45: 0
-            };
+            return createVersionedMetricResult({ worst5Drawdown: 0.2 });
         };
 
         const result = await runAutoOptimize({
@@ -737,12 +749,12 @@ try {
     {
         const mockEvaluate = async (candidate) => {
             const eq = candidate.targetEq ?? 60;
-            return {
+            return createVersionedMetricResult({
                 medianEndWealth: eq * 10000,
                 successProbFloor: 0.95 + eq / 1000,
                 worst5Drawdown: 0.5 - eq / 200,
                 timeShareWRgt45: 0.01
-            };
+            });
         };
 
         const result = await runAutoOptimize({
@@ -768,12 +780,7 @@ try {
         const seenModes = [];
         const mockEvaluate = async (_candidate, baseInputs) => {
             seenModes.push(baseInputs?.dynamicFlex === true);
-            return {
-                medianEndWealth: 500000,
-                successProbFloor: 1,
-                worst5Drawdown: 0.2,
-                timeShareWRgt45: 0
-            };
+            return createVersionedMetricResult({ worst5Drawdown: 0.2 });
         };
 
         const resultOn = await runAutoOptimize({
@@ -815,13 +822,13 @@ try {
         const mockEvaluate = async (candidate) => {
             const multiplier = Number(candidate.goGoMultiplier) || 1.0;
             const isAggressive = multiplier >= 1.25;
-            return {
+            return createVersionedMetricResult({
                 medianEndWealth: isAggressive ? 1200000 : 900000,
                 successProbFloor: isAggressive ? 0.90 : 0.985,
                 worst5Drawdown: isAggressive ? 0.72 : 0.42,
                 timeShareWRgt45: isAggressive ? 0.35 : 0.08,
-                medianWithdrawalRate: isAggressive ? 0.072 : 0.046
-            };
+                medianWithdrawalRate: isAggressive ? 0.072 : 0
+            });
         };
 
         const result = await runAutoOptimize({
@@ -843,6 +850,36 @@ try {
         assert(result.optimizationContext.usesDynamicFlexParams === true, 'Dynamic-Flex-Parameter sollten erkannt sein');
     }
     console.log('✓ runAutoOptimize Safety-Guards bremsen aggressive Dynamic-Flex Loesungen OK');
+
+    // Test 28b: Missingness in der Safety-Penalty ist nicht gleich einer echten Null
+    console.log('Test 28b: runAutoOptimize - Safety-Penalty Missingness');
+    {
+        let missingMetricError = null;
+        try {
+            await runAutoOptimize({
+                objective: { metric: 'EndWealth_P50', direction: 'max' },
+                params: {
+                    goGoMultiplier: { min: 1.0, max: 1.1, step: 0.05 }
+                },
+                runsPerCandidate: 20,
+                seedsTrain: 2,
+                seedsTest: 2,
+                constraints: {},
+                maxDauer: 30,
+                dynamicFlexMode: 'force_on',
+                evaluateCandidateFn: async () => {
+                    const result = createVersionedMetricResult({ medianEndWealth: 900000 });
+                    delete result.medianWithdrawalRate;
+                    return result;
+                }
+            });
+        } catch (error) {
+            missingMetricError = error;
+        }
+        assertEqual(missingMetricError?.code, 'AUTO_OPTIMIZE_METRIC_UNAVAILABLE',
+            'fehlende Entnahmequote sollte bei aktiven Safety-Guards fail-closed stoppen');
+    }
+    console.log('✓ runAutoOptimize Safety-Penalty Missingness OK');
 
     console.log('✅ Auto-Optimizer objective search works');
 

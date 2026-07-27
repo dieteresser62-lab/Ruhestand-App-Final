@@ -409,6 +409,8 @@ export async function runMonteCarloChunk({
         const careNeedTracker = createMonteCarloCareNeedTracker();
         let technicalPathError = null;
         const realWithdrawalsThisRun = [];
+        let withdrawalRateSumThisRun = 0;
+        let withdrawalRateObservationCountThisRun = 0;
 
         const runSeed = makeRunSeed(seed, 0, runIdx);
         const rand = legacyRand || rng(runSeed);
@@ -702,6 +704,12 @@ export async function runMonteCarloChunk({
                 break;
             }
 
+            const realizedWithdrawalRate = Number(result?.logData?.entnahmequote);
+            if (!isAccumulation && Number.isFinite(realizedWithdrawalRate)) {
+                withdrawalRateSumThisRun += realizedWithdrawalRate;
+                withdrawalRateObservationCountThisRun++;
+            }
+
             if (result?.kind === 'ruin' || result?.isRuin === true) {
                 failed = true;
                 if (!isAccumulation) {
@@ -982,6 +990,10 @@ export async function runMonteCarloChunk({
                 ? quantile(realWithdrawalsThisRun, 0.10)
                 : null,
             realWithdrawalObservationCount: realWithdrawalsThisRun.length,
+            meanWithdrawalRateRatio: withdrawalRateObservationCountThisRun > 0
+                ? withdrawalRateSumThisRun / withdrawalRateObservationCountThisRun
+                : null,
+            withdrawalRateObservationCount: withdrawalRateObservationCountThisRun,
             p1CareEntryAge: triggeredAge,
             p2CareEntryAge: triggeredAgeP2,
             p1CareYears,

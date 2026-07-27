@@ -216,6 +216,12 @@ try {
         'Auto-Optimize worker p10 should match serial'
     );
     assertClose(
+        workerResult.aggregatedResults.finalOutcomes.p25,
+        serialAggregates.finalOutcomes.p25,
+        1e-6,
+        'Auto-Optimize worker p25 should match serial'
+    );
+    assertClose(
         workerResult.aggregatedResults.finalOutcomes.p50,
         serialAggregates.finalOutcomes.p50,
         1e-6,
@@ -254,6 +260,22 @@ try {
     assert(
         workerResult.aggregatedResults.cutYearSharePct.sampleSize === serialAggregates.cutYearSharePct.sampleSize,
         'Auto-Optimize worker cut-year sample size should match serial'
+    );
+    assertClose(
+        workerResult.aggregatedResults.medianWithdrawalRate.medianRatio,
+        serialAggregates.medianWithdrawalRate.medianRatio,
+        1e-12,
+        'Auto-Optimize worker D-14 median withdrawal rate should match serial'
+    );
+    assert(
+        workerResult.aggregatedResults.medianWithdrawalRate.sampleSize
+            === serialAggregates.medianWithdrawalRate.sampleSize,
+        'Auto-Optimize worker D-14 sample size should match serial'
+    );
+    assertEqual(
+        JSON.stringify(workerResult.aggregatedResults.medianWithdrawalRate.missingness),
+        JSON.stringify(serialAggregates.medianWithdrawalRate.missingness),
+        'Auto-Optimize worker D-14 missingness should match serial'
     );
 
     let invalidParametersRejected = false;

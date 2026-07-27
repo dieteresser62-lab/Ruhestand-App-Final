@@ -4,7 +4,7 @@
 
 This directory contains the comprehensive testing infrastructure for the Ruhestand-App-Final project. The tests are designed to be zero-dependency, using native Node.js ESM and a custom test runner, avoiding the need for heavy frameworks like Jest or Mocha.
 
-**Test-Statistik:** 132 entdeckte Testdateien, davon 131 im Node-Gate ausgefuehrt, mit 7.722 von 7.722 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (in der Suite-Datenintegritaet-Slice-02-Re-Review-Nachbesserung mit `npm test` am 2026-07-27 verifiziert). `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen und bestand mit 16/16 Einstiegspunkt-/Zusatzflows, darunter vier isolierte Monte-Carlo-Browserfaelle.
+**Test-Statistik:** 136 entdeckte Testdateien, davon 135 im Node-Gate ausgefuehrt, mit 8.290 von 8.290 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (in Suite-Datenintegritaet Slice 11 mit `npm test` am 2026-07-27 verifiziert). `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen und bestand mit 16/16 Einstiegspunkt-/Zusatzflows, darunter vier isolierte Monte-Carlo-Browserfaelle.
 
 Die Zahl beschreibt nur die Node-Standardsuite. `npm run test:browser`, `npm run test:coverage` und ein echter Tauri-Build sind getrennte Gates und in den Assertions nicht enthalten.
 
@@ -50,7 +50,7 @@ Jede tatsaechlich ausgefuehrte Datei muss mindestens eine gezaehlte Assertion li
 npm run test:coverage
 ```
 
-Der Coverage-Runner loescht `.coverage/`, startet die Standardsuite mit `NODE_V8_COVERAGE` und schreibt bei gruener Standardsuite `.coverage/summary.json`. Der Report wertet Projektdateien unter `app/`, `engine/`, `workers/` und `types/` aus. Die Slice-12-Messung liegt bei 76,46% approximativer Coverage aus ausfuehrbaren V8-Zeilenbereichen (32.625/42.668 Zeilen in 206 Dateien), 0,34 Prozentpunkte ueber Slice 11. `npm run test:coverage` erzwingt zusaetzlich ein 50-Prozent-Dateigate fuer `worker-job-runner.js` und `results-renderers.js`; ein fehlender Inventareintrag oder eine Unterschreitung beendet den Lauf rot. Playwright-Ausfuehrung fliesst nicht in diese Node-V8-Zahl ein. Coverage bleibt ein Transparenz- und Review-Gate, keine Wirksamkeits- oder Eignungsaussage und insbesondere keine echte JavaScript-Statement-Metrik.
+Der Coverage-Runner loescht `.coverage/`, startet die Standardsuite mit `NODE_V8_COVERAGE` und schreibt bei gruener Standardsuite `.coverage/summary.json`. Der Report wertet Projektdateien unter `app/`, `engine/`, `workers/` und `types/` aus. Die Suite-Datenintegritaet-Slice-11-Messung liegt bei 78,29% approximativer Coverage aus ausfuehrbaren V8-Zeilenbereichen (36.097/46.105 Zeilen). `npm run test:coverage` erzwingt zusaetzlich ein 50-Prozent-Dateigate fuer `worker-job-runner.js` und `results-renderers.js`; ein fehlender Inventareintrag oder eine Unterschreitung beendet den Lauf rot. Playwright-Ausfuehrung fliesst nicht in diese Node-V8-Zahl ein. Coverage bleibt ein Transparenz- und Review-Gate, keine Wirksamkeits- oder Eignungsaussage und insbesondere keine echte JavaScript-Statement-Metrik.
 
 Monte-Carlo-Abschlussgate in Slice 12:
 
@@ -289,6 +289,13 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 - **Aktuelle Referenz:** `post-suite-data-02-v1` baut auf `post-suite-data-05-v1` auf; keine fruehere Fixture wird ueberschrieben.
 - **Slice-02-Delta:** Die harte Nullsemantik fuer `maxSkimPctOfEq` und das Equity-Gesamtbudget veraendert im festen Acht-Run-Fall nur Volatilitaet und maximalen Drawdown von Run 6 sowie die davon abgeleitete Median-Volatilitaet.
 - **Invarianten:** Direct-Runner-CaR, alle anderen Pfad-/Aggregatwerte, Outcome-Inventar, Missingness und Datenprovenienz bleiben exakt.
+- **Slice-11-Kandidat:** `post-suite-data-11-v1` bleibt bis zum externen Review
+  `pending`, dokumentiert D-14-Runwerte, Rohverteilungen und das erwartete
+  Bufferdelta 93 auf 106 Byte pro Run, ohne fruehere Referenzen zu
+  ueberschreiben.
+- **Ressourcenmessung:** Das feste Standardprofil mit 100.000 Runs ergab
+  977,62585 gesamte Worker-Result-Byte pro Run; der Laufzeitvertrag verwendet
+  gerundete 978 Byte pro Run.
 
 #### `monte-carlo-sampling.test.mjs`
 **Zweck:** Validiert den statistischen Kern der Simulation.
@@ -400,6 +407,13 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 - **Objective-Extraktion:** getObjectiveValue für verschiedene Metriken
 - **CandidateCache:** Vermeidung redundanter Evaluierungen
 - **Tie-Breaker:** Höhere Success Rate, niedrigerer Drawdown
+- **Fail-closed:** Fehlende Objective-, Constraint- oder Tiebreaker-Metriken
+  werden nicht als guenstige numerische 0 behandelt. Beide
+  Tiebreaker-Ergebnisse muessen `AutoOptimizeMetricResultV1` tragen; Bool,
+  Array und numerischer String gelten nicht als Zahlen.
+- **Safety-Penalty:** Fehlende D-14-Entnahmequote bricht die
+  Dynamic-Flex-Bewertung mit `AUTO_OPTIMIZE_METRIC_UNAVAILABLE` ab und ist
+  nicht gleichbedeutend mit einer beobachteten Nullquote.
 - **Champion-Findung:** Konvergenz nahe Optimum
 - **Modellannahmen:** MC-Sampling, CAPE, Datenfilter und disjunkte
   Train-/Bestaetigungsseeds werden im Ergebnisvertrag ausgewiesen
@@ -422,12 +436,37 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
   Formularziele vor dem ersten Write und verifiziert Ruecklese-Fingerprint
   sowie Gold-/Go-Go-Aktivierungszustand; manipulierte oder nicht anwendbare
   Champions werden fail-closed abgewiesen.
+- Reale Evaluate-Ergebnisse tragen `AutoOptimizeMetricResultV1`; P10, P25 und
+  P50 bleiben geordnet und D-14 liefert eine endliche, stichprobengestuetzte
+  Median-Entnahmequote.
+- Ein echter Sofortruin-Witness mit nicht leerer Liquiditaet belegt, dass das
+  tatsaechlich berechnete finale Ruinjahr in jedem Run enthalten bleibt und
+  vor dem Auszahlungsschritt eine beobachtete Nullauszahlung statt des
+  Restvermoegens als D-14-Zaehler verwendet.
+
+#### `auto-optimize-metrics-contract.test.mjs`
+**Zweck:** Sichert O-21 und den versionierten Slice-11-Metrikvertrag.
+- Die Endvermoegensreihe 1 bis 100 liefert mit kanonischer linearer
+  Interpolation P10 = 10,9, P25 = 25,75 und P50 = 50,5.
+- D-14 bildet zuerst das arithmetische Mittel je Run und danach den Median
+  ueber auswertbare Runs; echte 0 bleibt beobachtet, Missingness bleibt
+  separat.
+- Technische Pfade werden aus Endvermoegens- und Drawdownverteilungen
+  entfernt; `sampleSize`, `excludedRuns` und
+  `missingness.technical_error` reconciliieren die angeforderten Runs.
+- Das zusaetzliche Quantilfeld waehlt tatsaechlich das gewuenschte
+  Endvermoegensquantil; absichtlich vertauschte P10-/P25-Rangfolgen
+  diskriminieren den jeweiligen Gewinner.
+- Fehlende Objective-, Constraint- und Tiebreaker-Werte sowie
+  unversionierte oder nicht primitiv numerische Shapes schlagen fail-closed
+  fehl.
 
 #### `auto-optimize-worker-contract.test.mjs`
 **Zweck:** Testet den Worker-Merge-Contract des Auto-Optimize-MC-Pfads.
 - Mock-Worker führt echte `runMonteCarloChunk()`-Jobs aus
 - Vergleicht Auto-Optimize-Worker-Merge mit seriellem MC-Aggregat
-- Prüft `failCount`, P10/P50/P90, Erschöpfungsquote und Stress-Zeitanteil
+- Prüft `failCount`, P10/P25/P50/P90, Erschöpfungsquote,
+  Stress-Zeitanteil sowie D-14-Median, Stichprobengroesse und Missingness
 
 ### 6. Balance-App Module
 
@@ -859,6 +898,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `architecture-evidence.test.mjs` | ~170 | Offline-Contract für Evidenzrecords, Pflichtfelder, IDs, Anker, lokale Links und Fälligkeiten |
 | `auto-optimizer.test.mjs` | ~850 | Mehrphasige Optimierung, LHS, Constraints |
 | `auto-optimize-fidelity.test.mjs` | ~580 | O-15/O-20, Registry-, Fingerprint- und Apply-Paritaet |
+| `auto-optimize-metrics-contract.test.mjs` | ~170 | O-21, P10/P25/P50, D-14, Quantilselector und fail-closed Metriken |
 | `auto-optimize-worker-contract.test.mjs` | ~260 | Auto-Optimize Worker-Merge-Contract |
 | `balance-annual-cape.test.mjs` | ~140 | CAPE-Abruf, Fallback und Jahresupdate-Contract |
 | `balance-annual-inflation.test.mjs` | ~130 | Jährliche Inflationsanpassung |

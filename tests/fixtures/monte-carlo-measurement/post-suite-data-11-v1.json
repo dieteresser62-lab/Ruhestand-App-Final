@@ -1,0 +1,218 @@
+{
+  "schemaVersion": "monte-carlo-post-slice-snapshot-v1",
+  "snapshotId": "post-suite-data-11-v1",
+  "sourceReference": "post-suite-data-02-v1",
+  "sliceId": "SUITE-DATA-11",
+  "reviewStatus": "pending",
+  "capturedAtUtc": "2026-07-27T00:00:00Z",
+  "goldenCaseIds": [
+    "GC-RISK-01",
+    "GC-CAR-01"
+  ],
+  "resourceEvidence": {
+    "profileName": "standard",
+    "runs": 100000,
+    "durationYears": 35,
+    "workerCount": 8,
+    "jobTimeBudgetMs": 500,
+    "scenarioId": "base",
+    "seed": 12345,
+    "measuredAt": "2026-07-27",
+    "durationMs": 25407.9826,
+    "bufferBytesPerRun": 106,
+    "measuredWorkerPayloadBytes": 97762585,
+    "measuredWorkerPayloadBytesPerRun": 977.62585,
+    "rounding": "nearest_integer_bytes_per_run"
+  },
+  "metadata": {
+    "seed": 20260722,
+    "dataVersion": {
+      "annualDataHash": "614993a3",
+      "regimeHash": "50aa7f99"
+    },
+    "runtime": {
+      "kind": "node",
+      "version": "v25.2.1",
+      "platform": "win32",
+      "architecture": "x64"
+    },
+    "numericTolerance": {
+      "sameRuntime": {
+        "defaultAbsolute": 0
+      },
+      "crossRuntime": {
+        "defaultAbsolute": 0,
+        "fields": []
+      }
+    }
+  },
+  "result": {
+    "resourceContract": {
+      "measuredWorkerResultBytesPerRun": 978
+    },
+    "bufferBytes": 848,
+    "bufferBytesPerRun": 106,
+    "buffers": {
+      "meanWithdrawalRateRatio": [
+        0.07525604704941306,
+        0.042088105175756806,
+        0.05815647827134559,
+        0.04861590685734068,
+        0.02941453401832018,
+        0.025730745919035704,
+        0.056301614355368935,
+        0.08639787142635322
+      ],
+      "withdrawalRateObservationCount": [
+        8,
+        12,
+        12,
+        12,
+        12,
+        12,
+        12,
+        7
+      ],
+      "meanWithdrawalRateMissingness": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    "pathSummaries": {
+      "meanWithdrawalRateRatio": [
+        0.07525604704941306,
+        0.042088105175756806,
+        0.05815647827134559,
+        0.04861590685734068,
+        0.02941453401832018,
+        0.025730745919035704,
+        0.056301614355368935,
+        0.08639787142635322
+      ],
+      "withdrawalRateObservationCount": [
+        8,
+        12,
+        12,
+        12,
+        12,
+        12,
+        12,
+        7
+      ]
+    },
+    "pathMissingness": {
+      "meanWithdrawalRateRatio": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    "aggregates": {
+      "finalOutcomes": {
+        "p10": 355805.0625641398,
+        "p25": 470755.1115246885,
+        "p50": 570439.1055063346,
+      "p90": 2709189.5861991392,
+      "distribution": {
+        "definitionVersion": "MonteCarloFinancialRunDistributionV1",
+        "values": [
+          515817.85231319827,
+          880817.2230002069,
+            625060.3586994709,
+            442492.33397705486,
+            3435317.6066572573,
+            2397991.86314566,
+            480176.0373738997,
+          153534.76260067115
+        ],
+        "requestedRuns": 8,
+        "sampleSize": 8,
+        "excludedRuns": 0,
+        "missingness": {
+          "technical_error": 0
+        },
+        "unit": "nominal_eur",
+        "quantileMethod": "linear_interpolation_at_(n_minus_1)_q"
+        },
+        "p50_successful": 570439.1055063346,
+        "successfulCount": 8,
+        "successfulTerminalZeroCount": 0,
+        "successContract": "outcome_status_all_dead_or_horizon_exhausted",
+        "successfulMissingness": null
+      },
+      "maximumDrawdownPct": {
+      "p50": 48.474876403808594,
+      "p90": 71.94678573608398,
+      "distribution": {
+        "definitionVersion": "MonteCarloFinancialRunDistributionV1",
+        "values": [
+          68.00611114501953,
+          40.793907165527344,
+            42.43539047241211,
+            54.51436233520508,
+            9.03215503692627,
+            20.657459259033203,
+            64.06470489501953,
+          81.14169311523438
+        ],
+        "requestedRuns": 8,
+        "sampleSize": 8,
+        "excludedRuns": 0,
+        "missingness": {
+          "technical_error": 0
+        },
+        "unit": "percent_loss_from_prior_peak",
+        "quantileMethod": "linear_interpolation_at_(n_minus_1)_q"
+        }
+      },
+      "medianWithdrawalRate": {
+        "definitionVersion": "MedianWithdrawalRateD14V1",
+        "medianRatio": 0.05245876060635481,
+        "sampleSize": 8,
+        "excludedRuns": 0,
+        "missingness": {
+          "no_observations": 0,
+          "died_before_first_obligation": 0,
+          "technical_error": 0,
+          "not_applicable": 0
+        },
+        "runMeanRatios": [
+          0.07525604704941306,
+          0.042088105175756806,
+          0.05815647827134559,
+          0.04861590685734068,
+          0.02941453401832018,
+          0.025730745919035704,
+          0.056301614355368935,
+          0.08639787142635322
+        ],
+      "unit": "ratio",
+      "numerator": "jahresEntnahmeEffektiv",
+      "denominator": "depotwertGesamt",
+      "denominatorScope": "equity_bond_and_gold_tranches_excluding_liquidity_and_health_bucket",
+      "terminalRuinYearNumerator": "jahresEntnahmeEffektiv_actual_payout_only",
+      "includedYears": "calculated_decumulation_years_with_living_household_member_and_finite_rate_including_actual_terminal_ruin_year",
+        "excludedYears": [
+          "accumulation",
+          "technical_error",
+          "death_log",
+          "synthetic_post_ruin"
+        ],
+        "perRunStatistic": "arithmetic_mean",
+        "acrossRunStatistic": "median",
+        "quantileMethod": "linear_interpolation_at_(n_minus_1)_q"
+      }
+    }
+  }
+}

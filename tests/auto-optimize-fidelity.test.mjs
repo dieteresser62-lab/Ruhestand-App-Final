@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import { EngineAPI } from '../engine/index.mjs';
 import { applyChampionToForm } from '../app/simulator/auto-optimize-apply.js';
 import { evaluateCandidate } from '../app/simulator/auto-optimize-evaluate.js';
+import { AUTO_OPTIMIZE_METRIC_RESULT_VERSION } from '../app/simulator/auto-optimize-metrics.js';
 import {
     AUTO_OPTIMIZE_PARAMETER_OPTIONS,
     AUTO_OPTIMIZE_PARAMETER_REGISTRY,
@@ -500,6 +501,18 @@ console.log('Test 5: every interactive parameter has a deterministic causal witn
                 lower.parameterFidelity.requestFingerprint !== upper.parameterFidelity.requestFingerprint,
                 `${witness.key} causal witness should retain distinct canonical request fingerprints`
             );
+            if (witness === monteCarloWitnesses[0]) {
+                assertEqual(lower.metricContract.schemaVersion, AUTO_OPTIMIZE_METRIC_RESULT_VERSION,
+                    'real evaluate results should expose the versioned Slice-11 metric shape');
+                assert(lower.p10EndWealth <= lower.p25EndWealth,
+                    'real evaluate P10 should not exceed P25');
+                assert(lower.p25EndWealth <= lower.medianEndWealth,
+                    'real evaluate P25 should not exceed P50');
+                assert(Number.isFinite(lower.medianWithdrawalRate),
+                    'real evaluate should expose a finite D-14 median for a decumulation scenario');
+                assert(lower.metricContract.withdrawalRate.sampleSize > 0,
+                    'real evaluate should expose the D-14 run sample size');
+            }
         }
 
     } finally {
@@ -533,6 +546,52 @@ console.log('Test 6: UI copy states horizon and MC-assumption limits');
     ), 'Dynamic-Flex preset should remain applicable with horizonMethod=mean');
     assertEqual(AUTO_OPTIMIZE_PARAMETER_REGISTRY.horizonYears.requestKey, 'horizonYears',
         'direct request registry should retain the horizon contract');
+}
+
+console.log('Test 6b: real ruin years remain part of D-14');
+{
+    const ruinRunCount = 3;
+    const ruinChunk = await runMonteCarloChunk({
+        inputs: {
+            ...createSimulationInputs(),
+            startVermoegen: 1000,
+            tagesgeld: 20000,
+            zielLiquiditaet: 20000,
+            startFloorBedarf: 34000,
+            startFlexBedarf: 0,
+            targetEq: 90
+        },
+        widowOptions: {},
+        monteCarloParams: {
+            anzahl: ruinRunCount,
+            maxDauer: 3,
+            blockSize: 1,
+            seed: 4242,
+            methode: 'block',
+            rngMode: 'per-run-seed',
+            startYearMode: 'UNIFORM',
+            startYearFilter: 1970,
+            startYearHalfLife: 20,
+            excludeEstimatedHistory: false
+        },
+        useCapeSampling: false,
+        runRange: { start: 0, count: ruinRunCount },
+        logIndices: [],
+        engine: EngineAPI
+    });
+    assertEqual(ruinChunk.totals.outcomeRuinCount, ruinRunCount,
+        'ruin witness should terminate every path in the real first financial year');
+    for (let index = 0; index < ruinRunCount; index++) {
+        assertEqual(ruinChunk.buffers.withdrawalRateObservationCount[index], 1,
+            `ruin path ${index} should retain its actually calculated final year`);
+        assertEqual(
+            ruinChunk.buffers.meanWithdrawalRateMissingness[index],
+            1,
+            `ruin path ${index} should classify its D-14 value as observed`
+        );
+        assertEqual(ruinChunk.buffers.meanWithdrawalRateRatio[index], 0,
+            `ruin path ${index} should retain the actual zero payout before pre-payout ruin`);
+    }
 }
 
 console.log('Test 7: registry domains and range preflight match canonical input contracts');

@@ -7,9 +7,47 @@ import { MONTE_CARLO_MISSINGNESS_CODE } from './monte-carlo-chunk-result.js';
 import { summarizePerRunRealWithdrawalP10 } from './monte-carlo-statistics.js';
 
 const NO_OBSERVATIONS = 'no_observations';
+const WITHDRAWAL_RATE_DEFINITION_VERSION = 'MedianWithdrawalRateD14V1';
+const FINANCIAL_DISTRIBUTION_DEFINITION_VERSION = 'MonteCarloFinancialRunDistributionV1';
+const QUANTILE_METHOD = 'linear_interpolation_at_(n_minus_1)_q';
 
 function conditionalMedian(values) {
     return values.length > 0 ? quantile(values, 0.5) : null;
+}
+
+function buildFinancialRunDistribution(values, pathMissingness, totalRuns, unit) {
+    if (!values || values.length !== totalRuns) {
+        throw new TypeError('Financial run distributions must match totalRuns.');
+    }
+    if (pathMissingness !== undefined && pathMissingness !== null
+        && pathMissingness.length !== totalRuns) {
+        throw new TypeError('Financial run distribution missingness must match totalRuns.');
+    }
+    const observedValues = [];
+    let technicalErrorCount = 0;
+    for (let index = 0; index < totalRuns; index++) {
+        if (pathMissingness?.[index] === MONTE_CARLO_MISSINGNESS_CODE.TECHNICAL_ERROR) {
+            technicalErrorCount++;
+            continue;
+        }
+        const value = Number(values[index]);
+        if (!Number.isFinite(value)) {
+            throw new TypeError(`Financial run distribution value ${index} must be finite.`);
+        }
+        observedValues.push(value);
+    }
+    return {
+        definitionVersion: FINANCIAL_DISTRIBUTION_DEFINITION_VERSION,
+        values: observedValues,
+        requestedRuns: totalRuns,
+        sampleSize: observedValues.length,
+        excludedRuns: technicalErrorCount,
+        missingness: {
+            technical_error: technicalErrorCount
+        },
+        unit,
+        quantileMethod: QUANTILE_METHOD
+    };
 }
 
 function buildPersonCareAggregate({
@@ -29,6 +67,93 @@ function buildPersonCareAggregate({
         realCostEurP50: conditionalMedian(realCostsEur),
         sampleSize,
         missingness: sampleSize > 0 ? null : NO_OBSERVATIONS
+    };
+}
+
+function summarizePerRunMeanWithdrawalRate(buffers, totalRuns) {
+    const values = buffers?.meanWithdrawalRateRatio;
+    const observationCounts = buffers?.withdrawalRateObservationCount;
+    const missingness = buffers?.meanWithdrawalRateMissingness;
+    const inventory = {
+        no_observations: 0,
+        died_before_first_obligation: 0,
+        technical_error: 0,
+        not_applicable: 0
+    };
+    if (!values || !observationCounts || !missingness) {
+        inventory.no_observations = totalRuns;
+        return {
+            definitionVersion: WITHDRAWAL_RATE_DEFINITION_VERSION,
+            medianRatio: null,
+            sampleSize: 0,
+            excludedRuns: totalRuns,
+            missingness: inventory,
+            runMeanRatios: [],
+            unit: 'ratio',
+            numerator: 'jahresEntnahmeEffektiv',
+            denominator: 'depotwertGesamt',
+            denominatorScope: 'equity_bond_and_gold_tranches_excluding_liquidity_and_health_bucket',
+            terminalRuinYearNumerator: 'jahresEntnahmeEffektiv_actual_payout_only',
+            includedYears: 'calculated_decumulation_years_with_living_household_member_and_finite_rate_including_actual_terminal_ruin_year',
+            excludedYears: [
+                'accumulation',
+                'technical_error',
+                'death_log',
+                'synthetic_post_ruin'
+            ],
+            perRunStatistic: 'arithmetic_mean',
+            acrossRunStatistic: 'median',
+            quantileMethod: QUANTILE_METHOD
+        };
+    }
+    if (values.length !== totalRuns
+        || observationCounts.length !== totalRuns
+        || missingness.length !== totalRuns) {
+        throw new TypeError('Per-run withdrawal-rate arrays must match totalRuns.');
+    }
+
+    const observedValues = [];
+    for (let index = 0; index < totalRuns; index++) {
+        const state = missingness[index];
+        const count = observationCounts[index];
+        if (state === MONTE_CARLO_MISSINGNESS_CODE.OBSERVED) {
+            if (!Number.isSafeInteger(count) || count <= 0 || !Number.isFinite(values[index])) {
+                throw new TypeError(`Observed withdrawal-rate run ${index} has an invalid scalar or observation count.`);
+            }
+            observedValues.push(values[index]);
+        } else if (state === MONTE_CARLO_MISSINGNESS_CODE.DIED_BEFORE_FIRST_OBLIGATION) {
+            inventory.died_before_first_obligation++;
+        } else if (state === MONTE_CARLO_MISSINGNESS_CODE.TECHNICAL_ERROR) {
+            inventory.technical_error++;
+        } else if (state === MONTE_CARLO_MISSINGNESS_CODE.NOT_APPLICABLE) {
+            inventory.not_applicable++;
+        } else {
+            inventory.no_observations++;
+        }
+    }
+
+    return {
+        definitionVersion: WITHDRAWAL_RATE_DEFINITION_VERSION,
+        medianRatio: observedValues.length > 0 ? quantile(observedValues, 0.5) : null,
+        sampleSize: observedValues.length,
+        excludedRuns: totalRuns - observedValues.length,
+        missingness: inventory,
+        runMeanRatios: observedValues,
+        unit: 'ratio',
+        numerator: 'jahresEntnahmeEffektiv',
+        denominator: 'depotwertGesamt',
+        denominatorScope: 'equity_bond_and_gold_tranches_excluding_liquidity_and_health_bucket',
+        terminalRuinYearNumerator: 'jahresEntnahmeEffektiv_actual_payout_only',
+        includedYears: 'calculated_decumulation_years_with_living_household_member_and_finite_rate_including_actual_terminal_ruin_year',
+        excludedYears: [
+            'accumulation',
+            'technical_error',
+            'death_log',
+            'synthetic_post_ruin'
+        ],
+        perRunStatistic: 'arithmetic_mean',
+        acrossRunStatistic: 'median',
+        quantileMethod: QUANTILE_METHOD
     };
 }
 
@@ -216,6 +341,21 @@ export function buildMonteCarloAggregates({
         totalRuns,
         missingnessCodes: MONTE_CARLO_MISSINGNESS_CODE
     });
+    const medianWithdrawalRate = summarizePerRunMeanWithdrawalRate(buffers, totalRuns);
+    const finalOutcomeDistribution = buildFinancialRunDistribution(
+        finalOutcomes,
+        buffers.meanWithdrawalRateMissingness,
+        totalRuns,
+        'nominal_eur'
+    );
+    const maxDrawdownDistribution = buildFinancialRunDistribution(
+        maxDrawdowns,
+        buffers.meanWithdrawalRateMissingness,
+        totalRuns,
+        'percent_loss_from_prior_peak'
+    );
+    const finalOutcomeValues = finalOutcomeDistribution.values;
+    const maxDrawdownValues = maxDrawdownDistribution.values;
     return {
         outcomeCounts: {
             ruin: outcomeRuinCount,
@@ -223,8 +363,11 @@ export function buildMonteCarloAggregates({
             horizon_exhausted: outcomeHorizonExhaustedCount
         },
         finalOutcomes: {
-            p10: quantile(finalOutcomes, 0.1), p50: quantile(finalOutcomes, 0.5),
-            p90: quantile(finalOutcomes, 0.9),
+            p10: finalOutcomeValues.length > 0 ? quantile(finalOutcomeValues, 0.1) : null,
+            p25: finalOutcomeValues.length > 0 ? quantile(finalOutcomeValues, 0.25) : null,
+            p50: finalOutcomeValues.length > 0 ? quantile(finalOutcomeValues, 0.5) : null,
+            p90: finalOutcomeValues.length > 0 ? quantile(finalOutcomeValues, 0.9) : null,
+            distribution: finalOutcomeDistribution,
             p50_successful: successfulOutcomes.length > 0 ? quantile(successfulOutcomes, 0.5) : null,
             successfulCount,
             successfulTerminalZeroCount,
@@ -255,8 +398,13 @@ export function buildMonteCarloAggregates({
         },
         anteilJahreOhneFlex: { p50: quantile(anteilJahreOhneFlex, 0.5) },
         volatilities: { p50: quantile(volatilities, 0.5) },
-        maxDrawdowns: { p50: quantile(maxDrawdowns, 0.5), p90: quantile(maxDrawdowns, 0.9) },
+        maxDrawdowns: {
+            p50: maxDrawdownValues.length > 0 ? quantile(maxDrawdownValues, 0.5) : null,
+            p90: maxDrawdownValues.length > 0 ? quantile(maxDrawdownValues, 0.9) : null,
+            distribution: maxDrawdownDistribution
+        },
         realWithdrawalP10,
+        medianWithdrawalRate,
         heatmap: heatmap.map(yearData => Array.from(yearData)),
         bins: bins || MC_HEATMAP_BINS,
         extraKPI: {

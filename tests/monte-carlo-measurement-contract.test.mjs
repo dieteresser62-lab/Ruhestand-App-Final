@@ -53,6 +53,7 @@ const postSlice06 = readFixture('post-slice-06-v1.json');
 const postSlice07 = readFixture('post-slice-07-v1.json');
 const postSuiteData05 = readFixture('post-suite-data-05-v1.json');
 const postSuiteData02 = readFixture('post-suite-data-02-v1.json');
+const postSuiteData11 = readFixture('post-suite-data-11-v1.json');
 const finalCandidate = readFixture('monte-carlo-v1-final.json');
 const benchmarkContract = readFixture('benchmark-contract-v1.json');
 const benchmarkResults = readFixture('benchmark-results-2026-07-22.json');
@@ -422,6 +423,34 @@ function carUncertaintySnapshotProjection(result) {
             realWithdrawalP10: result.aggregates.realWithdrawalP10,
             stressRealWithdrawalP10: result.aggregates.stressKPI.realWithdrawalP10,
             floorCoverageEstimate: result.aggregates.outcomeInventory.floorCoverageEstimate
+        }
+    });
+}
+
+function autoOptimizeMetricsSnapshotProjection(result) {
+    const bufferBytes = Object.values(result.buffers).reduce((sum, buffer) => sum + buffer.byteLength, 0);
+    return canonicalize({
+        resourceContract: {
+            measuredWorkerResultBytesPerRun: MONTE_CARLO_PARAMETER_LIMITS.measuredWorkerResultBytesPerRun
+        },
+        bufferBytes,
+        bufferBytesPerRun: bufferBytes / result.totalRuns,
+        buffers: {
+            meanWithdrawalRateRatio: result.buffers.meanWithdrawalRateRatio,
+            withdrawalRateObservationCount: result.buffers.withdrawalRateObservationCount,
+            meanWithdrawalRateMissingness: result.buffers.meanWithdrawalRateMissingness
+        },
+        pathSummaries: {
+            meanWithdrawalRateRatio: result.pathSummaries.meanWithdrawalRateRatio,
+            withdrawalRateObservationCount: result.pathSummaries.withdrawalRateObservationCount
+        },
+        pathMissingness: {
+            meanWithdrawalRateRatio: result.pathMissingness.meanWithdrawalRateRatio
+        },
+        aggregates: {
+            finalOutcomes: result.aggregates.finalOutcomes,
+            maximumDrawdownPct: result.aggregates.maxDrawdowns,
+            medianWithdrawalRate: result.aggregates.medianWithdrawalRate
         }
     });
 }
@@ -960,6 +989,29 @@ function computeKpiDelta(low, high) {
     assertEqual(postSuiteData02.sourceReference, 'post-suite-data-05-v1', 'Suite-Data Slice 02 snapshot must reference the prior Suite-Data snapshot');
     assertEqual(postSuiteData02.reviewStatus, 'pending', 'Codex must not mark its own Suite-Data Slice 02 snapshot as reviewed');
     assertJsonEqual(postSuiteData02.carResult, postSuiteData05.carResult, 'Suite-Data Slice 02 must retain the direct-runner CaR reference exactly');
+    const suiteData11Entries = deltaLedger.entries.filter(entry => entry.sliceId === 'SUITE-DATA-11');
+    assertEqual(suiteData11Entries.length, 1, 'Suite-Data Slice 11 must ledger its optimizer-metric snapshot delta separately');
+    for (const field of deltaLedger.requiredEntryFields) {
+        assert(Object.prototype.hasOwnProperty.call(suiteData11Entries[0], field), `Suite-Data Slice 11 delta entry must contain ${field}`);
+    }
+    assertEqual(suiteData11Entries[0].sourceReference, 'post-suite-data-02-v1', 'Suite-Data Slice 11 must retain the prior Suite-Data reference');
+    assertEqual(suiteData11Entries[0].targetReference, 'post-suite-data-11-v1', 'Suite-Data Slice 11 must target a separate versioned snapshot');
+    assertEqual(postSuiteData11.sourceReference, 'post-suite-data-02-v1', 'Suite-Data Slice 11 snapshot must reference the prior Suite-Data snapshot');
+    assertEqual(postSuiteData11.reviewStatus, 'pending', 'Codex must not mark its own Suite-Data Slice 11 snapshot as reviewed');
+    assertEqual(postSuiteData11.resourceEvidence.profileName, 'standard', 'Suite-Data Slice 11 resource evidence must use the standard profile');
+    assertEqual(postSuiteData11.resourceEvidence.runs, 100000, 'Suite-Data Slice 11 resource evidence must measure 100000 runs');
+    assertEqual(postSuiteData11.resourceEvidence.bufferBytesPerRun, 106, 'Suite-Data Slice 11 resource evidence must retain the exact transfer-buffer size');
+    assertClose(
+        postSuiteData11.resourceEvidence.measuredWorkerPayloadBytesPerRun,
+        977.62585,
+        0,
+        'Suite-Data Slice 11 resource evidence must retain the measured total worker payload'
+    );
+    assertEqual(
+        postSuiteData11.result.resourceContract.measuredWorkerResultBytesPerRun,
+        Math.round(postSuiteData11.resourceEvidence.measuredWorkerPayloadBytesPerRun),
+        'Suite-Data Slice 11 resource contract must round the measured worker payload'
+    );
     const slice12Entries = deltaLedger.entries.filter(entry => entry.sliceId === '12');
     assertEqual(slice12Entries.length, 1, 'Slice 12 must ledger the integrated final candidate separately');
     for (const field of deltaLedger.requiredEntryFields) {
@@ -1064,6 +1116,11 @@ if (process.env.MC_PRINT_FINAL === '1') {
     console.log(JSON.stringify({ dataVersion: actualDataVersion, result: finalCandidateSnapshotProjection(fixedWorkerResult) }, null, 2));
     console.log('__MONTE_CARLO_V1_FINAL_CAPTURE_END__');
 }
+if (process.env.MC_PRINT_SUITE_DATA_11 === '1') {
+    console.log('__POST_SUITE_DATA_11_CAPTURE_START__');
+    console.log(JSON.stringify({ dataVersion: actualDataVersion, result: autoOptimizeMetricsSnapshotProjection(fixedWorkerResult) }, null, 2));
+    console.log('__POST_SUITE_DATA_11_CAPTURE_END__');
+}
 assertJsonEqual(actualDataVersion, postSlice03.metadata.dataVersion, 'Post-Slice-03 data version must match');
 assert(preHardening.result !== null, 'Immutable pre-hardening result must remain captured');
 assertEqual(preHardening.result.bufferBytesPerRun, 63, 'Immutable pre-hardening buffer evidence must remain unchanged');
@@ -1078,8 +1135,11 @@ assertEqual(postSlice05.result.bufferBytesPerRun, 75, 'Immutable Post-Slice-05 r
 assertJsonEqual(actualDataVersion, postSlice06.metadata.dataVersion, 'Post-Slice-06 data version must match');
 assertEqual(postSlice06.result.bufferBytesPerRun, 75, 'Immutable Post-Slice-06 reference retains its buffer evidence');
 assertJsonEqual(actualDataVersion, postSlice07.metadata.dataVersion, 'Post-Slice-07 data version must match');
+const priorCarProjection = canonicalize(actualSlice07Result);
+priorCarProjection.bufferBytes = postSuiteData02.carResult.bufferBytes;
+priorCarProjection.bufferBytesPerRun = postSuiteData02.carResult.bufferBytesPerRun;
 compareSnapshotNode(
-    actualSlice07Result,
+    priorCarProjection,
     postSuiteData02.carResult,
     'result',
     sameRuntime,
@@ -1089,12 +1149,23 @@ assertJsonEqual(actualDataVersion, finalCandidate.metadata.dataVersion, 'Final c
 assertEqual(MONTE_CARLO_SNAPSHOT_POLICY.finalCandidate, finalCandidate.snapshotId, 'Public snapshot policy must name the integrated final candidate');
 assertEqual(MONTE_CARLO_SNAPSHOT_POLICY.currentReference, postSuiteData02.snapshotId, 'Public snapshot policy must name the current Suite-Data reference');
 const actualFinalProjection = finalCandidateSnapshotProjection(fixedWorkerResult);
+const priorFinalProjection = canonicalize(actualFinalProjection);
+priorFinalProjection.resourceContract.measuredWorkerResultBytesPerRun = postSuiteData02.result.resourceContract.measuredWorkerResultBytesPerRun;
+priorFinalProjection.result.bufferBytesPerRun = postSuiteData02.result.result.bufferBytesPerRun;
+delete priorFinalProjection.result.riskKpis.maximumDrawdownPct.distribution;
 compareSnapshotNode(
-    actualFinalProjection,
+    priorFinalProjection,
     postSuiteData02.result,
     'postSuiteData02.result',
     sameRuntime,
     postSuiteData02.metadata.numericTolerance
+);
+compareSnapshotNode(
+    autoOptimizeMetricsSnapshotProjection(fixedWorkerResult),
+    postSuiteData11.result,
+    'postSuiteData11.result',
+    sameRuntime,
+    postSuiteData11.metadata.numericTolerance
 );
 
 const directChunk = await runMonteCarloChunk({

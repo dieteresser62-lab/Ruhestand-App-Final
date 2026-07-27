@@ -32,7 +32,7 @@ export const MONTE_CARLO_PARAMETER_LIMITS = Object.freeze({
         maximum: HISTORICAL_YEAR_MAXIMUM
     }),
     startYearHalfLife: Object.freeze({ minimum: 5, default: 20, maximum: 50 }),
-    measuredWorkerResultBytesPerRun: 419
+    measuredWorkerResultBytesPerRun: 978
 });
 
 export const MONTE_CARLO_SAMPLING_METHODS = Object.freeze([

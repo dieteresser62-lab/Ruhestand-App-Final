@@ -31,7 +31,11 @@ import { getCommonInputs, prepareHistoricalData } from './simulator-portfolio.js
 import { latinHypercubeSample, generateNeighborsReduced } from './auto-optimize-sampling.js';
 import { evaluateCandidate } from './auto-optimize-evaluate.js';
 import { CandidateCache, tieBreaker } from './auto-optimize-utils.js';
-import { checkConstraints, getObjectiveValue } from './auto-optimize-metrics.js';
+import {
+    checkConstraints,
+    getObjectiveValue,
+    requireAutoOptimizeMetricValue
+} from './auto-optimize-metrics.js';
 import {
     AUTO_OPTIMIZE_DYNAMIC_FLEX_PARAM_KEYS,
     assertAutoOptimizeParameterRanges,
@@ -143,20 +147,23 @@ function deriveSeedArrays(baseSeed, trainCount, confirmationCount) {
 }
 
 function computeDynamicFlexSafetyPenalty(results, objective) {
-    const sr = Number(results?.successProbFloor);
-    const dd = Number(results?.worst5Drawdown);
-    const ts = Number(results?.timeShareWRgt45);
-    const wr = Number(results?.medianWithdrawalRate);
+    const sr = requireAutoOptimizeMetricValue(results, 'successProbFloor', 'Success Rate');
+    const dd = requireAutoOptimizeMetricValue(results, 'worst5Drawdown', 'Drawdown P90');
+    const ts = requireAutoOptimizeMetricValue(results, 'timeShareWRgt45', 'Time Share WR > 4,5 %');
+    const wr = requireAutoOptimizeMetricValue(results, 'medianWithdrawalRate', 'Median Withdrawal Rate');
 
-    const srPenalty = Number.isFinite(sr) ? Math.max(0, (0.97 - sr) / 0.05) : 0;
-    const ddPenalty = Number.isFinite(dd) ? Math.max(0, (dd - 0.50) / 0.20) : 0;
-    const tsPenalty = Number.isFinite(ts) ? Math.max(0, (ts - 0.12) / 0.20) : 0;
-    const wrPenalty = Number.isFinite(wr) ? Math.max(0, (wr - 0.055) / 0.020) : 0;
+    const srPenalty = Math.max(0, (0.97 - sr) / 0.05);
+    const ddPenalty = Math.max(0, (dd - 0.50) / 0.20);
+    const tsPenalty = Math.max(0, (ts - 0.12) / 0.20);
+    const wrPenalty = Math.max(0, (wr - 0.055) / 0.020);
     const combined = (0.30 * srPenalty) + (0.35 * ddPenalty) + (0.25 * tsPenalty) + (0.10 * wrPenalty);
     if (combined <= 0) return 0;
 
     if (objective?.metric === 'EndWealth_P50' || objective?.metric === 'EndWealth_P25') {
-        const wealthBase = Math.max(50000, Number(results?.medianEndWealth) || 0);
+        const wealthBase = Math.max(
+            50000,
+            requireAutoOptimizeMetricValue(results, 'medianEndWealth', 'Medianes Endvermoegen')
+        );
         return wealthBase * Math.min(0.75, combined * 0.35);
     }
     return Math.min(0.8, combined * 0.2);

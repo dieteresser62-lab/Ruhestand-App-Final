@@ -147,6 +147,17 @@
       "reviewStatus": "pending"
     },
     {
+      "sliceId": "SUITE-DATA-11",
+      "sourceReference": "post-suite-data-02-v1",
+      "targetReference": "post-suite-data-11-v1",
+      "fieldPath": "buffers.{meanWithdrawalRateRatio,withdrawalRateObservationCount,meanWithdrawalRateMissingness}/pathSummaries.meanWithdrawalRateRatio/pathMissingness.meanWithdrawalRateRatio/aggregates.{finalOutcomes,maxDrawdowns,medianWithdrawalRate}/resourceContract.measuredWorkerResultBytesPerRun",
+      "formulaBefore": "the canonical path result retained no per-run realized withdrawal-rate statistic; optimizer end-wealth P25 reused P10, drawdown seed batches were averaged from batch quantiles and Median_WR was the constant zero",
+      "formulaAfter": "each evaluable run retains the arithmetic mean of finite realized withdrawal rates from calculated decumulation years, including the actual terminal ruin year with jahresEntnahmeEffektiv (the actual payout only) as its numerator, plus observation count and explicit missingness; canonical raw final-wealth and drawdown distributions exclude and classify technical paths; pooled linear-interpolation quantiles and the D-14 across-run median feed a strictly versioned, numeric-only optimizer contract whose safety penalty rejects a missing withdrawal rate",
+      "expectedDirection": "transfer buffers grow exactly from 93 to 106 bytes per run; the 100000-run standard measurement records 977.62585 total worker-result bytes per run and the resource contract rounds this to 978; existing non-ruin financial paths and previously captured KPIs remain exact; actual ruin paths retain their terminal observation while a pre-payout ruin contributes an observed zero payout rather than residual wealth, technical paths can no longer improve end-wealth or drawdown ranking through zero initialization, and the now-active withdrawal-rate safety term may change candidate rankings",
+      "goldenCaseIds": ["GC-RISK-01", "GC-CAR-01"],
+      "reviewStatus": "pending"
+    },
+    {
       "sliceId": "12",
       "sourceReference": "post-slice-07-v1",
       "targetReference": "monte-carlo-v1-final",

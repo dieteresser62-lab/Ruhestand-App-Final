@@ -111,7 +111,9 @@ function buildRuinOutcome({
     marketDataCurrentYear,
     reason,
     requiredFloorNominal,
-    coveredFloorNominal
+    coveredFloorNominal,
+    effectiveWithdrawalNominal,
+    depotValueNominal
 }) {
     const terminalPortfolio = { ...portfolio, liquiditaet: euros(liquiditaet) };
     const normalizedRequiredFloor = euros(Math.max(0, Number(requiredFloorNominal) || 0));
@@ -119,6 +121,14 @@ function buildRuinOutcome({
         0,
         Math.min(normalizedRequiredFloor, Number(coveredFloorNominal) || 0)
     ));
+    const normalizedEffectiveWithdrawal = euros(Math.max(
+        0,
+        Math.min(normalizedCoveredFloor, Number(effectiveWithdrawalNominal) || 0)
+    ));
+    const normalizedDepotValue = Math.max(0, Number(depotValueNominal) || 0);
+    const realizedWithdrawalRate = normalizedDepotValue > 0
+        ? normalizedEffectiveWithdrawal / normalizedDepotValue
+        : 0;
     return {
         kind: SIMULATOR_YEAR_OUTCOME_KINDS.RUIN,
         isRuin: true,
@@ -126,7 +136,16 @@ function buildRuinOutcome({
         ruinDetails: {
             requiredFloorNominal: normalizedRequiredFloor,
             coveredFloorNominal: normalizedCoveredFloor,
-            shortfallNominal: euros(Math.max(0, normalizedRequiredFloor - normalizedCoveredFloor))
+            shortfallNominal: euros(Math.max(0, normalizedRequiredFloor - normalizedCoveredFloor)),
+            effectiveWithdrawalNominal: normalizedEffectiveWithdrawal,
+            depotValueNominal: normalizedDepotValue,
+            realizedWithdrawalRate
+        },
+        logData: {
+            entnahmequote: realizedWithdrawalRate,
+            entnahme_effektiv: normalizedEffectiveWithdrawal,
+            depotwert_gesamt: normalizedDepotValue,
+            terminal_ruin_year: true
         },
         newState: {
             ...currentState,
@@ -660,7 +679,13 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             marketDataCurrentYear,
             reason: `Gesamtvermögen (${formatInteger(totalWealthAvailable)}) < Floor (${formatInteger(netFloorYear)})`,
             requiredFloorNominal: netFloorYear,
-            coveredFloorNominal: totalWealthAvailable
+            coveredFloorNominal: totalWealthAvailable,
+            // D-14 measures the amount actually paid out. This ruin branch
+            // terminates before the payout step, so the realized withdrawal
+            // is exactly zero even if residual wealth could cover part of the
+            // floor.
+            effectiveWithdrawalNominal: 0,
+            depotValueNominal: depotwertGesamt
         });
     }
 
@@ -700,7 +725,11 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             marketDataCurrentYear,
             reason: payoutFallback.reason,
             requiredFloorNominal: netFloorYear,
-            coveredFloorNominal: jahresEntnahmeEffektiv + equityAfterBuys + goldAfterBuys
+            coveredFloorNominal: jahresEntnahmeEffektiv + equityAfterBuys + goldAfterBuys,
+            // Assets that remain after the partial payout are coverage
+            // capacity, not an effective withdrawal.
+            effectiveWithdrawalNominal: jahresEntnahmeEffektiv,
+            depotValueNominal: depotwertGesamt
         });
     }
     liquiditaet = payoutFallback.liquiditaet;

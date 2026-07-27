@@ -817,6 +817,33 @@ try {
     assertEqual(result.ruinDetails.requiredFloorNominal, 24000, 'ruin diagnostics expose the required nominal floor');
     assertEqual(result.ruinDetails.coveredFloorNominal, 0, 'ruin diagnostics expose covered floor capacity');
     assertEqual(result.ruinDetails.shortfallNominal, 24000, 'ruin diagnostics expose the lossless floor shortfall');
+    assertEqual(result.logData.entnahmequote, 0, 'zero-depot ruin should preserve the canonical zero-denominator policy');
+
+    const prePayoutRuinState = JSON.parse(JSON.stringify(state));
+    prePayoutRuinState.portfolio.depotTranchesAktien = [
+        { marketValue: 1000, costBasis: 1000, type: 'aktien_alt' }
+    ];
+    prePayoutRuinState.portfolio.depotTranchesGold = [];
+    prePayoutRuinState.portfolio.liquiditaet = 20000;
+    const prePayoutRuin = simulateOneYear(
+        prePayoutRuinState,
+        inputs,
+        { ...yearDataNormal, rendite: 0, zinssatz: 0 },
+        0
+    );
+    assert(prePayoutRuin.isRuin, 'partial floor coverage should still end in ruin');
+    assertEqual(prePayoutRuin.ruinDetails.coveredFloorNominal, 21000,
+        'pre-payout ruin should retain residual wealth only as floor coverage');
+    assertEqual(prePayoutRuin.ruinDetails.effectiveWithdrawalNominal, 0,
+        'pre-payout ruin should report no effective withdrawal before any payout');
+    assertEqual(prePayoutRuin.ruinDetails.depotValueNominal, 1000,
+        'pre-payout ruin should preserve the canonical depot denominator');
+    assertEqual(prePayoutRuin.logData.entnahme_effektiv, 0,
+        'D-14 numerator should be the actual zero payout, not residual wealth');
+    assertEqual(prePayoutRuin.logData.entnahmequote, 0,
+        'pre-payout terminal year should retain its observed zero D-14 rate');
+    assert(prePayoutRuin.logData.terminal_ruin_year === true,
+        'ruin-year log data should remain explicitly terminal');
     console.log('✅ Ruin detection passed');
 } catch (e) {
     console.error('Test 2 Failed', e);

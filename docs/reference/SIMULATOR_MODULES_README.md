@@ -168,7 +168,7 @@ DOM-freier Eingangs- und Ressourcenvertrag fuer alle Monte-Carlo-Consumer.
 **Hauptfunktionen / Exporte:**
 - `normalizeMonteCarloParametersV1()` – validiert ganze, endliche Werte ohne Suffixe, alle erlaubten Enums und Booleans sowie Run-, Mortalitaetshorizont-, Block-, Seed- und Startjahrabhaengigkeiten; Default sind 10.000 Runs.
 - `normalizeMonteCarloResourceConfigV1()` / `resolveMonteCarloWorkerCountV1()` – validieren 0=auto beziehungsweise 1-32 Worker und 50-5.000 ms Jobbudget; auch die Hardware-Automatik endet bei 32 Workern.
-- `estimateMonteCarloResourcesV1()` – liefert Run-Jahre, eine auf 419 gemessenen Result-Bytes je Run basierende MiB-Schaetzung, Speicherklasse, Belastungsstufe und das Bestaetigungsflag oberhalb 100.000 Runs.
+- `estimateMonteCarloResourcesV1()` – liefert Run-Jahre, eine auf 978 gerundeten Result-Bytes je Run basierende MiB-Schaetzung (Standardmessung Slice 11: 977,62585 Byte je Run), Speicherklasse, Belastungsstufe und das Bestaetigungsflag oberhalb 100.000 Runs.
 
 **Einbindung:** `monte-carlo-ui.js`, `monte-carlo-runner.js`, `workers/mc-worker.js` und `auto-optimize-worker.js` rufen denselben Contract auf. Kein Consumer darf Parameter per `parseInt` teilakzeptieren oder fachliche Werte still begrenzen.
 
@@ -462,10 +462,10 @@ Auto-Optimierung für Parameter (LHS + Verfeinerung) und UI-Bedienung. Details s
 Die Logik wurde in spezialisierte Module zerlegt, um Wartbarkeit und Testbarkeit zu erhöhen:
 
 - `auto-optimize-worker.js` – Der Worker-To-Main-Adapter. Nutzt den gemeinsamen `workers/mc-worker.js`-Jobtyp `job`, merged MC-Buffers/Heatmap/Totals/Listen fuer Kandidaten-Evaluationen und faellt bei Worker-Fehlern auf seriell zurueck.
-- `auto-optimize-evaluate.js` – Bewertet Kandidaten anhand der Zielfunktion (Score-Berechnung).
-- `auto-optimize-metrics.js` – Definiert Metriken (Success Rate, Median End Wealth) und Constraints.
+- `auto-optimize-evaluate.js` – Bewertet Kandidaten anhand gepoolter kanonischer MC-Rohverteilungen. `AutoOptimizeMetricResultV1` weist Endvermoegensquantile, P90-Drawdown, D-14-Entnahmequote, Stichprobengroessen und Missingness aus. `MonteCarloFinancialRunDistributionV1` entfernt technische Pfade aus Endvermoegen und Drawdown, inventarisiert die Ausschluesse und laesst den Optimizer bei technischer Missingness fail-closed abbrechen. D-14 nimmt das tatsaechlich berechnete finale Ruinjahr auf; dessen Quote verwendet nur die tatsaechlich ausgezahlte `jahresEntnahmeEffektiv` und den Depotwert vor Auszahlung. Ein Ruin vor der Auszahlung bleibt als beobachtete Nullauszahlung enthalten. Safety-Penalty und Tiebreaker akzeptieren nur endliche primitive Zahlen aus beidseitig versionierten Resultaten.
+- `auto-optimize-metrics.js` – Definiert Objective- und Constraint-Reader fuer den flachen versionierten Metrikshape. Endvermoegensquantile verwenden lineare Interpolation bei `(n-1)q`; fehlende Werte werden niemals als guenstige 0 eingesetzt.
 - `auto-optimize-sampling.js` – Algorithmen für die Kandidatengenerierung (Latin Hypercube, Nachbarschaft).
-- `auto-optimize-utils.js` – Hilfsfunktionen (Caching, Logging, ID-Generierung).
+- `auto-optimize-utils.js` – Hilfsfunktionen (Caching, Logging, ID-Generierung) sowie der versionierte Tiebreaker auf Success Rate, realem `worst5Drawdown` und Zeitanteil oberhalb 4,5 Prozent.
 - `auto-optimize-params.js` – Definition der Parameter-Räume und Mapping (UI <-> Intern).
 - `auto-optimize-presets.js` – DOM-freie Preset-Definitionen fuer die UI.
 - `auto-optimize-param-meta.js` – Parameter-Optionen, Labels, Units, Dynamic-Flex-Keys und Apply-Mapping.
