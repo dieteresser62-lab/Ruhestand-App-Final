@@ -25,6 +25,7 @@ function finiteOrDefault(value, fallback) {
 }
 
 function normalizeMethod(method) {
+    if (method === 'direct') return 'direct';
     return method === 'mean' ? 'mean' : 'survival_quantile';
 }
 
@@ -56,6 +57,7 @@ function deriveRawHorizon(inputs, context, quantileOverride = null) {
     if (inputs?.dynamicFlex !== true) return fallback;
 
     const method = normalizeMethod(inputs?.horizonMethod);
+    if (method === 'direct') return fallback;
     const quantile = clamp(
         finiteOrDefault(quantileOverride, finiteOrDefault(inputs?.survivalQuantile, 0.85)),
         0.5,
@@ -125,11 +127,14 @@ export function resolveDynamicFlexRunnerHorizon(inputs, context = {}) {
     const rawHorizon = deriveRawHorizon(inputs, context);
     const method = normalizeMethod(inputs?.horizonMethod);
     const quantile = clamp(finiteOrDefault(inputs?.survivalQuantile, 0.85), 0.5, 0.99);
+    const configuredLongevityMode = inputs?.longevityMode || 'none';
     const adjustment = applyLongevityHorizonAdjustment({
         horizonYearsRaw: rawHorizon,
         survivalQuantile: quantile,
         horizonMethod: method,
-        settings: inputs,
+        // A direct request is already the final explicit horizon. Longevity
+        // adjustments only apply to actuarially derived horizons.
+        settings: method === 'direct' ? { longevityMode: 'none' } : inputs,
         recomputeHorizonForQuantile: shiftedQuantile => deriveRawHorizon(inputs, context, shiftedQuantile)
     });
 
@@ -142,7 +147,13 @@ export function resolveDynamicFlexRunnerHorizon(inputs, context = {}) {
         };
     }
 
-    const diagnostics = { ...adjustment.diagnostics };
+    const diagnostics = {
+        ...adjustment.diagnostics,
+        horizonMethod: method,
+        directInputApplicable: method === 'direct',
+        longevityConfiguredMode: configuredLongevityMode,
+        longevityIgnoredForDirect: method === 'direct' && configuredLongevityMode !== 'none'
+    };
     let horizonYears = diagnostics.horizonYears;
     if (
         diagnostics.longevityMode !== 'none' &&

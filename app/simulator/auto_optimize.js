@@ -3,7 +3,8 @@
  * Purpose: Central logic for the auto-optimization feature.
  *          Implements Latin Hypercube Sampling (LHS), candidate filtering, and multi-stage evaluation (Quick -> Full -> Refine -> Validate).
  * Usage: Called by auto_optimize_ui.js to run the optimization process.
- * Dependencies: auto-optimize-metrics.js, auto-optimize-params.js, auto-optimize-evaluate.js, auto-optimize-sampling.js
+ * Dependencies: auto-optimize-metrics.js, auto-optimize-param-meta.js,
+ *               auto-optimize-evaluate.js, auto-optimize-sampling.js
  */
 // Note: This module uses Promise.all batching for candidate evaluation,
 // not WebWorker-based parallelism. See worker-job-runner.js for the
@@ -27,11 +28,20 @@
 
 import { rng } from './simulator-utils.js';
 import { getCommonInputs, prepareHistoricalData } from './simulator-portfolio.js';
-import { isValidCandidate } from './auto-optimize-params.js';
 import { latinHypercubeSample, generateNeighborsReduced } from './auto-optimize-sampling.js';
 import { evaluateCandidate } from './auto-optimize-evaluate.js';
 import { CandidateCache, tieBreaker } from './auto-optimize-utils.js';
 import { checkConstraints, getObjectiveValue } from './auto-optimize-metrics.js';
+import {
+    AUTO_OPTIMIZE_DYNAMIC_FLEX_PARAM_KEYS,
+    assertAutoOptimizeParameterRanges,
+    createAutoOptimizeParameterFingerprint,
+    createAutoOptimizeRequestFingerprint,
+    isAutoOptimizeCandidateValid,
+    readAutoOptimizeCandidateFromInputs
+} from './auto-optimize-param-meta.js';
+import { normalizeMonteCarloParametersV1 } from './monte-carlo-parameters.js';
+import { readMonteCarloParameters } from './monte-carlo-ui.js';
 
 export { getObjectiveValue } from './auto-optimize-metrics.js';
 
@@ -52,10 +62,84 @@ function applyDynamicFlexMode(baseInputs, modeRaw) {
     return { inputs: resolved, mode };
 }
 
-const DYNAMIC_FLEX_OPTIMIZER_KEYS = new Set(['horizonYears', 'survivalQuantile', 'goGoMultiplier']);
-
 function hasDynamicFlexOptimizerParams(params) {
-    return Object.keys(params || {}).some(key => DYNAMIC_FLEX_OPTIMIZER_KEYS.has(key));
+    return Object.keys(params || {}).some(key => AUTO_OPTIMIZE_DYNAMIC_FLEX_PARAM_KEYS.has(key));
+}
+
+const AUTO_OPTIMIZE_EVALUATION_CONTRACT_VERSION = 'AutoOptimizeEvaluationContractV1';
+const AUTO_OPTIMIZE_SEED_CONTRACT_VERSION = 'AutoOptimizeSeedContractV1';
+const CONFIRMATION_SEED_OFFSET = 0x9E3779B9;
+
+function readControlChecked(id, fallback, doc = globalThis.document) {
+    const element = doc?.getElementById?.(id);
+    return element ? element.checked === true : fallback;
+}
+
+function buildAutoOptimizeEvaluationContract({
+    runsPerCandidate,
+    maxDauer,
+    baseInputs,
+    modelAssumptions = null,
+    doc = globalThis.document
+}) {
+    const suppliedParameters = modelAssumptions?.monteCarloParameters;
+    const rawParameters = suppliedParameters || readMonteCarloParameters(baseInputs);
+    const monteCarloParameters = normalizeMonteCarloParametersV1({
+        ...rawParameters,
+        anzahl: runsPerCandidate,
+        maxDauer
+    }, { inputs: baseInputs });
+    const useCapeSampling = modelAssumptions?.useCapeSampling === undefined
+        ? readControlChecked('useCapeSampling', false, doc)
+        : modelAssumptions.useCapeSampling === true;
+
+    return Object.freeze({
+        schemaVersion: AUTO_OPTIMIZE_EVALUATION_CONTRACT_VERSION,
+        source: suppliedParameters ? 'explicit_canonical_request' : 'main_monte_carlo_controls',
+        monteCarloParameters,
+        useCapeSampling,
+        dataFilter: Object.freeze({
+            startYearMode: monteCarloParameters.startYearMode,
+            startYearFilter: monteCarloParameters.startYearFilter,
+            startYearHalfLife: monteCarloParameters.startYearHalfLife,
+            excludeEstimatedHistory: monteCarloParameters.excludeEstimatedHistory
+        }),
+        fixedModelAssumptions: Object.freeze({
+            capeRatio: Number.isFinite(Number(baseInputs?.marketCapeRatio))
+                ? Number(baseInputs.marketCapeRatio)
+                : (Number.isFinite(Number(baseInputs?.capeRatio)) ? Number(baseInputs.capeRatio) : null),
+            stressPreset: baseInputs?.stressPreset ?? 'NONE',
+            dynamicFlex: baseInputs?.dynamicFlex === true,
+            horizonMethod: baseInputs?.horizonMethod ?? 'survival_quantile',
+            maxDauer
+        })
+    });
+}
+
+function deriveSeedArrays(baseSeed, trainCount, confirmationCount) {
+    if (!Number.isSafeInteger(trainCount) || trainCount < 1 || trainCount > 20) {
+        throw new TypeError('Train-Seeds muessen als ganze Zahl zwischen 1 und 20 angegeben werden.');
+    }
+    if (!Number.isSafeInteger(confirmationCount) || confirmationCount < 1 || confirmationCount > 20) {
+        throw new TypeError('Bestaetigungsseeds muessen als ganze Zahl zwischen 1 und 20 angegeben werden.');
+    }
+    const trainSeeds = Array.from({ length: trainCount }, (_, index) => (baseSeed + index) >>> 0);
+    const confirmationSeeds = Array.from(
+        { length: confirmationCount },
+        (_, index) => (baseSeed + CONFIRMATION_SEED_OFFSET + index) >>> 0
+    );
+    const trainSet = new Set(trainSeeds);
+    if (confirmationSeeds.some(seed => trainSet.has(seed))) {
+        throw new Error('Train- und Bestaetigungsseeds muessen disjunkt sein.');
+    }
+    return Object.freeze({
+        schemaVersion: AUTO_OPTIMIZE_SEED_CONTRACT_VERSION,
+        baseSeed,
+        derivation: 'train=uint32(base+i); confirmation=uint32(base+0x9E3779B9+i)',
+        trainSeeds: Object.freeze(trainSeeds),
+        confirmationSeeds: Object.freeze(confirmationSeeds),
+        disjoint: true
+    });
 }
 
 function computeDynamicFlexSafetyPenalty(results, objective) {
@@ -102,9 +186,10 @@ export async function runAutoOptimize(config) {
         dynamicFlexMode = 'inherit',
         safetyGuards = true,
         onProgress = () => { },
-        evaluateCandidateFn
+        evaluateCandidateFn,
+        modelAssumptions = null
     } = config;
-    const evaluate = evaluateCandidateFn || evaluateCandidate;
+    const evaluateImplementation = evaluateCandidateFn || evaluateCandidate;
 
     // Prepare historical data
     prepareHistoricalData();
@@ -118,16 +203,56 @@ export async function runAutoOptimize(config) {
     if (usesDynamicFlexParams && baseInputs.dynamicFlex !== true) {
         throw new Error('Dynamic-Flex Parameter im Optimizer gewaehlt, aber Dynamic Flex ist nicht aktiv (Mode=force_on oder aktive Rahmendaten erforderlich).');
     }
+    assertAutoOptimizeParameterRanges(params, baseInputs);
 
-    // Gold Cap aus Config
-    const goldCap = baseInputs.goldAllokationProzent || 10;
+    // Validate the comparison configuration before generating or evaluating
+    // candidates so invalid framework data cannot discard a completed run.
+    const currentConfig = readAutoOptimizeCandidateFromInputs(params, baseInputs);
+
+    const evaluationContract = buildAutoOptimizeEvaluationContract({
+        runsPerCandidate,
+        maxDauer,
+        baseInputs,
+        modelAssumptions
+    });
+    const seedContract = deriveSeedArrays(
+        evaluationContract.monteCarloParameters.seed,
+        seedsTrain,
+        seedsTest
+    );
+    const trainSeedArray = seedContract.trainSeeds;
+    const testSeedArray = seedContract.confirmationSeeds;
+
+    const evaluate = async (candidate, evaluationInputs, runs, duration, seeds, activeConstraints = null) => {
+        const results = await evaluateImplementation(
+            candidate,
+            evaluationInputs,
+            runs,
+            duration,
+            seeds,
+            activeConstraints,
+            evaluationContract
+        );
+        if (results?.parameterFidelity) {
+            const expectedParameterFingerprint = createAutoOptimizeParameterFingerprint(candidate);
+            const expectedRequestFingerprint = createAutoOptimizeRequestFingerprint(candidate);
+            if (
+                results.parameterFidelity.parameterFingerprint !== expectedParameterFingerprint
+                || results.parameterFidelity.requestFingerprint !== expectedRequestFingerprint
+            ) {
+                const error = new Error('Evaluate-Request weicht vom kanonischen Kandidatenfingerprint ab.');
+                error.code = 'AUTO_OPTIMIZE_EVALUATE_FINGERPRINT_MISMATCH';
+                throw error;
+            }
+        }
+        return results;
+    };
+
+    // Gold bleibt innerhalb des kanonischen Prozentvertrags.
+    const goldCap = 50;
 
     // RNG für LHS
     const rand = rng(42);
-
-    // Seeds generieren
-    const trainSeedArray = Array.from({ length: seedsTrain }, (_, i) => 42 + i);
-    const testSeedArray = Array.from({ length: seedsTest }, (_, i) => 420 + i);
 
     // Cache
     const cache = new CandidateCache();
@@ -142,9 +267,14 @@ export async function runAutoOptimize(config) {
         // Dynamically copy all parameters from sample
         const candidate = { ...sample };
 
-        if (isValidCandidate(candidate, goldCap)) {
+        if (isAutoOptimizeCandidateValid(candidate, goldCap, baseInputs)) {
             validCandidates.push(candidate);
         }
+    }
+    if (validCandidates.length === 0) {
+        const error = new Error('Kein gueltiger Kandidat: Suchbereiche und Runway-Reihenfolge passen nicht zu den Rahmendaten.');
+        error.code = 'AUTO_OPTIMIZE_CANDIDATE_SET_EMPTY';
+        throw error;
     }
 
     onProgress({ stage: 'quick_filter', progress: 0, total: validCandidates.length });
@@ -255,7 +385,7 @@ export async function runAutoOptimize(config) {
     for (const entry of top5) {
         const neighbors = generateNeighborsReduced(entry.candidate, params);
         for (const neighbor of neighbors) {
-            if (isValidCandidate(neighbor, goldCap)) {
+            if (isAutoOptimizeCandidateValid(neighbor, goldCap, baseInputs)) {
                 refineCandidates.add(JSON.stringify(neighbor));
             }
         }
@@ -352,45 +482,25 @@ export async function runAutoOptimize(config) {
     });
 
     const champion = validated[0];
+    const parameterFidelity = Object.freeze({
+        schemaVersion: 'AutoOptimizeChampionFidelityV1',
+        parameterFingerprint: createAutoOptimizeParameterFingerprint(champion.candidate),
+        requestFingerprint: createAutoOptimizeRequestFingerprint(champion.candidate)
+    });
+    Object.defineProperties(champion.candidate, {
+        __autoOptimizeParameterFingerprint: {
+            value: parameterFidelity.parameterFingerprint,
+            enumerable: false
+        },
+        __autoOptimizeRequestFingerprint: {
+            value: parameterFidelity.requestFingerprint,
+            enumerable: false
+        }
+    });
 
     // Stabilität: Wie oft war Champion in den Top-3 über verschiedene Seed-Kombinationen?
     // Vereinfachte Metrik: Verhältnis Train-Objective zu Test-Objective
     const stability = Math.min(1, champion.trainObjValue / (champion.testObjValue + 0.0001));
-
-    // Delta vs. Current - dynamically build current config from baseInputs
-    const currentConfig = {};
-
-    // Map all possible parameters from baseInputs to candidate format
-    if (params.runwayMinM !== undefined) {
-        currentConfig.runwayMinM = baseInputs.runwayMinMonths || 24;
-    }
-    if (params.runwayTargetM !== undefined) {
-        currentConfig.runwayTargetM = baseInputs.runwayTargetMonths || 36;
-    }
-    if (params.goldTargetPct !== undefined) {
-        currentConfig.goldTargetPct = baseInputs.goldAllokationProzent || 0;
-    }
-    if (params.targetEq !== undefined) {
-        currentConfig.targetEq = baseInputs.targetEq || 60;
-    }
-    if (params.rebalBand !== undefined) {
-        currentConfig.rebalBand = baseInputs.rebalBand || 5;
-    }
-    if (params.maxSkimPct !== undefined) {
-        currentConfig.maxSkimPct = baseInputs.maxSkimPctOfEq || 25;
-    }
-    if (params.maxBearRefillPct !== undefined) {
-        currentConfig.maxBearRefillPct = baseInputs.maxBearRefillPctOfEq || 50;
-    }
-    if (params.horizonYears !== undefined) {
-        currentConfig.horizonYears = baseInputs.horizonYears || 30;
-    }
-    if (params.survivalQuantile !== undefined) {
-        currentConfig.survivalQuantile = baseInputs.survivalQuantile || 0.85;
-    }
-    if (params.goGoMultiplier !== undefined) {
-        currentConfig.goGoMultiplier = baseInputs.goGoMultiplier || 1.0;
-    }
 
     const currentResults = await evaluate(
         currentConfig,
@@ -409,16 +519,22 @@ export async function runAutoOptimize(config) {
 
     onProgress({ stage: 'done', progress: 1 });
 
+    const reportedEvaluationContract = Object.freeze({
+        ...evaluationContract,
+        seedContract
+    });
     return {
         championCfg: champion.candidate,
         metricsTest: champion.testResults,
         deltaVsCurrent: delta,
         stability,
+        parameterFidelity,
         optimizationContext: {
             dynamicFlexMode: effectiveDynamicFlexMode,
             dynamicFlexActive: baseInputs.dynamicFlex === true,
             safetyGuardsActive,
-            usesDynamicFlexParams
+            usesDynamicFlexParams,
+            evaluationContract: reportedEvaluationContract
         }
     };
 }

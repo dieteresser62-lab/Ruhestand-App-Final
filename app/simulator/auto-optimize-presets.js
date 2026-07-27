@@ -57,7 +57,7 @@ export const AUTO_OPTIMIZE_PRESETS = {
         params: [
             { key: 'targetEq', min: 60, max: 90, step: 5 },
             { key: 'maxSkimPct', min: 20, max: 50, step: 5 },
-            { key: 'maxBearRefillPct', min: 30, max: 70, step: 5 }
+            { key: 'runwayMinM', min: 12, max: 30, step: 3 }
         ]
     },
     drawdown: {
@@ -73,15 +73,13 @@ export const AUTO_OPTIMIZE_PRESETS = {
     },
     dynamicFlexBalanced: {
         name: '🧭 Dynamic Flex',
-        description: 'Optimiert VPW-Parameter mit Safety-Guards',
+        description: 'Optimiert Liquiditaet und Go-Go-Faktor mit Safety-Guards',
         objective: { metric: 'EndWealth_P50', direction: 'max' },
         constraints: { sr99: true, noex: true, ts45: false, dd55: false },
         dynamicFlexMode: 'force_on',
         params: [
-            { key: 'horizonYears', min: 24, max: 36, step: 1 },
-            { key: 'survivalQuantile', min: 0.80, max: 0.92, step: 0.01 },
+            { key: 'runwayTargetM', min: 30, max: 60, step: 3 },
             { key: 'goGoMultiplier', min: 1.00, max: 1.20, step: 0.05 }
         ]
     }
 };
-

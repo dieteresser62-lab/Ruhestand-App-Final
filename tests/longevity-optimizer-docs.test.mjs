@@ -19,6 +19,8 @@ const LONGEVITY_KEYS = [
 // Test 1: Auto-Optimize does not expose Longevity as a selectable parameter in V1.
 {
     const optionKeys = new Set(AUTO_OPTIMIZE_PARAMETER_OPTIONS.map(option => option.key));
+    assert(!optionKeys.has('horizonYears'), 'direct horizon should not be selectable in the actuarial optimizer UI');
+    assert('horizonYears' in AUTO_OPTIMIZE_PARAM_FORM_IDS, 'direct request horizon should retain an apply mapping');
     for (const key of LONGEVITY_KEYS) {
         assert(!optionKeys.has(key), `${key} should not be selectable in Auto-Optimize`);
         assert(!(key in AUTO_OPTIMIZE_PARAM_FORM_IDS), `${key} should not map to a form field`);
@@ -41,20 +43,27 @@ const LONGEVITY_KEYS = [
         }
     };
     const doc = { getElementById: id => controls[id] || null };
-    applyChampionToForm({
-        championCfg: {
-            horizonYears: 35,
-            longevityBufferYears: 8
-        },
-        doc,
-        EventCtor: class {
-            constructor(type) {
-                this.type = type;
+    let error = null;
+    try {
+        applyChampionToForm({
+            championCfg: {
+                horizonYears: 35,
+                longevityBufferYears: 8
+            },
+            doc,
+            EventCtor: class {
+                constructor(type) {
+                    this.type = type;
+                }
             }
-        }
-    });
-    assertEqual(controls.horizonYears.value, 35, 'optimizer should still apply regular Dynamic-Flex horizon');
-    assertEqual(controls.longevityBufferYears.value, '2', 'optimizer should ignore longevityBufferYears');
+        });
+    } catch (caught) {
+        error = caught;
+    }
+    assertEqual(error?.code, 'AUTO_OPTIMIZE_APPLY_PARAMETER_UNKNOWN',
+        'unknown Longevity champion keys should fail closed');
+    assertEqual(controls.horizonYears.value, '30', 'failed apply should not partially mutate direct horizon');
+    assertEqual(controls.longevityBufferYears.value, '2', 'failed apply should preserve Longevity controls');
 }
 
 // Test 3: Sweep variations inherit Longevity from base inputs but cannot override it per combination.

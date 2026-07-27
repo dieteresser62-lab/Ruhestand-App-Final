@@ -27,8 +27,33 @@ function createLocalStorageMock() {
 }
 
 function createDocumentStub() {
+    const controls = {
+        mcBlockSize: { value: '7' },
+        mcAnzahl: { value: '10000' },
+        mcDauer: { value: '35' },
+        mcSeed: { value: '12345' },
+        mcMethode: { value: 'stationary' },
+        rngMode: { value: 'per-run-seed' },
+        mcStartYearMode: { value: 'RECENCY' },
+        mcStartYearFilter: { value: '1980' },
+        mcStartYearHalfLife: { value: '15' },
+        mcExcludeEstimatedHistory: { checked: true },
+        useCapeSampling: { checked: true },
+        runwayMinMonths: { value: '24' },
+        runwayTargetMonths: { value: '36' },
+        targetEq: { value: '60' },
+        rebalBand: { value: '5' },
+        maxSkimPctOfEq: { value: '10' },
+        maxBearRefillPctOfEq: { value: '5' },
+        dynamicFlex: { checked: false },
+        horizonMethod: { value: 'survival_quantile' },
+        horizonYears: { value: '30' },
+        survivalQuantile: { value: '0.85' },
+        goGoActive: { checked: false },
+        goGoMultiplier: { value: '1' }
+    };
     return {
-        getElementById: () => ({ value: '0', checked: false })
+        getElementById: id => controls[id] || ({ value: '0', checked: false })
     };
 }
 
@@ -43,13 +68,20 @@ try {
 
     // Importiere Module
     const { latinHypercubeSample, generateNeighborsReduced } = await import('../app/simulator/auto-optimize-sampling.js');
-    const { isValidCandidate } = await import('../app/simulator/auto-optimize-params.js');
+    const {
+        createAutoOptimizeParameterFingerprint,
+        createAutoOptimizeRequestFingerprint,
+        isAutoOptimizeCandidateValid: isValidCandidate
+    } = await import('../app/simulator/auto-optimize-param-meta.js');
     const { checkConstraints, getObjectiveValue } = await import('../app/simulator/auto-optimize-metrics.js');
     const { CandidateCache, tieBreaker } = await import('../app/simulator/auto-optimize-utils.js');
     const { applyChampionToForm } = await import('../app/simulator/auto-optimize-apply.js');
     const { readAutoOptimizeConfigFromUI } = await import('../app/simulator/auto-optimize-config-ui.js');
     const { AUTO_OPTIMIZE_PRESETS } = await import('../app/simulator/auto-optimize-presets.js');
-    const { formatAutoOptimizeProgress } = await import('../app/simulator/auto-optimize-renderer.js');
+    const {
+        createAutoOptimizeParameterBlock,
+        formatAutoOptimizeProgress
+    } = await import('../app/simulator/auto-optimize-renderer.js');
     const { rng } = await import('../app/simulator/simulator-utils.js');
     const { runAutoOptimize } = await import('../app/simulator/auto_optimize.js');
 
@@ -60,6 +92,16 @@ try {
     {
         assert(AUTO_OPTIMIZE_PRESETS.standard.params.length === 3, 'Standard-Preset sollte drei Parameter enthalten');
         assert(AUTO_OPTIMIZE_PRESETS.dynamicFlexBalanced.dynamicFlexMode === 'force_on', 'Dynamic-Flex-Preset sollte Force-On setzen');
+        assert(
+            !Object.values(AUTO_OPTIMIZE_PRESETS).some(
+                preset => preset.params.some(parameter => parameter.key === 'maxBearRefillPct')
+            ),
+            'Presets sollten die nachweislich wirkungslose Bear-Refill-Dimension nicht anbieten'
+        );
+        assert(
+            !AUTO_OPTIMIZE_PRESETS.dynamicFlexBalanced.params.some(parameter => parameter.key === 'survivalQuantile'),
+            'Dynamic-Flex-Preset sollte auch bei Horizon-Methode mean anwendbar bleiben'
+        );
     }
     console.log('✓ UI presets OK');
 
@@ -69,10 +111,10 @@ try {
         const paramBlock = {
             querySelector(selector) {
                 const values = {
-                    '.ao-param-key': { value: 'horizonYears' },
-                    '.ao-param-min': { value: '24' },
-                    '.ao-param-max': { value: '36' },
-                    '.ao-param-step': { value: '1' }
+                    '.ao-param-key': { value: 'survivalQuantile' },
+                    '.ao-param-min': { value: '0.80' },
+                    '.ao-param-max': { value: '0.92' },
+                    '.ao-param-step': { value: '0.01' }
                 };
                 return values[selector] || null;
             }
@@ -94,7 +136,7 @@ try {
         };
         const doc = { getElementById: (id) => controls[id] || null };
         const config = readAutoOptimizeConfigFromUI(doc);
-        assertEqual(config.params.horizonYears.min, 24, 'Config-Reader sollte Param-Min lesen');
+        assertEqual(config.params.survivalQuantile.min, 0.8, 'Config-Reader sollte Param-Min lesen');
         assertEqual(config.dynamicFlexMode, 'force_on', 'Config-Reader sollte Dynamic-Flex-Modus normalisieren');
 
         controls.ao_dynamic_flex_mode.value = 'inherit';
@@ -118,13 +160,26 @@ try {
 
         const events = [];
         const controls = {
+            dynamicFlex: { checked: true },
+            horizonMethod: { value: 'survival_quantile' },
             runwayMinMonths: { value: '', dispatchEvent: (event) => events.push(['runwayMinMonths', event.type]) },
             goGoMultiplier: { value: '', dispatchEvent: (event) => events.push(['goGoMultiplier', event.type]) },
             goGoActive: { checked: false, dispatchEvent: (event) => events.push(['goGoActive', event.type]) }
         };
         const doc = { getElementById: (id) => controls[id] || null };
+        const championCfg = { runwayMinM: 24, goGoMultiplier: 1.1 };
+        Object.defineProperties(championCfg, {
+            __autoOptimizeParameterFingerprint: {
+                value: createAutoOptimizeParameterFingerprint(championCfg),
+                enumerable: false
+            },
+            __autoOptimizeRequestFingerprint: {
+                value: createAutoOptimizeRequestFingerprint(championCfg),
+                enumerable: false
+            }
+        });
         applyChampionToForm({
-            championCfg: { runwayMinM: 24, goGoMultiplier: 1.1 },
+            championCfg,
             doc,
             EventCtor: class {
                 constructor(type) {
@@ -137,6 +192,71 @@ try {
         assert(events.some(([id]) => id === 'goGoActive'), 'Apply sollte Change-Events dispatchen');
     }
     console.log('✓ UI renderer/apply helpers OK');
+
+    // Test 0d: Neue Parameterbloecke verwenden Registry-Domains
+    console.log('Test 0d: UI renderer domain defaults');
+    {
+        class FakeControl {
+            constructor() {
+                this.value = '';
+                this.min = '';
+                this.max = '';
+                this.step = '';
+                this.listeners = {};
+            }
+            addEventListener(type, listener) {
+                this.listeners[type] = listener;
+            }
+            dispatch(type) {
+                this.listeners[type]?.();
+            }
+        }
+        const controls = {
+            '.ao-param-key': new FakeControl(),
+            '.ao-param-min': new FakeControl(),
+            '.ao-param-max': new FakeControl(),
+            '.ao-param-step': new FakeControl()
+        };
+        const parseAttribute = (tag, name) => tag.match(new RegExp(`${name}="([^"]*)"`))?.[1] ?? '';
+        const doc = {
+            createElement() {
+                return {
+                    style: {},
+                    set innerHTML(markup) {
+                        for (const [selector, control] of Object.entries(controls)) {
+                            const className = selector.slice(1);
+                            const tag = markup.match(new RegExp(`<[^>]+class="${className}"[^>]*>`, 's'))?.[0] || '';
+                            control.value = parseAttribute(tag, 'value');
+                            control.min = parseAttribute(tag, 'min');
+                            control.max = parseAttribute(tag, 'max');
+                            control.step = parseAttribute(tag, 'step');
+                        }
+                        controls['.ao-param-key'].value = markup.match(
+                            /<option value="([^"]+)" selected>/
+                        )?.[1] || markup.match(/<option value="([^"]+)"/)?.[1] || '';
+                    },
+                    querySelector(selector) {
+                        return controls[selector] || null;
+                    }
+                };
+            }
+        };
+        createAutoOptimizeParameterBlock({ paramId: 1, paramNumber: 1, doc });
+        assertEqual(Number(controls['.ao-param-min'].value), 12,
+            'neuer Parameterblock sollte mit Registry-Minimum statt 0 starten');
+        assertEqual(Number(controls['.ao-param-max'].value), 60,
+            'neuer Parameterblock sollte mit Registry-Maximum statt 100 starten');
+
+        controls['.ao-param-key'].value = 'survivalQuantile';
+        controls['.ao-param-key'].dispatch('change');
+        assertEqual(Number(controls['.ao-param-min'].value), 0.5,
+            'Parameterwechsel sollte das vollständige Quantilminimum setzen');
+        assertEqual(Number(controls['.ao-param-max'].value), 0.99,
+            'Parameterwechsel sollte das vollständige Quantilmaximum setzen');
+        assertEqual(Number(controls['.ao-param-step'].value), 0.01,
+            'Parameterwechsel sollte die Registry-Schrittweite setzen');
+    }
+    console.log('✓ UI renderer domain defaults OK');
 
     // ========== Latin Hypercube Sampling Tests ==========
 
@@ -252,6 +372,10 @@ try {
         };
 
         assert(!isValidCandidate(candidate, 10), 'Kandidat mit runwayMinM > runwayTargetM sollte abgelehnt werden');
+        assert(
+            !isValidCandidate({ runwayMinM: 48 }, 10, { runwayTargetMonths: 36 }),
+            'Ein einzelner Runway-Min-Kandidat sollte gegen das feste Basisziel validiert werden'
+        );
     }
     console.log('✓ isValidCandidate Runway-Invariante OK');
 
@@ -277,9 +401,10 @@ try {
     // Test 10: isValidCandidate - Grenzen überschritten
     console.log('Test 10: isValidCandidate - Grenzen überschritten');
     {
-        assert(!isValidCandidate({ targetEq: 150 }, 10), 'targetEq > 100 sollte abgelehnt werden');
-        assert(!isValidCandidate({ rebalBand: 60 }, 10), 'rebalBand > 50 sollte abgelehnt werden');
-        assert(!isValidCandidate({ maxSkimPct: 120 }, 10), 'maxSkimPct > 100 sollte abgelehnt werden');
+        assert(!isValidCandidate({ targetEq: 91 }, 10), 'targetEq > 90 sollte abgelehnt werden');
+        assert(!isValidCandidate({ rebalBand: 21 }, 10), 'rebalBand > 20 sollte abgelehnt werden');
+        assert(!isValidCandidate({ maxSkimPct: 51 }, 10), 'maxSkimPct > 50 sollte abgelehnt werden');
+        assert(!isValidCandidate({ maxBearRefillPct: 71 }, 10), 'maxBearRefillPct > 70 sollte abgelehnt werden');
     }
     console.log('✓ isValidCandidate Grenzen OK');
 
@@ -474,8 +599,74 @@ try {
         const delta = Math.abs(result.championCfg.targetEq - 60);
         assert(delta <= 4, `Champion sollte nahe Optimum sein (delta ${delta})`);
         assert(result.metricsTest.medianEndWealth > 900, 'Objective sollte nahe Maximum sein');
+        const evaluationContract = result.optimizationContext.evaluationContract;
+        assertEqual(evaluationContract.monteCarloParameters.methode, 'stationary',
+            'Optimizer sollte die MC-Samplingmethode aus dem Hauptvertrag ausweisen');
+        assertEqual(evaluationContract.monteCarloParameters.blockSize, 7,
+            'Optimizer sollte die MC-Blockgroesse aus dem Hauptvertrag ausweisen');
+        assertEqual(evaluationContract.dataFilter.startYearMode, 'RECENCY',
+            'Optimizer sollte den MC-Datenfilter aus dem Hauptvertrag ausweisen');
+        assertEqual(evaluationContract.dataFilter.startYearHalfLife, 15,
+            'Optimizer sollte die MC-Halbwertszeit aus dem Hauptvertrag ausweisen');
+        assert(evaluationContract.dataFilter.excludeEstimatedHistory === true,
+            'Optimizer sollte den Ausschluss geschaetzter Historie uebernehmen');
+        assert(evaluationContract.useCapeSampling === true,
+            'Optimizer sollte CAPE-Sampling aus dem Hauptvertrag uebernehmen');
+        assert(evaluationContract.seedContract.disjoint === true,
+            'Train- und Bestaetigungsseeds sollten disjunkt sein');
+        assert(
+            evaluationContract.seedContract.trainSeeds.every(
+                seed => !evaluationContract.seedContract.confirmationSeeds.includes(seed)
+            ),
+            'Train- und Bestaetigungsseedmengen sollten keine Ueberschneidung besitzen'
+        );
+        assertEqual(evaluationContract.source, 'main_monte_carlo_controls',
+            'Optimizer sollte den kanonischen Haupt-Control-Lesepfad ausweisen');
     }
     console.log('✓ runAutoOptimize Champion nahe Optimum OK');
+
+    // Test 23b: Ungueltige Rahmendaten stoppen vor der ersten Evaluation
+    console.log('Test 23b: runAutoOptimize - Current-Config Preflight');
+    {
+        const validDocument = global.document;
+        let evaluations = 0;
+        global.document = {
+            getElementById(id) {
+                if (id === 'targetEq') return { value: '91' };
+                return validDocument.getElementById(id);
+            }
+        };
+        let preflightError = null;
+        try {
+            await runAutoOptimize({
+                objective: { metric: 'EndWealth_P50', direction: 'max' },
+                params: { targetEq: { min: 20, max: 90, step: 5 } },
+                runsPerCandidate: 10,
+                seedsTrain: 2,
+                seedsTest: 2,
+                constraints: {},
+                maxDauer: 20,
+                evaluateCandidateFn: async () => {
+                    evaluations++;
+                    return {
+                        medianEndWealth: 1,
+                        successProbFloor: 1,
+                        worst5Drawdown: 0,
+                        timeShareWRgt45: 0
+                    };
+                }
+            });
+        } catch (error) {
+            preflightError = error;
+        } finally {
+            global.document = validDocument;
+        }
+        assertEqual(preflightError?.code, 'AUTO_OPTIMIZE_PARAMETER_DOMAIN_INVALID',
+            'ungueltige aktuelle Rahmendaten sollten einen konkreten Domainfehler liefern');
+        assertEqual(evaluations, 0,
+            'ungueltige aktuelle Rahmendaten sollten vor der ersten Kandidatenevaluation stoppen');
+    }
+    console.log('✓ runAutoOptimize Current-Config Preflight OK');
 
     // Test 24: runAutoOptimize - Multi-Parameter
     console.log('Test 24: runAutoOptimize - Multi-Parameter');

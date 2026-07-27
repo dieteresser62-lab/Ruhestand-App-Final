@@ -9,18 +9,39 @@ import {
     AUTO_OPTIMIZE_DYNAMIC_FLEX_MODE_LABELS,
     AUTO_OPTIMIZE_PARAM_LABELS,
     AUTO_OPTIMIZE_PARAM_UNITS,
+    AUTO_OPTIMIZE_PARAMETER_OPTIONS,
+    AUTO_OPTIMIZE_PARAMETER_REGISTRY,
     renderAutoOptimizeParamOptions
 } from './auto-optimize-param-meta.js';
 
 const formatFixed = (value, digits = 1) => Number(value).toFixed(digits);
 const formatPercentFromRatio = (value, digits = 1) => `${formatFixed((value ?? 0) * 100, digits)}%`;
 const formatSignedPercentFromRatio = (value, digits = 2) => `${value >= 0 ? '+' : ''}${formatPercentFromRatio(value, digits)}`;
+const formatBoolean = value => value === true ? 'ja' : 'nein';
+
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+}
 
 export function createAutoOptimizeParameterBlock({ paramId, paramNumber, defaults = null, doc = globalThis.document }) {
     const paramDiv = doc.createElement('div');
     paramDiv.id = `ao_param_${paramId}`;
     paramDiv.className = 'ao-parameter-block';
     paramDiv.style.cssText = 'border: 1px solid #ddd; padding: 10px; border-radius: 4px; margin-bottom: 10px;';
+    const selectedKey = AUTO_OPTIMIZE_PARAMETER_REGISTRY[defaults?.key]
+        ? defaults.key
+        : AUTO_OPTIMIZE_PARAMETER_OPTIONS[0].key;
+    const selectedDomain = AUTO_OPTIMIZE_PARAMETER_REGISTRY[selectedKey].domain;
+    const initialRange = {
+        min: defaults?.min ?? selectedDomain.min,
+        max: defaults?.max ?? selectedDomain.max,
+        step: defaults?.step ?? selectedDomain.step
+    };
 
     paramDiv.innerHTML = `
         <h5 style="margin-top: 0; margin-bottom: 10px;">Parameter ${paramNumber}</h5>
@@ -28,23 +49,46 @@ export function createAutoOptimizeParameterBlock({ paramId, paramNumber, default
             <div class="form-group">
                 <label>Key</label>
                 <select class="ao-param-key" data-param-id="${paramId}">
-                    ${renderAutoOptimizeParamOptions(defaults?.key)}
+                    ${renderAutoOptimizeParamOptions(selectedKey)}
                 </select>
             </div>
             <div class="form-group">
                 <label>Min</label>
-                <input type="number" class="ao-param-min" data-param-id="${paramId}" value="${defaults?.min ?? 0}" step="0.1">
+                <input type="number" class="ao-param-min" data-param-id="${paramId}" value="${initialRange.min}"
+                    min="${selectedDomain.min}" max="${selectedDomain.max}" step="${selectedDomain.step}">
             </div>
             <div class="form-group">
                 <label>Max</label>
-                <input type="number" class="ao-param-max" data-param-id="${paramId}" value="${defaults?.max ?? 100}" step="0.1">
+                <input type="number" class="ao-param-max" data-param-id="${paramId}" value="${initialRange.max}"
+                    min="${selectedDomain.min}" max="${selectedDomain.max}" step="${selectedDomain.step}">
             </div>
             <div class="form-group">
                 <label>Step</label>
-                <input type="number" class="ao-param-step" data-param-id="${paramId}" value="${defaults?.step ?? 1}" step="0.1" min="0.1">
+                <input type="number" class="ao-param-step" data-param-id="${paramId}" value="${initialRange.step}"
+                    step="${selectedDomain.step}" min="${selectedDomain.step}">
             </div>
         </div>
     `;
+
+    const keySelect = paramDiv.querySelector('.ao-param-key');
+    const minimumInput = paramDiv.querySelector('.ao-param-min');
+    const maximumInput = paramDiv.querySelector('.ao-param-max');
+    const stepInput = paramDiv.querySelector('.ao-param-step');
+    keySelect?.addEventListener?.('change', () => {
+        const domain = AUTO_OPTIMIZE_PARAMETER_REGISTRY[keySelect.value]?.domain;
+        if (!domain) return;
+        minimumInput.value = domain.min;
+        minimumInput.min = domain.min;
+        minimumInput.max = domain.max;
+        minimumInput.step = domain.step;
+        maximumInput.value = domain.max;
+        maximumInput.min = domain.min;
+        maximumInput.max = domain.max;
+        maximumInput.step = domain.step;
+        stepInput.value = domain.step;
+        stepInput.min = domain.step;
+        stepInput.step = domain.step;
+    });
 
     return paramDiv;
 }
@@ -80,13 +124,29 @@ export function formatAutoOptimizeProgress(status) {
 
 export function renderAutoOptimizeResult({ resultEl, result, objective }) {
     if (!resultEl) return;
-    const { championCfg, metricsTest, deltaVsCurrent, stability, optimizationContext } = result;
+    const {
+        championCfg,
+        metricsTest,
+        deltaVsCurrent,
+        stability,
+        optimizationContext,
+        parameterFidelity
+    } = result;
     const stabilityPct = Math.round(stability * 100);
     const stabilityColor = stabilityPct >= 80 ? '#4caf50' : stabilityPct >= 60 ? '#ff9800' : '#f44336';
     const dynamicFlexModeLabel = AUTO_OPTIMIZE_DYNAMIC_FLEX_MODE_LABELS[optimizationContext?.dynamicFlexMode]
         || AUTO_OPTIMIZE_DYNAMIC_FLEX_MODE_LABELS.inherit;
     const dynamicFlexStateLabel = optimizationContext?.dynamicFlexActive === true ? 'aktiv' : 'inaktiv';
     const safetyLabel = optimizationContext?.safetyGuardsActive === true ? 'aktiv' : 'inaktiv';
+    const evaluationContract = optimizationContext?.evaluationContract;
+    const monteCarloParameters = evaluationContract?.monteCarloParameters;
+    const seedContract = evaluationContract?.seedContract;
+    const dataFilter = evaluationContract?.dataFilter;
+    const fixedModelAssumptions = evaluationContract?.fixedModelAssumptions;
+    const trainSeeds = Array.isArray(seedContract?.trainSeeds) ? seedContract.trainSeeds.join(', ') : 'nicht ausgewiesen';
+    const confirmationSeeds = Array.isArray(seedContract?.confirmationSeeds)
+        ? seedContract.confirmationSeeds.join(', ')
+        : 'nicht ausgewiesen';
 
     let paramCardsHtml = '';
     for (const [key, value] of Object.entries(championCfg)) {
@@ -110,6 +170,26 @@ export function renderAutoOptimizeResult({ resultEl, result, objective }) {
             <div style="background: #eef6ff; border: 1px solid #cddff8; color: #244f7a; padding: 10px 12px; border-radius: 6px; margin-bottom: 14px; font-size: 0.9rem;">
                 <strong>Dynamic-Flex Modus:</strong> ${dynamicFlexModeLabel} (${dynamicFlexStateLabel})
                 <br><strong>Safety-Guards:</strong> ${safetyLabel}
+            </div>
+
+            <div style="background: #fff8e8; border: 1px solid #ead39b; color: #5f4b19; padding: 12px; border-radius: 6px; margin-bottom: 14px; font-size: 0.88rem;">
+                <strong>Versionierte Optimierungsannahmen:</strong>
+                <br>Sampling: ${escapeHtml(monteCarloParameters?.methode ?? 'nicht ausgewiesen')}
+                · RNG: ${escapeHtml(monteCarloParameters?.rngMode ?? 'nicht ausgewiesen')}
+                · Runs/Kandidat: ${escapeHtml(monteCarloParameters?.anzahl ?? 'nicht ausgewiesen')}
+                · Blockgröße: ${escapeHtml(monteCarloParameters?.blockSize ?? 'nicht ausgewiesen')}
+                · CAPE-Sampling: ${formatBoolean(evaluationContract?.useCapeSampling)}
+                <br>Datenfilter: ${escapeHtml(dataFilter?.startYearMode ?? 'nicht ausgewiesen')}
+                · Startjahr ${escapeHtml(dataFilter?.startYearFilter ?? 'nicht ausgewiesen')}
+                · Halbwertszeit ${escapeHtml(dataFilter?.startYearHalfLife ?? 'nicht ausgewiesen')}
+                · geschätzte Historie ausgeschlossen: ${formatBoolean(dataFilter?.excludeEstimatedHistory)}
+                <br>Train-Seeds: ${escapeHtml(trainSeeds)}
+                <br>Bestätigungsseeds: ${escapeHtml(confirmationSeeds)}
+                <br>Fixiert: CAPE ${escapeHtml(fixedModelAssumptions?.capeRatio ?? 'nicht ausgewiesen')}
+                · Stress ${escapeHtml(fixedModelAssumptions?.stressPreset ?? 'nicht ausgewiesen')}
+                · Horizon-Methode ${escapeHtml(fixedModelAssumptions?.horizonMethod ?? 'nicht ausgewiesen')}
+                · Dauer ${escapeHtml(fixedModelAssumptions?.maxDauer ?? 'nicht ausgewiesen')} Jahre
+                <br><small>Request-Fingerprint: ${escapeHtml(parameterFidelity?.requestFingerprint ?? 'nicht ausgewiesen')}</small>
             </div>
 
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 20px;">
@@ -173,7 +253,7 @@ export function appendAutoOptimizeApplySuccess({ resultEl, doc = globalThis.docu
     if (!resultEl) return;
     const successMsg = doc.createElement('div');
     successMsg.style.cssText = 'background: #4caf50; color: white; padding: 10px; border-radius: 6px; margin-top: 10px; text-align: center;';
-    successMsg.textContent = '✓ Configuration applied to framework data!';
+    successMsg.textContent = '✓ Konfiguration übernommen. Eine spätere Profilauswahl kann profilgebundene Felder erneut setzen.';
     resultEl.appendChild(successMsg);
 
     setTimeout(() => {
@@ -182,4 +262,3 @@ export function appendAutoOptimizeApplySuccess({ resultEl, doc = globalThis.docu
         setTimeout(() => successMsg.remove(), 500);
     }, 3000);
 }
-

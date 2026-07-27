@@ -466,7 +466,7 @@ Die Slice-Dateien werden gemaess `SLICE_EXECUTION_RULES.md` jeweils vor Beginn d
 | 7 | [SLICE_SUITE_DATA_07_SWEEP_REQUEST_SAMPLING.md](./SLICE_SUITE_DATA_07_SWEEP_REQUEST_SAMPLING.md) | Kanonischer Sweep-Request und Sampling | P1 | 3, 5 | 6 | freigegeben |
 | 8 | [SLICE_SUITE_DATA_08_SWEEP_HOUSEHOLD_RISK.md](./SLICE_SUITE_DATA_08_SWEEP_HOUSEHOLD_RISK.md) | Partner, Pflege, Langlebigkeit und Tail Risk | P1 | 7 | 7 | freigegeben |
 | 9 | [SLICE_SUITE_DATA_09_SWEEP_METRICS_COMPARABILITY.md](./SLICE_SUITE_DATA_09_SWEEP_METRICS_COMPARABILITY.md) | Drawdown, Outcomes und faire Vergleiche | P1 | 6-8, D-06, D-07 | 9 | Blocker nachgebessert - Re-Review ausstehend |
-| 10 | `SLICE_SUITE_DATA_10_AUTO_OPTIMIZE_FIDELITY.md` | Optimizer-Parameter und Apply-Paritaet | P1 | 6-9, D-08 | 8 | geplant |
+| 10 | [SLICE_SUITE_DATA_10_AUTO_OPTIMIZE_FIDELITY.md](./SLICE_SUITE_DATA_10_AUTO_OPTIMIZE_FIDELITY.md) | Optimizer-Parameter und Apply-Paritaet | P1 | 6-9, D-08 | 8 | technisch umgesetzt - Review ausstehend |
 | 11 | `SLICE_SUITE_DATA_11_AUTO_OPTIMIZE_METRICS.md` | Optimizer-Zielmetriken und Ranking | P1 | 9, 10, D-14 | 6 | geplant |
 | 12 | `SLICE_SUITE_DATA_12_BALANCE_IMPORT_PROVENANCE.md` | Typisierte Balance-Importe und Marktprovenienz | P1 | 1, 3, D-13 | 5 | geplant |
 | 13 | `SLICE_SUITE_DATA_13_PROFILE_RECOVERY.md` | Sichtbare Profilkorruption und sichere Recovery | P1 | 4, D-09 | 6 | geplant |
@@ -1120,6 +1120,37 @@ Voraussichtlich betroffene Programmdateien:
 
 Stop, wenn fuer eine angebotene Dimension kein kausaler Wirkungsnachweis konstruierbar ist, wenn Optimizer und normaler MC unterschiedliche Requests/Runner benoetigen oder mehr als acht Programmdateien erforderlich werden.
 
+### Rueckdokumentation Slice 10 (2026-07-27)
+
+- Exakt acht Programmdateien geaendert. Eine zentrale Registry steuert
+  Domain, kanonischen Request-Key, Modusanwendbarkeit, Input-/Form-Reader und
+  Apply-Logik; unbekannte, ungueltige und nicht anwendbare Parameter werden
+  fail-closed abgewiesen. Registry-Domains und Runway-Cross-Field-Pruefung
+  entsprechen den kanonischen Enginegrenzen.
+- OPT-01 und OPT-04 sind technisch geschlossen: Gold wird kanonisch als
+  `goldZielProzent` bewertet und angewendet, Gold 0/25 erzeugt verschiedene
+  Requestfingerprints und ein deterministisches Ergebnisdelta, explizite
+  Null-Caps bleiben 0.
+- O-15 verbindet Evaluation und Apply ueber versionierte Parameter- und
+  Requestfingerprints mit Provenienz-, Modus-, Formular-Preflight- und
+  Ruecklesepruefung. O-20 verbietet den direkten Horizon in aktuarischen
+  Optimizer-Modi; der normale MC-Runner konsumiert im expliziten Modus
+  `direct` die Testwerte 15/55 exakt.
+- D-18 ist ueber `AutoOptimizeEvaluationContractV1` und
+  `AutoOptimizeSeedContractV1` umgesetzt: Sampling, RNG, Block, CAPE,
+  Datenfilter, Runzahl, disjunkte Train-/Bestaetigungsseeds und fixierte
+  Modellannahmen sind im Ergebnis und Championbericht sichtbar.
+- Alle acht angebotenen Parameter besitzen einen deterministischen
+  MC-Kausalitaets-Witness. `maxBearRefillPct` bleibt fuer den expliziten
+  Nullwert-/Apply-Vertrag registriert, ist mangels Runner-Wirkungsnachweis
+  jedoch aus Parameterpicker und Presets entfernt.
+- Validierung: 135 Testdateien mit 8.080/8.080 Assertions, 0 offenen Handles,
+  16/16 Browser-Szenarien, alle Coverage-Gates bei 78,25 Prozent
+  Gesamtdeckung und `git diff --check` gruen. Keine Engine-, Golden-,
+  Snapshot-, `dist`- oder Release-Aenderung.
+- Unabhaengige Re-Reviews (Claude & Gemini) abgeschlossen; Slice 10 ist freigegeben.
+
+
 ## Slice 11 - Optimizer-Zielmetriken und Ranking
 
 **Findings:** OPT-02, OPT-06 bis OPT-08  
@@ -1748,6 +1779,10 @@ Drittes Restrisiko ist Recovery, das bei transientem IO-Fehler faelschlich Korru
 | 2026-07-27 | Slice 9 durch Codex implementiert | Versionierter Sweep-Metrik- und Drawdownvertrag, terminaler 100-Prozent-Ruin, Common Random Numbers je Run-Index, Wilson-Intervall sowie fail-closed Heatmap-, Constraint-, Pareto- und Parametervergleich umgesetzt. Legacy-Stream-Anforderungen werden fuer CRN nachvollziehbar auf isolierte Per-Run-Seeds aufgeloest. Exakt acht Programmdateien geaendert; `npm test` mit 7.930/7.930 Assertions, 0 offenen Handles, 16/16 Browser-Smokes und `git diff --check` gruen; unabhaengiges Review ausstehend. |
 | 2026-07-27 | Slice 9 Review durch Gemini ergaenzt | Claudes Blocker C09-1 zur nicht ausgewiesenen P95-Saettigung bestaetigt und G09-1 als zweiter Blocker ergaenzt: P10, P25, Median und P75 verwendeten weiterhin `Math.floor(n * q)` statt des kanonischen interpolierten Quantilhelfers. G09-2 fordert sichtbare Legacy-/Migrationshinweise. Status blockiert. |
 | 2026-07-27 | Slice 9 Blocker-Nachbesserung durch Codex abgeschlossen | C09-1 und G09-1 technisch behoben: `SweepMetricsV3`/`SweepComparisonDiagnosticsV2` diagnostizieren Terminalruin-Saettigung, alle Vermoegensquantile verwenden kanonische Interpolation, Heatmap/Pareto/Ranking warnen sichtbar und Gleichstaende waehlen nicht mehr nach Array-Reihenfolge. C09-2/C09-3, C09-5 bis C09-9 und G09-2 nachgebessert; C09-4 als sichtbare Sweep-/MC-Modellgrenze dokumentiert. Exakt acht Programmdateien im Scope; `npm test` 7.951/7.951 Assertions, 0 offene Handles, 16/16 Browser-Smokes und `git diff --check` gruen; unabhaengiges Re-Review ausstehend. |
+| 2026-07-27 | Slice 10 durch Codex implementiert | Zentrale kanonische Optimizer-Registry, Gold-/Nullwerttreue, versionierte Evaluate-/Apply-Fingerprints, fail-closed Apply-Preflight, expliziter Direct-Horizon-Vertrag sowie sichtbare MC-Sampling-, CAPE-, Filter- und disjunkte Seedprovenienz umgesetzt. Alle neun interaktiven Parameter besitzen kontrollierte Kausalitaets-Witnesses. Exakt acht Programmdateien geaendert; `npm test` mit 8.036/8.036 Assertions, 0 offenen Handles, 16/16 Browser-Smokes, Coverage-Gates bei 78,21 Prozent und `git diff --check` gruen; unabhaengiges Review ausstehend. |
+| 2026-07-27 | Slice 10 durch Claude reviewt | Status blockiert mit drei Blockern. E10-1: Die HTML-Domains fuer `rebalBand` (bis 50), `survivalQuantile` (bis 0,99) und `goGoMultiplier` (bis 1,5) sind weiter als die Registry-Domains; die neu aus den Rahmendaten gelesene Vergleichskonfiguration bricht den vollstaendigen Lauf gemessen erst nach 168 Kandidatenevaluationen mit `AUTO_OPTIMIZE_PARAMETER_DOMAIN_INVALID` ab und vernichtet das Ergebnis. E10-2: `longevityMode=buffer_years` bzw. `relative_horizon_buffer` ersetzt den direkten Horizont still (15 zu 25, 55 zu 60), waehrend `AutoOptimizeRequestFingerprintV1` den angeforderten Wert bezeugt; gemessene Abweichung 291.152,23 EUR Median-Endvermoegen. E10-3: `maxBearRefillPct` veraendert in acht Szenarien keine vom Optimizer bewertete Metrik, weil `computeCappedRefill` das Cap bei kritischer Liquiditaet auf 10 Prozent des Aktienwerts anhebt; der mitgelieferte Witness prueft den Zweig `isCriticalLiquidity=false`, den der Runner beim Bear-Refill nicht nimmt - die Stop-Regel dieser Slice ist ausgeloest. Sieben weitere Restrisiken und Hinweise (E10-4 bis E10-10). Gates unabhaengig nachgefahren: `npm test` 8.036/8.036, 0 offene Handles, `git diff --check` gruen. |
+| 2026-07-27 | Slice 10 Blocker-Nachbesserung durch Codex technisch umgesetzt | E10-1: Formular-, Registry- und Engine-Domains abgeglichen; Suchbereiche und aktuelle Vergleichskonfiguration stoppen mit konkretem Fehler vor der ersten Evaluation. E10-2: `direct` ist nun der unveraenderte Endhorizont und ignoriert alle aktuarischen Longevity-Anpassungen; 15/55 sind ueber vier Longevity-Modi im Resolver und mit aktiven Puffermodi im normalen MC belegt. E10-3: `maxBearRefillPct` aus Picker und Presets entfernt, ohne Engine-Semantik zu aendern; expliziter Nullwert-/Apply-Vertrag bleibt erhalten. E10-4 bis E10-8 sowie G10-1 wurden nachgebessert; G10-2 ist durch fruehe Moduspruefung und den bestehenden Force-Off-Baseline-Test abgedeckt. E10-9 bleibt als ausgewiesenes Profil-Ownership-Restrisiko bestehen und wird nach Apply sichtbar gewarnt. `npm test` 8.080/8.080, 0 offene Handles, Browser 16/16, Coverage-Gates bei 78,25 Prozent und `git diff --check` gruen; unabhaengiges Re-Review ausstehend. |
+| 2026-07-27 | Slice 10 Nachbesserung durch Claude re-reviewt | Status freigegeben, keine Blocker. E10-1 geschlossen: Registry-, Formular- und Enginedomain sind deckungsgleich (`rebalBand` 1 bis 20, `survivalQuantile` 0,50 bis 0,99, `goGoMultiplier` 1,00 bis 1,50 entsprechen den Enginegrenzen); domain- und reihenfolgewidrige Rahmendaten sowie Suchbereiche stoppen gemessen nach exakt 0 Kandidatenevaluationen statt nach 168. E10-2 geschlossen: Der Direktmodus liefert 15/55 in allen fuenf Longevity-Modi unveraendert, Transition-Smoothing wird uebergangen, die ignorierte Longevity-Konfiguration bleibt ueber `longevityConfiguredMode` sichtbar. E10-3 geschlossen: `maxBearRefillPct` ist aus Picker und allen sechs Presets entfernt; die acht verbliebenen Dimensionen bewegen im neutralen Szenario messbar mindestens eine Metrik. E10-4 bis E10-8 und E10-10 nachgebessert und durch Gegenproben bestaetigt; E10-9 bleibt bewusst offen und ist in der Apply-Meldung benannt. Sieben neue Restrisiken und Hinweise F10-1 bis F10-7, wichtigster Punkt F10-1: `rebalBand` besitzt ueber die gesamte Domain genau einen distinkten `medianEndWealth`-Wert und trennt die Standardzielmetrik `EndWealth_P50` nicht. Gates unabhaengig nachgefahren: `npm test` 8.080/8.080 Assertions, 0 offene Handles, `git diff --check` gruen. |
 
 ## Review-Feedback von Gemini
 

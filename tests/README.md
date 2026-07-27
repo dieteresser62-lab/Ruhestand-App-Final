@@ -393,12 +393,35 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 - **Latin Hypercube Sampling:** Gleichmäßige Verteilung im Parameterraum
 - **Quick-/Full-Evaluation:** Kandidaten werden vor der vollständigen Bewertung vorgefiltert
 - **Nachbarschafts-Generierung:** generateNeighborsReduced
-- **Kandidaten-Validierung:** isValidCandidate (Runway-Invariante, Gold-Cap, Grenzen)
+- **Kandidaten-Validierung:** zentrale Parameterregistry
+  (`isAutoOptimizeCandidateValid`) mit Runway-Invariante, Gold-Cap,
+  Domains und Modus-Anwendbarkeit
 - **Constraint-Prüfung:** checkConstraints (SR99, NOEX, TS45, DD55)
 - **Objective-Extraktion:** getObjectiveValue für verschiedene Metriken
 - **CandidateCache:** Vermeidung redundanter Evaluierungen
 - **Tie-Breaker:** Höhere Success Rate, niedrigerer Drawdown
 - **Champion-Findung:** Konvergenz nahe Optimum
+- **Modellannahmen:** MC-Sampling, CAPE, Datenfilter und disjunkte
+  Train-/Bestaetigungsseeds werden im Ergebnisvertrag ausgewiesen
+
+#### `auto-optimize-fidelity.test.mjs`
+**Zweck:** Sichert O-15/O-20 und die Evaluate-/Apply-Paritaet.
+- Jeder interaktive Registryparameter perturbiert seinen kanonischen
+  Request-Key; Null-Caps bleiben 0.
+- Alle acht angebotenen Parameter besitzen kontrollierte, deterministische
+  MC-Kausalitaets-Witnesses. `maxBearRefillPct` bleibt fuer explizite
+  Nullwert-/Apply-Vertraege registriert, wird mangels Runner-Wirkungsnachweis
+  aber weder im Parameterpicker noch in Presets angeboten.
+- Gold 0/25 verwendet `goldZielProzent`, besitzt verschiedene
+  Requestfingerprints und erzeugt unterschiedliche MC-Ergebnisse.
+- Der direkte Horizon 15/55 wirkt unabhaengig vom Longevity-Modus im Resolver
+  und normalen MC exakt;
+  aktuarische Methoden ignorieren das Direktfeld und der Optimizer bietet es
+  dort nicht an.
+- Champion-Apply verlangt Evaluationsfingerprints, prueft Modus und alle
+  Formularziele vor dem ersten Write und verifiziert Ruecklese-Fingerprint
+  sowie Gold-/Go-Go-Aktivierungszustand; manipulierte oder nicht anwendbare
+  Champions werden fail-closed abgewiesen.
 
 #### `auto-optimize-worker-contract.test.mjs`
 **Zweck:** Testet den Worker-Merge-Contract des Auto-Optimize-MC-Pfads.
@@ -793,6 +816,7 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 - `feature-flags.test.mjs`
 - `simulator-sweep.test.mjs`
 - `auto-optimizer.test.mjs`
+- `auto-optimize-fidelity.test.mjs`
 
 ---
 
@@ -833,7 +857,8 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `3bucket-config.test.mjs` | ~90 | 3-Bucket-Konfiguration und Engine-Input-Mapping |
 | `3bucket-refill.test.mjs` | ~160 | Bond-Refill und 3-Bucket-Nachsteuerung |
 | `architecture-evidence.test.mjs` | ~170 | Offline-Contract für Evidenzrecords, Pflichtfelder, IDs, Anker, lokale Links und Fälligkeiten |
-| `auto-optimizer.test.mjs` | ~500 | Mehrphasige Optimierung, LHS, Constraints |
+| `auto-optimizer.test.mjs` | ~850 | Mehrphasige Optimierung, LHS, Constraints |
+| `auto-optimize-fidelity.test.mjs` | ~580 | O-15/O-20, Registry-, Fingerprint- und Apply-Paritaet |
 | `auto-optimize-worker-contract.test.mjs` | ~260 | Auto-Optimize Worker-Merge-Contract |
 | `balance-annual-cape.test.mjs` | ~140 | CAPE-Abruf, Fallback und Jahresupdate-Contract |
 | `balance-annual-inflation.test.mjs` | ~130 | Jährliche Inflationsanpassung |
