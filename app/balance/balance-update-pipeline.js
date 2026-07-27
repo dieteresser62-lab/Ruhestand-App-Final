@@ -50,40 +50,87 @@ function hasOwn(value, key) {
     return Object.prototype.hasOwnProperty.call(value, key);
 }
 
-function normalizeFingerprintValue(value, seen = new WeakSet()) {
-    if (value === null) return null;
-    if (value === undefined) return { __balanceType: 'undefined' };
+function assertJsonCompatibleBalanceValue(value, seen = new WeakSet()) {
+    if (value === null) return;
+    if (value === undefined) {
+        throw new BalanceStateLifecycleError(
+            'Der Balance-State enthaelt einen nicht per JSON speicherbaren undefined-Wert.',
+            'non_json_state'
+        );
+    }
     if (typeof value === 'number') {
-        return Number.isFinite(value) ? value : { __balanceType: String(value) };
+        if (Number.isFinite(value)) return;
+        throw new BalanceStateLifecycleError(
+            'Der Balance-State enthaelt eine nicht per JSON speicherbare Zahl.',
+            'non_json_state'
+        );
     }
-    if (typeof value === 'string' || typeof value === 'boolean') return value;
-    if (typeof value === 'bigint') return { __balanceType: 'bigint', value: value.toString() };
-    if (typeof value === 'function' || typeof value === 'symbol') {
-        return { __balanceType: typeof value };
+    if (typeof value === 'string' || typeof value === 'boolean') return;
+    if (typeof value !== 'object') {
+        throw new BalanceStateLifecycleError(
+            `Der Balance-State enthaelt einen nicht per JSON speicherbaren Wert vom Typ ${typeof value}.`,
+            'non_json_state'
+        );
     }
-    if (typeof value !== 'object') return String(value);
     if (seen.has(value)) {
         throw new BalanceStateLifecycleError(
-            'Der Balance-State enthaelt eine zyklische Struktur und kann nicht sicher fingerprinted werden.',
+            'Der Balance-State enthaelt eine zyklische Struktur und kann nicht sicher verarbeitet werden.',
             'fingerprint_cycle'
         );
     }
-
-    seen.add(value);
-    let normalized;
-    if (Array.isArray(value)) {
-        normalized = value.map(entry => normalizeFingerprintValue(entry, seen));
-    } else {
-        normalized = {};
-        Object.keys(value).sort().forEach(key => {
-            normalized[key] = normalizeFingerprintValue(value[key], seen);
-        });
+    const prototype = Object.getPrototypeOf(value);
+    if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null) {
+        throw new BalanceStateLifecycleError(
+            `Der Balance-State enthaelt ein nicht unterstuetztes Laufzeitobjekt ${value.constructor?.name || 'Object'}.`,
+            'non_json_state'
+        );
     }
+    seen.add(value);
+    if (Array.isArray(value)) {
+        for (let index = 0; index < value.length; index++) {
+            if (!Object.prototype.hasOwnProperty.call(value, index)) {
+                throw new BalanceStateLifecycleError(
+                    'Der Balance-State enthaelt ein nicht per JSON eindeutig speicherbares Array mit Luecken.',
+                    'non_json_state'
+                );
+            }
+        }
+        const hasCustomArrayKey = Object.keys(value).some(key => {
+            const index = Number(key);
+            return !Number.isSafeInteger(index) || index < 0 || index >= value.length || String(index) !== key;
+        });
+        if (hasCustomArrayKey) {
+            throw new BalanceStateLifecycleError(
+                'Der Balance-State enthaelt ein Array mit nicht per JSON erhaltenen Zusatzfeldern.',
+                'non_json_state'
+            );
+        }
+    }
+    if (Object.getOwnPropertySymbols(value).length > 0) {
+        throw new BalanceStateLifecycleError(
+            'Der Balance-State enthaelt nicht per JSON speicherbare Symbol-Schluessel.',
+            'non_json_state'
+        );
+    }
+    Object.keys(value).forEach(key => assertJsonCompatibleBalanceValue(value[key], seen));
     seen.delete(value);
+}
+
+function normalizeFingerprintValue(value) {
+    if (value === null) return null;
+    if (typeof value !== 'object') return value;
+    if (Array.isArray(value)) {
+        return value.map(entry => normalizeFingerprintValue(entry));
+    }
+    const normalized = {};
+    Object.keys(value).sort().forEach(key => {
+        normalized[key] = normalizeFingerprintValue(value[key]);
+    });
     return normalized;
 }
 
 export function createBalanceFingerprint(value) {
+    assertJsonCompatibleBalanceValue(value);
     const serialized = JSON.stringify(normalizeFingerprintValue(value));
     let hash = 0x811c9dc5;
     for (let index = 0; index < serialized.length; index++) {
@@ -93,8 +140,51 @@ export function createBalanceFingerprint(value) {
     return `fnv1a32:${(hash >>> 0).toString(16).padStart(8, '0')}`;
 }
 
+function selectPersistentFinancialInputs(inputs) {
+    if (!inputs || typeof inputs !== 'object' || Array.isArray(inputs)) return null;
+    return Object.fromEntries(
+        Object.entries(inputs)
+            .filter(([key]) => key !== 'depotLastUpdate')
+    );
+}
+
+/**
+ * Fingerprints only persisted JSON data that can influence the financial
+ * candidate. Workflow/UI metadata and depotLastUpdate are intentionally
+ * excluded; period validity is guarded separately by assertBalancePeriodCommit.
+ */
+export function createBalanceCommitBaseFingerprint({
+    persistentState = {},
+    profilverbundProfiles = []
+} = {}) {
+    const profiles = Array.isArray(profilverbundProfiles)
+        ? profilverbundProfiles
+            .map(entry => {
+                const balanceState = entry?.balanceState || {};
+                return {
+                    profileId: entry?.profileId || null,
+                    inputs: selectPersistentFinancialInputs(balanceState.inputs),
+                    lastState: balanceState.lastState || null,
+                    profilverbundHouseholdInputs: selectPersistentFinancialInputs(
+                        balanceState.profilverbundHouseholdInputs
+                    ),
+                    profilverbundHouseholdLastState:
+                        balanceState.profilverbundHouseholdLastState || null
+                };
+            })
+            .sort((left, right) => String(left.profileId).localeCompare(String(right.profileId)))
+        : [];
+
+    return createBalanceFingerprint({
+        inputs: selectPersistentFinancialInputs(persistentState?.inputs),
+        lastState: persistentState?.lastState || null,
+        profilverbundProfiles: profiles
+    });
+}
+
 export function cloneBalanceState(value) {
-    if (value === null || value === undefined) return value;
+    if (value === null) return value;
+    assertJsonCompatibleBalanceValue(value);
     if (typeof structuredClone === 'function') return structuredClone(value);
     return JSON.parse(JSON.stringify(value));
 }
@@ -116,12 +206,13 @@ export function resolveBalanceUpdateRequest(options = {}) {
         );
     }
 
-    let mode = hasMode ? options.mode : BALANCE_UPDATE_MODE.PERSIST_INPUTS;
     if (hasLegacyPersist) {
-        mode = options.persist === false
-            ? BALANCE_UPDATE_MODE.PREVIEW
-            : BALANCE_UPDATE_MODE.PERSIST_INPUTS;
+        throw new BalanceStateLifecycleError(
+            'Der Legacy-Parameter persist wird nicht mehr unterstuetzt. Bitte einen expliziten mode verwenden.',
+            'legacy_persist_unsupported'
+        );
     }
+    const mode = hasMode ? options.mode : BALANCE_UPDATE_MODE.PREVIEW;
     if (!Object.values(BALANCE_UPDATE_MODE).includes(mode)) {
         throw new BalanceStateLifecycleError(
             `Unbekannter Balance-Update-Modus: ${String(mode)}`,
@@ -220,6 +311,17 @@ export function assertBalancePeriodCommit(persistentState = {}, periodId) {
     }
 
     return pending;
+}
+
+export function assertBalanceCommitStillCurrent({
+    expectedBaseFingerprint,
+    currentBaseFingerprint,
+    currentPersistentState = {},
+    periodId
+} = {}) {
+    assertBalanceCandidateFresh(expectedBaseFingerprint, currentBaseFingerprint);
+    assertBalancePeriodCommit(currentPersistentState, periodId);
+    return currentPersistentState;
 }
 
 function buildBalanceLifecycleMetadata(persistentState, periodId, fingerprints = {}) {
@@ -394,7 +496,7 @@ export function enrichBalanceDiagnosisPayload({ formattedDiagnosis, modelResult 
 }
 
 export function persistBalanceUpdate({
-    mode = BALANCE_UPDATE_MODE.PERSIST_INPUTS,
+    mode = BALANCE_UPDATE_MODE.PREVIEW,
     periodId = null,
     profilverbundRuns,
     profilverbundHandlers,
@@ -408,9 +510,20 @@ export function persistBalanceUpdate({
         return { persisted: false, kind: BALANCE_UPDATE_MODE.PREVIEW };
     }
 
+    const hasProfilverbundRuns = profilverbundRuns !== null && profilverbundRuns !== undefined;
+    if (
+        hasProfilverbundRuns
+        && (!Array.isArray(profilverbundRuns) || profilverbundRuns.length < 1)
+    ) {
+        throw new BalanceStateLifecycleError(
+            'Profilverbund-Persistenz benoetigt mindestens einen gueltigen Profil-Run.',
+            'profile_runs_required'
+        );
+    }
+
     if (mode === BALANCE_UPDATE_MODE.PERSIST_INPUTS) {
-        if (profilverbundRuns) {
-            profilverbundHandlers.persistProfilverbundInputs(profilverbundRuns, { inputData });
+        if (hasProfilverbundRuns) {
+            profilverbundHandlers.persistProfilverbundInputs(profilverbundRuns);
         } else {
             storageManager.saveState({
                 ...persistentState,
@@ -438,10 +551,9 @@ export function persistBalanceUpdate({
     }
 
     const lifecycle = buildBalanceLifecycleMetadata(persistentState, periodId, fingerprints);
-    if (profilverbundRuns) {
+    if (hasProfilverbundRuns) {
         profilverbundHandlers.persistProfilverbundProfileStates(profilverbundRuns, {
-            lifecycle,
-            periodId
+            lifecycle
         });
     } else {
         storageManager.saveState({

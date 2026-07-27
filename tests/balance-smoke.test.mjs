@@ -340,7 +340,7 @@ assertEqual(simulateCallCount, 2, 'Debounced input should trigger exactly one ad
 
 console.log("Testing machine-readable update results and fail-closed persistence...");
 
-const successResult = balanceMain.update({ persist: false });
+const successResult = balanceMain.update({ mode: 'preview' });
 if (!successResult.ok || successResult.status !== 'success') {
     throw new Error(`Successful update returned unexpected result: ${JSON.stringify(successResult)}`);
 }

@@ -16,6 +16,7 @@ import { UIReader } from '../app/balance/balance-reader.js';
 import { UIRenderer } from '../app/balance/balance-renderer.js';
 import { StorageManager } from '../app/balance/balance-storage.js';
 import {
+    BALANCE_UPDATE_MODE,
     BALANCE_UPDATE_STATUS,
     assertActiveEngineHandshake,
     createEngineHandshake,
@@ -347,14 +348,16 @@ async function runBalanceUiOrchestrationTests() {
 
         let updateCalls = 0;
         let debouncedCalls = 0;
+        let saveCalls = 0;
         StorageManager.loadState = () => ({ inputs: {} });
-        StorageManager.saveState = () => {};
+        StorageManager.saveState = () => { saveCalls += 1; };
         StorageManager.resetState = () => {};
         StorageManager.connectFolder = () => {};
 
         const dom = createDomRefs(documentRef);
         delete dom.controls.exportBtn;
-        initUIBinder(dom, { snapshotHandle: null }, () => { updateCalls += 1; }, () => { debouncedCalls += 1; });
+        const binderState = { snapshotHandle: null, pendingInputMetadata: {} };
+        initUIBinder(dom, binderState, () => { updateCalls += 1; }, () => { debouncedCalls += 1; });
 
         UIBinder.bindUI();
         UIBinder.bindUI();
@@ -367,6 +370,16 @@ async function runBalanceUiOrchestrationTests() {
         dom.containers.form.listeners.input[0]({ target: { id: 'floorBedarf' } });
         assertEqual(debouncedCalls, 1, 'Ein Input-Event loest genau einen debounced Update aus');
         assertEqual(updateCalls, 0, 'Input-Event loest keinen direkten Update-Pfad aus');
+
+        dom.containers.form.listeners.input[0]({ target: { id: 'depotwertAlt' } });
+        assertEqual(saveCalls, 0, 'Depot-Input schreibt keinen State ausserhalb der Update-Pipeline');
+        assert(Number.isFinite(binderState.pendingInputMetadata.depotLastUpdate),
+            'Depot-Zeitstempel wird bis zum expliziten persist_inputs-Lauf vorgemerkt');
+
+        const debounceCallsBeforeFileChange = debouncedCalls;
+        dom.containers.form.listeners.change[0]({ target: { id: 'importFile', type: 'file' } });
+        assertEqual(debouncedCalls, debounceCallsBeforeFileChange,
+            'Dateiauswahl wird nur vom Import-Handler verarbeitet und plant keinen parallelen Persistenzlauf');
     }
 
     console.log('Test 2: Profilverbund init preserves membership and excludes opted-out profiles');
@@ -375,6 +388,12 @@ async function runBalanceUiOrchestrationTests() {
         const localStorageRef = createLocalStorageMock();
         installBrowserGlobals(documentRef, localStorageRef);
         PersistenceFacade.resetPersistenceForTests();
+        let migratedMainStateLoads = 0;
+        StorageManager.loadState = () => {
+            migratedMainStateLoads += 1;
+            return prevLoadState.call(StorageManager);
+        };
+        StorageManager.saveState = state => prevSaveState.call(StorageManager, state);
 
         const includedState = {
             inputs: {
@@ -384,8 +403,19 @@ async function runBalanceUiOrchestrationTests() {
                 renteAktiv: false,
                 renteMonatlich: 0
             },
-            lastState: { guardrailMarker: 'included-keep', taxState: { lossCarry: 111 } },
-            profilverbundHouseholdLastState: { householdGuardrail: 'household-keep' }
+            lastState: {
+                guardrailMarker: 'included-keep',
+                cumulativeInflationFactor: 99,
+                taxState: { lossCarry: 111 }
+            },
+            profilverbundHouseholdLastState: { householdGuardrail: 'household-keep' },
+            annualPeriodMetadata: {
+                schemaVersion: 1,
+                lastCommittedPeriod: 'calendar-year:2024',
+                pendingCommit: null
+            },
+            balanceStateLifecycle: { schemaVersion: 1, lastCommittedPeriod: 'calendar-year:2024' },
+            ageAdjustedForInflation: 66
         };
         const partnerState = {
             inputs: {
@@ -453,6 +483,18 @@ async function runBalanceUiOrchestrationTests() {
         registryAfterReload.profiles.partner.data[CONFIG.STORAGE.LS_KEY] = JSON.stringify(partnerState);
         registryAfterReload.profiles.excluded.data[CONFIG.STORAGE.LS_KEY] = JSON.stringify(excludedState);
         localStorageRef.setItem('rs_profiles_v1', JSON.stringify(registryAfterReload));
+        localStorageRef.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify({
+            ...includedState,
+            annualPeriodMetadata: {
+                lastCommittedPeriod: null,
+                pendingCommit: {
+                    periodId: 'calendar-year:2025',
+                    snapshotId: 'snapshot-multi',
+                    phase: 'writes_started'
+                }
+            },
+            ageAdjustedForInflation: 67
+        }));
 
         const selectedProfiles = loadProfilverbundProfiles();
         assertEqual(selectedProfiles.length, 2, 'Nur ausgewaehlte Profile werden fuer den Profilverbund geladen');
@@ -464,7 +506,8 @@ async function runBalanceUiOrchestrationTests() {
             flexBedarf: 0,
             flexBudgetAnnual: 0,
             flexBudgetYears: 0,
-            flexBudgetRecharge: 0
+            flexBudgetRecharge: 0,
+            depotLastUpdate: 123456
         };
         handlers.updateProfilverbundGlobals(selectedProfiles, aggregateInput);
         assertEqual(aggregateInput.tagesgeld, 30000, 'Opt-out-Vermoegen beeinflusst das Haushaltsaggregat nicht');
@@ -526,6 +569,26 @@ async function runBalanceUiOrchestrationTests() {
             'household-keep',
             'Input-only Persistenz erhaelt den Household-Guardrail-State'
         );
+        assertEqual(includedAfterInputPersistence.annualPeriodMetadata, undefined,
+            'Profil-State uebernimmt keine haushaltsweite Pending-Periode');
+        assertEqual(includedAfterInputPersistence.ageAdjustedForInflation, undefined,
+            'Profil-State uebernimmt keine ausschliesslich im Haupt-State gefuehrte Inflationsmetadaten');
+        assertEqual(includedAfterInputPersistence.inputs.depotLastUpdate, 123456,
+            'Profilverbund persistiert den vorgemerkten Depot-Zeitstempel im aktiven Profil');
+        const mainAfterInputPersistence = JSON.parse(localStorageRef.getItem(CONFIG.STORAGE.LS_KEY));
+        assertEqual(
+            mainAfterInputPersistence.annualPeriodMetadata.pendingCommit.phase,
+            'writes_started',
+            'Input-only Profilverbund-Write loescht die Pending-Periode nicht aus dem Haupt-State'
+        );
+        assertEqual(mainAfterInputPersistence.ageAdjustedForInflation, 67,
+            'Input-only Profilverbund-Write erhaelt die Inflationsmetadaten im Haupt-State');
+        assertEqual(mainAfterInputPersistence.inputs.depotLastUpdate, 123456,
+            'Profilverbund persistiert den Depot-Zeitstempel auch im Haupt-State');
+        assertEqual(mainAfterInputPersistence.lastState.cumulativeInflationFactor, 1,
+            'Input-only Write schreibt die migrierte Main-State-Sicht nicht aus rohen Profildaten zurueck');
+        assert(migratedMainStateLoads > 0,
+            'Aktiver Profilverbund-Write liest seine Merge-Basis ueber den migrierenden StorageManager');
 
         handlers.persistProfilverbundProfileStates(runs, {
             lifecycle: { schemaVersion: 1, lastCommittedPeriod: 'calendar-year:2025' }
@@ -543,8 +606,48 @@ async function runBalanceUiOrchestrationTests() {
             'Gemeinsamer Haushalts-Guardrail-State bleibt separat erhalten');
         assertClose(includedPersisted.profilverbundHouseholdLastState.taxState.lossCarry, 0, 0.001,
             'Nicht autoritativer Haushalts-Steuerzustand wird vor der Persistenz neutralisiert');
-        assertEqual(includedPersisted.balanceStateLifecycle.lastCommittedPeriod, 'calendar-year:2025',
-            'Profilverbund-Commit speichert die gemeinsame Perioden-ID');
+        assertEqual(includedPersisted.balanceStateLifecycle, undefined,
+            'Profil-State uebernimmt keinen haushaltsweiten Lifecycle');
+        assertEqual(includedPersisted.annualPeriodMetadata, undefined,
+            'Profilverbund-Commit haelt Perioden-Metadaten aus den Profildaten heraus');
+        const mainAfterCommit = JSON.parse(localStorageRef.getItem(CONFIG.STORAGE.LS_KEY));
+        assertEqual(
+            mainAfterCommit.annualPeriodMetadata.pendingCommit.periodId,
+            'calendar-year:2025',
+            'Realer Profilverbund-Commit erhaelt die Perioden-Metadaten im Haupt-State'
+        );
+        assertEqual(mainAfterCommit.balanceStateLifecycle.lastCommittedPeriod, 'calendar-year:2025',
+            'Profilverbund-Commit speichert die gemeinsame Perioden-ID nur im Haupt-State');
+
+        localStorageRef.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify({
+            ...mainAfterCommit,
+            annualPeriodMetadata: {
+                schemaVersion: 1,
+                lastCommittedPeriod: 'calendar-year:2025',
+                pendingCommit: null
+            }
+        }));
+        const profileStatesAfterCommit = JSON.parse(localStorageRef.getItem('rs_profiles_v1'));
+        runs.forEach(run => {
+            run.balanceState = JSON.parse(
+                profileStatesAfterCommit.profiles[run.profileId].data[CONFIG.STORAGE.LS_KEY]
+            );
+        });
+        handlers.persistProfilverbundInputs(runs);
+        const mainAfterFollowingInput = JSON.parse(localStorageRef.getItem(CONFIG.STORAGE.LS_KEY));
+        assertEqual(
+            mainAfterFollowingInput.annualPeriodMetadata.lastCommittedPeriod,
+            'calendar-year:2025',
+            'Spaeterer Input-Write kann ein abgeschlossenes Haushaltsjahr nicht zuruecksetzen'
+        );
+        assertEqual(mainAfterFollowingInput.annualPeriodMetadata.pendingCommit, null,
+            'Spaeterer Input-Write kann keinen Phantom-Pending-Commit wiederbeleben');
+        const registryAfterFollowingInput = JSON.parse(localStorageRef.getItem('rs_profiles_v1'));
+        const includedAfterFollowingInput = JSON.parse(
+            registryAfterFollowingInput.profiles.included.data[CONFIG.STORAGE.LS_KEY]
+        );
+        assertEqual(includedAfterFollowingInput.annualPeriodMetadata, undefined,
+            'Auch der zweite reale Write haelt Haushaltsmetadaten aus dem Profil-State heraus');
     }
 
     console.log('Test 3: Balance import schema, legacy migration and fail-safe orchestration');
@@ -718,7 +821,8 @@ async function runBalanceUiOrchestrationTests() {
         };
         await dryRunFailHandlers.handleImport({ target: dryRunFailTarget });
         assertEqual(dryRunOptions.length, 1, 'Fehlgeschlagener Dry-Run fuehrt keinen zweiten Update-Lauf aus');
-        assertEqual(dryRunOptions[0].persist, false, 'Erste Engine-Pruefung ist explizit nicht persistent');
+        assertEqual(dryRunOptions[0].mode, BALANCE_UPDATE_MODE.PREVIEW,
+            'Erste Engine-Pruefung ist explizit nicht persistent');
         assertEqual(replaceCalls, 0, 'Fehlgeschlagener Dry-Run schreibt keine Live-Daten');
         assertEqual(dom.inputs.aktuellesAlter.value, '66', 'Fehlgeschlagener Dry-Run stellt die sichtbaren Eingaben wieder her');
         assert(errors[0].message.includes('Live-Daten wurden nicht verändert'), 'Dry-Run-Fehler nennt den unveraenderten Zustand');
@@ -739,8 +843,10 @@ async function runBalanceUiOrchestrationTests() {
         };
         await successHandlers.handleImport({ target: successTarget });
         assertEqual(successUpdateOptions.length, 2, 'Gueltiger Import durchlaeuft Dry-Run und persistentes Abschluss-Update');
-        assertEqual(successUpdateOptions[0].persist, false, 'Gueltiger Import prueft zuerst ohne Persistenz');
-        assertEqual(successUpdateOptions[1], undefined, 'Erst nach Recovery und Replace folgt das persistente Update');
+        assertEqual(successUpdateOptions[0].mode, BALANCE_UPDATE_MODE.PREVIEW,
+            'Gueltiger Import prueft zuerst ohne Persistenz');
+        assertEqual(successUpdateOptions[1].mode, BALANCE_UPDATE_MODE.PERSIST_INPUTS,
+            'Erst nach Recovery und Replace folgt ein explizites persist_inputs-Update');
         assertEqual(replaceCalls, 1, 'Gueltiger Import ersetzt den Balance-State genau einmal');
         assertEqual(rollbackCalls, 0, 'Erfolgreicher Import benoetigt keinen Rollback');
         assert(toasts.some(message => message.includes('Recovery-Snapshot')), 'Erfolgsmeldung bestaetigt den Recovery-Punkt');

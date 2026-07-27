@@ -170,14 +170,16 @@ export const UIBinder = {
     handleFormInput(e) {
         const targetId = e.target.id;
         if (targetId && (targetId.startsWith('depotwert') || targetId === 'goldWert')) {
-            const state = StorageManager.loadState();
-            state.inputs = { ...(state.inputs || {}), depotLastUpdate: Date.now() };
-            StorageManager.saveState(state);
+            appState.pendingInputMetadata = {
+                ...(appState.pendingInputMetadata || {}),
+                depotLastUpdate: Date.now()
+            };
         }
         debouncedUpdate();
     },
 
-    handleFormChange() {
+    handleFormChange(e) {
+        if (e?.target?.type === 'file') return;
         UIReader.applySideEffectsFromInputs();
         debouncedUpdate();
     },

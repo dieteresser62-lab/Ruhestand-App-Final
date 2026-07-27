@@ -33,11 +33,12 @@ import {
     BALANCE_UPDATE_MODE,
     BALANCE_UPDATE_STATUS,
     assertActiveEngineHandshake,
-    assertBalanceCandidateFresh,
+    assertBalanceCommitStillCurrent,
     assertBalancePeriodCommit,
     buildBalanceRendererPayload,
     calculateExpensesBudget,
     createBlockedUpdateResult,
+    createBalanceCommitBaseFingerprint,
     createBalanceFingerprint,
     createEngineHandshake,
     createUpdateFailureResult,
@@ -59,7 +60,8 @@ const appState = {
     diagnosisData: null,
     lastUpdateTimestamp: null,
     lastMarktData: null,
-    engineHandshake: null
+    engineHandshake: null,
+    pendingInputMetadata: {}
 };
 
 const PROFILVERBUND_STORAGE_KEYS = {
@@ -186,7 +188,10 @@ export function update(options = {}) {
         // 1. Read Inputs & State
         // Liest alle Formular-Eingaben und den letzten gespeicherten Zustand
         phase = 'validation';
-        const inputData = UIReader.readAllInputs();
+        const inputData = {
+            ...UIReader.readAllInputs(),
+            ...(appState.pendingInputMetadata || {})
+        };
         validateBalanceInputs(inputData);
         const profilverbundProfiles = loadProfilverbundProfiles();
         profilverbundHandlers.updateProfilverbundGlobals(profilverbundProfiles, inputData);
@@ -198,6 +203,12 @@ export function update(options = {}) {
         }
 
         const persistentState = StorageManager.loadState();
+        if (
+            inputData.depotLastUpdate === undefined
+            && Object.prototype.hasOwnProperty.call(persistentState?.inputs || {}, 'depotLastUpdate')
+        ) {
+            inputData.depotLastUpdate = persistentState.inputs.depotLastUpdate;
+        }
         const lastState = prepareEngineLastState(persistentState, inputData);
 
         // Profilverbund runs are computed only for multi-profile households.
@@ -205,16 +216,15 @@ export function update(options = {}) {
         if (request.mode === BALANCE_UPDATE_MODE.COMMIT_PERIOD) {
             assertBalancePeriodCommit(persistentState, request.periodId);
         }
-        const createBaseStateFingerprint = (state, profiles) => createBalanceFingerprint({
-            persistentState: state,
-            profilverbundStates: isMultiProfileHousehold
-                ? profiles.map(entry => ({
-                    profileId: entry.profileId,
-                    balanceState: entry.balanceState || null
-                }))
-                : null
-        });
-        const baseStateFingerprint = createBaseStateFingerprint(persistentState, profilverbundProfiles);
+        const createCurrentBaseStateFingerprint = (state, profiles) =>
+            createBalanceCommitBaseFingerprint({
+                persistentState: state,
+                profilverbundProfiles: isMultiProfileHousehold ? profiles : []
+            });
+        const baseStateFingerprint = createCurrentBaseStateFingerprint(
+            persistentState,
+            profilverbundProfiles
+        );
         const householdStateSource = profilverbundProfiles
             .find(entry => entry?.balanceState?.profilverbundHouseholdLastState)
             ?.balanceState || persistentState;
@@ -313,14 +323,20 @@ export function update(options = {}) {
         // Persistenz ist ausschliesslich nach erfolgreicher Validierung und Engine-Ausfuehrung erlaubt.
         if (request.mode !== BALANCE_UPDATE_MODE.PREVIEW && result.status === BALANCE_UPDATE_STATUS.SUCCESS) {
             phase = 'persistence';
+            let persistentStateForWrite = persistentState;
             if (request.mode === BALANCE_UPDATE_MODE.COMMIT_PERIOD) {
                 const currentPersistentState = StorageManager.loadState();
                 const currentProfiles = loadProfilverbundProfiles();
-                const currentBaseStateFingerprint = createBaseStateFingerprint(
+                const currentBaseStateFingerprint = createCurrentBaseStateFingerprint(
                     currentPersistentState,
                     currentProfiles
                 );
-                assertBalanceCandidateFresh(baseStateFingerprint, currentBaseStateFingerprint);
+                persistentStateForWrite = assertBalanceCommitStillCurrent({
+                    expectedBaseFingerprint: baseStateFingerprint,
+                    currentBaseFingerprint: currentBaseStateFingerprint,
+                    currentPersistentState,
+                    periodId: request.periodId
+                });
             }
             result.persistence = persistBalanceUpdate({
                 mode: request.mode,
@@ -328,11 +344,12 @@ export function update(options = {}) {
                 profilverbundRuns,
                 profilverbundHandlers,
                 storageManager: StorageManager,
-                persistentState,
+                persistentState: persistentStateForWrite,
                 inputData,
                 modelResult,
                 fingerprints
             });
+            appState.pendingInputMetadata = {};
 
             profilverbundHandlers.refreshProfilverbundBalance();
         }

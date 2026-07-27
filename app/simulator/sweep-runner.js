@@ -62,6 +62,8 @@ export const SWEEP_SAMPLING_FINGERPRINT_VERSION = 'SweepSamplingFingerprintV1';
 
 const MAX_FINGERPRINT_TRACE_RUNS = 3;
 const MAX_FINGERPRINT_TRACE_YEARS = 64;
+const FINGERPRINT_RUN_SEPARATOR = 0xFFFFFFFD;
+const FINGERPRINT_UNKNOWN_YEAR = 0xFFFFFFFE;
 const ANNUAL_DATA_INDEX_BY_YEAR = new Map(
     annualData.map((entry, index) => [Number(entry?.jahr), index])
 );
@@ -71,13 +73,14 @@ function updateFingerprintHash(hash, value) {
     return Math.imul((hash ^ normalized) >>> 0, 0x01000193) >>> 0;
 }
 
-function createSweepSamplingFingerprint(request) {
+function createSweepSamplingFingerprint(request, combinationIndex) {
     return {
         hash: 0x811C9DC5,
         publicValue: {
             schemaVersion: SWEEP_SAMPLING_FINGERPRINT_VERSION,
             hashAlgorithm: 'fnv1a32_run_and_historical_index_sequence',
             hash: null,
+            combinationIndex,
             requestedSamplingMethod: request.requestedSamplingMethod,
             appliedSamplingMethod: request.appliedSamplingMethod,
             tracedRuns: [],
@@ -87,7 +90,7 @@ function createSweepSamplingFingerprint(request) {
 }
 
 function beginSweepFingerprintRun(fingerprint, runIndex) {
-    fingerprint.hash = updateFingerprintHash(fingerprint.hash, 0xFFFFFFFF);
+    fingerprint.hash = updateFingerprintHash(fingerprint.hash, FINGERPRINT_RUN_SEPARATOR);
     fingerprint.hash = updateFingerprintHash(fingerprint.hash, runIndex);
     if (fingerprint.publicValue.tracedRuns.length >= MAX_FINGERPRINT_TRACE_RUNS) {
         fingerprint.publicValue.truncated = true;
@@ -100,7 +103,9 @@ function beginSweepFingerprintRun(fingerprint, runIndex) {
 
 function recordSweepFingerprintYear(fingerprint, trace, yearData) {
     const historicalIndex = ANNUAL_DATA_INDEX_BY_YEAR.get(Number(yearData?.jahr));
-    const normalizedIndex = Number.isInteger(historicalIndex) ? historicalIndex : -1;
+    const normalizedIndex = Number.isInteger(historicalIndex)
+        ? historicalIndex
+        : FINGERPRINT_UNKNOWN_YEAR;
     fingerprint.hash = updateFingerprintHash(fingerprint.hash, normalizedIndex);
     if (!trace) return;
     if (trace.historicalYearIndices.length >= MAX_FINGERPRINT_TRACE_YEARS) {
@@ -115,15 +120,20 @@ function finalizeSweepSamplingFingerprint(fingerprint) {
     return fingerprint.publicValue;
 }
 
-function buildSweepResultProvenance(request, samplingDiagnostics, samplingFingerprint) {
+function buildSweepResultProvenance(request, combinationIndex, samplingDiagnostics, samplingFingerprint) {
     return {
         schemaVersion: SWEEP_RESULT_PROVENANCE_VERSION,
         requestVersion: request.schemaVersion,
+        combinationIndex,
         requestedSamplingMethod: request.requestedSamplingMethod,
         appliedSamplingMethod: request.appliedSamplingMethod,
+        samplingMethodResolution: request.samplingMethodResolution,
         useCapeSampling: request.useCapeSampling,
         normalizedParameters: { ...request.monteCarloParameters },
-        samplingDiagnostics,
+        unsupportedOverlays: ['tailRisk'],
+        samplingDiagnostics: samplingDiagnostics
+            ? { ...samplingDiagnostics, tailRisk: null }
+            : null,
         samplingFingerprint
     };
 }
@@ -262,7 +272,7 @@ export function runSweepChunk({
     refP2Invariants = null,
     engine = null
 }) {
-    const normalizedRequest = normalizeSweepRequestV1(sweepRequest ?? sweepConfig ?? {}, {
+    const normalizedRequest = normalizeSweepRequestV1(sweepRequest ?? sweepConfig, {
         inputs: baseInputs,
         historicalRecordCount: annualData.length || null
     });
@@ -279,6 +289,24 @@ export function runSweepChunk({
         excludeEstimatedHistory
     } = normalizedRequest.monteCarloParameters;
     const { useCapeSampling } = normalizedRequest;
+    const yearSamplingConfig = buildYearSamplingConfig(startYearMode, annualData, {
+        startYearFilter,
+        startYearHalfLife,
+        blockSize,
+        excludeEstimatedHistory
+    });
+    const samplingResolution = resolveMonteCarloSamplingContractV1({
+        method: methode,
+        inputs: baseInputs,
+        annualData,
+        useCapeSampling,
+        startYearMode,
+        startYearFilter,
+        startYearHalfLife,
+        blockSize,
+        excludeEstimatedHistory,
+        yearSamplingConfig
+    });
     const start = comboRange?.start ?? 0;
     const count = comboRange?.count ?? paramCombinations.length;
 
@@ -296,34 +324,16 @@ export function runSweepChunk({
                 comboIdx,
                 params,
                 metrics: makeInvalidSweepMetrics(validation.reason),
-                provenance: buildSweepResultProvenance(normalizedRequest, null, null)
+                provenance: buildSweepResultProvenance(normalizedRequest, comboIdx, null, null)
             });
             continue;
         }
         const inputs = buildSweepInputs(baseInputs, params);
-        const yearSamplingConfig = buildYearSamplingConfig(startYearMode, annualData, {
-            startYearFilter,
-            startYearHalfLife,
-            blockSize,
-            excludeEstimatedHistory
-        });
-        const samplingResolution = resolveMonteCarloSamplingContractV1({
-            method: methode,
-            inputs,
-            annualData,
-            useCapeSampling,
-            startYearMode,
-            startYearFilter,
-            startYearHalfLife,
-            blockSize,
-            excludeEstimatedHistory,
-            yearSamplingConfig
-        });
         const samplingDiagnostics = createMonteCarloSamplingDiagnosticsV1({
             contract: samplingResolution.contract,
             dataVersion: getDataVersion()
         });
-        const samplingFingerprint = createSweepSamplingFingerprint(normalizedRequest);
+        const samplingFingerprint = createSweepSamplingFingerprint(normalizedRequest, comboIdx);
 
         const p2Invariants = extractP2Invariants(inputs);
         if (!resolvedRef) {
@@ -476,6 +486,7 @@ export function runSweepChunk({
         finalizeMonteCarloSamplingDiagnosticsV1(samplingDiagnostics);
         const resultProvenance = buildSweepResultProvenance(
             normalizedRequest,
+            comboIdx,
             samplingDiagnostics,
             finalizeSweepSamplingFingerprint(samplingFingerprint)
         );

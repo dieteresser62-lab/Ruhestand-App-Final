@@ -16,7 +16,7 @@ import {
     importProfilesBundleFromWindowName as importProfilesBundleFromWindowNameFromIo
 } from './profile-bundle-io.js';
 import {
-    captureProfileData,
+    captureProfileData as captureLiveProfileData,
     hasProfileScopedDataInLocalStorage,
     loadProfileDataIntoLocalStorage
 } from './profile-live-storage.js';
@@ -34,6 +34,72 @@ import {
     setProfileVerbundMembership as setProfileVerbundMembershipInRegistry,
     updateProfileData as updateProfileDataInRegistry
 } from './profile-registry.js';
+import { CONFIG } from '../balance/balance-config.js';
+
+export const HOUSEHOLD_OWNED_BALANCE_STATE_KEYS = Object.freeze([
+    'annualPeriodMetadata',
+    'balanceStateLifecycle',
+    'ageAdjustedForInflation',
+    'annualMarketDataMeta',
+    'capeMeta'
+]);
+
+function parseBalanceState(raw) {
+    if (raw === null || raw === undefined || raw === '') return null;
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw;
+    try {
+        const parsed = JSON.parse(String(raw));
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+            ? parsed
+            : null;
+    } catch {
+        return null;
+    }
+}
+
+export function createProfileOwnedBalanceState(state = {}) {
+    const profileState = { ...state };
+    HOUSEHOLD_OWNED_BALANCE_STATE_KEYS.forEach(key => {
+        delete profileState[key];
+    });
+    return profileState;
+}
+
+function createHouseholdOwnedBalanceState(state = {}) {
+    return Object.fromEntries(
+        HOUSEHOLD_OWNED_BALANCE_STATE_KEYS
+            .filter(key => Object.prototype.hasOwnProperty.call(state, key))
+            .map(key => [key, state[key]])
+    );
+}
+
+function sanitizeStoredProfileBalanceState(raw) {
+    const parsed = parseBalanceState(raw);
+    if (!parsed) return { raw, changed: false };
+    const changed = HOUSEHOLD_OWNED_BALANCE_STATE_KEYS.some(
+        key => Object.prototype.hasOwnProperty.call(parsed, key)
+    );
+    return {
+        raw: changed ? JSON.stringify(createProfileOwnedBalanceState(parsed)) : raw,
+        changed
+    };
+}
+
+function sanitizeProfileDataBalanceOwnership(data) {
+    if (!data || typeof data !== 'object') return data;
+    const key = CONFIG.STORAGE.LS_KEY;
+    if (!Object.prototype.hasOwnProperty.call(data, key)) return data;
+    const sanitized = sanitizeStoredProfileBalanceState(data[key]);
+    if (!sanitized.changed) return data;
+    return {
+        ...data,
+        [key]: sanitized.raw
+    };
+}
+
+function captureProfileData() {
+    return sanitizeProfileDataBalanceOwnership(captureLiveProfileData());
+}
 
 const PROFILE_STORAGE_KEY = PROFILE_STORAGE_KEYS.registry;
 const ACTIVE_PROFILE_KEY = PROFILE_STORAGE_KEYS.active;
@@ -92,7 +158,22 @@ export function loadProfileIntoLocalStorage(id) {
     const registry = ensureRegistryWithLiveSnapshot();
     const profile = registry.profiles[id];
     if (!profile) return false;
-    loadProfileDataIntoLocalStorage(profile.data);
+    const currentMainState = parseBalanceState(persistenceStorage.getItem(CONFIG.STORAGE.LS_KEY));
+    const householdState = createHouseholdOwnedBalanceState(currentMainState || {});
+    const sanitizedData = sanitizeProfileDataBalanceOwnership(profile.data);
+    if (sanitizedData !== profile.data) {
+        replaceProfileData(id, sanitizedData, { captureProfileData });
+    }
+    loadProfileDataIntoLocalStorage(sanitizedData);
+    const loadedProfileState = parseBalanceState(persistenceStorage.getItem(CONFIG.STORAGE.LS_KEY));
+    if (loadedProfileState) {
+        persistenceStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify({
+            ...createProfileOwnedBalanceState(loadedProfileState),
+            ...householdState
+        }));
+    } else if (Object.keys(householdState).length > 0) {
+        persistenceStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify(householdState));
+    }
     persistenceStorage.setItem(ACTIVE_PROFILE_KEY, id);
     return true;
 }

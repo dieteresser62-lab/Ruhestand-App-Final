@@ -576,6 +576,72 @@ console.log('Test 9: versioned Sweep request worker parity');
             'worker and serial Sweep return identical request and sampling provenance'
         );
 
+        let missingSerialError = null;
+        try {
+            runSweepChunk({
+                baseInputs,
+                paramCombinations,
+                comboRange: { start: 0, count: 1 },
+                engine: EngineAPI
+            });
+        } catch (error) {
+            missingSerialError = error;
+        }
+        const missing = await postAndWait(worker, {
+            type: 'sweep',
+            jobId: 'sweep-missing-request-v1',
+            comboRange: { start: 0, count: 1 }
+        });
+        assertEqual(missing.message.type, 'error', 'worker rejects a missing Sweep request');
+        assertEqual(
+            missing.message.code,
+            'SWEEP_REQUEST_OBJECT_REQUIRED',
+            'worker rejects missing Sweep requests before applying the 10,000-run MC default'
+        );
+        assertEqual(
+            missing.message.message,
+            missingSerialError?.message,
+            'worker and serial Sweep expose the same missing-request error'
+        );
+
+        const emptyRegimePoolRequest = {
+            ...sweepRequest,
+            monteCarloParameters: {
+                ...sweepRequest.monteCarloParameters,
+                methode: 'regime_markov',
+                startYearFilter: annualData.at(-1).jahr
+            }
+        };
+        let emptyPoolSerialError = null;
+        try {
+            runSweepChunk({
+                baseInputs,
+                paramCombinations,
+                comboRange: { start: 0, count: 1 },
+                sweepRequest: emptyRegimePoolRequest,
+                engine: EngineAPI
+            });
+        } catch (error) {
+            emptyPoolSerialError = error;
+        }
+        const emptyPool = await postAndWait(worker, {
+            type: 'sweep',
+            jobId: 'sweep-empty-regime-pool-v1',
+            sweepRequest: emptyRegimePoolRequest,
+            comboRange: { start: 0, count: 1 }
+        });
+        assertEqual(emptyPool.message.type, 'error', 'worker rejects an empty drawable regime pool');
+        assertEqual(
+            emptyPool.message.code,
+            'MC_SAMPLING_REGIME_POOL_EMPTY',
+            'worker exposes the stable empty-regime-pool code'
+        );
+        assertEqual(
+            emptyPool.message.message,
+            emptyPoolSerialError?.message,
+            'worker and serial Sweep expose the same empty-regime-pool error'
+        );
+
         const invalidSweepRequest = {
             ...sweepRequest,
             monteCarloParameters: {

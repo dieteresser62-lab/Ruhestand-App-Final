@@ -26,7 +26,11 @@
       "Bash(QUICK_TESTS=1 npm test:*)",
       "Bash(comm:*)",
       "Bash(xxd:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(awk 'NR<=375 && /^export function|^function |^    applyAnnualInflation|applyAnnualInflation\\\\s*[=\\(]/ {print NR\": \"$0}' app/balance/balance-annual-inflation.js)",
+      "Bash(awk '/^## Review-Feedback von Claude/,/^### Review-Ergebnis/' docs/internal/SLICE_SUITE_DATA_01_BALANCE_PREVIEW_COMMIT.md)",
+      "Bash(python -)",
+      "Bash(git hash-object *)"
     ]
   }
 }

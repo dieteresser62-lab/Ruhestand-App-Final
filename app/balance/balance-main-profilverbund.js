@@ -10,7 +10,14 @@
 
 import { CONFIG } from './balance-config.js';
 import { UIReader } from './balance-reader.js';
-import { listProfiles, saveCurrentProfileFromLocalStorage, setProfileVerbundMembership, updateProfileData, getCurrentProfileId } from '../profile/profile-storage.js';
+import {
+    createProfileOwnedBalanceState,
+    listProfiles,
+    saveCurrentProfileFromLocalStorage,
+    setProfileVerbundMembership,
+    updateProfileData,
+    getCurrentProfileId
+} from '../profile/profile-storage.js';
 import {
     loadProfilverbundProfiles,
     aggregateProfilverbundInputs,
@@ -25,6 +32,7 @@ import {
     reconcileHouseholdLiquidityKpis
 } from '../profile/profilverbund-action-attribution.js';
 import { persistenceStorage } from '../shared/persistence-facade.js';
+import { StorageManager } from './balance-storage.js';
 
 export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS }) {
     let profilverbundBound = false;
@@ -190,12 +198,18 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
         return runs.finalAction;
     };
 
-    const writeProfileBalanceState = (profileId, nextState) => {
+    const writeProfileBalanceState = (profileId, nextState, { mainStatePatch = {} } = {}) => {
+        const isActiveProfile = profileId === getCurrentProfileId();
+        const profileState = createProfileOwnedBalanceState(nextState);
         updateProfileData(profileId, {
-            [CONFIG.STORAGE.LS_KEY]: JSON.stringify(nextState)
+            [CONFIG.STORAGE.LS_KEY]: JSON.stringify(profileState)
         });
-        if (profileId === getCurrentProfileId()) {
-            persistenceStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify(nextState));
+        if (isActiveProfile) {
+            const currentMainState = StorageManager.loadState();
+            StorageManager.saveState({
+                ...currentMainState,
+                ...mainStatePatch
+            });
         }
     };
 
@@ -207,11 +221,19 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
                 inputs: run.persistedInput || run.input,
                 profilverbundHouseholdInputs: runs.householdInput || existing.profilverbundHouseholdInputs
             };
-            writeProfileBalanceState(run.profileId, nextState);
+            writeProfileBalanceState(run.profileId, nextState, {
+                mainStatePatch: {
+                    inputs: nextState.inputs,
+                    profilverbundHouseholdInputs: nextState.profilverbundHouseholdInputs
+                }
+            });
         });
     };
 
     const persistProfilverbundProfileStates = (runs, { lifecycle = null } = {}) => {
+        // Steuerliche Verlustvortraege sind pro Profil autoritativ. Der
+        // Haushalts-State dient nur als gemeinsamer Guardrail-Kontext und darf
+        // keinen zweiten, konkurrierenden Verlusttopf fortschreiben.
         const householdNewState = runs.householdResult?.newState
             ? { ...runs.householdResult.newState, taxState: { lossCarry: 0 } }
             : null;
@@ -222,10 +244,17 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
                 inputs: run.persistedInput || run.input,
                 lastState: run.newState,
                 profilverbundHouseholdInputs: runs.householdInput || existing.profilverbundHouseholdInputs,
-                profilverbundHouseholdLastState: householdNewState || existing.profilverbundHouseholdLastState,
-                ...(lifecycle ? { balanceStateLifecycle: lifecycle } : {})
+                profilverbundHouseholdLastState: householdNewState || existing.profilverbundHouseholdLastState
             };
-            writeProfileBalanceState(run.profileId, nextState);
+            writeProfileBalanceState(run.profileId, nextState, {
+                mainStatePatch: {
+                    inputs: nextState.inputs,
+                    lastState: nextState.lastState,
+                    profilverbundHouseholdInputs: nextState.profilverbundHouseholdInputs,
+                    profilverbundHouseholdLastState: nextState.profilverbundHouseholdLastState,
+                    ...(lifecycle ? { balanceStateLifecycle: lifecycle } : {})
+                }
+            });
         });
     };
 

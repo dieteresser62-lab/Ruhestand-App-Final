@@ -12,6 +12,7 @@ import { UIUtils } from './balance-utils.js';
 import { UIRenderer } from './balance-renderer.js';
 import { StorageManager } from './balance-storage.js';
 import { deriveCompletedCalendarYear } from './balance-annual-period.js';
+import { BALANCE_UPDATE_MODE } from './balance-update-pipeline.js';
 
 export const INFLATION_RESULT_METRIC = 'consumer_prices_all_items_annual_average_growth_pct';
 
@@ -372,7 +373,7 @@ export function createInflationHandlers({
         });
         state.ageAdjustedForInflation = currentAge;
         StorageManager.saveState(state);
-        update();
+        update({ mode: BALANCE_UPDATE_MODE.PERSIST_INPUTS });
     };
 
     const applyInflationToBedarfe = rateOverride => {

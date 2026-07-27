@@ -6,6 +6,7 @@ import { StorageManager } from '../app/balance/balance-storage.js';
 import { UIRenderer } from '../app/balance/balance-renderer.js';
 import { CONFIG } from '../app/balance/balance-config.js';
 import { UIUtils } from '../app/balance/balance-utils.js';
+import { BALANCE_UPDATE_MODE } from '../app/balance/balance-update-pipeline.js';
 
 console.log('--- Balance Annual Inflation Tests ---');
 
@@ -347,6 +348,21 @@ try {
         assertEqual(requestCount, 2, 'Timeout should continue with the next source');
         assertEqual(result.fetchStatus, 'ok_fallback_world_bank', 'Timeout fallback should report its source path');
         assertEqual(cleared.length, 2, 'Timed-out and successful requests should both clean up timers');
+    }
+
+    console.log('Test 9: need mutations request explicit input-only persistence');
+    {
+        localStorage.clear();
+        const dom = createDom();
+        const updateRequests = [];
+        const handlers = createHandlers(dom, {
+            update: request => { updateRequests.push(request); }
+        });
+
+        handlers.applyInflationToBedarfe();
+        assertEqual(updateRequests.length, 1, 'Need mutation triggers exactly one update');
+        assertEqual(updateRequests[0].mode, BALANCE_UPDATE_MODE.PERSIST_INPUTS,
+            'Need mutation never relies on the update default');
     }
 
     console.log('Balance annual inflation tests passed');

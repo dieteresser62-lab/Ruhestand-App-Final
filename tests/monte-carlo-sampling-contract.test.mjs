@@ -204,34 +204,49 @@ for (const method of ['block', 'stationary', 'regime_markov', 'regime_iid']) {
     }
     if (method === 'regime_markov') {
         assertEqual(diagnostics.contract.regimePolicy, 'initial_record_then_markov_transition', 'Markov transitions start after the selected record');
+        assertEqual(diagnostics.contract.emptyRegimePoolPolicy, 'reject_request', 'Markov rejects a request with an empty drawable regime pool');
+        assert(
+            diagnostics.contract.precedence.includes('effective_year_universe_validation'),
+            'Markov precedence explicitly documents the effective-year-universe validation'
+        );
     }
     if (method === 'regime_iid') {
         assertEqual(diagnostics.contract.regimePolicy, 'initial_record_then_iid', 'IID draws start after the selected record');
+        assertEqual(diagnostics.contract.emptyRegimePoolPolicy, 'reject_request', 'regime IID rejects a request with an empty drawable regime pool');
+        assert(
+            diagnostics.contract.precedence.includes('effective_year_universe_validation'),
+            'regime IID precedence explicitly documents the effective-year-universe validation'
+        );
     }
 }
 
 {
     const lastHistoricalYear = annualData.at(-1).jahr;
-    const chunk = await runCase('regime_markov', {
-        params: {
-            maxDauer: 5,
-            startYearMode: 'FILTER',
-            startYearFilter: lastHistoricalYear,
-            excludeEstimatedHistory: true
-        },
-        useCapeSampling: false
-    });
-    const rows = chunk.runMeta?.[0]?.logDataRows || [];
-    assertEqual(rows.length, 5, 'filtered Markov reference path remains inspectable for the full horizon');
-    assert(
-        rows.every(row => Number(row.histJahr) === Number(lastHistoricalYear)),
-        'every Markov draw remains inside the only eligible filtered historical record'
-    );
-    assert(
-        Object.keys(chunk.samplingDiagnostics.historicalYearCounts)
-            .every(year => Number(year) === Number(lastHistoricalYear)),
-        'Markov diagnostics expose no draw outside the effective filtered universe'
-    );
+    for (const method of ['regime_markov', 'regime_iid']) {
+        let rejected = null;
+        try {
+            await runCase(method, {
+                params: {
+                    maxDauer: 5,
+                    startYearMode: 'FILTER',
+                    startYearFilter: lastHistoricalYear,
+                    excludeEstimatedHistory: true
+                },
+                useCapeSampling: false
+            });
+        } catch (error) {
+            rejected = error;
+        }
+        assertEqual(
+            rejected?.code,
+            'MC_SAMPLING_REGIME_POOL_EMPTY',
+            `${method} fails closed before execution when a drawable regime has no filtered year`
+        );
+        assert(
+            rejected?.message.includes('BEAR'),
+            `${method} names a missing drawable regime in the controlled error`
+        );
+    }
 }
 
 {
@@ -251,6 +266,40 @@ for (const method of ['block', 'stationary', 'regime_markov', 'regime_iid']) {
     assertEqual(tail.evaluatedYears, chunk.totals.tailRiskEvaluatedYears, 'tail-risk evaluated-year diagnostics reconcile with chunk totals');
     assertEqual(tail.appliedYears, chunk.totals.tailRiskAppliedYears, 'tail-risk applied-year diagnostics reconcile with chunk totals');
     assertEqual(chunk.samplingDiagnostics.contract.precedence.at(-1), 'tail_risk_overlay', 'tail risk is explicitly the last sampling stage');
+}
+
+{
+    const yearSamplingConfig = buildYearSamplingConfig('FILTER', annualData, {
+        startYearFilter: 1970,
+        blockSize: 3,
+        excludeEstimatedHistory: true
+    });
+    const before = JSON.stringify({
+        blockStartIndices: yearSamplingConfig.blockStartIndices,
+        blockSampler: yearSamplingConfig.blockSampler,
+        allowedIndices: yearSamplingConfig.allowedIndices
+    });
+    const resolution = resolveMonteCarloSamplingContractV1({
+        method: 'block',
+        inputs: buildInputs(),
+        annualData,
+        useCapeSampling: false,
+        startYearMode: 'FILTER',
+        startYearFilter: 1970,
+        blockSize: 3,
+        excludeEstimatedHistory: true,
+        yearSamplingConfig
+    });
+    const after = JSON.stringify({
+        blockStartIndices: yearSamplingConfig.blockStartIndices,
+        blockSampler: yearSamplingConfig.blockSampler,
+        allowedIndices: yearSamplingConfig.allowedIndices
+    });
+    assertEqual(after, before, 'sampling-contract resolution does not mutate the caller-owned sampling config');
+    assert(
+        resolution.effectiveYearSamplingConfig !== yearSamplingConfig,
+        'sampling-contract resolution returns an isolated effective config'
+    );
 }
 
 {

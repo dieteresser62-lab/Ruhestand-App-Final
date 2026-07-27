@@ -33,6 +33,7 @@ import {
 } from '../app/simulator/sweep-runner.js';
 import {
     SWEEP_REQUEST_VERSION,
+    SWEEP_SAMPLING_METHOD_RESOLUTION,
     normalizeSweepRequestV1
 } from '../app/simulator/monte-carlo-parameters.js';
 import { runMonteCarloChunk } from '../app/simulator/monte-carlo-runner.js';
@@ -941,7 +942,10 @@ console.log('Test 29: O-11 - expliziter Stationary-/Markov-Dispatch mit Indexfin
         baseInputs,
         paramCombinations: [samplingTestCombination],
         comboRange: { start: 0, count: 1 },
-        sweepRequest: buildSweepRequest('regime_markov', requestOverrides)
+        sweepRequest: buildSweepRequest('regime_markov', {
+            ...requestOverrides,
+            startYearFilter: 2000
+        })
     }).results[0];
 
     const stationaryFingerprint = stationary.provenance.samplingFingerprint;
@@ -955,8 +959,13 @@ console.log('Test 29: O-11 - expliziter Stationary-/Markov-Dispatch mit Indexfin
         'stationary exact reference path remains anchored to the only eligible historical index'
     );
     assert(
-        markovFingerprint.tracedRuns[0].historicalYearIndices.every(index => index === lastHistoricalIndex),
-        'regime Markov exact reference path remains inside the only eligible historical index'
+        markovFingerprint.tracedRuns[0].historicalYearIndices
+            .every(index => Number(annualData[index]?.jahr) >= 2000),
+        'regime Markov exact reference path remains inside its prevalidated filtered universe'
+    );
+    assert(
+        markovFingerprint.hash !== stationaryFingerprint.hash,
+        'stationary and regime Markov produce distinct sampling fingerprints'
     );
     assertEqual(stationary.provenance.appliedSamplingMethod, 'stationary', 'stationary provenance names the applied sampler');
     assertEqual(markov.provenance.appliedSamplingMethod, 'regime_markov', 'Markov provenance names the applied sampler');
@@ -968,6 +977,10 @@ console.log('Test 29: O-11 - expliziter Stationary-/Markov-Dispatch mit Indexfin
         markov.provenance.samplingDiagnostics.stationaryRestartCounts.initial,
         0,
         'Markov dispatch does not pass through the stationary sampler'
+    );
+    assert(
+        (markov.provenance.samplingDiagnostics.sourceCounts.regime_markov || 0) > 0,
+        'Markov dispatch records draws from the Markov sampler'
     );
     console.log('✓ O-11 expliziter Stationary-/Markov-Dispatch OK');
 }
@@ -1021,15 +1034,31 @@ console.log('Test 31: Sweep Startjahrfilter und Estimated-History-Ausschluss');
     }).results[0];
     const tracedIndices = result.provenance.samplingFingerprint.tracedRuns
         .flatMap(run => run.historicalYearIndices);
+    const countedYears = Object.keys(
+        result.provenance.samplingDiagnostics.historicalYearCounts
+    ).map(Number);
     assert(tracedIndices.length > 0, 'filtered Sweep exposes inspected historical indices');
     assert(
         tracedIndices.every(index => Number(annualData[index]?.jahr) >= filterYear),
         'every inspected Sweep draw satisfies the configured start-year filter'
     );
+    assert(
+        countedYears.length > 0 && countedYears.every(year => year >= filterYear),
+        'the complete historical-year counter satisfies filter and estimated-history exclusion'
+    );
     assertEqual(
         result.provenance.samplingDiagnostics.contract.excludeEstimatedHistory,
         true,
         'sampling diagnostics retain estimated-history exclusion'
+    );
+    assertEqual(
+        result.provenance.samplingDiagnostics.tailRisk,
+        null,
+        'Sweep provenance represents its unsupported tail-risk overlay as missing instead of zero'
+    );
+    assert(
+        result.provenance.unsupportedOverlays.includes('tailRisk'),
+        'Sweep provenance explicitly names tail risk as unsupported'
     );
     console.log('✓ Sweep Startjahrfilter und Estimated-History-Ausschluss OK');
 }
@@ -1080,7 +1109,12 @@ console.log('Test 32: Single-Combination-Sweep/MC Samplingparitaet');
     assertEqual(
         sweep.results[0].provenance.requestedSamplingMethod,
         sweep.results[0].provenance.appliedSamplingMethod,
-        'result provenance distinguishes and reconciles requested/applied method'
+        'strict method validation preserves requested/applied equality'
+    );
+    assertEqual(
+        sweep.results[0].provenance.samplingMethodResolution,
+        SWEEP_SAMPLING_METHOD_RESOLUTION,
+        'result provenance explains requested/applied equality as strict no-fallback validation'
     );
     console.log('✓ Single-Combination-Sweep/MC Samplingparitaet OK');
 }
@@ -1107,6 +1141,84 @@ console.log('Test 33: Unbekannte Sweep-Methode');
     }
     assertEqual(thrown?.code, 'MC_PARAMETER_ENUM_INVALID', 'unknown Sweep method is rejected by the canonical parameter contract');
     console.log('✓ Unbekannte Sweep-Methode OK');
+}
+
+// Test 34: Fehlender Sweep-Request wird fail-closed abgewiesen
+console.log('Test 34: Fehlender Sweep-Request');
+{
+    let thrown = null;
+    try {
+        runSweepChunk({
+            baseInputs: buildSamplingTestInputs(),
+            paramCombinations: [samplingTestCombination],
+            comboRange: { start: 0, count: 1 }
+        });
+    } catch (error) {
+        thrown = error;
+    }
+    assertEqual(
+        thrown?.code,
+        'SWEEP_REQUEST_OBJECT_REQUIRED',
+        'missing Sweep request fails closed before any default run count can be scheduled'
+    );
+    console.log('✓ Fehlender Sweep-Request OK');
+}
+
+// Test 35: Provenienz bindet den Seedraum an den globalen Kombinationsindex
+console.log('Test 35: Sweep Kombinationsindex-Provenienz');
+{
+    const result = runSweepChunk({
+        baseInputs: buildSamplingTestInputs(),
+        paramCombinations: [samplingTestCombination, samplingTestCombination],
+        comboRange: { start: 1, count: 1 },
+        sweepRequest: buildSweepRequest('stationary', {
+            anzahl: 1,
+            maxDauer: 1,
+            seed: 4242
+        })
+    }).results[0];
+    assertEqual(result.comboIdx, 1, 'chunk result retains the global combination index');
+    assertEqual(
+        result.provenance.combinationIndex,
+        1,
+        'result provenance identifies the combination coordinate used by makeRunSeed'
+    );
+    assertEqual(
+        result.provenance.samplingFingerprint.combinationIndex,
+        1,
+        'sampling fingerprint identifies the same combination coordinate'
+    );
+    console.log('✓ Sweep Kombinationsindex-Provenienz OK');
+}
+
+// Test 36: Leerer Pool eines ziehbaren Regimes blockiert vor dem Sweep
+console.log('Test 36: Sweep Regime-Pool Fail-Closed');
+{
+    const lastHistoricalYear = annualData.at(-1).jahr;
+    for (const method of ['regime_markov', 'regime_iid']) {
+        let thrown = null;
+        try {
+            runSweepChunk({
+                baseInputs: buildSamplingTestInputs(),
+                paramCombinations: [samplingTestCombination],
+                comboRange: { start: 0, count: 1 },
+                sweepRequest: buildSweepRequest(method, {
+                    anzahl: 1,
+                    maxDauer: 1,
+                    startYearMode: 'FILTER',
+                    startYearFilter: lastHistoricalYear
+                })
+            });
+        } catch (error) {
+            thrown = error;
+        }
+        assertEqual(
+            thrown?.code,
+            'MC_SAMPLING_REGIME_POOL_EMPTY',
+            `${method} rejects an empty drawable regime pool before scheduling runs`
+        );
+    }
+    console.log('✓ Sweep Regime-Pool Fail-Closed OK');
 }
 
 console.log('--- Simulator Sweep Tests Abgeschlossen ---');

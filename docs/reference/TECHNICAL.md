@@ -610,6 +610,23 @@ Floor, Flex, Dynamic Flex, Renten, sonstige Einkuenfte und die strategische Tran
 
 Profilaktionen sind anschliessend reine Attributionen dieser Haushaltsaktion. Sie duerfen weder neue Kauf-/Verkaufszwecke noch gegenlaeufige Transaktionen erzeugen. Jede Verkaufstranche behaelt ihre Profilherkunft; je Profil wird aus dem finalen Rohaggregat genau ein Steuerabschluss berechnet. Die Haushaltssteuer ist die Summe der Profilsteuern. Quellen, Steuer und Nettoverwendungen muessen innerhalb 0,01 EUR reconciliert sein, sonst blockiert der Pfad fail-closed. Die Liquiditaetsdeckung und Runway-Diagnose werden aus dem Cashflow der finalen Aktion abgeleitet. Haushalts-Guardrail-State und profilbezogener Steuer-State werden getrennt gespeichert.
 
+Die Persistenz folgt dabei einem asymmetrischen Ownership-Vertrag. Die
+Profilregistry speichert nur profilbezogene Inputs, `lastState` und Steuer-State;
+Perioden-, Lifecycle-, Inflations- und Marktmetadaten gehoeren ausschliesslich
+dem aktiven Haupt-State. Dieser wird ueber `StorageManager.loadState()` inklusive
+Migration geladen und modusabhaengig gepatcht: `persist_inputs` schreibt nur
+Inputs und Haushaltsinputs, `commit_period` zusaetzlich fachliche
+Profil-/Haushalts-States und Lifecycle. Profil-Verlustvortraege bleiben
+autoritativ; der nicht autoritative Haushalts-Verlustvortrag besitzt beim Commit
+bewusst nullwertige Semantik.
+
+Der Profilwechsel verwendet denselben Ownership-Vertrag. Beim Capture werden
+haushaltsweite Metadaten nicht in die Profilregistry gespiegelt. Beim Laden
+eines Zielprofils bleiben aktuelle Perioden-, Lifecycle-, Inflations- und
+Marktmetadaten des Haupt-States erhalten; nur profilbezogene Inputs und States
+werden ersetzt. Bereits kontaminierte Altprofile werden dabei kanonisch
+bereinigt und in der Registry aktualisiert.
+
 **Verteilungsmodi:**
 - `tax_optimized`: geeignete Verkaufstranchen werden global nach aktueller marginaler Profilsteuer gewählt; Verlusttopf, Pauschbetrag, Kirchensteuer, Kostenbasis und Teilfreistellung bleiben dem Eigentuemer zugeordnet
 - `proportional`: Quellenattribution nach Vermögensanteil (Default)

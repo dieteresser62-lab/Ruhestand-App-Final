@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import {
     MONTE_CARLO_PARAMETER_LIMITS,
     SWEEP_REQUEST_VERSION,
+    SWEEP_SAMPLING_METHOD_RESOLUTION,
     estimateMonteCarloResourcesV1,
     normalizeMonteCarloParametersV1,
     normalizeMonteCarloResourceConfigV1,
@@ -90,6 +91,11 @@ const validParameters = Object.freeze({
     assertEqual(sweepRequest.monteCarloParameters.excludeEstimatedHistory, true, 'Sweep request transports estimated-history exclusion');
     assertEqual(sweepRequest.requestedSamplingMethod, 'stationary', 'Sweep request records requested method');
     assertEqual(sweepRequest.appliedSamplingMethod, 'stationary', 'Sweep request records applied method');
+    assertEqual(
+        sweepRequest.samplingMethodResolution,
+        SWEEP_SAMPLING_METHOD_RESOLUTION,
+        'Sweep request records that unsupported sampling methods are rejected instead of substituted'
+    );
     assertEqual(sweepRequest.useCapeSampling, true, 'Sweep request transports CAPE sampling');
     assert(Object.isFrozen(sweepRequest), 'normalized Sweep request is immutable');
 
@@ -105,6 +111,15 @@ const validParameters = Object.freeze({
     });
     assertEqual(legacyRequest.monteCarloParameters.anzahl, 7, 'legacy Sweep run count maps into canonical MC parameters');
     assertEqual(legacyRequest.monteCarloParameters.seed, 0, 'legacy Sweep seed zero maps without a falsy default');
+
+    const renormalizedRequest = normalizeSweepRequestV1(sweepRequest, {
+        inputs: { startAlter: 65, partner: { aktiv: false } }
+    });
+    assertEqual(
+        JSON.stringify(renormalizedRequest),
+        JSON.stringify(sweepRequest),
+        'normalizing an already canonical Sweep request preserves method provenance byte-for-byte'
+    );
 }
 
 {
@@ -138,6 +153,35 @@ const validParameters = Object.freeze({
         versionError = error;
     }
     assertEqual(versionError?.code, 'SWEEP_REQUEST_VERSION_INVALID', 'Sweep request rejects unknown contract versions');
+
+    let missingRequestError = null;
+    try {
+        normalizeSweepRequestV1();
+    } catch (error) {
+        missingRequestError = error;
+    }
+    assertEqual(
+        missingRequestError?.code,
+        'SWEEP_REQUEST_OBJECT_REQUIRED',
+        'Sweep normalization rejects a missing request instead of applying the 10,000-run MC default'
+    );
+
+    let provenanceError = null;
+    try {
+        normalizeSweepRequestV1({
+            schemaVersion: SWEEP_REQUEST_VERSION,
+            requestedSamplingMethod: 'stationary',
+            appliedSamplingMethod: 'regime_markov',
+            monteCarloParameters: validParameters
+        });
+    } catch (error) {
+        provenanceError = error;
+    }
+    assertEqual(
+        provenanceError?.code,
+        'SWEEP_REQUEST_METHOD_PROVENANCE_MISMATCH',
+        'Sweep normalization rejects inconsistent requested/applied method provenance'
+    );
 }
 
 {

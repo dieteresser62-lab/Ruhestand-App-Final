@@ -10,6 +10,7 @@ import { UIReader } from './balance-reader.js';
 import { UIRenderer } from './balance-renderer.js';
 import { StorageManager } from './balance-storage.js';
 import { UIUtils } from './balance-utils.js';
+import { BALANCE_UPDATE_MODE } from './balance-update-pipeline.js';
 
 export const BALANCE_EXPORT_APP_ID = 'ruhe-stand-suite.balance';
 export const BALANCE_EXPORT_SCHEMA = 'balance-state';
@@ -473,13 +474,13 @@ export function createImportExportHandlers({ dom, debouncedUpdate, update }) {
                 const normalized = normalizeBalanceImportDocument(json);
                 UIReader.applyStoredInputs(normalized.payload.inputs);
 
-                const dryRunResult = await update({ persist: false });
+                const dryRunResult = await update({ mode: BALANCE_UPDATE_MODE.PREVIEW });
                 if (!dryRunResult?.ok) {
                     failImport('dry_run_failed', 'Die importierten Daten bestehen die Eingabe-/Engine-Prüfung nicht. Die Live-Daten wurden nicht verändert; bitte die Importdatei korrigieren.');
                 }
 
                 replaceReceipt = await StorageManager.replaceStateFromImport(normalized.payload);
-                const finalResult = await update();
+                const finalResult = await update({ mode: BALANCE_UPDATE_MODE.PERSIST_INPUTS });
                 if (!finalResult?.ok) {
                     failImport('final_update_failed', 'Die importierten Daten konnten nach dem Ersetzen nicht erfolgreich gespeichert und bestätigt werden.');
                 }

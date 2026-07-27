@@ -948,6 +948,81 @@ try {
     }
     console.log('✓ Multiple profile data isolation OK');
 
+    // Test 30b: Contaminated legacy profile state is scrubbed on profile switch
+    console.log('Test 30b: Household metadata ownership survives contaminated legacy profile switch');
+    {
+        localStorage.clear();
+        ensureProfileRegistry();
+        const currentHouseholdState = {
+            inputs: { owner: 'A' },
+            annualPeriodMetadata: {
+                lastCommittedPeriod: 'calendar-year:2025',
+                pendingCommit: null
+            },
+            balanceStateLifecycle: {
+                lastCommittedPeriod: 'calendar-year:2025',
+                candidateFingerprint: 'current'
+            },
+            ageAdjustedForInflation: 67
+        };
+        localStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify(currentHouseholdState));
+        saveCurrentProfileFromLocalStorage();
+
+        const contaminatedProfile = createProfile('Kontaminiertes Altprofil');
+        updateProfileData(contaminatedProfile.id, {
+            [CONFIG.STORAGE.LS_KEY]: JSON.stringify({
+                inputs: { owner: 'B' },
+                lastState: { taxState: { lossCarry: 321 } },
+                annualPeriodMetadata: {
+                    lastCommittedPeriod: null,
+                    pendingCommit: {
+                        periodId: 'calendar-year:2025',
+                        phase: 'writes_started'
+                    }
+                },
+                balanceStateLifecycle: {
+                    lastCommittedPeriod: null,
+                    candidateFingerprint: 'stale'
+                },
+                ageAdjustedForInflation: 66
+            })
+        });
+
+        assert(switchProfile(contaminatedProfile.id) === true, 'Kontaminiertes Altprofil sollte ladbar bleiben');
+
+        const liveState = JSON.parse(localStorage.getItem(CONFIG.STORAGE.LS_KEY));
+        assertEqual(liveState.inputs.owner, 'B', 'Profilbezogene Inputs sollten vom Zielprofil stammen');
+        assertEqual(liveState.lastState.taxState.lossCarry, 321, 'Profilbezogener Fachstate sollte vom Zielprofil stammen');
+        assertEqual(
+            liveState.annualPeriodMetadata.lastCommittedPeriod,
+            'calendar-year:2025',
+            'Aktueller Haushalts-Periodenstatus muss den kontaminierten Profilwert ueberstimmen'
+        );
+        assertEqual(
+            liveState.balanceStateLifecycle.candidateFingerprint,
+            'current',
+            'Aktueller Haushalts-Lifecycle muss den kontaminierten Profilwert ueberstimmen'
+        );
+        assertEqual(liveState.ageAdjustedForInflation, 67, 'Aktuelles Haushaltsalter muss erhalten bleiben');
+
+        const migratedProfileState = JSON.parse(
+            getProfileData(contaminatedProfile.id)[CONFIG.STORAGE.LS_KEY]
+        );
+        assert(
+            !Object.prototype.hasOwnProperty.call(migratedProfileState, 'annualPeriodMetadata'),
+            'Altprofil-Migration muss Periodenmetadaten aus der Registry entfernen'
+        );
+        assert(
+            !Object.prototype.hasOwnProperty.call(migratedProfileState, 'balanceStateLifecycle'),
+            'Altprofil-Migration muss Lifecycle-Metadaten aus der Registry entfernen'
+        );
+        assert(
+            !Object.prototype.hasOwnProperty.call(migratedProfileState, 'ageAdjustedForInflation'),
+            'Altprofil-Migration muss Haushaltsalter aus der Registry entfernen'
+        );
+    }
+    console.log('✓ Contaminated legacy profile ownership migration OK');
+
     console.log('✅ Profile storage behaviors validated');
 
 } finally {

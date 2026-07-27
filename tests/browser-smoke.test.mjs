@@ -533,7 +533,10 @@ async function runBalanceImportReject(browser, baseUrl) {
     const afterState = JSON.parse(after.value);
     assert(
         JSON.stringify(afterState.inputs) === JSON.stringify(beforeState.inputs),
-        'Abgelehnter Import darf die persistenten Eingaben nicht veraendern'
+        `Abgelehnter Import darf die persistenten Eingaben nicht veraendern: ${JSON.stringify({
+            before: beforeState.inputs,
+            after: afterState.inputs
+        })}`
     );
     assert(
         JSON.stringify(afterState.annualPeriodMetadata) === JSON.stringify(beforeState.annualPeriodMetadata),

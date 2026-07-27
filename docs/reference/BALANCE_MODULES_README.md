@@ -376,6 +376,25 @@ Kernlogik für den Profilverbund (Multi-Profil-Modus).
 - Das Haushaltssettlement ist fuer diesen Lauf explizit deferiert. Erst nach der Quellenattribution ruft `profilverbund-action-attribution.js` `settleTaxYear()` genau einmal je Steuer-Owner auf und setzt `taxSettlementDeferred` im finalen Ergebnis auf `false`.
 - Quellen, Verwendungen und die Summe der finalen Profilsteuern muessen innerhalb 0,01 EUR reconciliert sein. Fehlende Herkunft oder nicht finanzierbare Restbetraege blockieren fail-closed.
 - Haushalts-Guardrail-State und Profil-Steuer-State werden getrennt persistiert. Je Profil wird nur der aus den final attribuierten Verkaeufen berechnete `taxState` ersetzt; sonstige Profil-Last-State-Felder bleiben erhalten.
+- Die Persistenzspiegel sind bewusst asymmetrisch: Die Profilregistry enthaelt
+  nur profilbezogene Inputs, `lastState` und Profil-Steuer-State.
+  `annualPeriodMetadata`, `balanceStateLifecycle`, `ageAdjustedForInflation`,
+  `annualMarketDataMeta` und `capeMeta` gehoeren ausschliesslich dem aktiven
+  Haupt-State und werden vor jedem Profilwrite aus dem Profildatensatz entfernt.
+- Der aktive Haupt-State wird ueber den migrierenden
+  `StorageManager.loadState()`-Pfad geladen und nur mit expliziten Patches
+  aktualisiert. Input-Persistenz schreibt Inputs und Haushaltsinputs; erst ein
+  Periodencommit schreibt fachliche Profil-/Haushalts-States und Lifecycle.
+  Veraltete Profildaten koennen dadurch keinen Haupt-Periodenstatus
+  zuruecksetzen.
+- `profile-storage.js` erzwingt denselben Vertrag beim Profil-Capture und
+  Profilwechsel. Bereits kontaminierte Altprofile werden beim Laden in der
+  Registry bereinigt; fuer Haushaltsmetadaten gewinnt der aktuelle Haupt-State,
+  waehrend Inputs und profilbezogener Fachstate aus dem Zielprofil stammen.
+- Profil-Verlustvortraege sind die autoritative Steuerquelle. Der
+  Haushalts-`taxState.lossCarry` ist nicht autoritativ und wird beim Commit
+  bewusst mit nullwertiger Semantik gespeichert, um keine doppelte
+  Verlustverrechnung zu suggerieren.
 
 **Tranchen-/Cash-Contract:**
 - Entnahmen nutzen zuerst Tagesgeld und Geldmarkt, bevor ein Verkauf aus Detailtranchen geplant wird.

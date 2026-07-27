@@ -7,6 +7,7 @@ const HISTORICAL_YEAR_MAXIMUM = annualData[annualData.length - 1]?.jahr ?? 2025;
 
 export const MONTE_CARLO_PARAMETERS_VERSION = 'MonteCarloParametersV1';
 export const SWEEP_REQUEST_VERSION = 'SweepRequestV1';
+export const SWEEP_SAMPLING_METHOD_RESOLUTION = 'strict_no_fallback';
 
 export const MONTE_CARLO_PARAMETER_LIMITS = Object.freeze({
     runs: Object.freeze({
@@ -200,7 +201,7 @@ export function normalizeMonteCarloParametersV1(rawParameters = {}, {
  * production callers emit the versioned nested form. Both routes are validated
  * by normalizeMonteCarloParametersV1 so no second bounds contract can drift.
  */
-export function normalizeSweepRequestV1(rawRequest = {}, {
+export function normalizeSweepRequestV1(rawRequest, {
     inputs = null,
     historicalRecordCount = null
 } = {}) {
@@ -235,16 +236,31 @@ export function normalizeSweepRequestV1(rawRequest = {}, {
         inputs,
         historicalRecordCount
     });
-    const requestedSamplingMethod = rawParameters?.methode === undefined
+    const derivedRequestedSamplingMethod = rawParameters?.methode === undefined
         || rawParameters?.methode === null
         || rawParameters?.methode === ''
         ? monteCarloParameters.methode
         : rawParameters.methode;
+    const requestedSamplingMethod = rawRequest.requestedSamplingMethod
+        ?? derivedRequestedSamplingMethod;
+    const appliedSamplingMethod = rawRequest.appliedSamplingMethod
+        ?? monteCarloParameters.methode;
+    const samplingMethodResolution = rawRequest.samplingMethodResolution
+        ?? SWEEP_SAMPLING_METHOD_RESOLUTION;
+    if (samplingMethodResolution !== SWEEP_SAMPLING_METHOD_RESOLUTION
+        || requestedSamplingMethod !== monteCarloParameters.methode
+        || appliedSamplingMethod !== monteCarloParameters.methode) {
+        throw sweepRequestError(
+            'SWEEP_REQUEST_METHOD_PROVENANCE_MISMATCH',
+            'Requested und Applied Samplingmethodik muessen dem strikt validierten MC-Parametervertrag entsprechen.'
+        );
+    }
 
     return Object.freeze({
         schemaVersion: SWEEP_REQUEST_VERSION,
         requestedSamplingMethod,
-        appliedSamplingMethod: monteCarloParameters.methode,
+        appliedSamplingMethod,
+        samplingMethodResolution,
         useCapeSampling: readBoolean(rawRequest.useCapeSampling, 'CAPE-Sampling', false),
         monteCarloParameters
     });

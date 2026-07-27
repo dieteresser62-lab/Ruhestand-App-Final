@@ -3,6 +3,9 @@ import {
     BALANCE_UPDATE_MODE,
     BalanceStateLifecycleError,
     assertBalanceCandidateFresh,
+    assertBalanceCommitStillCurrent,
+    cloneBalanceState,
+    createBalanceCommitBaseFingerprint,
     createBalanceFingerprint,
     persistBalanceUpdate,
     prepareEngineLastState,
@@ -22,28 +25,25 @@ function captureError(callback) {
     }
 }
 
-console.log('Test 1: update modes are explicit and legacy dry-runs stay write-free');
+console.log('Test 1: update modes are explicit and every implicit or legacy request fails write-closed');
 {
     assertEqual(
         resolveBalanceUpdateRequest().mode,
-        BALANCE_UPDATE_MODE.PERSIST_INPUTS,
-        'Default updates persist only inputs'
+        BALANCE_UPDATE_MODE.PREVIEW,
+        'Default updates are write-free'
     );
     assertEqual(
         resolveBalanceUpdateRequest({ mode: BALANCE_UPDATE_MODE.PREVIEW }).mode,
         BALANCE_UPDATE_MODE.PREVIEW,
         'Explicit preview mode is preserved'
     );
-    assertEqual(
-        resolveBalanceUpdateRequest({ persist: false }).mode,
-        BALANCE_UPDATE_MODE.PREVIEW,
-        'Legacy import dry-run maps to preview'
-    );
-    assertEqual(
-        resolveBalanceUpdateRequest({ persist: true }).mode,
-        BALANCE_UPDATE_MODE.PERSIST_INPUTS,
-        'Legacy persist true can no longer commit fachlichen State'
-    );
+    [false, true, 0, null, '', 'false'].forEach(persist => {
+        const legacyRequest = captureError(() => resolveBalanceUpdateRequest({ persist }));
+        assert(legacyRequest instanceof BalanceStateLifecycleError,
+            `Legacy persist=${String(persist)} is rejected instead of guessing a write mode`);
+        assertEqual(legacyRequest.reason, 'legacy_persist_unsupported',
+            'Legacy persist requests expose one stable fail-closed reason');
+    });
 
     const missingPeriod = captureError(() => resolveBalanceUpdateRequest({
         mode: BALANCE_UPDATE_MODE.COMMIT_PERIOD
@@ -247,6 +247,74 @@ console.log('Test 5: stale candidates and invalid annual metadata fail closed');
     }));
     assert(invalidPeriod instanceof BalanceStateLifecycleError, 'Mismatched pending period blocks commit');
     assertEqual(invalidPeriod.reason, 'period_mismatch', 'Period mismatch exposes a stable reason');
+
+    const baseState = {
+        inputs: {
+            floorBedarf: 24000,
+            flexBedarf: 12000,
+            depotLastUpdate: 100
+        },
+        lastState: { taxState: { lossCarry: 20000 } },
+        annualPeriodMetadata: { pendingCommit: { phase: 'writes_started' } },
+        uiOnlyMarker: 'first'
+    };
+    const baseFingerprint = createBalanceCommitBaseFingerprint({
+        persistentState: baseState,
+        profilverbundProfiles: []
+    });
+    const transientOnlyFingerprint = createBalanceCommitBaseFingerprint({
+        persistentState: {
+            ...baseState,
+            inputs: { ...baseState.inputs, depotLastUpdate: 999 },
+            annualPeriodMetadata: { pendingCommit: { phase: 'validating' } },
+            uiOnlyMarker: 'second'
+        },
+        profilverbundProfiles: []
+    });
+    assertEqual(
+        transientOnlyFingerprint,
+        baseFingerprint,
+        'Transient timestamp and workflow metadata do not invalidate a fachlichen candidate'
+    );
+    const financialChangeFingerprint = createBalanceCommitBaseFingerprint({
+        persistentState: {
+            ...baseState,
+            lastState: { taxState: { lossCarry: 19999 } }
+        },
+        profilverbundProfiles: []
+    });
+    assert(financialChangeFingerprint !== baseFingerprint,
+        'A changed fachlicher state still invalidates the candidate');
+
+    const concurrentlyCommitted = captureError(() => assertBalanceCommitStillCurrent({
+        expectedBaseFingerprint: baseFingerprint,
+        currentBaseFingerprint: baseFingerprint,
+        currentPersistentState: {
+            ...baseState,
+            annualPeriodMetadata: {
+                lastCommittedPeriod: PERIOD_ID,
+                pendingCommit: null
+            }
+        },
+        periodId: PERIOD_ID
+    }));
+    assert(concurrentlyCommitted instanceof BalanceStateLifecycleError,
+        'Final commit guard re-checks workflow metadata even when financial state is unchanged');
+    assertEqual(concurrentlyCommitted.reason, 'period_already_committed',
+        'Cross-window completion is detected by the final period re-check');
+
+    [new Date('2026-01-01T00:00:00.000Z'), new Map([['state', 1]]), new Set([1])].forEach(value => {
+        const nonJsonState = captureError(() => createBalanceFingerprint(value));
+        assert(nonJsonState instanceof BalanceStateLifecycleError,
+            'Fingerprinting rejects non-JSON runtime objects');
+        assertEqual(nonJsonState.reason, 'non_json_state',
+            'Non-JSON runtime objects expose one stable fail-closed reason');
+        const nonJsonClone = captureError(() => cloneBalanceState(value));
+        assert(nonJsonClone instanceof BalanceStateLifecycleError,
+            'Cloning rejects the same non-JSON runtime objects as fingerprinting');
+        assertEqual(nonJsonClone.reason, 'non_json_state',
+            'Clone and fingerprint share the same non-JSON failure contract');
+    });
 }
 
 console.log('Test 6: multi-profile modes dispatch inputs and fachlichen State separately');
@@ -304,6 +372,19 @@ console.log('Test 6: multi-profile modes dispatch inputs and fachlichen State se
         PERIOD_ID,
         'Multi-profile commit receives the same lifecycle period'
     );
+
+    const emptyRuns = captureError(() => persistBalanceUpdate({
+        mode: BALANCE_UPDATE_MODE.PERSIST_INPUTS,
+        profilverbundRuns: [],
+        profilverbundHandlers,
+        storageManager: {},
+        persistentState,
+        inputData: {}
+    }));
+    assert(emptyRuns instanceof BalanceStateLifecycleError,
+        'An empty multi-profile run list fails closed instead of reporting a phantom write');
+    assertEqual(emptyRuns.reason, 'profile_runs_required',
+        'Empty multi-profile persistence exposes a stable reason');
 }
 
 console.log('Balance preview/commit contract tests passed');

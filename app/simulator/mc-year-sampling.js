@@ -1,5 +1,9 @@
 import { getStartYearCandidates } from '../shared/cape-utils.js';
-import { ESTIMATED_HISTORY_CUTOFF_YEAR } from './simulator-data.js';
+import {
+    ESTIMATED_HISTORY_CUTOFF_YEAR,
+    REGIME_DATA,
+    REGIME_TRANSITIONS
+} from './simulator-data.js';
 import {
     STATIONARY_BOOTSTRAP_METHOD,
     isStationaryBootstrapMethod
@@ -39,6 +43,88 @@ function samplerFromIndices(indices, weightedSampler = null) {
         return weightedSampler;
     }
     return { indices: [...indices], cdf: null };
+}
+
+function cloneSampler(sampler) {
+    if (!sampler || !Array.isArray(sampler.indices)) return null;
+    return {
+        indices: [...sampler.indices],
+        cdf: Array.isArray(sampler.cdf) ? [...sampler.cdf] : null
+    };
+}
+
+function cloneYearSamplingConfig(config) {
+    if (!config) return null;
+    return {
+        ...config,
+        allowedIndices: [...(config.allowedIndices || [])],
+        allowedIndexSet: new Set(config.allowedIndexSet || []),
+        allSampler: cloneSampler(config.allSampler),
+        blockSampler: cloneSampler(config.blockSampler),
+        blockStartIndices: [...(config.blockStartIndices || [])],
+        regimeSamplers: Object.fromEntries(
+            Object.entries(config.regimeSamplers || {})
+                .map(([regime, sampler]) => [regime, cloneSampler(sampler)])
+        ),
+        weightsByIndex: [...(config.weightsByIndex || [])]
+    };
+}
+
+function collectDrawableRegimes(method, initialStartSampler, annualData) {
+    if (method === 'regime_iid') {
+        return Object.keys(REGIME_DATA);
+    }
+    if (method !== 'regime_markov') return [];
+
+    const reachable = new Set(
+        (initialStartSampler?.indices || [])
+            .map(index => annualData[index]?.regime)
+            .filter(Boolean)
+    );
+    const pending = [...reachable];
+    while (pending.length > 0) {
+        const currentRegime = pending.shift();
+        const transitions = REGIME_TRANSITIONS[currentRegime];
+        if (!transitions || !Number.isFinite(transitions.total) || transitions.total <= 0) {
+            throw samplingContractError(
+                'MC_SAMPLING_REGIME_TRANSITIONS_INVALID',
+                `transition data for regime ${String(currentRegime)} is missing or empty.`
+            );
+        }
+        for (const [targetRegime, count] of Object.entries(transitions)) {
+            if (targetRegime === 'total' || !(Number(count) > 0) || reachable.has(targetRegime)) {
+                continue;
+            }
+            reachable.add(targetRegime);
+            pending.push(targetRegime);
+        }
+    }
+
+    const configuredOrder = Object.keys(REGIME_DATA);
+    return [
+        ...configuredOrder.filter(regime => reachable.has(regime)),
+        ...[...reachable].filter(regime => !configuredOrder.includes(regime)).sort()
+    ];
+}
+
+function assertDrawableRegimePools({
+    method,
+    initialStartSampler,
+    effectiveYearSamplingConfig,
+    annualData
+}) {
+    const drawableRegimes = collectDrawableRegimes(method, initialStartSampler, annualData);
+    const missingRegimes = drawableRegimes.filter(regime => {
+        const sampler = effectiveYearSamplingConfig?.regimeSamplers?.[regime];
+        return !Array.isArray(sampler?.indices) || sampler.indices.length === 0;
+    });
+    if (missingRegimes.length > 0) {
+        throw samplingContractError(
+            'MC_SAMPLING_REGIME_POOL_EMPTY',
+            `${method} kann Regime ohne zulaessiges Jahr ziehen: ${missingRegimes.join(', ')}.`
+        );
+    }
+    return drawableRegimes;
 }
 
 function incrementCounter(target, key, amount = 1) {
@@ -250,11 +336,19 @@ export function resolveMonteCarloSamplingContractV1({
         throw samplingContractError('MC_SAMPLING_NO_START_CANDIDATES', 'no initial start sampler could be constructed.');
     }
 
-    const effectiveYearSamplingConfig = capeEffective ? uniformConfig : requestedConfig;
+    const effectiveYearSamplingConfig = cloneYearSamplingConfig(
+        capeEffective ? uniformConfig : requestedConfig
+    );
     if (method === 'block') {
         effectiveYearSamplingConfig.blockStartIndices = [...initialStartSampler.indices];
         effectiveYearSamplingConfig.blockSampler = initialStartSampler;
     }
+    const drawableRegimes = assertDrawableRegimePools({
+        method,
+        initialStartSampler,
+        effectiveYearSamplingConfig,
+        annualData
+    });
 
     const warnings = [];
     if (useCapeSampling === true && !(Number.isFinite(capeValue) && capeValue > 0)) {
@@ -267,6 +361,15 @@ export function resolveMonteCarloSamplingContractV1({
         ? ['startYearMode', normalizedMode === 'FILTER' ? 'startYearFilter' : 'startYearHalfLife']
         : [];
     const startSource = capeEffective ? 'cape' : normalizedMode.toLowerCase();
+    const isRegimeMethod = method === 'regime_markov' || method === 'regime_iid';
+    const precedence = [
+        'estimated_history_exclusion',
+        'cape_or_start_weighting',
+        'sampling_method',
+        ...(isRegimeMethod ? ['effective_year_universe_validation'] : []),
+        'conditional_stress_override',
+        'tail_risk_overlay'
+    ];
     const publicContract = {
         schemaVersion: MONTE_CARLO_SAMPLING_CONTRACT_VERSION,
         method,
@@ -284,13 +387,13 @@ export function resolveMonteCarloSamplingContractV1({
         regimePolicy: method === 'regime_markov'
             ? 'initial_record_then_markov_transition'
             : (method === 'regime_iid' ? 'initial_record_then_iid' : 'not_applicable'),
-        precedence: [
-            'estimated_history_exclusion',
-            'cape_or_start_weighting',
-            'sampling_method',
-            'conditional_stress_override',
-            'tail_risk_overlay'
-        ]
+        ...(isRegimeMethod
+            ? {
+                emptyRegimePoolPolicy: 'reject_request',
+                drawableRegimes
+            }
+            : {}),
+        precedence
     };
 
     return {
@@ -319,7 +422,6 @@ function assertSamplingRuntimeContract(method, samplingResolution) {
 function enforceEffectiveYearUniverse({
     yearData,
     state,
-    rand,
     samplingResolution,
     annualData
 }) {
@@ -341,21 +443,10 @@ function enforceEffectiveYearUniverse({
         return { yearData, usedFallback: false };
     }
 
-    const regimeSampler = yearSampling?.regimeSamplers?.[yearData?.regime];
-    const fallbackSampler = regimeSampler?.indices?.length
-        ? regimeSampler
-        : yearSampling?.allSampler;
-    if (!fallbackSampler?.indices?.length) {
-        throw samplingContractError(
-            'MC_SAMPLING_YEAR_OUTSIDE_EFFECTIVE_UNIVERSE',
-            'sampled year is outside the effective filtered universe.'
-        );
-    }
-    const fallbackIndex = pickFromSampler(rand, fallbackSampler, fallbackSampler.indices[0]);
-    return {
-        yearData: { ...annualData[fallbackIndex] },
-        usedFallback: true
-    };
+    throw samplingContractError(
+        'MC_SAMPLING_YEAR_OUTSIDE_EFFECTIVE_UNIVERSE',
+        'sampled year is outside the prevalidated effective universe.'
+    );
 }
 
 /**
@@ -500,7 +591,6 @@ export function sampleMonteCarloYearV1({
         const effectiveSample = enforceEffectiveYearUniverse({
             yearData,
             state,
-            rand,
             samplingResolution,
             annualData
         });
@@ -524,7 +614,15 @@ export function createMonteCarloSamplingDiagnosticsV1({ contract, dataVersion } 
     }
     return {
         schemaVersion: MONTE_CARLO_SAMPLING_DIAGNOSTICS_VERSION,
-        contract: { ...contract, ignoredOptions: [...contract.ignoredOptions], warnings: [...contract.warnings], precedence: [...contract.precedence] },
+        contract: {
+            ...contract,
+            ignoredOptions: [...contract.ignoredOptions],
+            warnings: [...contract.warnings],
+            ...(Array.isArray(contract.drawableRegimes)
+                ? { drawableRegimes: [...contract.drawableRegimes] }
+                : {}),
+            precedence: [...contract.precedence]
+        },
         dataVersion: { ...(dataVersion || {}) },
         requestedRuns: 0,
         sampledYears: 0,
