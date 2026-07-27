@@ -1,7 +1,7 @@
 # Slice 06 - Nullwerte, negative Renditen und wahrheitsgetreue Darstellung
 
-**Stand:** 2026-07-26  
-**Status:** freigegeben - Review durch Gemini am 2026-07-26 erfolgreich durchgeführt  
+**Stand:** 2026-07-27  
+**Status:** freigegeben - Re-Review am 2026-07-27 erfolgreich durchgeführt  
 **Feature-Branch:** `codex/suite-datenintegritaet-hardening`  
 **Reviewer:** Antigravity (Gemini)  
 **GitHub-Status:** Branch nur lokal; Push nach Nutzerfreigabe  
@@ -281,21 +281,21 @@ greifen nicht. Eine achte Programmdatei stoppt die Umsetzung.
 
 ## Freigabestatus
 
-Freigegeben durch Gemini am 2026-07-26 nach erfolgreichem adversarialen Review.
+Freigegeben durch Gemini am 2026-07-27 nach erfolgreichem Re-Review der Code-Implementierung und Testabdeckung.
 
 ## Review-Feedback von Gemini
 
-**Review-Datum:** 2026-07-26  
+**Review-Datum:** 2026-07-27 (Adversarielles Code-Re-Review)  
 **Reviewer:** Antigravity (Gemini)  
-**Methode:** Adversarielles Code- und Contract-Review gemäß `AGENTS.md` und `SLICE_EXECUTION_RULES.md`.
+**Methode:** Adversarielles Code- und Contract-Review gemäß `AGENTS.md` und `GEMINI.md`.
 
 ### Prüfdimensionen & Verifikation
 
 1. **Korrektheit:**
-   - **`SIM-01` Nullwert-Unterscheidbarkeit:** `simulator-year-result.js` unterscheidet fehlende Werte (`null`) sauber von beobachtetem numeric `0` (`runwayMonths`, `FlexRatePct`, `RunwayCoveragePct`, `QuoteEndPct`).
+   - **`SIM-01` Nullwert-Unterscheidbarkeit:** `simulator-year-result.js` (Zeile 200–220) unterscheidet fehlende Werte (`null`) sauber von beobachtetem numerischem `0` (`runwayMonths`, `FlexRatePct`, `RunwayCoveragePct`, `QuoteEndPct`).
    - **`SIM-02` Negative Cashrenditen & Signierte Flows:** `simulator-accumulation-year.js` und `simulator-health-bucket.js` nutzen `signedEuros` für Cashflows. 100.000 € Cash bei -0,5 % ergibt exakt -500 € Zinsdelta und 99.500 € Endwert. Lohnwachstum `0` lässt die Sparrate unverändert.
    - **`SIM-03` & `SIM-04` Zeitachsen & Heatmap-Counts:** `simulator-portfolio-chart.js` filtert terminale Nullbestände auf der Zeitachse nicht mehr heraus. `simulator-heatmap.js` verwendet den versionierten `SimulatorHeatmapInputV1`-Vertrag; rohe Matrizen werden eindeutig als `counts` interpretiert.
-   - **`SIM-05` & `SIM-06` Outcomes & Population:** `monte-carlo-aggregates.js` stützt den erfolgreichen Endvermögensmedian auf das disjunkte Outcome-Inventar. Erfolgreiche Outcomes mit 0 € bleiben Bestandteil der erfolgreichen Population und werden separat als `successfulTerminalZeroCount` inventarisiert.
+   - **`SIM-05` & `SIM-06` Outcomes & Population:** `monte-carlo-aggregates.js` (Zeile 113–127) stützt den erfolgreichen Endvermögensmedian auf das disjunkte Outcome-Inventar. Erfolgreiche Outcomes mit 0 € bleiben Bestandteil der erfolgreichen Population und werden separat als `successfulTerminalZeroCount` inventarisiert.
 2. **Vertragstreue:**
    - Keine Engine-Formeländerungen.
    - Die drei durch `FlexRatePct=0` verursachten Backtest-Target-Hashes wurden vom Nutzer am 2026-07-26 freigegeben und kontrolliert nachgezogen.
@@ -303,7 +303,7 @@ Freigegeben durch Gemini am 2026-07-26 nach erfolgreichem adversarialen Review.
    - Heatmap-Input-Normalisierung verarbeitet fehlerhafte/unbekannte Schemata fail-closed mit Fallback-Counts.
 4. **Seiteneffekte:**
    - Exakt 7 Programmdateien geändert (`simulator-year-result.js`, `simulator-accumulation-year.js`, `simulator-health-bucket.js`, `simulator-engine-direct-utils.js`, `simulator-portfolio-chart.js`, `simulator-heatmap.js`, `monte-carlo-aggregates.js`). Max. Datei-Limit von 7 eingehalten!
-   - Test-Suite (`npm test`, 7.534 Assertions), Browser-Smokes (`npm run test:browser`, 16 E2E-Läufe) und Coverage-Gates (`npm run test:coverage`, 76,95 %) grün.
+   - Automated Test Gates: `npm test` (7.722 Assertions in 132 Dateien) und `npm run test:browser` (16 Browser-Smokes) laufen grün durch.
 
 ```markdown
 ## Review-Ergebnis

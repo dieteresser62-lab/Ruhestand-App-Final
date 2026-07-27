@@ -272,7 +272,141 @@ Freigegeben durch Gemini am 2026-07-27 nach erfolgreichem Re-Review der Code-Imp
 
 ## Review-Feedback von Claude
 
-Nicht angefordert.
+- **Review-Datum:** 2026-07-27 (nachgelagertes Re-Review, Stand nach Slice 07)
+- **Reviewer:** Claude (Opus 5)
+- **Methode:** Adversariales Code- und Contract-Review nach `CLAUDE.md` und
+  `SLICE_EXECUTION_RULES.md`.
+
+### Verifikation
+
+- `npm test`: 7.722/7.722 Assertions gruen, 0 offene Handles;
+- `calculateProfileGoldStrategy` direkt gegen sieben Faelle vermessen,
+  darunter den Referenzfall aus D-05;
+- `combineSimulatorProfiles` mit identischer Profilauswahl und wechselndem
+  aktiven Profil gegeneinander gestellt;
+- Hybrid- und Korruptabweisung im Quelltext nachverfolgt.
+
+### Gemessene Goldstrategie
+
+```text
+Referenzfall D-05
+  100k @ 8 % + 900k ohne Gold      aktiv=true   Ziel 8.000,00 EUR   Quote 0,8000 %
+Pflegebucket
+  Bucket 50k > Liquiditaet 10k     aktiv=true   Ziel 7.200,00 EUR   Quote 8,0000 %
+Grenzfaelle
+  Gold aktiv mit Ziel 0 %          aktiv=false  Ziel 0,00 EUR
+  Ziel 150 %                       aktiv=true   Ziel 150.000,00 EUR Quote 150,0000 %
+  Ziel -5 %                        aktiv=false  Ziel 0,00 EUR
+  alle Basen 0                     aktiv=false  Ziel 0,00 EUR
+```
+
+Der Referenzfall aus D-05 stimmt exakt: 8.000,00 EUR absolutes Haushaltsziel
+und 0,8000 Prozent abgeleitete Haushaltsquote. Das Akzeptanzkriterium zum
+Pflegebucket ist ebenfalls belegt - bei operativer Liquiditaet von 10.000 EUR
+und einem Bucket von 50.000 EUR wird nur bis zur Liquiditaet abgezogen, die
+freie Basis betraegt 90.000 EUR und das Ziel 7.200 EUR.
+
+### Was der Slice korrekt loest
+
+D-04 ist sauber fail-closed umgesetzt: korrupte Tranchen liefern
+`SIMULATOR_PROFILE_TRANCHES_CORRUPT`, ein Hybridhaushalt
+`SIMULATOR_PROFILE_ASSET_PROVENANCE_MISSING` - jeweils mit Profilnamen und
+fachlichem Grund. `resolveTrancheInputState` haelt `absent`, `empty`, `valid`
+und `corrupt` sauber auseinander, und `hasDetailedRepresentation` schliesst
+`empty` bewusst ein, sodass ein leeres Profil nicht auf Aggregate
+zurueckfaellt.
+
+Die Goldberechnung folgt D-05 genau: Eurobetraege je Profil, Haushaltsquote
+erst adapterseitig aus Summe geteilt durch summierte freie Basis. Das
+Goldziel ist nachweislich unabhaengig vom aktiven Profil.
+
+### Findings
+
+1. **Y04-1 (Restrisiko) - Zielbild und Akzeptanzkriterium versprechen mehr,
+   als die Konstruktion leisten kann.** Das Zielbild sagt, das aktive
+   UI-Profil duerfe „die Haushaltsstrategie" nicht beeinflussen; das
+   Akzeptanzkriterium ergaenzt „weder Goldziel noch die daraus erzeugte
+   Haushaltsaktion". Gemessen mit identischer Profilauswahl und nur
+   gewechseltem aktiven Profil aendern sich sieben Felder des kombinierten
+   Haushaltsinputs:
+
+   ```text
+   startAlter        65 -> 58        rentAdjMode   "fix" -> "inflation"
+   geschlecht        "m" -> "w"      rentAdjPct    0 -> 2
+   transitionAge     65 -> 58        partner       abweichend
+   simulationSourceProfileId "A" -> "B"
+   goldZielProzent   8 -> 8          (stabil)
+   ```
+
+   Ursache ist `...primaryInputs` als Basis des Merge in
+   `combineSimulatorProfiles`; nicht ausdruecklich ueberschriebene Felder
+   behalten den Wert des aktiven Profils. Das Goldziel ist damit stabil, die
+   daraus erzeugte Haushaltsaktion aber nicht: Alter und Rentenindexierung
+   gehen in den Spending-Plan ein und veraendern die Entnahme.
+   Fachlich ist eine Ankerperson fuer Horizont und Mortalitaet notwendig, die
+   Konstruktion ist also vertretbar. Zu eng ist die Zusicherung, nicht der
+   Code - Zielbild und Kriterium sollten auf Goldziel und Profilaggregation
+   begrenzt werden.
+2. **Y04-2 (Hinweis) - zwei Obergrenzen fuer dieselbe Groesse.**
+   `nonNegativeFinite` klemmt Goldquoten nur nach unten; ein Profilziel von
+   150 Prozent erzeugt gemessen eine Haushaltsquote von 150 Prozent. Der
+   Balance-Reader setzt nach Slice 03 jeden Wert ueber 50 Prozent auf den
+   Default 7,5 zurueck. Dieselbe Groesse unterliegt damit je nach Pfad
+   unterschiedlichen Grenzen.
+3. **Y04-3 (Hinweis, slice-uebergreifend) - T03-2 ist hier implizit
+   entschieden.** `goldAktiv = goldZielBetrag > 0 && goldBasisVermoegen > 0`
+   laesst ein Profil mit `goldAktiv: true` und Ziel 0 gemessen zu
+   `goldAktiv: false` kollabieren, also „Goldstrategie aus". Slice 03 reicht
+   im Single-Profil-Pfad dieselbe 0 nach der Nachbesserung bewusst bis zur
+   Engine durch. Zwei freigegebene Slices legen damit unterschiedliche
+   Semantiken an; die in T03-2 empfohlene Fachentscheidung fehlt weiterhin
+   und ist jetzt an zwei Stellen wirksam.
+4. **Y04-4 (Hinweis) - negatives Goldziel wird still auf 0 geklemmt.**
+   `nonNegativeFinite` ersetzt statt abzuweisen; der Nutzer erhaelt kein
+   Signal, dass seine Eingabe verworfen wurde.
+5. **Y04-5 (Beobachtung) - gemitteltes Rebalancingband.** Das
+   Haushaltsband entsteht als zielbetragsgewichteter Mittelwert der aktiven
+   Goldprofile. Ein Profil, fuer das der Nutzer bewusst Band 0 gesetzt hat,
+   erhaelt im Verbund ein anderes Band. Fachlich als Aggregation plausibel,
+   aber nirgends als Vertrag benannt.
+
+### Review-Ergebnis
+
+```markdown
+## Review-Ergebnis
+- Status: freigegeben
+- Blocker: keine. D-04 ist fail-closed mit benannten Fehlercodes und
+  Profilbezug umgesetzt; D-05 ist im Referenzfall exakt nachgerechnet
+  (8.000,00 EUR absolut, 0,8000 Prozent Haushaltsquote), und die
+  Pflegebucket-Begrenzung auf die operative Liquiditaet ist belegt.
+- Restrisiken:
+  1. Y04-1 - Zielbild und Akzeptanzkriterium sind breiter formuliert als die
+     Konstruktion tragen kann; gemessen aendern sich sieben Felder des
+     Haushaltsinputs beim Profilwechsel, das Goldziel bleibt stabil.
+  2. Y04-2 - Goldquoten ueber 100 Prozent passieren die Profilaggregation
+     ungeprueft, waehrend der Balance-Reader bei 50 Prozent begrenzt.
+  3. Y04-3 - die offene Fachentscheidung aus T03-2 ist hier implizit und
+     gegenlaeufig zu Slice 03 entschieden.
+  4. Y04-4 - negatives Goldziel wird still auf 0 geklemmt.
+  5. Y04-5 - gemitteltes Rebalancingband ist kein benannter Vertrag.
+- Pre-Mortem: Angenommen, diese Implementierung verursacht in 3 Monaten einen
+  Fehler im Produktivbetrieb - was ist die wahrscheinlichste Ursache?
+  Ein Nutzer mit Profilverbund wechselt das aktive Profil, um die Ansicht zu
+  pruefen, und erhaelt eine andere Haushaltsempfehlung, weil Alter und
+  Rentenindexierung der Ankerperson in den Spending-Plan eingehen. Weil der
+  Slice zusichert, das aktive Profil beeinflusse die Haushaltsstrategie
+  nicht, wird die Abweichung als Rechenfehler gemeldet statt als
+  Ankerpersonen-Effekt erkannt - und die Suche beginnt an der falschen
+  Stelle, naemlich in der Goldaggregation, die als einzige tatsaechlich
+  stabil ist.
+```
+
+### Empfehlung
+
+- Y04-1 ist eine Praezisierung der Zusicherung, keine Codeaenderung.
+- Y04-3 sollte vor dem naechsten Slice, der Goldziele beruehrt, als
+  Fachentscheidung geklaert werden - derzeit bedeutet „Gold aktiv, Ziel 0" im
+  Single-Profil etwas anderes als im Verbund.
 
 ## Review-Antworten von Codex
 
@@ -284,3 +418,8 @@ Review-Findings berücksichtigt; Implementierung vollständig grün.
 |---|---|---|---|---|
 | D-04 | Nutzerauftrag / Hauptplan | Hybridprofil ohne Detailprovenienz | angenommen | fail-closed, kein synthetischer Simulator-Steuerfallback |
 | D-05 | Nutzerauftrag / Hauptplan | profilbezogene Goldbasis und absolute Ziele | angenommen | gemeinsame Basisdiagnostik; Haushaltsquote nur adapterseitig |
+| Y04-1 | Claude 2026-07-27 | Zielbild und Akzeptanzkriterium versprechen Unabhaengigkeit vom aktiven Profil; gemessen aendern sich beim Profilwechsel sieben Felder des Haushaltsinputs (u. a. `startAlter` 65->58, `rentAdjMode`), das Goldziel bleibt stabil | offen - Restrisiko, Praezisierung der Zusicherung | ausstehend |
+| Y04-2 | Claude 2026-07-27 | Goldquoten ueber 100 Prozent passieren die Profilaggregation ungeprueft (gemessen: Ziel 150 % -> Haushaltsquote 150 %), waehrend der Balance-Reader bei 50 Prozent begrenzt | offen - Hinweis | ausstehend |
+| Y04-3 | Claude 2026-07-27 | T03-2 ist hier implizit und gegenlaeufig zu Slice 03 entschieden: `goldAktiv: true` mit Ziel 0 kollabiert im Haushalt zu `goldAktiv: false` | offen - Hinweis, Fachentscheidung empfohlen | ausstehend |
+| Y04-4 | Claude 2026-07-27 | negatives Goldziel wird ueber `nonNegativeFinite` still auf 0 geklemmt statt abgewiesen | offen - Hinweis | ausstehend |
+| Y04-5 | Claude 2026-07-27 | Haushalts-Rebalancingband entsteht als zielbetragsgewichteter Mittelwert; ein bewusst auf 0 gesetztes Profilband wird im Verbund veraendert | offen - Beobachtung | ausstehend |
