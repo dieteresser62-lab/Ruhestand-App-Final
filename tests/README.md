@@ -355,6 +355,38 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 - **buildSweepInputs:** Parameter-Überschreibung
 - **runSweepChunk:** Ausführung und Determinismus
 - **Mindest-Flex:** Sweep-Chunk mit gesetztem `minimumFlexAnnual` bleibt gueltig und berechnet Metriken.
+- **Common Random Numbers:** Wirkungsgleiche Kombinationen verwenden je
+  Run-Index identische Seeds, Sampling-Rohpfade und Metriken. Wirkungsvoll
+  verschiedene Kombinationen belegen denselben Rohpfadpraefix bis zu einer
+  strategieabhaengigen Terminierung, ohne vollstaendige Pfadgleichheit zu
+  behaupten.
+- **Terminalruin:** Der Nullpunkt wird vor dem Abbruch in die Drawdownserie
+  aufgenommen und ergibt aus positivem Peak exakt 100 Prozent Drawdown.
+
+#### `sweep-metrics.test.mjs`
+**Zweck:** Testet den versionierten Sweep-Metrik- und Unsicherheitsvertrag.
+- **D-06:** P95 des aufsteigend sortierten nichtnegativen
+  Drawdown-Verlustmasses sowie handberechnete Reihe 1 bis 100.
+- **Kanonische Quantile:** P10, P25, Median und P75 des Endvermoegens
+  verwenden denselben interpolierten Quantilhelfer wie der Drawdown.
+- **Saettigung:** Terminalruinanzahl und -anteil sowie ein im Ruinblock
+  liegendes P95 werden explizit diagnostiziert.
+- **Metadaten:** Einheit, Richtung, Rohquelle, Quantilrichtung und
+  Terminalruin-Semantik sind versioniert.
+- **Unsicherheit:** Runzahl, CRN-Status und Wilson-95-Prozent-Intervall der
+  Erfolgsquote; Quantil-Konfidenzintervall bleibt explizit `null`.
+- **Contract-Reader:** Unversionierte und nicht endliche Metrikwerte werden
+  fail-closed abgewiesen; Drawdownverluste ausserhalb 0 bis 100 werfen
+  ebenfalls fail-closed.
+
+#### `simulator-sweep-consumers.test.mjs`
+**Zweck:** Sichert den gemeinsamen Metrikshape aller Sweep-Consumer.
+- Parametervergleich, Multi-Objective und Constraints lesen nur den
+  kanonischen versionierten Shape.
+- Pareto-Berechnung und -Rendering schliessen Legacy-/NaN-Werte aus.
+- Gesaettigte Drawdownziele werden in Heatmap und Pareto sichtbar
+  ausgewiesen; exakte Ranking-Gleichstaende waehlen nicht mehr den ersten
+  Arrayeintrag.
 
 #### `auto-optimizer.test.mjs`
 **Zweck:** Testet die mehrphasige Auto-Optimierung.
@@ -681,6 +713,8 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 **Zweck:** Kritische Parity-Prüfung.
 - MC/Sweep Chunk-Merges produzieren identische Aggregate wie Single-Pass
 - Worker-Chunking beeinflusst Ergebnisse nicht
+- Sweep-Metrikmetadaten, Unsicherheitsdiagnostik und CRN-Provenienz bleiben
+  ueber Chunkgrenzen identisch.
 - Pflegekosten-Drift bleibt beim Szenario-Klon und über Care-Chunks als
   normalisiertes Verhältnis unverändert
 

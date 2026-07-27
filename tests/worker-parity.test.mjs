@@ -215,6 +215,26 @@ function assertSweepResultsEqual(fullResults, splitResults, prefix) {
             String(full.metrics?.invalidReason || ''),
             `${prefix} invalid reason mismatch for combo ${full.comboIdx}`
         );
+        assertEqual(
+            split.metrics?.schemaVersion,
+            full.metrics?.schemaVersion,
+            `${prefix} metric schema mismatch for combo ${full.comboIdx}`
+        );
+        assertEqual(
+            JSON.stringify(split.metrics?.metricMetadata || null),
+            JSON.stringify(full.metrics?.metricMetadata || null),
+            `${prefix} metric metadata mismatch for combo ${full.comboIdx}`
+        );
+        assertEqual(
+            JSON.stringify(split.metrics?.comparison || null),
+            JSON.stringify(full.metrics?.comparison || null),
+            `${prefix} comparison diagnostics mismatch for combo ${full.comboIdx}`
+        );
+        assertEqual(
+            JSON.stringify(split.provenance?.comparisonRandomness || null),
+            JSON.stringify(full.provenance?.comparisonRandomness || null),
+            `${prefix} CRN provenance mismatch for combo ${full.comboIdx}`
+        );
 
         for (const key of SWEEP_METRIC_KEYS) {
             assertClose(split.metrics?.[key] || 0, full.metrics?.[key] || 0, 1e-6, `${prefix} metric ${key} mismatch for combo ${full.comboIdx}`);

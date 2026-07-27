@@ -1,4 +1,5 @@
 import { viridis, computeHeatmapStats, renderHeatmapSVG, renderSweepHeatmapSVG } from '../app/simulator/simulator-heatmap.js';
+import { aggregateSweepMetrics } from '../app/simulator/simulator-results.js';
 
 console.log('--- Simulator Heatmap Tests ---');
 
@@ -59,17 +60,53 @@ console.log('--- Simulator Heatmap Tests ---');
     const sweepResults = [
         {
             params: { targetEq: 60, runwayMin: 24 },
-            metrics: {
-                successProbFloor: 0.95,
-                p10EndWealth: 10000,
-                worst5Drawdown: 0.2,
-                minRunwayObserved: 24
-            }
+            metrics: aggregateSweepMetrics([
+                {
+                    finalVermoegen: 10000,
+                    maxDrawdown: 20,
+                    minRunway: 24,
+                    failed: false
+                }
+            ], {
+                commonRandomNumbers: true,
+                randomPolicyVersion: 'SweepCommonRandomNumbersV2'
+            })
         }
     ];
     const svg = renderSweepHeatmapSVG(sweepResults, 'successProbFloor', 'targetEq', 'runwayMin', [60], [24], { showLegend: false });
     const midColor = viridis(0.5);
     assert(svg.includes(midColor), 'Single-value sweep should use mid-color for zero range');
+    assert(svg.includes('1 Lauf je Kombination'), 'Sweep heatmap should expose the singular run count');
+    assert(svg.includes('Common Random Numbers: aktiv'), 'Sweep heatmap should expose active CRN comparison');
+    assert(svg.includes('Quantilrankings sind experimentelle Punktschätzer'), 'Sweep heatmap should expose quantile uncertainty');
+
+    const saturatedOutcomes = Array.from({ length: 200 }, (_, index) => ({
+        finalVermoegen: index < 11 ? 0 : 10000,
+        maxDrawdown: index < 11 ? 100 : 34,
+        minRunway: index < 11 ? 0 : 24,
+        failed: index < 11
+    }));
+    const saturated = renderSweepHeatmapSVG([
+        {
+            params: { targetEq: 60, runwayMin: 24 },
+            metrics: aggregateSweepMetrics(saturatedOutcomes)
+        }
+    ], 'worst5Drawdown', 'targetEq', 'runwayMin', [60], [24], { showLegend: false });
+    assert(
+        saturated.includes('Drawdown-P95 ist durch terminale Ruine gesättigt'),
+        'Sweep heatmap visibly explains a terminal-ruin-saturated drawdown metric'
+    );
+
+    const legacyOnly = renderSweepHeatmapSVG([
+        {
+            params: { targetEq: 60, runwayMin: 24 },
+            metrics: { successProbFloor: 100 }
+        }
+    ], 'successProbFloor', 'targetEq', 'runwayMin', [60], [24], { showLegend: false });
+    assert(
+        legacyOnly.includes('veralteten oder unversionierten Ergebnisvertrag'),
+        'Sweep heatmap should reject an unversioned metric shape with a migration hint'
+    );
 }
 
 console.log('✅ Simulator heatmap tests passed');

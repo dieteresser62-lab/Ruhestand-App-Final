@@ -8,7 +8,11 @@
  * 2. Adaptive Grid Refinement: Iterative Verfeinerung zur Optimierung
  */
 
-import { aggregateSweepMetrics } from './simulator-results.js';
+import {
+    SWEEP_DECISION_METRIC_KEYS,
+    SWEEP_METRICS_VERSION,
+    readSweepMetricValue
+} from './sweep-metrics-contract.js';
 import { runParameterSweep } from './simulator-sweep.js';
 
 const WEALTH_METRICS = new Set([
@@ -35,12 +39,43 @@ const formatMetricValue = (value, metric) => {
 };
 
 function isValidSweepResult(result, metricKeys = []) {
-    if (!result || !result.metrics || result.metrics.invalidCombination === true) return false;
-    for (const key of metricKeys) {
-        const value = Number(result.metrics[key]);
-        if (!Number.isFinite(value)) return false;
+    return Boolean(result)
+        && result.metrics?.invalidCombination !== true
+        && Array.isArray(metricKeys)
+        && metricKeys.length > 0
+        && metricKeys.every(key => readSweepMetricValue(result, key) !== null);
+}
+
+function metricValuesEqual(left, right) {
+    const scale = Math.max(1, Math.abs(left), Math.abs(right));
+    return Math.abs(left - right) <= Number.EPSILON * 8 * scale;
+}
+
+function hasLegacySweepMetricShapes(results) {
+    return Array.isArray(results) && results.some(result => (
+        result?.metrics && result.metrics.schemaVersion !== SWEEP_METRICS_VERSION
+    ));
+}
+
+function renderComparisonNotice(metrics, rankingDiagnostics = null) {
+    const comparison = metrics?.comparison;
+    if (!comparison) {
+        return '<p style="color:#b71c1c;"><strong>Vergleichsdiagnostik fehlt:</strong> Ergebnis wird nicht als belastbares Ranking interpretiert.</p>';
     }
-    return true;
+    const interval = comparison.successProbability?.confidenceInterval95;
+    const intervalText = interval
+        ? `Wilson-95%-KI der Erfolgsquote: ${formatPercent(interval.lowerPct, 1)} bis ${formatPercent(interval.upperPct, 1)}.`
+        : 'Kein Wilson-Intervall verfügbar.';
+    const runCountText = comparison.runCount === 1
+        ? '1 Lauf'
+        : `${comparison.runCount} Läufe`;
+    const saturationText = comparison.drawdownQuantile?.quantileInTerminalRuinBlock === true
+        ? ` <strong>Drawdown-P95 gesättigt:</strong> ${formatPercent(comparison.drawdownQuantile.terminalRuinSharePct, 1)} der Läufe enden terminal; diese Kennzahl unterscheidet Strategien in diesem Bereich nicht.`
+        : '';
+    const tieText = rankingDiagnostics?.status === 'indeterminate_tie'
+        ? ` <strong>Keine eindeutige Führung:</strong> ${rankingDiagnostics.tiedBestCount} Kombinationen teilen denselben Punktschätzer.`
+        : '';
+    return `<p style="color:#8a5a00;"><strong>Experimenteller Parametervergleich:</strong> ${runCountText}; Common Random Numbers ${comparison.commonRandomNumbers === true ? 'aktiv' : 'nicht belegt'}. ${intervalText} Quantilwerte besitzen kein geschätztes Konfidenzintervall und belegen keine objektiv beste Strategie. Der Sweep-Drawdown enthält terminale Ruine und ist nicht direkt mit der unversionierten Monte-Carlo-Drawdownkennzahl vergleichbar.${saturationText}${tieText}</p>`;
 }
 
 /**
@@ -59,10 +94,10 @@ export function findBestParameters(sweepResults, metricKey, maximize = true) {
     if (validResults.length === 0) return null;
 
     let bestIndex = 0;
-    let bestValue = validResults[0].metrics[metricKey];
+    let bestValue = readSweepMetricValue(validResults[0], metricKey);
 
     for (let i = 1; i < validResults.length; i++) {
-        const value = validResults[i].metrics[metricKey];
+        const value = readSweepMetricValue(validResults[i], metricKey);
 
         if (maximize && value > bestValue) {
             bestValue = value;
@@ -73,11 +108,34 @@ export function findBestParameters(sweepResults, metricKey, maximize = true) {
         }
     }
 
+    const tiedBestResults = validResults.filter(result => (
+        metricValuesEqual(readSweepMetricValue(result, metricKey), bestValue)
+    ));
+    const rankingDiagnostics = {
+        status: tiedBestResults.length > 1 ? 'indeterminate_tie' : 'unique_point_estimate',
+        tiedBestCount: tiedBestResults.length,
+        totalValidCount: validResults.length,
+        metricKey,
+        terminalRuinSaturatedCount: validResults.filter(result => (
+            result.metrics?.comparison?.drawdownQuantile?.quantileInTerminalRuinBlock === true
+        )).length
+    };
+    if (tiedBestResults.length > 1) {
+        return {
+            params: null,
+            metricValue: bestValue,
+            index: null,
+            metrics: tiedBestResults[0].metrics,
+            rankingDiagnostics
+        };
+    }
+
     return {
         params: validResults[bestIndex].params,
         metricValue: bestValue,
         index: bestIndex,
-        metrics: validResults[bestIndex].metrics
+        metrics: validResults[bestIndex].metrics,
+        rankingDiagnostics
     };
 }
 
@@ -182,9 +240,19 @@ export function displayBestParameters(bestResult, metricKey) {
     };
 
     let html = '<div style="padding: 15px; background-color: #e8f5e9; border-radius: 8px; border: 2px solid #4caf50;">';
-    html += `<h4 style="margin-top: 0; color: #2e7d32;">✓ Optimale Parameter gefunden</h4>`;
-    html += `<p><strong>Optimiert für:</strong> ${metricLabels[metricKey] || metricKey}</p>`;
-    html += `<p><strong>Optimaler Wert:</strong> ${formatMetricValue(bestResult.metricValue, metricKey)}</p>`;
+    html += bestResult.params
+        ? '<h4 style="margin-top: 0; color: #2e7d32;">Im Sweep-Vergleich führende Kombination</h4>'
+        : '<h4 style="margin-top: 0; color: #b71c1c;">Keine eindeutig führende Kombination</h4>';
+    html += renderComparisonNotice(bestResult.metrics, bestResult.rankingDiagnostics);
+    html += `<p><strong>Verglichen nach:</strong> ${metricLabels[metricKey] || metricKey}</p>`;
+    html += `<p><strong>${bestResult.params ? 'Führender' : 'Geteilter'} Punktschätzer:</strong> ${formatMetricValue(bestResult.metricValue, metricKey)}</p>`;
+    if (!bestResult.params) {
+        html += '<p>Es werden keine Parameter zur Übernahme angeboten. Verwenden Sie eine zusätzliche unterscheidende Metrik oder erhöhen Sie die Aussagekraft des Versuchsdesigns.</p>';
+        html += '</div>';
+        container.innerHTML = html;
+        container.style.display = 'block';
+        return;
+    }
     html += '<h5>Parameter:</h5>';
     html += '<table style="width: 100%; border-collapse: collapse;">';
 
@@ -199,8 +267,9 @@ export function displayBestParameters(bestResult, metricKey) {
     html += '<h5 style="margin-top: 15px;">Alle Metriken bei diesen Parametern:</h5>';
     html += '<table style="width: 100%; border-collapse: collapse;">';
 
-    for (const [key, value] of Object.entries(bestResult.metrics)) {
-        if (key === 'warningR2Varies') continue;
+    for (const key of SWEEP_DECISION_METRIC_KEYS) {
+        const value = readSweepMetricValue(bestResult, key);
+        if (value === null) continue;
         html += `<tr style="border-bottom: 1px solid #ddd;">`;
         html += `<td style="padding: 5px;"><strong>${metricLabels[key] || key}:</strong></td>`;
         html += `<td style="padding: 5px; text-align: right;">${formatMetricValue(value, key)}</td>`;
@@ -219,7 +288,7 @@ export function displayBestParameters(bestResult, metricKey) {
     // Event-Listener für "Parameter übernehmen"
     document.getElementById('applyOptimalParams').addEventListener('click', () => {
         applyParametersToForm(bestResult.params);
-        alert('✓ Optimale Parameter wurden ins Hauptformular übernommen!');
+        alert('Die im experimentellen Sweep-Vergleich führenden Parameter wurden ins Hauptformular übernommen.');
     });
 }
 
@@ -249,7 +318,7 @@ export function findBestParametersMultiObjective(sweepResults, objectives) {
     // (sonst dominiert eine Metrik mit großem Wertebereich).
     const normalized = {};
     for (const obj of objectives) {
-        const values = validResults.map(r => r.metrics[obj.metricKey]);
+        const values = validResults.map(r => readSweepMetricValue(r, obj.metricKey));
         const min = Math.min(...values);
         const max = Math.max(...values);
         const range = max - min;
@@ -260,12 +329,13 @@ export function findBestParametersMultiObjective(sweepResults, objectives) {
     // Berechne gewichtete Summe für jedes Ergebnis
     let bestIndex = 0;
     let bestScore = -Infinity;
+    const scores = [];
 
     for (let i = 0; i < validResults.length; i++) {
         let score = 0;
 
         for (const obj of objectives) {
-            const value = validResults[i].metrics[obj.metricKey];
+            const value = readSweepMetricValue(validResults[i], obj.metricKey);
             const norm = normalized[obj.metricKey];
 
             // Normalisiere auf 0-1 (Range=0 => neutraler 0.5-Wert).
@@ -278,6 +348,7 @@ export function findBestParametersMultiObjective(sweepResults, objectives) {
 
             score += normalizedValue * obj.weight;
         }
+        scores.push(score);
 
         if (score > bestScore) {
             bestScore = score;
@@ -285,11 +356,34 @@ export function findBestParametersMultiObjective(sweepResults, objectives) {
         }
     }
 
+    const tiedBestIndices = scores
+        .map((score, index) => metricValuesEqual(score, bestScore) ? index : -1)
+        .filter(index => index >= 0);
+    const degenerateMetricKeys = objectives
+        .filter(objective => normalized[objective.metricKey].range === 0)
+        .map(objective => objective.metricKey);
+    const rankingDiagnostics = {
+        status: tiedBestIndices.length > 1 ? 'indeterminate_tie' : 'unique_point_estimate',
+        tiedBestCount: tiedBestIndices.length,
+        totalValidCount: validResults.length,
+        degenerateMetricKeys
+    };
+    if (tiedBestIndices.length > 1) {
+        return {
+            params: null,
+            score: bestScore,
+            index: null,
+            metrics: validResults[tiedBestIndices[0]].metrics,
+            rankingDiagnostics
+        };
+    }
+
     return {
         params: validResults[bestIndex].params,
         score: bestScore,
         index: bestIndex,
-        metrics: validResults[bestIndex].metrics
+        metrics: validResults[bestIndex].metrics,
+        rankingDiagnostics
     };
 }
 
@@ -307,11 +401,13 @@ export function findBestParametersWithConstraints(sweepResults, objectiveMetricK
     }
 
     // Filtere Ergebnisse die alle Constraints erfüllen
+    const constraintMetricKeys = constraints.map(constraint => constraint.metricKey);
     const feasible = sweepResults.filter(result => {
-        if (!isValidSweepResult(result, [objectiveMetricKey])) return false;
+        if (!isValidSweepResult(result, [objectiveMetricKey, ...constraintMetricKeys])) return false;
         for (const constraint of constraints) {
-            const value = result.metrics[constraint.metricKey];
-            const target = constraint.value;
+            const value = readSweepMetricValue(result, constraint.metricKey);
+            const target = Number(constraint.value);
+            if (!Number.isFinite(target)) return false;
 
             switch (constraint.operator) {
                 case '>=':
@@ -348,10 +444,10 @@ export function findBestParametersWithConstraints(sweepResults, objectiveMetricK
 
     // Finde bestes unter den feasible
     let bestIndex = 0;
-    let bestValue = feasible[0].metrics[objectiveMetricKey];
+    let bestValue = readSweepMetricValue(feasible[0], objectiveMetricKey);
 
     for (let i = 1; i < feasible.length; i++) {
-        const value = feasible[i].metrics[objectiveMetricKey];
+        const value = readSweepMetricValue(feasible[i], objectiveMetricKey);
 
         if (maximize && value > bestValue) {
             bestValue = value;
@@ -362,12 +458,34 @@ export function findBestParametersWithConstraints(sweepResults, objectiveMetricK
         }
     }
 
+    const tiedBestResults = feasible.filter(result => (
+        metricValuesEqual(readSweepMetricValue(result, objectiveMetricKey), bestValue)
+    ));
+    const rankingDiagnostics = {
+        status: tiedBestResults.length > 1 ? 'indeterminate_tie' : 'unique_point_estimate',
+        tiedBestCount: tiedBestResults.length,
+        totalValidCount: feasible.length,
+        metricKey: objectiveMetricKey
+    };
+    if (tiedBestResults.length > 1) {
+        return {
+            params: null,
+            error: `${tiedBestResults.length} zulässige Kombinationen besitzen denselben führenden Punktschätzer`,
+            metricValue: bestValue,
+            metrics: tiedBestResults[0].metrics,
+            feasibleCount: feasible.length,
+            totalCount: sweepResults.length,
+            rankingDiagnostics
+        };
+    }
+
     return {
         params: feasible[bestIndex].params,
         metricValue: bestValue,
         metrics: feasible[bestIndex].metrics,
         feasibleCount: feasible.length,
-        totalCount: sweepResults.length
+        totalCount: sweepResults.length,
+        rankingDiagnostics
     };
 }
 
@@ -384,8 +502,18 @@ export function displayMultiObjectiveOptimization(objectives) {
     const result = findBestParametersMultiObjective(window.sweepResults, objectives);
 
     if (!result) {
-        alert('Fehler bei Multi-Objective Optimierung.');
+        alert(hasLegacySweepMetricShapes(window.sweepResults)
+            ? 'Die Sweep-Ergebnisse verwenden einen veralteten oder unversionierten Ergebnisvertrag. Bitte führen Sie den Sweep neu aus.'
+            : 'Fehler bei der Multi-Objective-Optimierung.');
         return null;
+    }
+    if (!result.params) {
+        const container = document.getElementById('optimizationResults');
+        if (container) {
+            container.innerHTML = `<div style="padding:15px; background:#fff3e0; border:2px solid #ff9800; border-radius:8px;"><h4>Keine eindeutig führende Kombination</h4>${renderComparisonNotice(result.metrics, result.rankingDiagnostics)}<p>Mehrere Kombinationen besitzen denselben gewichteten Punktschätzer. Es werden keine Parameter zur Übernahme angeboten.</p></div>`;
+            container.style.display = 'block';
+        }
+        return result;
     }
 
     const metricLabels = {
@@ -414,7 +542,8 @@ export function displayMultiObjectiveOptimization(objectives) {
     };
 
     let html = '<div style="padding: 15px; background-color: #fff3e0; border-radius: 8px; border: 2px solid #ff9800;">';
-    html += '<h4 style="margin-top: 0; color: #e65100;">🎯 Multi-Objective Optimization</h4>';
+    html += '<h4 style="margin-top: 0; color: #e65100;">Multi-Objective Parametervergleich</h4>';
+    html += renderComparisonNotice(result.metrics, result.rankingDiagnostics);
     html += '<h5>Objectives:</h5>';
     html += '<ul>';
     for (const obj of objectives) {
@@ -423,7 +552,7 @@ export function displayMultiObjectiveOptimization(objectives) {
     }
     html += '</ul>';
     html += `<p><strong>Gewichteter Score:</strong> ${formatFixed(result.score, 3)}</p>`;
-    html += '<h5>Optimale Parameter:</h5>';
+    html += '<h5>Im Vergleich führende Parameter:</h5>';
     html += '<table style="width: 100%; border-collapse: collapse;">';
 
     for (const [key, value] of Object.entries(result.params)) {
@@ -447,7 +576,7 @@ export function displayMultiObjectiveOptimization(objectives) {
 
         document.getElementById('applyMultiObjectiveParams').addEventListener('click', () => {
             applyParametersToForm(result.params);
-            alert('✓ Optimale Multi-Objective Parameter wurden übernommen!');
+            alert('Die im experimentellen Multi-Objective-Vergleich führenden Parameter wurden übernommen.');
         });
     }
 
@@ -469,7 +598,10 @@ export function displayConstraintBasedOptimization(objectiveMetricKey, maximize,
     const result = findBestParametersWithConstraints(window.sweepResults, objectiveMetricKey, maximize, constraints);
 
     if (!result || !result.params) {
-        alert(`Constraint-Based Optimierung fehlgeschlagen:\n\n${result?.error || 'Unbekannter Fehler'}\n\nFeasible: ${result?.feasibleCount || 0} von ${result?.totalCount || 0}`);
+        const errorMessage = !result && hasLegacySweepMetricShapes(window.sweepResults)
+            ? 'Die Sweep-Ergebnisse verwenden einen veralteten oder unversionierten Ergebnisvertrag. Bitte führen Sie den Sweep neu aus.'
+            : (result?.error || 'Unbekannter Fehler');
+        alert(`Constraint-Based Optimierung fehlgeschlagen:\n\n${errorMessage}\n\nFeasible: ${result?.feasibleCount || 0} von ${result?.totalCount || 0}`);
         return null;
     }
 
@@ -499,8 +631,9 @@ export function displayConstraintBasedOptimization(objectiveMetricKey, maximize,
     };
 
     let html = '<div style="padding: 15px; background-color: #e1f5fe; border-radius: 8px; border: 2px solid #03a9f4;">';
-    html += '<h4 style="margin-top: 0; color: #01579b;">⚖️ Constraint-Based Optimization</h4>';
-    html += `<p><strong>Optimiert für:</strong> ${metricLabels[objectiveMetricKey] || objectiveMetricKey} (${maximize ? 'Maximize' : 'Minimize'})</p>`;
+    html += '<h4 style="margin-top: 0; color: #01579b;">Constraint-basierter Parametervergleich</h4>';
+    html += renderComparisonNotice(result.metrics, result.rankingDiagnostics);
+    html += `<p><strong>Verglichen nach:</strong> ${metricLabels[objectiveMetricKey] || objectiveMetricKey} (${maximize ? 'Maximize' : 'Minimize'})</p>`;
     html += '<h5>Constraints:</h5>';
     html += '<ul>';
     for (const c of constraints) {
@@ -508,8 +641,8 @@ export function displayConstraintBasedOptimization(objectiveMetricKey, maximize,
     }
     html += '</ul>';
     html += `<p><strong>Gefunden:</strong> ${result.feasibleCount} von ${result.totalCount} Kombinationen erfüllen alle Constraints</p>`;
-    html += `<p><strong>Optimaler Wert:</strong> ${formatMetricValue(result.metricValue, objectiveMetricKey)}</p>`;
-    html += '<h5>Optimale Parameter:</h5>';
+    html += `<p><strong>Führender Punktschätzer:</strong> ${formatMetricValue(result.metricValue, objectiveMetricKey)}</p>`;
+    html += '<h5>Im Vergleich führende Parameter:</h5>';
     html += '<table style="width: 100%; border-collapse: collapse;">';
 
     for (const [key, value] of Object.entries(result.params)) {
@@ -533,7 +666,7 @@ export function displayConstraintBasedOptimization(objectiveMetricKey, maximize,
 
         document.getElementById('applyConstraintParams').addEventListener('click', () => {
             applyParametersToForm(result.params);
-            alert('✓ Optimale Constraint-Based Parameter wurden übernommen!');
+            alert('Die im experimentellen Constraint-Vergleich führenden Parameter wurden übernommen.');
         });
     }
 

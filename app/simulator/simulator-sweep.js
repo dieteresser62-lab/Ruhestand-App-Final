@@ -29,8 +29,9 @@ import {
     SWEEP_REQUEST_VERSION,
     normalizeSweepRequestV1
 } from './monte-carlo-parameters.js';
+import { SWEEP_METRICS_VERSION } from './sweep-metrics-contract.js';
 
-export const SWEEP_EXECUTION_VERSION = 'SweepExecutionV1';
+export const SWEEP_EXECUTION_VERSION = 'SweepExecutionV2';
 
 /**
  * Initialisiert Sweep-Inputfelder und synchronisiert sie mit der Persistenz-Facade.
@@ -360,9 +361,12 @@ export async function runParameterSweep() {
         }
 
         window.sweepResults = sweepResults;
+        const representativeResult = sweepResults.find(result => result?.metrics);
         window.sweepExecution = {
             schemaVersion: SWEEP_EXECUTION_VERSION,
             request: sweepRequest,
+            metricMetadata: representativeResult?.metrics?.metricMetadata ?? null,
+            comparisonRandomness: representativeResult?.provenance?.comparisonRandomness ?? null,
             results: sweepResults
         };
         window.sweepParamRanges = paramRanges;
@@ -400,7 +404,7 @@ export async function runParameterSweep() {
  */
 
 /**
- * Findet und zeigt die besten Parameter aus dem aktuellen Sweep an
+ * Zeigt die im experimentellen Sweep-Vergleich führende Kombination an.
  */
 window.findAndDisplayBest = function () {
     if (!window.sweepResults || window.sweepResults.length === 0) {
@@ -417,7 +421,12 @@ window.findAndDisplayBest = function () {
         // Scroll zu den Ergebnissen
         document.getElementById('optimizationResults').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } else {
-        alert('Keine Ergebnisse zum Optimieren gefunden.');
+        const hasLegacyShape = window.sweepResults.some(result => (
+            result?.metrics && result.metrics.schemaVersion !== SWEEP_METRICS_VERSION
+        ));
+        alert(hasLegacyShape
+            ? 'Die Sweep-Ergebnisse verwenden einen veralteten oder unversionierten Ergebnisvertrag. Bitte führen Sie den Sweep neu aus.'
+            : 'Keine gültigen versionierten Ergebnisse für die gewählte Metrik gefunden.');
     }
 };
 
@@ -492,8 +501,7 @@ window.runMultiObjectiveDemo = function () {
  */
 window.runConstraintBasedDemo = function () {
     const constraints = [
-        { metricKey: 'successProbFloor', operator: '>=', value: 95 },
-        { metricKey: 'worst5Drawdown', operator: '<=', value: 40 }
+        { metricKey: 'successProbFloor', operator: '>=', value: 95 }
     ];
     displayConstraintBasedOptimization('medianEndWealth', true, constraints);
 };

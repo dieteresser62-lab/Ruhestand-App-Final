@@ -1,10 +1,16 @@
 "use strict";
 
-import { formatCurrency, formatCurrencyShortLog, shortenText } from './simulator-utils.js';
+import { formatCurrency, formatCurrencyShortLog, quantile, shortenText } from './simulator-utils.js';
 import { formatPercentValue, formatPercentRatio } from './simulator-formatting.js';
 import { prepareMonteCarloViewModel } from './results-metrics.js';
 import { renderSummary, renderKpiDashboard, renderStressSection, renderHeatmap, renderCareSection } from './results-renderers.js';
 import { showToast } from './simulator-main-helpers.js';
+import { buildBinaryProportionEstimate } from './monte-carlo-statistics.js';
+import {
+    SWEEP_COMPARISON_DIAGNOSTICS_VERSION,
+    SWEEP_METRIC_METADATA,
+    SWEEP_METRICS_VERSION
+} from './sweep-metrics-contract.js';
 import { EngineAPI } from '../../engine/index.mjs';
 import { STRATEGY_OPTIONS } from '../../types/strategy-options.js';
 import { persistenceStorage } from '../shared/persistence-facade.js';
@@ -21,6 +27,15 @@ const formatPercentFromRatio = (value, digits = 1) => formatPercentRatio(Number(
 export const LEGACY_LOG_DETAIL_KEY = 'logDetailLevel';
 export const WORST_LOG_DETAIL_KEY = 'worstLogDetailLevel';
 export const BACKTEST_LOG_DETAIL_KEY = 'backtestLogDetailLevel';
+export {
+    SWEEP_COMPARISON_DIAGNOSTICS_VERSION,
+    SWEEP_DECISION_METRIC_KEYS,
+    SWEEP_DRAWDOWN_DEFINITION_VERSION,
+    SWEEP_METRIC_METADATA,
+    SWEEP_METRIC_METADATA_VERSION,
+    SWEEP_METRICS_VERSION,
+    readSweepMetricValue
+} from './sweep-metrics-contract.js';
 
 /**
  * Reads the persisted detail level with a defensive fallback.
@@ -601,14 +616,71 @@ export function portfolioTotal(p) {
     return sumTr(p?.depotTranchesAktien) + sumTr(p?.depotTranchesGold) + (Number(p?.liquiditaet) || 0);
 }
 
+function buildSweepComparisonDiagnostics(runOutcomes, values, successCount, options = {}) {
+    const runCount = runOutcomes.length;
+    const terminalRuinRuns = runOutcomes.filter(outcome => outcome?.failed === true).length;
+    const terminalRuinSharePct = runCount > 0 ? (terminalRuinRuns / runCount) * 100 : 0;
+    const worst5Drawdown = Number(values?.worst5Drawdown);
+    const quantileInTerminalRuinBlock = terminalRuinRuns > 0
+        && Number.isFinite(worst5Drawdown)
+        && Math.abs(worst5Drawdown - 100) <= 1e-12;
+    return {
+        schemaVersion: SWEEP_COMPARISON_DIAGNOSTICS_VERSION,
+        runCount,
+        successfulRuns: successCount,
+        failedRuns: runCount - successCount,
+        commonRandomNumbers: options.commonRandomNumbers === true,
+        randomPolicyVersion: options.randomPolicyVersion ?? null,
+        successProbability: buildBinaryProportionEstimate({
+            successes: successCount,
+            trials: runCount
+        }),
+        quantileUncertainty: {
+            confidenceInterval: null,
+            reason: 'quantile_confidence_interval_not_estimated'
+        },
+        drawdownQuantile: {
+            metricKey: 'worst5Drawdown',
+            quantile: 0.95,
+            terminalRuinLossPct: 100,
+            terminalRuinRuns,
+            terminalRuinSharePct,
+            upperTailSharePct: 5,
+            quantileInTerminalRuinBlock,
+            status: quantileInTerminalRuinBlock
+                ? 'saturated_by_terminal_ruin'
+                : 'not_saturated_by_terminal_ruin',
+            warning: quantileInTerminalRuinBlock
+                ? 'Der Drawdown-P95 liegt im Block terminaler Ruine und unterscheidet Strategien mit derselben gesaettigten Kennzahl nicht.'
+                : null
+        },
+        ranking: {
+            status: 'experimental_point_estimate',
+            warning: 'Quantilrankings sind experimentelle Punktschätzer; CRN reduziert Vergleichsrauschen, ersetzt aber kein Quantil-Konfidenzintervall und kein Modellrisiko.'
+        }
+    };
+}
+
+function buildSweepMetricsEnvelope(runOutcomes, values, successCount, options = {}) {
+    return {
+        schemaVersion: SWEEP_METRICS_VERSION,
+        metricMetadata: SWEEP_METRIC_METADATA,
+        comparison: buildSweepComparisonDiagnostics(runOutcomes, values, successCount, options),
+        ...values
+    };
+}
+
 /**
- * Aggregiert Metriken für eine Reihe von Monte-Carlo-Läufen
+ * Aggregiert Metriken für eine Reihe von Monte-Carlo-Läufen.
+ *
  * @param {Array} runOutcomes - Array mit Ergebnissen einzelner Läufe
- * @returns {Object} Aggregierte Metriken
+ * @param {Object} options - Vergleichs-/Seedvertrag des aufrufenden Runners
+ * @returns {Object} Versionierte aggregierte Sweep-Metriken
  */
-export function aggregateSweepMetrics(runOutcomes) {
-    if (!runOutcomes || runOutcomes.length === 0) {
-        return {
+export function aggregateSweepMetrics(runOutcomes, options = {}) {
+    const outcomes = Array.isArray(runOutcomes) ? runOutcomes : [];
+    if (outcomes.length === 0) {
+        return buildSweepMetricsEnvelope(outcomes, {
             successProbFloor: 0,
             p10EndWealth: 0,
             p25EndWealth: 0,
@@ -618,41 +690,45 @@ export function aggregateSweepMetrics(runOutcomes) {
             maxEndWealth: 0,
             worst5Drawdown: 0,
             minRunwayObserved: 0
-        };
+        }, 0, options);
     }
 
-    const successCount = runOutcomes.filter(r => !r.failed).length;
-    const successProbFloor = (successCount / runOutcomes.length) * 100;
+    const successCount = outcomes.filter(r => !r.failed).length;
+    const successProbFloor = (successCount / outcomes.length) * 100;
 
-    // Sort end wealths to compute percentile cutoffs.
-    const endWealths = runOutcomes.map(r => r.finalVermoegen || 0);
-    endWealths.sort((a, b) => a - b);
+    // End wealth quantiles use the same canonical interpolated method as D-06.
+    const endWealths = outcomes.map(r => Number.isFinite(Number(r?.finalVermoegen))
+        ? Number(r.finalVermoegen)
+        : 0);
 
-    // Perzentile
-    const p10Index = Math.floor(endWealths.length * 0.10);
-    const p10EndWealth = endWealths[p10Index] || 0;
-    const p25Index = Math.floor(endWealths.length * 0.25);
-    const p25EndWealth = endWealths[p25Index] || 0;
-    const p50Index = Math.floor(endWealths.length * 0.50);
-    const medianEndWealth = endWealths[p50Index] || 0;
-    const p75Index = Math.floor(endWealths.length * 0.75);
-    const p75EndWealth = endWealths[p75Index] || 0;
+    const p10EndWealth = quantile(endWealths, 0.10);
+    const p25EndWealth = quantile(endWealths, 0.25);
+    const medianEndWealth = quantile(endWealths, 0.50);
+    const p75EndWealth = quantile(endWealths, 0.75);
 
     // Mittelwert
     const meanEndWealth = endWealths.reduce((sum, val) => sum + val, 0) / endWealths.length;
 
     // Maximum
-    const maxEndWealth = endWealths[endWealths.length - 1] || 0;
+    const maxEndWealth = Math.max(...endWealths);
 
-    const drawdowns = runOutcomes.map(r => r.maxDrawdown || 0);
-    drawdowns.sort((a, b) => b - a);
-    const p95Index = Math.floor(drawdowns.length * 0.95);
-    const worst5Drawdown = drawdowns[p95Index] || 0;
+    // D-06: Verlustmass aufsteigend lesen; der schlechte Tail liegt oben.
+    // Die kanonische Quantilfunktion interpoliert auf (n - 1) * q.
+    const drawdowns = outcomes.map(r => {
+        const value = Number(r?.maxDrawdown);
+        if (!Number.isFinite(value) || value < 0 || value > 100) {
+            throw new RangeError(`Sweep-Drawdown ausserhalb des gueltigen Bereichs 0..100: ${String(r?.maxDrawdown)}`);
+        }
+        return value;
+    });
+    const worst5Drawdown = quantile(drawdowns, 0.95);
 
-    const runways = runOutcomes.map(r => r.minRunway || 0);
+    const runways = outcomes.map(r => Number.isFinite(Number(r?.minRunway))
+        ? Number(r.minRunway)
+        : 0);
     const minRunwayObserved = Math.min(...runways);
 
-    return {
+    return buildSweepMetricsEnvelope(outcomes, {
         successProbFloor,
         p10EndWealth,
         p25EndWealth,
@@ -662,5 +738,5 @@ export function aggregateSweepMetrics(runOutcomes) {
         maxEndWealth,
         worst5Drawdown,
         minRunwayObserved
-    };
+    }, successCount, options);
 }

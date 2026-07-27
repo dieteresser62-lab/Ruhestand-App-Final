@@ -2,7 +2,7 @@
 
 import { rng, makeRunSeed, RUNIDX_COMBO_SETUP } from './simulator-utils.js';
 import { buildStressContext, computeRentAdjRate, applyStressOverride } from './simulator-portfolio.js';
-import { annualData, BREAK_ON_RUIN } from './simulator-data.js';
+import { annualData } from './simulator-data.js';
 import {
     assertSimulatorHorizonAgeContract,
     createMonteCarloLifeState,
@@ -65,9 +65,10 @@ const SWEEP_LIMITS = {
     dynamicGoGoMultiplierMin: 1.0,
     dynamicGoGoMultiplierMax: 1.5
 };
-export const SWEEP_RESULT_PROVENANCE_VERSION = 'SweepResultProvenanceV1';
-export const SWEEP_SAMPLING_FINGERPRINT_VERSION = 'SweepSamplingFingerprintV1';
+export const SWEEP_RESULT_PROVENANCE_VERSION = 'SweepResultProvenanceV2';
+export const SWEEP_SAMPLING_FINGERPRINT_VERSION = 'SweepSamplingFingerprintV2';
 export const SWEEP_HOUSEHOLD_RISK_DIAGNOSTICS_VERSION = 'SweepHouseholdRiskDiagnosticsV1';
+export const SWEEP_COMPARISON_RANDOMNESS_VERSION = 'SweepCommonRandomNumbersV2';
 
 const MAX_FINGERPRINT_TRACE_RUNS = 3;
 const MAX_FINGERPRINT_TRACE_YEARS = 64;
@@ -77,6 +78,7 @@ const MAX_TAIL_SCHEDULE_TRACE_EVENTS = 16;
 const HOUSEHOLD_TRACE_INITIAL_YEARS = 4;
 const FINGERPRINT_RUN_SEPARATOR = 0xFFFFFFFD;
 const FINGERPRINT_UNKNOWN_YEAR = 0xFFFFFFFE;
+const COMMON_RANDOM_NUMBER_COMBINATION_COORDINATE = 0;
 const ANNUAL_DATA_INDEX_BY_YEAR = new Map(
     annualData.map((entry, index) => [Number(entry?.jahr), index])
 );
@@ -131,6 +133,40 @@ function recordSweepFingerprintYear(fingerprint, trace, yearData) {
 function finalizeSweepSamplingFingerprint(fingerprint) {
     fingerprint.publicValue.hash = fingerprint.hash.toString(16).padStart(8, '0');
     return fingerprint.publicValue;
+}
+
+function buildSweepComparisonRandomness(request) {
+    const { seed, rngMode } = request.monteCarloParameters;
+    const requestedRngMode = rngMode === 'legacy-stream' ? 'legacy-stream' : 'per-run-seed';
+    const appliedRngMode = 'per-run-seed';
+    return {
+        schemaVersion: SWEEP_COMPARISON_RANDOMNESS_VERSION,
+        policy: 'common_random_numbers_by_run_index',
+        commonSeedScheduleAcrossCombinations: true,
+        commonDrawsUntilStrategyTermination: true,
+        completeRawPathsCommonAcrossCombinations: false,
+        pathEqualityScope: 'common_prefix_until_strategy_dependent_termination',
+        baseSeed: seed,
+        requestedRngMode,
+        appliedRngMode,
+        rngModeResolution: requestedRngMode === appliedRngMode
+            ? 'requested_mode_already_run_isolated'
+            : 'legacy_stream_replaced_for_crn_run_isolation',
+        combinationSeedCoordinate: COMMON_RANDOM_NUMBER_COMBINATION_COORDINATE,
+        setupSeed: makeRunSeed(
+            seed,
+            COMMON_RANDOM_NUMBER_COMBINATION_COORDINATE,
+            RUNIDX_COMBO_SETUP
+        ),
+        runSeedDerivation: 'makeRunSeed(baseSeed, combinationSeedCoordinate=0, runIndex)'
+    };
+}
+
+function buildSweepMetricAggregationOptions() {
+    return {
+        commonRandomNumbers: true,
+        randomPolicyVersion: SWEEP_COMPARISON_RANDOMNESS_VERSION
+    };
 }
 
 function createSweepHouseholdRiskDiagnostics() {
@@ -363,6 +399,7 @@ function buildSweepResultProvenance(
         samplingMethodResolution: request.samplingMethodResolution,
         useCapeSampling: request.useCapeSampling,
         normalizedParameters: { ...request.monteCarloParameters },
+        comparisonRandomness: buildSweepComparisonRandomness(request),
         unsupportedOverlays: [],
         samplingDiagnostics: samplingDiagnostics
             ? {
@@ -382,15 +419,7 @@ function isConditionalStressActive(stressContext) {
 
 function makeInvalidSweepMetrics(reason) {
     return {
-        successProbFloor: 0,
-        p10EndWealth: 0,
-        p25EndWealth: 0,
-        medianEndWealth: 0,
-        p75EndWealth: 0,
-        meanEndWealth: 0,
-        maxEndWealth: 0,
-        worst5Drawdown: 0,
-        minRunwayObserved: 0,
+        ...aggregateSweepMetrics([], buildSweepMetricAggregationOptions()),
         invalidCombination: true,
         invalidReason: String(reason || 'ungueltige Kombination')
     };
@@ -552,7 +581,7 @@ export function runSweepChunk({
     let p2VarianceCount = 0;
     let resolvedRef = refP2Invariants;
 
-    // Sweep each combination deterministically using comboIdx-based seeds.
+    // D-07: Alle Kombinationen verwenden je Run-Index dieselben Zufallspfade.
     for (let offset = 0; offset < count; offset++) {
         const comboIdx = start + offset;
         const params = paramCombinations[comboIdx];
@@ -584,18 +613,26 @@ export function runSweepChunk({
             p2VarianceCount++;
         }
 
-        // Legacy-stream uses one RNG per combo, otherwise per-run seeds for determinism.
-        const resolvedRngMode = rngMode === 'legacy-stream' ? 'legacy-stream' : 'per-run-seed';
-        const legacyRand = resolvedRngMode === 'legacy-stream' ? rng(baseSeed + comboIdx) : null;
-        const comboRand = legacyRand || rng(makeRunSeed(baseSeed, comboIdx, RUNIDX_COMBO_SETUP));
+        // Sweep-Vergleiche loesen auch angeforderten Legacy-Stream auf
+        // isolierte Run-Index-Seeds auf. Andernfalls verschiebt ein frueher
+        // Abbruch den Stream aller nachfolgenden Runs nur in dieser Kombination.
+        const comboRand = rng(makeRunSeed(
+            baseSeed,
+            COMMON_RANDOM_NUMBER_COMBINATION_COORDINATE,
+            RUNIDX_COMBO_SETUP
+        ));
         const stressCtxMaster = buildStressContext(inputs.stressPreset, comboRand);
 
         const runOutcomes = [];
         let invalidComboReason = '';
 
         for (let i = 0; i < anzahlRuns; i++) {
-            const runSeed = makeRunSeed(baseSeed, comboIdx, i);
-            const rand = legacyRand || rng(runSeed);
+            const runSeed = makeRunSeed(
+                baseSeed,
+                COMMON_RANDOM_NUMBER_COMBINATION_COORDINATE,
+                i
+            );
+            const rand = rng(runSeed);
             const tailRiskPlan = createTailRiskSchedule(runSeed, inputs, maxDauer);
             const tailRiskEntriesThisRun = [];
             let failed = false;
@@ -821,7 +858,10 @@ export function runSweepChunk({
 
                 if (result.isRuin) {
                     failed = true;
-                    if (BREAK_ON_RUIN) break;
+                    // SWP-09 / D-06: Der terminale Nullpunkt gehoert vor dem
+                    // zwingenden Sweep-Abbruch in die Drawdownserie.
+                    depotWertHistorie.push(0);
+                    break;
                 } else {
                     simState = result.newState;
                     totalTaxSavedByLossCarryThisRun += Number(result.logData?.taxSavedByLossCarry) || 0;
@@ -875,7 +915,10 @@ export function runSweepChunk({
         }
 
         // Aggregate P50/P10/etc per combo to feed the heatmap.
-        const metrics = aggregateSweepMetrics(runOutcomes);
+        const metrics = aggregateSweepMetrics(
+            runOutcomes,
+            buildSweepMetricAggregationOptions()
+        );
         metrics.warningR2Varies = p2VarianceWarning;
         results.push({ comboIdx, params, metrics, provenance: resultProvenance });
     }

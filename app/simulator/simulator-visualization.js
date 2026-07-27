@@ -9,14 +9,33 @@
  * 3. Parameter Distribution Charts
  */
 
-import { aggregateSweepMetrics } from './simulator-results.js';
 import { formatPercentValue } from './simulator-formatting.js';
+import { readSweepMetricValue } from './sweep-metrics-contract.js';
 
 // Kleine Format-Helfer, damit die UI-Strings konsistent sind.
 const formatFixed = (value, digits = 1) => value.toFixed(digits);
 const formatPercent = (value, digits = 0) => formatPercentValue(value, { fractionDigits: digits, invalid: '0%' });
 const formatRangeLine = (min, max, range) => `Range: ${formatFixed(min, 1)} → ${formatFixed(max, 1)} (Δ ${formatFixed(range, 1)})`;
-const isValidSweepResult = result => result && result.metrics && result.metrics.invalidCombination !== true;
+const isValidSweepResult = (result, metricKeys = []) => (
+    Boolean(result)
+    && result.metrics?.invalidCombination !== true
+    && Array.isArray(metricKeys)
+    && metricKeys.length > 0
+    && metricKeys.every(metricKey => readSweepMetricValue(result, metricKey) !== null)
+);
+
+function buildDrawdownSaturationNotice(results, metricKeys) {
+    if (!metricKeys.includes('worst5Drawdown')) return '';
+    const validResults = results.filter(result => (
+        readSweepMetricValue(result, 'worst5Drawdown') !== null
+    ));
+    const saturatedCount = validResults.filter(result => (
+        result.metrics?.comparison?.drawdownQuantile?.quantileInTerminalRuinBlock === true
+    )).length;
+    if (saturatedCount === 0) return '';
+    const allSaturated = saturatedCount === validResults.length;
+    return `<p class="pareto-saturation-notice" style="color:#b71c1c; font-size:0.9rem;"><strong>Drawdown-P95 ist durch terminale Ruine gesättigt:</strong> ${saturatedCount} von ${validResults.length} Kombinationen liegen bei 100 %.${allSaturated ? ' Diese Zielgröße trägt keine Unterscheidung zur Frontier bei.' : ''}</p>`;
+}
 
 /**
  * Berechnet Sensitivity für jeden Parameter
@@ -26,7 +45,7 @@ const isValidSweepResult = result => result && result.metrics && result.metrics.
  */
 export function calculateSensitivity(sweepResults, metricKey) {
     if (!sweepResults || sweepResults.length === 0) return null;
-    const validSweepResults = sweepResults.filter(isValidSweepResult);
+    const validSweepResults = sweepResults.filter(result => isValidSweepResult(result, [metricKey]));
     if (validSweepResults.length === 0) return null;
 
     // Parameterräume kommen aus der Sweep-UI und sind global gepuffert.
@@ -53,7 +72,7 @@ export function calculateSensitivity(sweepResults, metricKey) {
         const metricsByParamValue = {};
         for (const result of validSweepResults) {
             const paramValue = result.params[paramKey];
-            const metricValue = result.metrics[metricKey];
+            const metricValue = readSweepMetricValue(result, metricKey);
 
             if (!metricsByParamValue[paramValue]) {
                 metricsByParamValue[paramValue] = [];
@@ -165,15 +184,17 @@ export function renderSensitivityChart(sensitivity, metricKey) {
  */
 export function calculateParetoFrontier(sweepResults, metricKey1, metricKey2, maximize1 = true, maximize2 = true) {
     if (!sweepResults || sweepResults.length === 0) return [];
-    const validSweepResults = sweepResults.filter(isValidSweepResult);
+    const validSweepResults = sweepResults.filter(result => (
+        isValidSweepResult(result, [metricKey1, metricKey2])
+    ));
     if (validSweepResults.length === 0) return [];
 
     const paretoPoints = [];
 
     for (let i = 0; i < validSweepResults.length; i++) {
         const point = validSweepResults[i];
-        const m1 = point.metrics[metricKey1];
-        const m2 = point.metrics[metricKey2];
+        const m1 = readSweepMetricValue(point, metricKey1);
+        const m2 = readSweepMetricValue(point, metricKey2);
 
         let isDominated = false;
 
@@ -182,8 +203,8 @@ export function calculateParetoFrontier(sweepResults, metricKey1, metricKey2, ma
         if (i === j) continue;
 
             const other = validSweepResults[j];
-            const om1 = other.metrics[metricKey1];
-            const om2 = other.metrics[metricKey2];
+            const om1 = readSweepMetricValue(other, metricKey1);
+            const om2 = readSweepMetricValue(other, metricKey2);
 
             // Dominanz hängt von der Maximierungs-/Minimierungsrichtung ab.
             const better1 = maximize1 ? (om1 > m1) : (om1 < m1);
@@ -241,9 +262,16 @@ export function renderParetoFrontier(paretoPoints, allPoints, metricKey1, metric
         minRunwayObserved: 'Min Runway Observed'
     };
 
+    const renderablePoints = allPoints.filter(point => (
+        isValidSweepResult(point, [metricKey1, metricKey2])
+    ));
+    if (renderablePoints.length === 0) {
+        return '<p>Keine gültigen, versionierten Sweep-Metriken für die Pareto-Darstellung vorhanden. Bei importierten Altständen den Sweep bitte neu ausführen.</p>';
+    }
+
     // Extrahiere Metrik-Werte für Achsenskalierung.
-    const m1Values = allPoints.map(p => p.metrics[metricKey1]);
-    const m2Values = allPoints.map(p => p.metrics[metricKey2]);
+    const m1Values = renderablePoints.map(p => readSweepMetricValue(p, metricKey1));
+    const m2Values = renderablePoints.map(p => readSweepMetricValue(p, metricKey2));
 
     const minX = Math.min(...m1Values);
     const maxX = Math.max(...m1Values);
@@ -251,8 +279,14 @@ export function renderParetoFrontier(paretoPoints, allPoints, metricKey1, metric
     const maxY = Math.max(...m2Values);
 
     // Lineare Skalierung von Metrikraum in SVG-Koordinaten.
-    const scaleX = (val) => margin.left + ((val - minX) / (maxX - minX)) * plotWidth;
-    const scaleY = (val) => height - margin.bottom - ((val - minY) / (maxY - minY)) * plotHeight;
+    const rangeX = maxX - minX;
+    const rangeY = maxY - minY;
+    const scaleX = (val) => margin.left + (rangeX === 0
+        ? plotWidth / 2
+        : ((val - minX) / rangeX) * plotWidth);
+    const scaleY = (val) => height - margin.bottom - (rangeY === 0
+        ? plotHeight / 2
+        : ((val - minY) / rangeY) * plotHeight);
 
     let svg = `<svg width="${width}" height="${height}" style="background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">`;
 
@@ -268,9 +302,9 @@ export function renderParetoFrontier(paretoPoints, allPoints, metricKey1, metric
     svg += `<text x="15" y="${height / 2}" text-anchor="middle" transform="rotate(-90, 15, ${height / 2})" style="font-size: 12px;">${metricLabels[metricKey2] || metricKey2}</text>`;
 
     // Alle Punkte (grau) als Kontextwolke.
-    for (const point of allPoints) {
-        const x = scaleX(point.metrics[metricKey1]);
-        const y = scaleY(point.metrics[metricKey2]);
+    for (const point of renderablePoints) {
+        const x = scaleX(readSweepMetricValue(point, metricKey1));
+        const y = scaleY(readSweepMetricValue(point, metricKey2));
         svg += `<circle cx="${x}" cy="${y}" r="4" fill="#ccc" opacity="0.6"/>`;
     }
 
@@ -292,7 +326,7 @@ export function renderParetoFrontier(paretoPoints, allPoints, metricKey1, metric
 
     svg += '</svg>';
 
-    return svg;
+    return `${buildDrawdownSaturationNotice(renderablePoints, [metricKey1, metricKey2])}${svg}`;
 }
 
 /**
@@ -344,6 +378,12 @@ export function displayParetoFrontier() {
 
     let html = '<div style="padding: 20px;">';
     html += '<h4>Pareto Frontier</h4>';
+    const comparison = window.sweepResults.find(result => (
+        isValidSweepResult(result, [metric1, metric2])
+    ))?.metrics?.comparison;
+    html += comparison
+        ? `<p style="color:#8a5a00; font-size:0.9rem;">Experimenteller Vergleich mit ${comparison.runCount} ${comparison.runCount === 1 ? 'Lauf' : 'Läufen'} je Kombination und ${comparison.commonRandomNumbers === true ? 'gemeinsamen Zufallspfaden (CRN)' : 'nicht belegter CRN-Policy'}. Quantilwerte besitzen kein geschätztes Konfidenzintervall. Der Sweep-Drawdown enthält terminale Ruine und ist nicht direkt mit der unversionierten Monte-Carlo-Drawdownkennzahl vergleichbar.</p>`
+        : '<p style="color:#b71c1c; font-size:0.9rem;">Vergleichsdiagnostik fehlt; Frontier nicht als belastbares Ranking interpretieren.</p>';
     html += `<p style="color: #666; font-size: 0.9rem;">Grüne Punkte = Pareto-optimal (nicht von anderen dominiert)</p>`;
     html += `<p style="color: #666; font-size: 0.9rem;">Gefunden: ${paretoPoints.length} von ${window.sweepResults.length} Punkten sind Pareto-optimal</p>`;
     html += svg;

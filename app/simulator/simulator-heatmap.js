@@ -1,6 +1,10 @@
 "use strict";
 
 import { lerp } from './simulator-utils.js';
+import {
+    SWEEP_METRICS_VERSION,
+    readSweepMetricValue
+} from './sweep-metrics-contract.js';
 
 const formatFixed = (value, digits = 1) => value.toFixed(digits);
 const formatPercent = (value, digits = 1) => `${formatFixed(value, digits)}%`;
@@ -407,13 +411,19 @@ export function renderSweepHeatmapSVG(sweepResults, metricKey, xParam, yParam, x
         const heatmapData = new Map();
         for (const result of sweepResults) {
             const key = `${result.params[xParam]}_${result.params[yParam]}`;
-            if (result?.metrics?.invalidCombination === true) continue;
-            heatmapData.set(key, result.metrics[metricKey] || 0);
+            const metricValue = readSweepMetricValue(result, metricKey);
+            if (metricValue === null) continue;
+            heatmapData.set(key, metricValue);
         }
 
         const allValues = Array.from(heatmapData.values());
         if (allValues.length === 0) {
-            return '<p>Keine gueltigen Sweep-Ergebnisse fuer die aktuelle Auswahl vorhanden.</p>';
+            const hasLegacyShape = sweepResults.some(result => (
+                result?.metrics && result.metrics.schemaVersion !== SWEEP_METRICS_VERSION
+            ));
+            return hasLegacyShape
+                ? '<p>Die Sweep-Ergebnisse verwenden einen veralteten oder unversionierten Ergebnisvertrag. Bitte den Sweep neu ausführen.</p>'
+                : '<p>Keine gültigen Sweep-Ergebnisse für die aktuelle Auswahl vorhanden.</p>';
         }
         const minVal = Math.min(...allValues);
         const maxVal = Math.max(...allValues);
@@ -443,7 +453,7 @@ export function renderSweepHeatmapSVG(sweepResults, metricKey, xParam, yParam, x
                 const yVal = yValues[yValues.length - 1 - yi];
                 const key = `${xVal}_${yVal}`;
                 const hasValue = heatmapData.has(key);
-                const value = hasValue ? (heatmapData.get(key) || 0) : minVal;
+                const value = hasValue ? heatmapData.get(key) : minVal;
 
                 const x = xi * cellWidth;
                 const y = yi * cellHeight;
@@ -452,16 +462,31 @@ export function renderSweepHeatmapSVG(sweepResults, metricKey, xParam, yParam, x
                 const result = sweepResults.find(r => r.params[xParam] === xVal && r.params[yParam] === yVal);
                 const hasR2Warning = result && result.metrics && result.metrics.warningR2Varies;
                 const isInvalidCombo = result && result.metrics && result.metrics.invalidCombination === true;
-                const invalidReason = isInvalidCombo ? (result.metrics.invalidReason || 'ungueltige Kombination') : '';
+                const invalidReason = isInvalidCombo ? (result.metrics.invalidReason || 'ungültige Kombination') : '';
+                const comparison = result?.metrics?.comparison;
+                const drawdownQuantile = comparison?.drawdownQuantile;
+                const successProbability = comparison?.successProbability;
+                const successInterval = successProbability?.confidenceInterval95;
+                const successValue = readSweepMetricValue(result, 'successProbFloor');
+                const p10Value = readSweepMetricValue(result, 'p10EndWealth');
+                const drawdownValue = readSweepMetricValue(result, 'worst5Drawdown');
+                const runwayValue = readSweepMetricValue(result, 'minRunwayObserved');
 
                 const tooltipLines = result ? [
                     `${paramLabels[xParam]}: ${xVal}`,
                     `${paramLabels[yParam]}: ${yVal}`,
                     '',
-                    isInvalidCombo ? `Ungueltig: ${invalidReason}` : `Success Prob: ${formatPercent(result.metrics.successProbFloor, 1)}`,
-                    isInvalidCombo ? '' : `P10 End Wealth: ${formatThousandsEuro(result.metrics.p10EndWealth)}`,
-                    isInvalidCombo ? '' : `Worst 5% DD: ${formatPercent(result.metrics.worst5Drawdown, 1)}`,
-                    isInvalidCombo ? '' : `Min Runway: ${formatMonths(result.metrics.minRunwayObserved, 1)}`,
+                    isInvalidCombo ? `Ungültig: ${invalidReason}` : `Läufe: ${comparison?.runCount ?? 0}`,
+                    isInvalidCombo ? '' : `CRN: ${comparison?.commonRandomNumbers === true ? 'aktiv' : 'nicht belegt'}`,
+                    isInvalidCombo || successValue === null ? '' : `Success Prob: ${formatPercent(successValue, 1)}`,
+                    isInvalidCombo || !successInterval ? '' : `Wilson 95%-KI: ${formatPercent(successInterval.lowerPct, 1)} bis ${formatPercent(successInterval.upperPct, 1)}`,
+                    isInvalidCombo || p10Value === null ? '' : `P10 End Wealth: ${formatThousandsEuro(p10Value)}`,
+                    isInvalidCombo || drawdownValue === null ? '' : `Worst 5% DD: ${formatPercent(drawdownValue, 1)}`,
+                    isInvalidCombo || runwayValue === null ? '' : `Min Runway: ${formatMonths(runwayValue, 1)}`,
+                    isInvalidCombo || !drawdownQuantile?.quantileInTerminalRuinBlock
+                        ? ''
+                        : `Drawdown-P95 gesättigt: ${formatPercent(drawdownQuantile.terminalRuinSharePct, 1)} terminale Ruine`,
+                    isInvalidCombo ? '' : 'Quantilranking: experimenteller Punktschätzer',
                     hasR2Warning ? '\n⚠ Rente 2 variierte im Sweep' : ''
                 ].filter(Boolean) : [`${paramLabels[xParam]}: ${xVal}`, `${paramLabels[yParam]}: ${yVal}`, 'Keine Daten'];
 
@@ -479,7 +504,7 @@ export function renderSweepHeatmapSVG(sweepResults, metricKey, xParam, yParam, x
 
                     // Warn-Symbol bei R2-Varianz oder invaliden Kombis
                     if (hasR2Warning || isInvalidCombo) {
-                        const warnTitle = isInvalidCombo ? 'Ungueltige Parameterkombination' : 'Rente 2 variierte im Sweep';
+                        const warnTitle = isInvalidCombo ? 'Ungültige Parameterkombination' : 'Rente 2 variierte im Sweep';
                         const warnGlyph = isInvalidCombo ? '⛔' : '⚠';
                         cellsHtml += `<text x="${x + cellWidth / 2}" y="${y + cellHeight / 2 + 10}" text-anchor="middle" dominant-baseline="middle" font-size="14px" pointer-events="none" title="${warnTitle}">${warnGlyph}</text>`;
                     }
@@ -510,10 +535,32 @@ export function renderSweepHeatmapSVG(sweepResults, metricKey, xParam, yParam, x
             </g>`;
         }
 
+        const comparison = sweepResults.find(result => readSweepMetricValue(result, metricKey) !== null)
+            ?.metrics?.comparison;
+        const validMetricResults = sweepResults.filter(result => (
+            readSweepMetricValue(result, metricKey) !== null
+        ));
+        const saturatedDrawdownCount = metricKey === 'worst5Drawdown'
+            ? validMetricResults.filter(result => (
+                result.metrics?.comparison?.drawdownQuantile?.quantileInTerminalRuinBlock === true
+            )).length
+            : 0;
+        const saturationNotice = saturatedDrawdownCount > 0
+            ? `<p class="sweep-saturation-notice" style="color:#b71c1c; font-size:0.9rem;"><strong>Drawdown-P95 ist durch terminale Ruine gesättigt:</strong> ${saturatedDrawdownCount} von ${validMetricResults.length} Kombinationen liegen bei 100 %.${range === 0 ? ' Die Metrik unterscheidet die dargestellten Kombinationen nicht.' : ''}</p>`
+            : '';
+        const runCountText = comparison?.runCount === 1
+            ? '1 Lauf'
+            : `${comparison?.runCount ?? 0} Läufe`;
+        const comparisonNotice = comparison
+            ? `${runCountText} je Kombination · Common Random Numbers: ${comparison.commonRandomNumbers === true ? 'aktiv' : 'nicht belegt'} · Erfolgsquote mit Wilson-95%-KI. Quantilrankings sind experimentelle Punktschätzer ohne Quantil-Konfidenzintervall. Der Sweep-Drawdown enthält terminale Ruine und ist nicht direkt mit der unversionierten Monte-Carlo-Drawdownkennzahl vergleichbar.`
+            : 'Vergleichsdiagnostik nicht verfügbar.';
+
         return `
         ${HEATMAP_V4_STYLE}
         <div style="text-align:center;">
             <h4>Parameter Sweep: ${metricLabels[metricKey] || metricKey}</h4>
+            ${saturationNotice}
+            <p class="sweep-comparison-notice" style="color:#8a5a00; font-size:0.9rem;">${comparisonNotice}</p>
             <svg class="heatmap-v4-svg" viewBox="0 0 ${opts.width} ${opts.height}">
                 <g transform="translate(${margin.left}, ${margin.top})">
                     <text x="${chartWidth / 2}" y="-35" text-anchor="middle" class="axis-label">${paramLabels[xParam] || xParam}</text>

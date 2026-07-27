@@ -34,9 +34,11 @@ import {
     SWEEP_RESULT_PROVENANCE_VERSION,
     SWEEP_SAMPLING_FINGERPRINT_VERSION,
     SWEEP_HOUSEHOLD_RISK_DIAGNOSTICS_VERSION,
+    SWEEP_COMPARISON_RANDOMNESS_VERSION,
     buildSweepInputs,
     runSweepChunk
 } from '../app/simulator/sweep-runner.js';
+import { SWEEP_METRICS_VERSION } from '../app/simulator/sweep-metrics-contract.js';
 import {
     SWEEP_REQUEST_VERSION,
     SWEEP_SAMPLING_METHOD_RESOLUTION,
@@ -1185,7 +1187,7 @@ console.log('Test 34: Fehlender Sweep-Request');
     console.log('✓ Fehlender Sweep-Request OK');
 }
 
-// Test 35: Provenienz bindet den Seedraum an den globalen Kombinationsindex
+// Test 35: Provenienz trennt Ergebniskoordinate von der gemeinsamen Seedkoordinate
 console.log('Test 35: Sweep Kombinationsindex-Provenienz');
 {
     const result = runSweepChunk({
@@ -1202,12 +1204,17 @@ console.log('Test 35: Sweep Kombinationsindex-Provenienz');
     assertEqual(
         result.provenance.combinationIndex,
         1,
-        'result provenance identifies the combination coordinate used by makeRunSeed'
+        'result provenance retains the global result coordinate'
     );
     assertEqual(
         result.provenance.samplingFingerprint.combinationIndex,
         1,
         'sampling fingerprint identifies the same combination coordinate'
+    );
+    assertEqual(
+        result.provenance.comparisonRandomness.combinationSeedCoordinate,
+        0,
+        'CRN provenance keeps the common seed coordinate independent from the result coordinate'
     );
     console.log('✓ Sweep Kombinationsindex-Provenienz OK');
 }
@@ -1651,9 +1658,9 @@ console.log('Test 41: Single-Profile Sweep/MC Ergebnisparitaet');
     const expectedMean = finalOutcomes.reduce((sum, value) => sum + value, 0) / finalOutcomes.length;
     assertClose(
         sweep.metrics.p10EndWealth,
-        sortedOutcomes[Math.floor(sortedOutcomes.length * 0.1)],
+        quantile(sortedOutcomes, 0.1),
         1e-8,
-        'Sweep P10 matches its documented order-statistic aggregation over MC raw paths'
+        'Sweep P10 matches the canonical interpolated quantile over MC raw paths'
     );
     assertClose(sweep.metrics.medianEndWealth, quantile(finalOutcomes, 0.5), 1e-8, 'Sweep median matches MC raw paths');
     assertClose(sweep.metrics.meanEndWealth, expectedMean, 1e-8, 'Sweep mean matches MC raw paths');
@@ -1853,6 +1860,178 @@ console.log('Test 44: A08-8 Sweep Paar-Flex ohne Pflegelogik');
         'surviving P2 keeps the canonical couple flex factor without care metadata'
     );
     console.log('✓ A08-8 Sweep Paar-Flex ohne Pflegelogik OK');
+}
+
+// Test 45: D-07 - wirkungsgleiche Kombinationen verwenden identische Raw-Pfade
+console.log('Test 45: D-07 Common Random Numbers');
+{
+    const duplicateCombinations = [
+        { ...samplingTestCombination },
+        { ...samplingTestCombination }
+    ];
+    for (const rngMode of ['per-run-seed', 'legacy-stream']) {
+        const { results } = runSweepChunk({
+            baseInputs: buildSamplingTestInputs(),
+            paramCombinations: duplicateCombinations,
+            comboRange: { start: 0, count: duplicateCombinations.length },
+            sweepRequest: buildSweepRequest('block', {
+                anzahl: 8,
+                maxDauer: 4,
+                blockSize: 3,
+                seed: 20260727,
+                rngMode
+            }),
+            engine: EngineAPI
+        });
+        const [first, second] = results;
+
+        assertEqual(first.metrics.schemaVersion, SWEEP_METRICS_VERSION, `${rngMode} emits the versioned metric shape`);
+        assertEqual(
+            JSON.stringify(first.metrics),
+            JSON.stringify(second.metrics),
+            `${rngMode} effect-equivalent combinations produce identical aggregate metrics under CRN`
+        );
+        assertEqual(
+            first.provenance.samplingFingerprint.hash,
+            second.provenance.samplingFingerprint.hash,
+            `${rngMode} effect-equivalent combinations produce the same complete sampling fingerprint hash`
+        );
+        assertEqual(
+            JSON.stringify(first.provenance.samplingFingerprint.tracedRuns),
+            JSON.stringify(second.provenance.samplingFingerprint.tracedRuns),
+            `${rngMode} effect-equivalent combinations expose identical traced raw historical paths`
+        );
+        assertEqual(
+            first.provenance.comparisonRandomness.schemaVersion,
+            SWEEP_COMPARISON_RANDOMNESS_VERSION,
+            `${rngMode} CRN policy is independently versioned in result provenance`
+        );
+        assertEqual(
+            first.provenance.comparisonRandomness.runSeedDerivation,
+            second.provenance.comparisonRandomness.runSeedDerivation,
+            `${rngMode} all combinations export the same run-index seed derivation`
+        );
+        assertEqual(
+            first.provenance.comparisonRandomness.requestedRngMode,
+            rngMode,
+            `${rngMode} provenance retains the requested RNG mode`
+        );
+        assertEqual(
+            first.provenance.comparisonRandomness.appliedRngMode,
+            'per-run-seed',
+            `${rngMode} comparison applies run-index-isolated seeds`
+        );
+        assertEqual(
+            first.provenance.comparisonRandomness.commonSeedScheduleAcrossCombinations,
+            true,
+            `${rngMode} provenance guarantees the common setup/run seed schedule`
+        );
+        assertEqual(
+            first.provenance.comparisonRandomness.commonDrawsUntilStrategyTermination,
+            true,
+            `${rngMode} provenance qualifies common draws by strategy-dependent termination`
+        );
+        assertEqual(
+            first.provenance.comparisonRandomness.completeRawPathsCommonAcrossCombinations,
+            false,
+            `${rngMode} provenance does not promise identical complete paths for effectful combinations`
+        );
+        assertEqual(
+            first.metrics.comparison.runCount,
+            8,
+            `${rngMode} comparison diagnostics export the configured run count`
+        );
+    }
+
+    const effectfulCombinations = [
+        { ...samplingTestCombination, targetEq: 40 },
+        { ...samplingTestCombination, targetEq: 80 }
+    ];
+    const effectfulResults = runSweepChunk({
+        baseInputs: buildSamplingTestInputs(),
+        paramCombinations: effectfulCombinations,
+        comboRange: { start: 0, count: effectfulCombinations.length },
+        sweepRequest: buildSweepRequest('block', {
+            anzahl: 8,
+            maxDauer: 4,
+            blockSize: 3,
+            seed: 20260727
+        }),
+        engine: EngineAPI
+    }).results;
+    assertEqual(
+        JSON.stringify(effectfulResults[0].provenance.samplingFingerprint.tracedRuns),
+        JSON.stringify(effectfulResults[1].provenance.samplingFingerprint.tracedRuns),
+        'effectful combinations share the same raw-path trace while both remain active'
+    );
+    console.log('✓ D-07 Common Random Numbers OK');
+}
+
+// Test 46: SWP-09 - terminaler Ruin wird vor Abbruch als Nullpunkt erfasst
+console.log('Test 46: O-14 Terminaler Ruin-Drawdown');
+{
+    const ruinEngine = {
+        simulateSingleYear() {
+            return {
+                ui: {
+                    spending: {
+                        monatlicheEntnahme: 1000000,
+                        kuerzungProzent: 0,
+                        kuerzungQuelle: 'none',
+                        details: {}
+                    },
+                    action: {
+                        type: 'HOLD',
+                        quellen: [],
+                        nettoErlös: 0,
+                        steuer: 0,
+                        verwendungen: { gold: 0, aktien: 0 },
+                        taxRawAggregate: {
+                            sumRealizedGainSigned: 0,
+                            sumTaxableAfterTqfSigned: 0
+                        }
+                    },
+                    market: { sKey: 'hot_neutral', szenarioText: 'hot_neutral' },
+                    zielLiquiditaet: 0,
+                    liquiditaet: { deckungNachher: 0 },
+                    runway: { months: 0 },
+                    vpw: null
+                },
+                newState: {
+                    alarmActive: false,
+                    lastMarketSKey: 'hot_neutral',
+                    cumulativeInflationFactor: 1,
+                    taxState: { lossCarry: 0 }
+                }
+            };
+        }
+    };
+    const baseInputs = buildSamplingTestInputs({
+        startVermoegen: 100000,
+        depotwertAlt: 100000,
+        einstandAlt: 100000,
+        tagesgeld: 0,
+        geldmarktEtf: 0,
+        zielLiquiditaet: 0,
+        startFloorBedarf: 12000000,
+        startFlexBedarf: 0
+    });
+    const result = runSweepChunk({
+        baseInputs,
+        paramCombinations: [samplingTestCombination],
+        comboRange: { start: 0, count: 1 },
+        sweepRequest: buildSweepRequest('block', {
+            anzahl: 1,
+            maxDauer: 1,
+            blockSize: 1,
+            seed: 99
+        }),
+        engine: ruinEngine
+    }).results[0];
+
+    assertEqual(result.metrics.successProbFloor, 0, 'synthetic terminal run is classified as failed');
+    assertEqual(result.metrics.worst5Drawdown, 100, 'terminal ruin contributes a zero point and therefore a 100 percent drawdown');
+    console.log('✓ O-14 Terminaler Ruin-Drawdown OK');
 }
 
 console.log('--- Simulator Sweep Tests Abgeschlossen ---');
