@@ -14,6 +14,11 @@ export function buildKeyParams(params = {}) {
     const vpw = (params && typeof params.vpw === 'object') ? params.vpw : null;
     const healthBucket = (params && typeof params.healthBucket === 'object') ? params.healthBucket : null;
     const runwayTargetSmoothing = (params && typeof params.runwayTargetSmoothing === 'object') ? params.runwayTargetSmoothing : null;
+    const marketDataProvenance = (
+        params &&
+        typeof params.marketDataProvenance === 'object' &&
+        !Array.isArray(params.marketDataProvenance)
+    ) ? params.marketDataProvenance : null;
 
     const formatCurrencySafe = (value) => {
         if (typeof value !== 'number' || !isFinite(value)) {
@@ -69,6 +74,38 @@ export function buildKeyParams(params = {}) {
             label: 'Kumulierte Inflation',
             value: formattedInflation,
             meta: 'Seit Modellstart'
+        });
+    }
+
+    if (marketDataProvenance) {
+        const instrument = String(
+            marketDataProvenance.instrument ||
+            marketDataProvenance.ticker ||
+            'unbekannt'
+        );
+        const period = String(marketDataProvenance.periodId || 'ohne Periode');
+        const asOf = String(marketDataProvenance.asOf || 'ohne Stichtag');
+        const source = String(marketDataProvenance.source || 'unbekannte Quelle');
+        const highScope = String(
+            marketDataProvenance.highScope ||
+            marketDataProvenance.high?.scope ||
+            marketDataProvenance.ath?.scope ||
+            (Number.isFinite(marketDataProvenance.ath?.value) ? 'allTimeHigh' : null) ||
+            'unbekannt'
+        );
+        const engineReference = marketDataProvenance.engineReference?.policy ===
+            'window_high_as_conservative_ath_lower_bound'
+            ? (
+                marketDataProvenance.engineReference?.applied === true
+                    ? '; Engine-Referenz konservative ATH-Untergrenze angewendet'
+                    : '; Engine-Referenz nicht angewendet (kein belegter Fensterabstand)'
+            )
+            : '';
+        pushMetric({
+            label: 'Marktdaten-Provenienz',
+            value: `${instrument} · ${asOf}`,
+            meta: `${period}; ${source}; Hoch-Scope ${highScope}${engineReference}`,
+            trend: highScope === 'windowHigh' ? 'neutral' : 'up'
         });
     }
 

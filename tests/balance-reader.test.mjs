@@ -6,6 +6,7 @@ import {
     parseLocalizedNumber
 } from '../app/balance/balance-utils.js';
 import {
+    getMarketDataProvenanceViewModel,
     UIReader as ProductionUIReader,
     initUIReader as initProductionUIReader,
     parseBalanceCurrencyInput
@@ -13,9 +14,12 @@ import {
 import { ValidationError } from '../app/balance/balance-config.js';
 import { PersistenceFacade } from '../app/shared/persistence-facade.js';
 import {
+    createBalanceExportDocument,
+    createManualMarketCsvImportPlan,
     MarketCsvImportError,
     parseMarketDataCsv
 } from '../app/balance/balance-binder-imports.js';
+import { MarketAnalyzer } from '../engine/analyzers/MarketAnalyzer.mjs';
 
 /**
  * Tests für balance-reader.js
@@ -393,7 +397,136 @@ console.log('Test 0: Striktes Zahlen- und Markt-CSV-Parsing');
     assertEqual(parsedMarket.values.endeVJ_1, 150, 'Markt-CSV bindet VJ-1 an das korrekte Zieljahr');
     assertEqual(parsedMarket.values.endeVJ_2, 120, 'Markt-CSV bindet VJ-2 an das korrekte Zieljahr');
     assertEqual(parsedMarket.values.endeVJ_3, 100, 'Markt-CSV bindet VJ-3 an das korrekte Zieljahr');
-    assertEqual(parsedMarket.values.ath, 150, 'Markt-CSV ermittelt das historische Schlusskursmaximum');
+    assertEqual(parsedMarket.values.ath, undefined, 'Vier CSV-Zeilen werden nicht als historisches ATH ausgegeben');
+    assertEqual(parsedMarket.high.value, 150, 'Das Maximum bleibt als lokales Fensterhoch verfügbar');
+    assertEqual(parsedMarket.high.scope, 'windowHigh', 'Das lokale Maximum ist explizit als windowHigh klassifiziert');
+    assertEqual(parsedMarket.high.verifiedAllTimeHighAvailable, false,
+        'Das Fensterhoch darf nicht als verifiziertes Allzeithoch gelten');
+
+    const currentImportPlan = createManualMarketCsvImportPlan(parsedMarket, {
+        mode: 'current',
+        targetYear: 2026,
+        expectedAsOf: '2026-07-14',
+        instrument: 'vwce.de',
+        sourceFileName: 'markt-2026.csv',
+        currentPeriodYear: 2026,
+        importedAt: '2026-07-27T10:00:00.000Z'
+    });
+    assertEqual(currentImportPlan.engineValues.ath, 150,
+        'Das Fensterhoch wird intern als konservative ATH-Untergrenze verwendet');
+    assertEqual(currentImportPlan.engineValues.jahreSeitAth, 0,
+        'Die Engine-Referenz übernimmt ausschließlich die beobachteten Jahre seit dem Fensterhoch');
+    assertEqual(currentImportPlan.provenance.instrument, 'VWCE.DE', 'Instrument wird normalisiert und persistierbar');
+    assertEqual(currentImportPlan.provenance.asOf, '2026-07-14', 'Provenienz bindet den bestätigten Stichtag');
+    assertEqual(currentImportPlan.provenance.periodMode, 'current', 'Provenienz unterscheidet aktuellen Importmodus');
+    assertEqual(currentImportPlan.provenance.highScope, 'windowHigh', 'Provenienz konserviert die eingeschränkte Hoch-Semantik');
+    assertEqual(
+        currentImportPlan.provenance.engineReference.policy,
+        'window_high_as_conservative_ath_lower_bound',
+        'Die konservative Engine-Nutzung ist maschinenlesbar von einer echten ATH-Behauptung getrennt'
+    );
+    assertEqual(currentImportPlan.provenance.engineReference.applied, true,
+        'Ein positives Fensterhoch-Gefälle wird als gerichtete Engine-Untergrenze angewendet');
+
+    const bearParsedMarket = parseMarketDataCsv([
+        'Datum;Schluss',
+        '14.07.2023;100,00',
+        '14.07.2024;90,00',
+        '14.07.2025;80,00',
+        '14.07.2026;55,00'
+    ].join('\n'));
+    const bearImportPlan = createManualMarketCsvImportPlan(bearParsedMarket, {
+        mode: 'current',
+        targetYear: 2026,
+        expectedAsOf: '2026-07-14',
+        instrument: 'VWCE.DE',
+        sourceFileName: 'markt-bear-2026.csv',
+        currentPeriodYear: 2026,
+        importedAt: '2026-07-27T10:00:00.000Z'
+    });
+    const bearAnalysis = MarketAnalyzer.analyzeMarket({
+        ...bearImportPlan.engineValues,
+        inflation: 2,
+        capeRatio: 25
+    });
+    assertEqual(bearAnalysis.sKey, 'bear_deep',
+        'Ein belegter 45-Prozent-Einbruch aus dem CSV-Fenster aktiviert weiterhin die Baerenmarkterkennung');
+
+    const risingParsedMarket = parseMarketDataCsv([
+        'Datum;Schluss',
+        '14.07.2023;80,00',
+        '14.07.2024;95,00',
+        '14.07.2025;110,00',
+        '14.07.2026;130,00'
+    ].join('\n'));
+    const risingImportPlan = createManualMarketCsvImportPlan(risingParsedMarket, {
+        mode: 'current',
+        targetYear: 2026,
+        expectedAsOf: '2026-07-14',
+        instrument: 'VWCE.DE',
+        sourceFileName: 'markt-steigend-2026.csv',
+        currentPeriodYear: 2026,
+        importedAt: '2026-07-27T10:00:00.000Z'
+    });
+    const risingAnalysis = MarketAnalyzer.analyzeMarket({
+        ...risingImportPlan.engineValues,
+        inflation: 2,
+        capeRatio: 25
+    });
+    assertEqual(risingImportPlan.engineValues.ath, 0,
+        'Ein Fensterhoch am letzten Datenpunkt wird nicht als Allzeithoch an die Engine gereicht');
+    assertEqual(risingImportPlan.engineValues.jahreSeitAth, 0,
+        'Ohne anwendbare ATH-Untergrenze bleibt auch das Referenzalter neutral');
+    assertEqual(risingImportPlan.provenance.engineReference.applied, false,
+        'Die Provenienz kennzeichnet die nicht tragende Untergrenze explizit als nicht angewendet');
+    assertEqual(risingImportPlan.provenance.engineReference.value, null,
+        'Eine nicht angewendete Engine-Referenz behauptet keinen ATH-Wert');
+    assertEqual(risingAnalysis.sKey, 'side_long',
+        'Ein steigendes CSV-Fenster ohne Vollhistorie nutzt den neutralen Markt-Fallback');
+    assertEqual(risingAnalysis.reasons.includes('Neues Allzeithoch'), false,
+        'Der steigende CSV-Fall behauptet kein unbelegtes Allzeithoch');
+
+    let staleCurrentError = null;
+    try {
+        createManualMarketCsvImportPlan(parsedMarket, {
+            mode: 'current',
+            targetYear: 2025,
+            expectedAsOf: '2025-07-14',
+            instrument: 'VWCE.DE',
+            sourceFileName: 'markt-alt.csv',
+            currentPeriodYear: 2026
+        });
+    } catch (error) {
+        staleCurrentError = error;
+    }
+    assertEqual(staleCurrentError?.code, 'market_csv_period_mismatch', 'Veraltete CSV wird im aktuellen Modus periodenscharf blockiert');
+
+    const historicalImportPlan = createManualMarketCsvImportPlan(parsedMarket, {
+        mode: 'historical',
+        targetYear: 2026,
+        expectedAsOf: '2026-07-14',
+        instrument: 'VWCE.DE',
+        sourceFileName: 'markt-historisch.csv',
+        currentPeriodYear: 2027,
+        importedAt: '2026-07-27T10:00:00.000Z'
+    });
+    assertEqual(historicalImportPlan.provenance.periodMode, 'historical', 'Expliziter historischer Modus erlaubt eine abgeschlossene Vorperiode');
+    assertEqual(historicalImportPlan.provenance.periodId, 'calendar-year:2026', 'Historische Zielperiode bleibt eindeutig');
+
+    let wrongAsOfError = null;
+    try {
+        createManualMarketCsvImportPlan(parsedMarket, {
+            mode: 'historical',
+            targetYear: 2026,
+            expectedAsOf: '2026-07-13',
+            instrument: 'VWCE.DE',
+            sourceFileName: 'markt-historisch.csv',
+            currentPeriodYear: 2027
+        });
+    } catch (error) {
+        wrongAsOfError = error;
+    }
+    assertEqual(wrongAsOfError?.code, 'market_csv_asof_mismatch', 'Abweichender erwarteter Stichtag wird vor jeder Mutation blockiert');
 
     const leapDayMarket = parseMarketDataCsv([
         'Datum;Schluss',
@@ -490,6 +623,12 @@ console.log('Test 1: readAllInputs - Basis mit DOM-Werten');
     assertEqual(result.depotwertAlt, 200000, 'depotwertAlt sollte 200000 sein');
     assertEqual(result.renteAktiv, true, 'renteAktiv sollte true sein');
     assertEqual(result.renteMonatlich, 1500, 'renteMonatlich sollte 1500 sein');
+    const readerExport = createBalanceExportDocument({ inputs: result });
+    assertEqual(readerExport.schemaVersion, 2, 'Realer Reader-Zustand wird im aktuellen Exportvertrag gesichert');
+    assert(
+        readerExport.validationWarnings?.[0]?.message.includes('kirchensteuerSatz'),
+        'Erreichbare, aber ausserhalb des Importvertrags liegende Reader-Werte bleiben exportierbar und feldgenau markiert'
+    );
     console.log('✓ readAllInputs Basis OK');
 }
 
@@ -886,6 +1025,83 @@ console.log('Test 14: Produktionsreader für Gold-Nullgrenzen');
     if (previousDocument === undefined) delete global.document;
     else global.document = previousDocument;
     console.log('✓ Produktionsreader für Gold-Nullgrenzen OK');
+}
+
+// Test 15: Gespeicherte Booleans und Marktdaten-Provenienz bleiben typ- und reload-sicher.
+console.log('Test 15: Strikte Boolean-Anwendung und Marktdaten-Provenienz');
+{
+    const previousWindow = global.window;
+    const previousDocument = global.document;
+    const inputs = {
+        goldAktiv: new MockElement('checkbox', '', true),
+        goldSteuerfrei: new MockElement('checkbox', '', true),
+        dynamicFlex: new MockElement('checkbox', '', true),
+        goGoActive: new MockElement('checkbox', '', true),
+        renteAktiv: new MockElement('select', 'ja'),
+        renteMonatlich: new MockElement('input', '1000')
+    };
+    const provenanceOutput = new MockElement('p');
+    provenanceOutput.dataset = {};
+    global.document = createDocumentMock(inputs);
+    global.window = { __profilverbundTranchenOverride: null };
+    initProductionUIReader({
+        inputs,
+        controls: { goldPanel: new MockElement() },
+        outputs: { marketDataProvenance: provenanceOutput }
+    });
+
+    ProductionUIReader.applyStoredInputs({
+        goldAktiv: 'false',
+        goldSteuerfrei: '0',
+        dynamicFlex: 'false',
+        goGoActive: '0',
+        renteAktiv: 'true'
+    });
+    assertEqual(inputs.goldAktiv.checked, false, 'String "false" darf Checkboxen nicht aktivieren');
+    assertEqual(inputs.goldSteuerfrei.checked, false, 'String "0" darf Checkboxen nicht aktivieren');
+    assertEqual(inputs.dynamicFlex.checked, false, 'String "false" darf Dynamic Flex nicht aktivieren');
+    assertEqual(inputs.goGoActive.checked, false, 'String "0" darf Go-Go nicht aktivieren');
+    assertEqual(inputs.renteAktiv.value, 'nein', 'String "true" darf den Rentenmodus nicht aktivieren');
+
+    ProductionUIReader.applyStoredInputs({
+        goldAktiv: true,
+        goldSteuerfrei: false,
+        dynamicFlex: true,
+        goGoActive: false,
+        renteAktiv: true
+    });
+    assertEqual(inputs.goldAktiv.checked, true, 'Nur echter Boolean true aktiviert eine Checkbox');
+    assertEqual(inputs.goldSteuerfrei.checked, false, 'Echter Boolean false deaktiviert eine Checkbox');
+    assertEqual(inputs.dynamicFlex.checked, true, 'Echter Boolean true aktiviert Dynamic Flex');
+    assertEqual(inputs.goGoActive.checked, false, 'Echter Boolean false deaktiviert Go-Go');
+    assertEqual(inputs.renteAktiv.value, 'ja', 'Nur echter Boolean true aktiviert den Rentenmodus');
+
+    const provenance = {
+        schemaVersion: 1,
+        periodId: 'calendar-year:2026',
+        asOf: '2026-07-14',
+        instrument: 'VWCE.DE',
+        source: 'Manuelle CSV: markt.csv',
+        importedAt: '2026-07-27T10:00:00.000Z',
+        coverage: {
+            start: '2023-07-14',
+            end: '2026-07-14',
+            rowCount: 4
+        },
+        highScope: 'windowHigh'
+    };
+    const view = getMarketDataProvenanceViewModel(provenance);
+    assertEqual(view.highScope, 'windowHigh', 'Provenienzmodell gibt die eingeschränkte Hoch-Semantik aus');
+    assert(view.text.includes('markt.csv'), 'Provenienzmodell benennt die gespeicherte Quelle');
+    ProductionUIReader.renderMarketDataProvenance(provenance);
+    assertEqual(provenanceOutput.dataset.periodId, 'calendar-year:2026', 'Gerenderte Provenienz ist für Reload-/Browserprüfung adressierbar');
+    assertEqual(provenanceOutput.dataset.highScope, 'windowHigh', 'Gerenderte Provenienz erhält den Hoch-Scope');
+
+    if (previousWindow === undefined) delete global.window;
+    else global.window = previousWindow;
+    if (previousDocument === undefined) delete global.document;
+    else global.document = previousDocument;
+    console.log('✓ Strikte Boolean-Anwendung und Marktdaten-Provenienz OK');
 }
 
 // Cleanup

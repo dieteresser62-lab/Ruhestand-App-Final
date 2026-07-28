@@ -1123,6 +1123,38 @@
                                 neu berechnen → Diagnose aktualisieren → Kapitalfluss-Vorschläge anzeigen.</li>
                         </ul>
                     </div>
+                    <div class="detail-block" id="balance-marktdaten-csv">
+                        <h3>Marktdaten per CSV importieren</h3>
+                        <p>Der CSV-Button im Bereich „Marktdaten“ ist fuer einen kontrollierten lokalen Import
+                            gedacht. Oeffnen Sie zuerst „CSV-Ziel und Datenquelle festlegen“ und geben Sie Modus,
+                            Zieljahr, erwarteten Stichtag und Instrument an.</p>
+                        <ul
+                            style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Aktuelle Planperiode:</strong> Das Zieljahr muss der aktuell erwarteten
+                                Jahresperiode entsprechen. Eine alte Datei kann dadurch nicht still eine neue
+                                Planung speisen.</li>
+                            <li><strong>Historische Periode:</strong> Waehlen Sie diesen Modus ausdruecklich; das
+                                Zieljahr muss vor der aktuellen Planperiode liegen.</li>
+                            <li><strong>Exakter Stichtag:</strong> Die letzte CSV-Zeile muss im Zieljahr liegen und
+                                genau dem eingegebenen ISO-Stichtag entsprechen. Erwartet werden eine Datums- und
+                                eine Schlusskursspalte sowie Vergleichswerte aus den drei Vorjahren.</li>
+                            <li><strong>Hoch-Semantik:</strong> Das Maximum einer kurzen CSV ist nur ein
+                                <code>windowHigh</code> und kein verifiziertes Allzeithoch. Die Berechnung
+                                verwendet es gerichtet als konservative ATH-Untergrenze: Ein positiver
+                                Fensterabstand bleibt als Baerenmarktsignal erhalten; faellt das Hoch mit dem
+                                letzten Kurs zusammen, bleibt der ATH-Eingang neutral. Status und Diagnose
+                                kennzeichnen Policy und Anwendung dieser Engine-Referenz ausdruecklich.</li>
+                            <li><strong>Nachvollziehbarkeit:</strong> Nach erfolgreichem Preview und
+                                Recovery-Snapshot zeigt die App Instrument, Periode, Stichtag, Quelldatei,
+                                Abdeckung und Hoch-Scope unter den Marktdaten sowie in der Diagnose. Diese Angaben
+                                bleiben nach Reload und im Balance-JSON-Export erhalten.</li>
+                            <li><strong>JSON-Kompatibilitaet:</strong> Neue Balance-Exporte verwenden Schema V2.
+                                V1-Sicherungen werden beim Import benannt migriert. Ein Recovery-Export bleibt
+                                auch bei erreichbaren, aber ausserhalb des aktuellen Importvertrags liegenden
+                                Formularwerten moeglich und fuehrt die konkrete Abweichung als
+                                <code>validationWarnings</code> auf.</li>
+                        </ul>
+                    </div>
                     <div class="detail-block" id="balance-snapshots">
                         <h3>Jahresabschluss-Snapshots</h3>
                         <p>Beim Jahresabschluss speichert die App zuerst einen Snapshot des aktuellen Stands. Erst

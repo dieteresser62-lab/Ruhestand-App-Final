@@ -2,6 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { UIBinder, initUIBinder } from '../app/balance/balance-binder.js';
 import {
+    BALANCE_IMPORT_INPUT_SCHEMA_VERSION,
     BALANCE_EXPORT_APP_ID,
     BALANCE_EXPORT_SCHEMA,
     BALANCE_EXPORT_SCHEMA_VERSION,
@@ -12,7 +13,7 @@ import {
 } from '../app/balance/balance-binder-imports.js';
 import { createProfilverbundHandlers } from '../app/balance/balance-main-profilverbund.js';
 import { CONFIG, ValidationError } from '../app/balance/balance-config.js';
-import { UIReader } from '../app/balance/balance-reader.js';
+import { UIReader, initUIReader } from '../app/balance/balance-reader.js';
 import { UIRenderer } from '../app/balance/balance-renderer.js';
 import { StorageManager } from '../app/balance/balance-storage.js';
 import {
@@ -23,6 +24,7 @@ import {
     createUpdateFailureResult,
     createUpdateSuccessResult
 } from '../app/balance/balance-update-pipeline.js';
+import { ANNUAL_MARKET_DATA_META_KEY } from '../app/balance/balance-annual-marketdata.js';
 import { PersistenceFacade } from '../app/shared/persistence-facade.js';
 import { loadProfilverbundProfiles } from '../app/profile/profilverbund-balance.js';
 import { EngineAPI } from '../engine/index.mjs';
@@ -270,10 +272,21 @@ function createDomRefs(documentRef) {
             renteAktiv: documentRef.register(new MockElement('renteAktiv', 'select')),
             renteMonatlich: documentRef.register(new MockElement('renteMonatlich', 'input')),
             fixedIncomeAnnual: documentRef.register(new MockElement('fixedIncomeAnnual', 'input')),
-            aktuellesAlter: documentRef.register(new MockElement('aktuellesAlter', 'input'))
+            aktuellesAlter: documentRef.register(new MockElement('aktuellesAlter', 'input')),
+            marketCsvMode: documentRef.register(new MockElement('marketCsvMode', 'select')),
+            marketCsvTargetYear: documentRef.register(new MockElement('marketCsvTargetYear', 'input')),
+            marketCsvExpectedAsOf: documentRef.register(new MockElement('marketCsvExpectedAsOf', 'input')),
+            marketCsvInstrument: documentRef.register(new MockElement('marketCsvInstrument', 'input')),
+            endeVJ: documentRef.register(new MockElement('endeVJ', 'input')),
+            endeVJ_1: documentRef.register(new MockElement('endeVJ_1', 'input')),
+            endeVJ_2: documentRef.register(new MockElement('endeVJ_2', 'input')),
+            endeVJ_3: documentRef.register(new MockElement('endeVJ_3', 'input')),
+            ath: documentRef.register(new MockElement('ath', 'input')),
+            jahreSeitAth: documentRef.register(new MockElement('jahreSeitAth', 'input'))
         },
         outputs: {
-            snapshotList: documentRef.register(new MockElement('snapshotList'))
+            snapshotList: documentRef.register(new MockElement('snapshotList')),
+            marketDataProvenance: documentRef.register(new MockElement('marketDataProvenance'))
         },
         controls,
         containers: {
@@ -673,9 +686,117 @@ async function runBalanceUiOrchestrationTests() {
         assert(Number.isFinite(new Date(currentDocument.exportedAt).getTime()), 'Export enthaelt einen gueltigen ISO-Zeitpunkt');
 
         const normalizedCurrent = normalizeBalanceImportDocument(currentDocument);
-        assertEqual(normalizedCurrent.sourceFormat, 'balance-state-v1', 'Aktuelles Exportformat wird eindeutig erkannt');
+        assertEqual(normalizedCurrent.sourceFormat, 'balance-state-v2', 'Aktuelles Exportformat wird eindeutig erkannt');
         assertEqual(normalizedCurrent.migrated, false, 'Aktuelles Exportformat wird nicht als Legacy markiert');
         assertEqual(normalizedCurrent.payload.inputs.floorBedarf, 24000, 'Validierung erhaelt gueltige Kernwerte');
+        assertEqual(Object.hasOwn(normalizedCurrent.payload.inputs, 'dynamicFlex'), false,
+            'Ein fehlendes optionales Booleanfeld bleibt fehlend und wird nicht aktiviert');
+        assertEqual(BALANCE_IMPORT_INPUT_SCHEMA_VERSION, 2, 'Der vollständige Eingabevertrag ist explizit versioniert');
+
+        const versionOneDocument = {
+            ...currentDocument,
+            schemaVersion: 1,
+            inputSchemaVersion: 1,
+            payload: {
+                ...validState,
+                inputs: {
+                    ...validState.inputs,
+                    aktuellesAlter: 0,
+                    targetEq: 0,
+                    rebalBand: 0,
+                    tqfAlt: 30,
+                    kirchensteuerSatz: 0.08
+                }
+            }
+        };
+        const normalizedVersionOne = normalizeBalanceImportDocument(versionOneDocument);
+        assertEqual(normalizedVersionOne.sourceFormat, 'balance-state-v1',
+            'Bestehende Version-1-Sicherungen laufen über den benannten Aufwärtsmigrator');
+        assertEqual(normalizedVersionOne.migrated, true, 'Version-1-Sicherungen werden sichtbar als migriert markiert');
+        assertEqual(normalizedVersionOne.payload.inputs.targetEq, 0,
+            'Der Version-1-Migrator erhält die in Slice 03 entschiedene Aktienquote 0');
+        assertEqual(normalizedVersionOne.payload.inputs.rebalBand, 0,
+            'Der Version-1-Migrator erhält den Reader-Fallback 0 für das Rebalancing-Band');
+        assertEqual(normalizedVersionOne.payload.inputs.tqfAlt, 0.3,
+            'Eindeutige historische Prozentschreibweise wird symmetrisch in die Dezimalrate migriert');
+        assertEqual(normalizedVersionOne.payload.inputs.kirchensteuerSatz, 0.08,
+            'Der bereits versionierte Kirchensteuer-Enum bleibt ohne unbelegte Prozentheuristik erhalten');
+
+        [
+            { field: 'rebalBand', value: 0, expectsWarning: false },
+            { field: 'aktuellesAlter', value: 0, expectsWarning: false },
+            { field: 'inflation', value: 60, expectsWarning: true },
+            { field: 'horizonYears', value: 30.5, expectsWarning: true },
+            { field: 'profilName', value: 'P'.repeat(250), expectsWarning: true },
+            { field: 'flexBudgetYears', value: 12, expectsWarning: true },
+            { field: 'tqfAlt', value: 30, expectsWarning: true }
+        ].forEach(({ field, value, expectsWarning }) => {
+            const exportWithReachableValue = createBalanceExportDocument({
+                ...validState,
+                inputs: { ...validState.inputs, [field]: value }
+            });
+            assertEqual(exportWithReachableValue.schemaVersion, 2,
+                `Erreichbarer Livewert ${field} verhindert den Recovery-Export nicht`);
+            assertEqual(Boolean(exportWithReachableValue.validationWarnings?.length), expectsWarning,
+                `${field} wird entsprechend dem aktuellen Importvertrag als Hinweis inventarisiert`);
+            if (expectsWarning) {
+                assert(exportWithReachableValue.validationWarnings[0].message.includes(field),
+                    `${field} bleibt im Exporthinweis konkret benannt`);
+            }
+        });
+        const zeroBoundaryDocument = createBalanceExportDocument({
+            ...validState,
+            inputs: { ...validState.inputs, targetEq: 0, rebalBand: 0 }
+        });
+        const normalizedZeroBoundary = normalizeBalanceImportDocument(zeroBoundaryDocument);
+        assertEqual(normalizedZeroBoundary.payload.inputs.targetEq, 0,
+            'Aktueller Export-/Import-Roundtrip erhält targetEq=0 ohne Legacy-Fallback');
+        assertEqual(normalizedZeroBoundary.payload.inputs.rebalBand, 0,
+            'Aktueller Export-/Import-Roundtrip erhält rebalBand=0 ohne Legacy-Fallback');
+        const goldDiagnosticInputs = {
+            ...validState.inputs,
+            goldBasisVermoegen: 100000,
+            goldZielBetrag: 7500,
+            goldFloorBetrag: 1000,
+            goldStrategyDiagnostics: [{
+                profileId: 'default',
+                name: 'Standard',
+                assetBase: 120000,
+                operativeLiquidity: 30000,
+                excludedHealthBucket: 20000,
+                freeAssetBase: 100000,
+                goldAktiv: true,
+                goldZielProzent: 7.5,
+                goldFloorProzent: 1,
+                goldZielBetrag: 7500,
+                goldFloorBetrag: 1000,
+                rebalancingBand: 25,
+                goldSteuerfrei: true
+            }]
+        };
+        const normalizedGoldDiagnostics = normalizeBalanceImportDocument(
+            createBalanceExportDocument({ ...validState, inputs: goldDiagnosticInputs })
+        );
+        assertEqual(normalizedGoldDiagnostics.payload.inputs.goldStrategyDiagnostics.length, 1,
+            'Profilverbund-Golddiagnostik ist Teil des vollständigen persistierten Inputvertrags');
+        const invalidGoldDiagnosticDocument = createBalanceExportDocument({
+            ...validState,
+            inputs: {
+                ...goldDiagnosticInputs,
+                goldStrategyDiagnostics: [{
+                    ...goldDiagnosticInputs.goldStrategyDiagnostics[0],
+                    freeAssetBase: 99999
+                }]
+            }
+        });
+        let invalidGoldDiagnosticError = null;
+        try {
+            normalizeBalanceImportDocument(invalidGoldDiagnosticDocument);
+        } catch (error) {
+            invalidGoldDiagnosticError = error;
+        }
+        assertEqual(invalidGoldDiagnosticError?.code, 'invalid_core_value',
+            'Inkonsistente Profilverbund-Golddiagnostik wird vor DOM und Persistenz blockiert');
 
         const legacyDocument = {
             app: CONFIG.APP.NAME,
@@ -704,20 +825,142 @@ async function runBalanceUiOrchestrationTests() {
                 return error;
             }
         };
+        const createVersionOneProbe = inputOverrides => ({
+            ...currentDocument,
+            schemaVersion: 1,
+            inputSchemaVersion: 1,
+            payload: {
+                ...validState,
+                inputs: {
+                    ...validState.inputs,
+                    ...inputOverrides
+                }
+            }
+        });
+        [
+            {
+                label: 'unbekannte Zusatzfelder',
+                overrides: { unbekanntesFeld: 1 },
+                code: 'unknown_input_field'
+            },
+            {
+                label: 'Bereichsverletzungen',
+                overrides: { targetEq: 5000 },
+                code: 'invalid_input_bounds'
+            },
+            {
+                label: 'freie Enums',
+                overrides: { horizonMethod: 'wuerfeln' },
+                code: 'invalid_input_value'
+            },
+            {
+                label: 'ueberlange Strings',
+                overrides: { profilName: 'P'.repeat(5000) },
+                code: 'invalid_input_type'
+            },
+            {
+                label: 'unbelegte Kirchensteuer-Prozentschreibweisen',
+                overrides: { kirchensteuerSatz: 8 },
+                code: 'invalid_input_bounds'
+            }
+        ].forEach(({ label, overrides, code }) => {
+            const error = captureImportError(createVersionOneProbe(overrides));
+            assertEqual(error?.code, code,
+                `Version-1-Import blockiert ${label} nach der Migration am vollständigen V2-Vertrag`);
+        });
         const wrongAppError = captureImportError({ ...currentDocument, appId: 'fremde-app' });
         assert(wrongAppError instanceof BalanceImportError, 'Falsche App-ID liefert einen kontrollierten Importfehler');
         assertEqual(wrongAppError.code, 'wrong_app', 'Falsche App-ID ist maschinenlesbar');
         const wrongVersionError = captureImportError({ ...currentDocument, schemaVersion: 99 });
         assertEqual(wrongVersionError?.code, 'unsupported_version', 'Nicht unterstuetzte Schema-Version wird blockiert');
+        const wrongInputSchemaError = captureImportError({ ...currentDocument, inputSchemaVersion: 99 });
+        assertEqual(wrongInputSchemaError?.code, 'unsupported_input_schema_version',
+            'Nicht unterstuetzte Eingabevertragsversion wird blockiert');
         const wrongShapeError = captureImportError({ inputs: validState.inputs });
         assertEqual(wrongShapeError?.code, 'unknown_shape', 'Unversionierter Rohzustand wird nicht als Legacy erraten');
         const invalidCoreError = captureImportError({
             ...currentDocument,
             payload: { ...validState, inputs: { ...validState.inputs, floorBedarf: -1 } }
         });
-        assertEqual(invalidCoreError?.code, 'invalid_core_value', 'Ungueltige finanzielle Kernwerte werden vor der Mutation blockiert');
+        assertEqual(invalidCoreError?.code, 'invalid_input_bounds', 'Ungueltige finanzielle Kernwerte werden vor der Mutation blockiert');
+        ['false', '0', 0, 1, null].forEach(value => {
+            const invalidBooleanError = captureImportError({
+                ...currentDocument,
+                payload: {
+                    ...validState,
+                    inputs: { ...validState.inputs, dynamicFlex: value }
+                }
+            });
+            assertEqual(invalidBooleanError?.code, 'invalid_boolean',
+                `Aktuelles Schema blockiert den Nicht-Boolean ${JSON.stringify(value)}`);
+        });
+        const unknownInputError = captureImportError({
+            ...currentDocument,
+            payload: {
+                ...validState,
+                inputs: { ...validState.inputs, unbekanntesFeld: 1 }
+            }
+        });
+        assertEqual(unknownInputError?.code, 'unknown_input_field', 'Nicht inventarisierte Eingabefelder werden fail-closed blockiert');
+        const invalidTrancheError = captureImportError({
+            ...currentDocument,
+            payload: {
+                ...validState,
+                inputs: {
+                    ...validState.inputs,
+                    detailledTranches: [{ schemaVersion: 1, trancheId: 'broken' }]
+                }
+            }
+        });
+        assertEqual(invalidTrancheError?.code, 'invalid_input_value',
+            'Komplexe Eingabefelder werden gegen ihren kanonischen Detailvertrag validiert');
         const unsupportedLegacyError = captureImportError({ ...legacyDocument, version: 'v20.0' });
         assertEqual(unsupportedLegacyError?.code, 'unsupported_legacy_version', 'Nicht explizit migrierbare Legacy-Version wird blockiert');
+        const invalidLegacyFieldError = captureImportError({
+            ...legacyDocument,
+            payload: {
+                ...validState,
+                inputs: {
+                    ...validState.inputs,
+                    unbekanntesFeld: 1
+                }
+            }
+        });
+        assertEqual(invalidLegacyFieldError?.code, 'unknown_input_field',
+            'Auch der Legacy-V0-Pfad endet nach der Migration am vollständigen Eingabevertrag');
+
+        const legacyBooleanDocument = {
+            ...legacyDocument,
+            payload: {
+                ...validState,
+                inputs: {
+                    ...validState.inputs,
+                    renteAktiv: 'false',
+                    goldAktiv: '0',
+                    goldSteuerfrei: 0,
+                    dynamicFlex: 'true',
+                    goGoActive: '1',
+                    healthBucketEnabled: 'ja',
+                    decumulation: {
+                        mode: '3_bucket_jilge',
+                        bondTargetFactor: 5,
+                        drawdownTrigger: 15,
+                        bondRefillThresholdPct: 8
+                    }
+                }
+            }
+        };
+        const normalizedLegacyBooleans = normalizeBalanceImportDocument(legacyBooleanDocument);
+        assertEqual(normalizedLegacyBooleans.payload.inputs.renteAktiv, false, 'Legacy-String false wird explizit migriert');
+        assertEqual(normalizedLegacyBooleans.payload.inputs.goldAktiv, false, 'Legacy-String 0 wird explizit migriert');
+        assertEqual(normalizedLegacyBooleans.payload.inputs.goldSteuerfrei, false, 'Legacy-Zahl 0 wird explizit migriert');
+        assertEqual(normalizedLegacyBooleans.payload.inputs.dynamicFlex, true, 'Legacy-String true wird explizit migriert');
+        assertEqual(normalizedLegacyBooleans.payload.inputs.goGoActive, true, 'Legacy-String 1 wird explizit migriert');
+        assertEqual(normalizedLegacyBooleans.payload.inputs.healthBucketEnabled, true, 'Legacy-String ja wird explizit migriert');
+        assertEqual(normalizedLegacyBooleans.payload.inputs.decumulation.bondRefillThreshold, 8,
+            'Legacy-Refill-Alias wird im benannten Legacy-Pfad kanonisiert');
+        assertEqual(Object.hasOwn(normalizedLegacyBooleans.payload.inputs.decumulation, 'bondRefillThresholdPct'), false,
+            'Legacy-Refill-Alias bleibt nicht parallel zum kanonischen Feld erhalten');
         let invalidExportError = null;
         try {
             createBalanceExportDocument({});
@@ -751,6 +994,7 @@ async function runBalanceUiOrchestrationTests() {
         };
 
         const dom = createDomRefs(documentRef);
+        initUIReader(dom);
         dom.inputs.aktuellesAlter.value = '66';
         UIReader.applyStoredInputs = inputs => {
             dom.inputs.aktuellesAlter.value = String(inputs.aktuellesAlter);
@@ -762,6 +1006,15 @@ async function runBalanceUiOrchestrationTests() {
             update: () => { updateCalls += 1; return { ok: true, status: 'success' }; },
             debouncedUpdate: () => {}
         });
+
+        StorageManager.loadState = () => ({});
+        handlers.handleExport();
+        assert(errors[0].message.includes('[invalid_inputs]'),
+            'Ein strukturell unmöglicher Export reicht den maschinenlesbaren Fehlercode durch');
+        assert(errors[0].message.includes('inputs'),
+            'Ein strukturell unmöglicher Export nennt den konkreten fehlenden Bereich');
+        errors.length = 0;
+        StorageManager.loadState = () => ({ inputs: {} });
 
         let badJsonFileValue = 'C:\\fakepath\\invalid.json';
         const badJsonTarget = {
@@ -850,6 +1103,174 @@ async function runBalanceUiOrchestrationTests() {
         assertEqual(replaceCalls, 1, 'Gueltiger Import ersetzt den Balance-State genau einmal');
         assertEqual(rollbackCalls, 0, 'Erfolgreicher Import benoetigt keinen Rollback');
         assert(toasts.some(message => message.includes('Recovery-Snapshot')), 'Erfolgsmeldung bestaetigt den Recovery-Punkt');
+
+        const jsonLoadState = StorageManager.loadState;
+        const jsonReplaceStateFromImport = StorageManager.replaceStateFromImport;
+        const jsonRollbackImportReplace = StorageManager.rollbackImportReplace;
+        let csvStoredState = {
+            inputs: {
+                aktuellesAlter: 67,
+                floorBedarf: 24000,
+                flexBedarf: 12000
+            }
+        };
+        let csvReplaceCalls = 0;
+        let csvRollbackCalls = 0;
+        StorageManager.loadState = () => JSON.parse(JSON.stringify(csvStoredState));
+        StorageManager.replaceStateFromImport = async payload => {
+            csvReplaceCalls += 1;
+            csvStoredState = JSON.parse(JSON.stringify(payload));
+            return { ok: true, recoverySnapshotId: 'csv-import-recovery-test' };
+        };
+        StorageManager.rollbackImportReplace = async receipt => {
+            csvRollbackCalls += 1;
+            assertEqual(receipt.recoverySnapshotId, 'csv-import-recovery-test', 'CSV-Rollback nutzt den Recovery-Receipt');
+            return { ok: true };
+        };
+        dom.inputs.marketCsvMode.value = 'current';
+        dom.inputs.marketCsvTargetYear.value = '2025';
+        dom.inputs.marketCsvExpectedAsOf.value = '2025-12-30';
+        dom.inputs.marketCsvInstrument.value = 'vwce.de';
+        const csvUpdateOptions = [];
+        const csvHandlers = createImportExportHandlers({
+            dom,
+            update: options => {
+                csvUpdateOptions.push(options);
+                return {
+                    ok: true,
+                    status: 'success',
+                    inputData: {
+                        aktuellesAlter: 67,
+                        floorBedarf: 24000,
+                        flexBedarf: 12000,
+                        endeVJ: Number(dom.inputs.endeVJ.value),
+                        endeVJ_1: Number(dom.inputs.endeVJ_1.value),
+                        endeVJ_2: Number(dom.inputs.endeVJ_2.value),
+                        endeVJ_3: Number(dom.inputs.endeVJ_3.value),
+                        ath: Number(dom.inputs.ath.value),
+                        jahreSeitAth: Number(dom.inputs.jahreSeitAth.value)
+                    }
+                };
+            },
+            debouncedUpdate: () => {}
+        });
+        const csvSuccessTarget = {
+            files: [{
+                name: 'markt-2025.csv',
+                text: async () => [
+                    'Datum;Schluss',
+                    '30.12.2022;100',
+                    '30.12.2023;110',
+                    '30.12.2024;120',
+                    '30.12.2025;130'
+                ].join('\n')
+            }],
+            value: 'selected'
+        };
+        await csvHandlers.handleCsvImport({ target: csvSuccessTarget });
+        assertEqual(csvUpdateOptions.length, 2, 'CSV-Import durchlaeuft Preview und persistente Bestaetigung');
+        assertEqual(csvUpdateOptions[0].mode, BALANCE_UPDATE_MODE.PREVIEW, 'CSV prueft vor dem Replace ohne Persistenz');
+        assertEqual(csvUpdateOptions[1].mode, BALANCE_UPDATE_MODE.PERSIST_INPUTS, 'CSV persistiert erst nach erfolgreichem Replace');
+        assertEqual(csvReplaceCalls, 1, 'Gueltige CSV ersetzt den State atomar genau einmal');
+        assertEqual(csvRollbackCalls, 0, 'Erfolgreiche CSV benoetigt keinen Rollback');
+        assertEqual(csvStoredState.inputs.ath, 0,
+            'Ein Fensterhoch am letzten Kurs wird nicht als Allzeithoch gespeichert');
+        assertEqual(csvStoredState.inputs.jahreSeitAth, 0,
+            'Ohne gerichteten Fensterabstand bleibt die ATH-Referenz neutral');
+        assertEqual(csvStoredState[ANNUAL_MARKET_DATA_META_KEY].sourceFileName, 'markt-2025.csv',
+            'CSV-Dateiname bleibt als persistierte Quellenangabe erhalten');
+        assertEqual(csvStoredState[ANNUAL_MARKET_DATA_META_KEY].periodId, 'calendar-year:2025',
+            'CSV-Provenienz bleibt an die explizite Zielperiode gebunden');
+        assertEqual(csvStoredState[ANNUAL_MARKET_DATA_META_KEY].highScope, 'windowHigh',
+            'CSV-Provenienz kennzeichnet das lokale Fensterhoch');
+        assertEqual(
+            csvStoredState[ANNUAL_MARKET_DATA_META_KEY].engineReference.policy,
+            'window_high_as_conservative_ath_lower_bound',
+            'CSV-Provenienz trennt die Engine-Untergrenze maschinenlesbar von einem echten ATH'
+        );
+        assertEqual(
+            csvStoredState[ANNUAL_MARKET_DATA_META_KEY].engineReference.applied,
+            false,
+            'Die steigende CSV dokumentiert, dass ihre Untergrenze nicht als Engine-ATH angewendet wurde'
+        );
+        const csvExportDocument = createBalanceExportDocument(csvStoredState);
+        assertEqual(
+            csvExportDocument.payload[ANNUAL_MARKET_DATA_META_KEY].sourceFileName,
+            'markt-2025.csv',
+            'JSON-Export erhält die persistierte CSV-Provenienz vollständig'
+        );
+        const versionOneCsvDocument = JSON.parse(JSON.stringify(csvExportDocument));
+        versionOneCsvDocument.schemaVersion = 1;
+        versionOneCsvDocument.inputSchemaVersion = 1;
+        versionOneCsvDocument.payload.inputs.ath = 0;
+        versionOneCsvDocument.payload.inputs.jahreSeitAth = 0;
+        const versionOneMarketMeta = versionOneCsvDocument.payload[ANNUAL_MARKET_DATA_META_KEY];
+        delete versionOneMarketMeta.engineReference;
+        delete versionOneMarketMeta.high.verifiedAllTimeHighAvailable;
+        versionOneMarketMeta.high.engineAthAvailable = false;
+        const migratedVersionOneCsv = normalizeBalanceImportDocument(versionOneCsvDocument);
+        assertEqual(migratedVersionOneCsv.payload.inputs.ath, 0,
+            'Version-1-CSV-Provenienz ohne positiven Fensterabstand bleibt nach Migration ATH-neutral');
+        assertEqual(
+            migratedVersionOneCsv.payload[ANNUAL_MARKET_DATA_META_KEY].engineReference.policy,
+            'window_high_as_conservative_ath_lower_bound',
+            'Der Version-1-Migrator ergänzt die neue Engine-Referenz nachvollziehbar'
+        );
+        assertEqual(
+            migratedVersionOneCsv.payload[ANNUAL_MARKET_DATA_META_KEY].engineReference.applied,
+            false,
+            'Der Version-1-Migrator leitet die gerichtete Anwendung aus Fensterhoch und Schlusskurs ab'
+        );
+        const correctedMarketState = JSON.parse(JSON.stringify(csvStoredState));
+        correctedMarketState.inputs.endeVJ = 131;
+        const correctedMarketExport = createBalanceExportDocument(correctedMarketState);
+        assertEqual(correctedMarketExport.schemaVersion, 2,
+            'Eine manuelle Marktdatenkorrektur verhindert den Recovery-Export nicht');
+        assertEqual(correctedMarketExport.validationWarnings?.[0]?.code, 'invalid_market_provenance',
+            'Eine manuelle Marktdatenkorrektur bleibt im Export als Provenienzabweichung sichtbar');
+        assert(correctedMarketExport.validationWarnings[0].message.includes('Provenienz'),
+            'Der Exporthinweis benennt die abweichende Provenienz statt den Zustand pauschal als beschädigt');
+        const tamperedCsvExport = JSON.parse(JSON.stringify(csvExportDocument));
+        tamperedCsvExport.payload[ANNUAL_MARKET_DATA_META_KEY].highScope = 'allTimeHigh';
+        const tamperedCsvError = captureImportError(tamperedCsvExport);
+        assertEqual(tamperedCsvError?.code, 'invalid_market_provenance',
+            'Ein Export kann windowHigh nicht durch manipulierte Metadaten zum ATH hochstufen');
+        assertEqual(dom.outputs.marketDataProvenance.dataset.asOf, '2025-12-30',
+            'Erfolgreiche CSV rendert die persistierte Provenienz sichtbar');
+        assertEqual(
+            dom.outputs.marketDataProvenance.dataset.enginePolicy,
+            'window_high_as_conservative_ath_lower_bound',
+            'Die sichtbare Provenienz exponiert die konservative Engine-Policy maschinenlesbar'
+        );
+        assertEqual(
+            dom.outputs.marketDataProvenance.dataset.engineReferenceApplied,
+            'false',
+            'Die sichtbare Provenienz zeigt die nicht angewendete Engine-Referenz maschinenlesbar'
+        );
+
+        const staleStateBeforeImport = JSON.stringify(csvStoredState);
+        dom.inputs.marketCsvExpectedAsOf.value = '2025-12-31';
+        errors.length = 0;
+        await csvHandlers.handleCsvImport({ target: {
+            files: [{
+                name: 'markt-stale.csv',
+                text: async () => [
+                    'Datum;Schluss',
+                    '30.12.2022;100',
+                    '30.12.2023;110',
+                    '30.12.2024;120',
+                    '30.12.2025;130'
+                ].join('\n')
+            }],
+            value: 'selected'
+        } });
+        assertEqual(csvReplaceCalls, 1, 'Stichtagsabweichung erreicht keinen weiteren Replace');
+        assertEqual(JSON.stringify(csvStoredState), staleStateBeforeImport, 'Abgewiesene CSV veraendert den persistierten State nicht');
+        assert(errors[0].message.includes('Stichtag'), 'CSV-Stichtagsfehler bleibt fuer Nutzende handlungsfaehig');
+
+        StorageManager.loadState = jsonLoadState;
+        StorageManager.replaceStateFromImport = jsonReplaceStateFromImport;
+        StorageManager.rollbackImportReplace = jsonRollbackImportReplace;
 
         dom.inputs.aktuellesAlter.value = '66';
         errors.length = 0;

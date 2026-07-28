@@ -115,7 +115,15 @@ Liest UI-Eingaben und kümmert sich um UI-Side-Effects.
 - `UIReader`
   - `readAllInputs()`
   - `applyStoredInputs(storedInputs)`
+  - `renderMarketDataProvenance(meta)` – zeigt persistierte Quelle, Periode,
+    Stichtag, Instrument und Hoch-Scope und exponiert sie als `data-*`
   - `applySideEffectsFromInputs()` – zeigt/verbirgt Panels (z. B. Gold, zweite Rente)
+- `getMarketDataProvenanceViewModel(meta)` – DOM-freie Projektion fuer
+  Reload-, Diagnose- und Browservertraege
+
+**Import-Booleans:** Persistierte Checkboxen und `renteAktiv` werden nur durch
+echtes Boolean `true` aktiviert. Stringwerte werden nicht per Truthiness
+interpretiert.
 
 **Pflegebucket:** Liest die Profildefinition `profile_health_bucket` als optionalen Haushaltsbaustein. Die eigentliche Diagnose wird nicht im Reader berechnet, sondern an `balance-health-bucket.js` delegiert.
 
@@ -201,7 +209,7 @@ Event-Hub der Anwendung.
 
 **Helper-Module (ausgelagert):**
 - `balance-binder-annual.js` – Jahres-Update, Inflation, ETF-Nachrücken, Modal-Logik
-- `balance-binder-imports.js` – erzeugt `balance-state`-Exports mit stabiler App-ID und `schemaVersion: 1`; akzeptiert nur dieses Format oder die explizit migrierten v21.1-/v22.0-Legacy-Envelopes. Vor dem Replace validiert es Pflichtwerte und `lastState`, fuehrt `update({ persist: false })` aus und wertet den Slice-07-Ergebnisvertrag aus. Nach Recovery/Replace muss das persistente `update()` erfolgreich sein; andernfalls werden Storage und sichtbare Eingaben automatisch zurueckgerollt. File-Inputs werden dabei nie auf einen nichtleeren Wert restauriert, weil Browser nur das programmgesteuerte Leeren erlauben.
+- `balance-binder-imports.js` – erzeugt `balance-state`-Exports mit stabiler App-ID, `schemaVersion: 2` und `inputSchemaVersion: 2`; `BALANCE_IMPORT_INPUT_SCHEMA_V2` validiert alle importierbaren Felder, Bounds und Enums und akzeptiert im aktuellen Format nur echte Booleans. Domainabweichungen blockieren den Recovery-Export nicht, sondern werden feldgenau unter `validationWarnings` inventarisiert. `balance-state` V1 und die expliziten v21.1-/v22.0-Legacy-Envelopes besitzen benannte Migratoren und durchlaufen danach denselben vollstaendigen V2-Vertrag. JSON- und Markt-CSV-Pfade fuehren zuerst `PREVIEW`, dann Recovery/Replace und abschliessend `PERSIST_INPUTS` aus; spaete Fehler rollen Storage und sichtbare Eingaben zurueck. Der CSV-Pfad bindet Modus, Periode, Stichtag, Instrument und Dateiquelle, persistiert Abdeckung/Zeilenzahl/Hoch-Scope und kennzeichnet das lokale Fensterhoch weiterhin als `windowHigh`; nach D-13 verwendet die Engine es nur bei positivem Fensterabstand separat dokumentiert als konservative ATH-Untergrenze. `engineReference.applied` unterscheidet Anwendung und neutralen Fallback. File-Inputs werden nie auf einen nichtleeren Wert restauriert, weil Browser nur das programmgesteuerte Leeren erlauben.
 - `balance-binder-snapshots.js` – Snapshot-Handling und Jahresprozess-Coordinator; validiert den Live-State, flusht, bestaetigt den Snapshot vor fachlichen Writes und persistiert bei Teilfehlern Snapshot-ID sowie Recovery-Phase
 - `balance-binder-diagnosis.js` – Diagnose-Export
 
@@ -276,14 +284,14 @@ Inflation-bezogene Operationen für das jährliche Update.
 ---
 
 ### 9.2 `balance-annual-marketdata.js`
-Periodengebundene ETF-Jahresenddaten und davon unabhängige CAPE-Updates für den „Nachrücken"-Workflow. Der ETF-Pfad liest `calendar-year:<YYYY>` aus dem laufenden Commit, fragt Yahoo im UTC-Jahresendfenster ab und persistiert den akzeptierten Stichtagscontract unter `annualMarketDataMeta`.
+Periodengebundene ETF-Jahresenddaten und davon unabhängige CAPE-Updates für den „Nachrücken"-Workflow. Der ETF-Pfad liest `calendar-year:<YYYY>` aus dem laufenden Commit, fragt Yahoo im UTC-Jahresendfenster ab und persistiert den akzeptierten Stichtagscontract unter `annualMarketDataMeta`. Derselbe Metadaten-Schluessel kann eine strikt gekennzeichnete manuelle CSV-Provenienz tragen; deren `windowHigh` ist kein Online-/Vollhistorien-ATH.
 
 **Exports:**
 - `ANNUAL_MARKET_DATA_META_KEY` / `ANNUAL_MARKET_DATA_SCHEMA_VERSION` – stabiler Persistenzschlüssel und Schema-Version
 - `createAnnualMarketDataRequest(periodId)` – bildet Zieljahr sowie `period1`/exklusives `period2` ohne Systemdatumsableitung
 - `selectAnnualCloseQuote(data, context)` – wählt aus Yahoo-Daten unabhängig von deren Reihenfolge den letzten VWCE.DE-Schlusskurs von 0,50 bis 100.000 EUR vom 27.12. bis 31.12. des Zieljahres
 - `createMarketdataHandlers({ dom, appState, debouncedUpdate, applyAnnualInflation })`
-  - `handleNachruecken()` – verschiebt Vorjahreswerte und aktualisiert ATH; quellenloses manuelles Nachrücken invalidiert veraltete Online-Stichtagsmetadaten
+  - `handleNachruecken()` – verschiebt Vorjahreswerte und aktualisiert ATH; quellenloses manuelles Nachrücken invalidiert jede veraltete Online- oder CSV-Provenienz
   - `handleUndoNachruecken()` – macht Nachrücken einschließlich der Stichtagsmetadaten rückgängig
   - `handleNachrueckenMitETF()` – holt den VWCE.DE-Jahresendkurs via Yahoo-Proxy, prüft den vollständigen laufenden Commit-Kontext vor Fetch und Mutation, führt das Nachrücken durch und speichert Marktdateninputs gemeinsam mit Preis, ISO-Stichtag, Ticker, Quelle, Zieljahr, Perioden-ID sowie der stichtagsgleichen ATH-Auswertung; Fehler nach begonnener Mutation stellen den vorherigen DOM-/State-Stand wieder her
   - `handleFetchCapeAuto()` – Holt US-Shiller-CAPE via Yale/Mirror/r.jina.ai mit lokalem Fallback und persistiert `capeMeta`

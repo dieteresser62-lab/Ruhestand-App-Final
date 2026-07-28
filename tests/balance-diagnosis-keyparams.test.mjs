@@ -89,6 +89,18 @@ setupDom();
             operativeLiquidity: 40000,
             targetCoveragePct: 75,
             targetGap: 50000
+        },
+        marketDataProvenance: {
+            schemaVersion: 1,
+            periodId: 'calendar-year:2025',
+            asOf: '2025-12-30',
+            instrument: 'VWCE.DE',
+            source: 'Manuelle CSV: markt-2025.csv',
+            highScope: 'windowHigh',
+            engineReference: {
+                policy: 'window_high_as_conservative_ath_lower_bound',
+                applied: true
+            }
         }
     });
     const txt = flattenText(grid);
@@ -111,6 +123,12 @@ setupDom();
     assert(txt.includes('Pflegebucket'), 'Health bucket metric should be rendered');
     assert(txt.includes('Pflegebucket-Zieldeckung'), 'Health bucket target coverage should be rendered');
     assert(txt.includes('keine automatische Freigabe'), 'Health bucket policy should be visible');
+    assert(txt.includes('Marktdaten-Provenienz'), 'Persistierte Marktdaten-Provenienz should be rendered');
+    assert(txt.includes('VWCE.DE · 2025-12-30'), 'Marktdaten-Provenienz should expose instrument and as-of');
+    assert(txt.includes('calendar-year:2025'), 'Marktdaten-Provenienz should expose its exact period');
+    assert(txt.includes('Hoch-Scope windowHigh'), 'Diagnosis should not mislabel a manual window high as ATH');
+    assert(txt.includes('Engine-Referenz konservative ATH-Untergrenze angewendet'),
+        'Diagnosis should expose the conservative engine reference explicitly');
 }
 
 {

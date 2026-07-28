@@ -4,6 +4,7 @@ import { createLocalStorageAdapter } from '../app/shared/persistence-adapter-loc
 import { resetPersistenceForTests } from '../app/shared/persistence-facade.js';
 import { SnapshotArchive, SNAPSHOT_TYPE } from '../app/shared/snapshot-archive.js';
 import { PROFILE_STORAGE_KEYS } from '../app/profile/profile-state.js';
+import { ANNUAL_MARKET_DATA_META_KEY } from '../app/balance/balance-annual-marketdata.js';
 
 console.log('--- Balance Storage Contract Tests ---');
 
@@ -255,8 +256,68 @@ try {
     console.log('Test 7: import replace creates confirmed recovery and rollback restores all captured live data');
     {
         installMockLocalStorage();
-        const oldState = { inputs: { aktuellesAlter: 66, floorBedarf: 18000, flexBedarf: 6000 } };
-        const importedState = { inputs: { aktuellesAlter: 67, floorBedarf: 24000, flexBedarf: 12000 } };
+        const oldState = {
+            inputs: { aktuellesAlter: 66, floorBedarf: 18000, flexBedarf: 6000 },
+            [ANNUAL_MARKET_DATA_META_KEY]: {
+                schemaVersion: 1,
+                periodId: 'calendar-year:2024',
+                asOf: '2024-12-30',
+                source: 'Vorherige Quelle'
+            }
+        };
+        const importedState = {
+            inputs: {
+                aktuellesAlter: 67,
+                floorBedarf: 24000,
+                flexBedarf: 12000,
+                endeVJ: 130,
+                ath: 130,
+                jahreSeitAth: 0
+            },
+            [ANNUAL_MARKET_DATA_META_KEY]: {
+                schemaVersion: 1,
+                acquisitionMode: 'manual_csv',
+                periodMode: 'current',
+                periodId: 'calendar-year:2025',
+                targetYear: 2025,
+                price: 130,
+                asOf: '2025-12-30',
+                ticker: 'VWCE.DE',
+                instrument: 'VWCE.DE',
+                source: 'Manuelle CSV: markt-2025.csv',
+                sourceType: 'manual_csv',
+                sourceFileName: 'markt-2025.csv',
+                importedAt: '2026-07-27T10:00:00.000Z',
+                coverage: {
+                    start: '2022-12-30',
+                    end: '2025-12-30',
+                    calendarYears: [2022, 2023, 2024, 2025],
+                    rowCount: 4
+                },
+                highScope: 'windowHigh',
+                high: {
+                    scope: 'windowHigh',
+                    value: 130,
+                    asOf: '2025-12-30',
+                    yearsSince: 0,
+                    verifiedAllTimeHighAvailable: false
+                },
+                engineReference: {
+                    policy: 'window_high_as_conservative_ath_lower_bound',
+                    sourceScope: 'windowHigh',
+                    value: 130,
+                    yearsSince: 0
+                },
+                ath: {
+                    value: null,
+                    yearsSince: null,
+                    evaluatedAsOf: '2025-12-30',
+                    lastHighAsOf: null,
+                    scope: 'unavailable_manual_window',
+                    engineAvailable: false
+                }
+            }
+        };
         localStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify(oldState));
         localStorage.setItem(PROFILE_STORAGE_KEYS.current, 'default');
         localStorage.setItem(PROFILE_STORAGE_KEYS.active, 'default');
@@ -270,7 +331,12 @@ try {
         const receipt = await StorageManager.replaceStateFromImport(importedState);
 
         assertEqual(receipt.ok, true, 'Import-Replace meldet erst nach bestaetigtem Write Erfolg');
-        assertEqual(JSON.parse(localStorage.getItem(CONFIG.STORAGE.LS_KEY)).inputs.floorBedarf, 24000, 'Import-Replace schreibt den validierten Balance-State');
+        const replacedState = JSON.parse(localStorage.getItem(CONFIG.STORAGE.LS_KEY));
+        assertEqual(replacedState.inputs.floorBedarf, 24000, 'Import-Replace schreibt den validierten Balance-State');
+        assertEqual(replacedState[ANNUAL_MARKET_DATA_META_KEY].sourceFileName, 'markt-2025.csv',
+            'Import-Replace schreibt die vollständige manuelle Quellenprovenienz atomar mit');
+        assertEqual(replacedState[ANNUAL_MARKET_DATA_META_KEY].highScope, 'windowHigh',
+            'Import-Replace erhält die eingeschränkte Hoch-Semantik');
         const recovery = await SnapshotArchive.readSnapshot(receipt.recoverySnapshotId);
         assertEqual(recovery.kind, BALANCE_IMPORT_RECOVERY_KIND, 'Recovery-Snapshot ist als Import-Recovery typisiert');
         assertEqual(JSON.parse(recovery.records[CONFIG.STORAGE.LS_KEY]).inputs.floorBedarf, 18000, 'Recovery-Snapshot enthaelt den Zustand vor dem Replace');
@@ -280,6 +346,11 @@ try {
         await StorageManager.rollbackImportReplace(receipt);
 
         assertEqual(JSON.parse(localStorage.getItem(CONFIG.STORAGE.LS_KEY)).inputs.floorBedarf, 18000, 'Rollback stellt den vorherigen Balance-State wieder her');
+        assertEqual(
+            JSON.parse(localStorage.getItem(CONFIG.STORAGE.LS_KEY))[ANNUAL_MARKET_DATA_META_KEY].periodId,
+            'calendar-year:2024',
+            'Rollback stellt auch die vorherige Marktdaten-Provenienz wieder her'
+        );
         assertEqual(localStorage.getItem('profile_tagesgeld'), '50000', 'Rollback stellt auch erfasste profilbezogene Live-Daten wieder her');
         assert(await SnapshotArchive.readSnapshot(receipt.recoverySnapshotId), 'Rollback behaelt den Recovery-Snapshot fuer weitere Wiederherstellung');
     }

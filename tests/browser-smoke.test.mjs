@@ -547,6 +547,110 @@ async function runBalanceImportReject(browser, baseUrl) {
     await smoke.close();
 }
 
+async function runBalanceCsvImportRoundtrip(browser, baseUrl) {
+    const storage = createBalanceStorage(2025);
+    const seededState = JSON.parse(storage[BALANCE_STATE_KEY]);
+    seededState.inputs.dynamicFlex = true;
+    seededState.inputs.goGoActive = false;
+    storage[BALANCE_STATE_KEY] = JSON.stringify(seededState);
+    const smoke = await openSmokePage(browser, baseUrl, 'Balance.html', { storage });
+    const { page } = smoke;
+    await page.locator('#profilverbund-profile-list input').waitFor({ state: 'visible' });
+    await page.waitForTimeout(750);
+    await page.locator('#marketCsvMode').evaluate(element => {
+        const details = element.closest('details');
+        if (details) details.open = true;
+    });
+    await page.locator('#marketCsvMode').selectOption('current');
+    await page.locator('#marketCsvTargetYear').fill('2025');
+    await page.locator('#marketCsvExpectedAsOf').fill('2025-12-30');
+    await page.locator('#marketCsvInstrument').fill('vwce.de');
+
+    const csv = [
+        'Datum;Schluss',
+        '30.12.2022;100',
+        '30.12.2023;110',
+        '30.12.2024;120',
+        '30.12.2025;130'
+    ].join('\n');
+    await page.locator('#csvFileInput').setInputFiles({
+        name: 'markt-2025.csv',
+        mimeType: 'text/csv',
+        buffer: Buffer.from(csv, 'utf8')
+    });
+    const csvImportStatus = page.locator('#error-container');
+    await csvImportStatus.waitFor({
+        state: 'visible',
+        timeout: 10000
+    });
+    const csvImportStatusText = await csvImportStatus.textContent();
+    assert(
+        csvImportStatusText.includes('CSV importiert'),
+        `CSV-Roundtrip muss erfolgreich abschliessen; Status war: ${csvImportStatusText}`
+    );
+
+    const row = await readIndexedDb(page, 'kv', BALANCE_STATE_KEY);
+    const imported = JSON.parse(row.value);
+    const meta = imported.annualMarketDataMeta;
+    assert(imported.inputs.ath === 0,
+        'Ein CSV-Fensterhoch am letzten Kurs darf nicht als Allzeithoch persistiert werden');
+    assert(imported.inputs.jahreSeitAth === 0,
+        'Jahre seit der Engine-Untergrenze müssen aus dem beobachteten CSV-Fenster stammen');
+    assert(meta?.periodId === 'calendar-year:2025', 'CSV-Provenienz muss die explizite Zielperiode persistieren');
+    assert(meta?.asOf === '2025-12-30', 'CSV-Provenienz muss den bestätigten Stichtag persistieren');
+    assert(meta?.instrument === 'VWCE.DE', 'CSV-Provenienz muss das normalisierte Instrument persistieren');
+    assert(meta?.sourceFileName === 'markt-2025.csv', 'CSV-Provenienz muss die Quelldatei persistieren');
+    assert(meta?.highScope === 'windowHigh', 'Vier CSV-Zeilen dürfen nur ein windowHigh belegen');
+    assert(meta?.ath?.engineAvailable === false, 'Manueller Fensterimport darf weiterhin kein echtes ATH behaupten');
+    assert(
+        meta?.engineReference?.policy === 'window_high_as_conservative_ath_lower_bound',
+        'Die interne Engine-Verwendung muss maschinenlesbar als konservative Untergrenze markiert sein'
+    );
+    assert(meta?.engineReference?.applied === false,
+        'Das steigende CSV-Fenster muss die Engine-Untergrenze als nicht angewendet markieren');
+    assert(imported.inputs.dynamicFlex === true, 'CSV-Roundtrip muss Boolean true semantisch erhalten');
+    assert(imported.inputs.goGoActive === false, 'CSV-Roundtrip muss Boolean false semantisch erhalten');
+    assert(await readIndexedDb(page, 'snapshots', null) === 1, 'CSV-Replace muss genau einen Recovery-Snapshot anlegen');
+
+    await page.reload({ waitUntil: 'load' });
+    await page.locator('#marketDataProvenance[data-available="true"]').waitFor({
+        state: 'visible',
+        timeout: 10000
+    });
+    const provenanceView = await page.locator('#marketDataProvenance').evaluate(element => ({
+        text: element.textContent,
+        periodId: element.dataset.periodId,
+        asOf: element.dataset.asOf,
+        instrument: element.dataset.instrument,
+        highScope: element.dataset.highScope,
+        engineReferenceApplied: element.dataset.engineReferenceApplied
+    }));
+    assert(provenanceView.periodId === 'calendar-year:2025', 'Reload muss die persistierte CSV-Periode wieder anzeigen');
+    assert(provenanceView.asOf === '2025-12-30', 'Reload muss den persistierten Stichtag wieder anzeigen');
+    assert(provenanceView.instrument === 'VWCE.DE', 'Reload muss das persistierte Instrument wieder anzeigen');
+    assert(provenanceView.highScope === 'windowHigh', 'Reload muss die eingeschränkte Hoch-Semantik wieder anzeigen');
+    assert(provenanceView.engineReferenceApplied === 'false',
+        'Reload muss den neutralen Anwendungsstatus der Engine-Referenz anzeigen');
+    assert(provenanceView.text.includes('markt-2025.csv'), 'Reload muss die persistierte Quelle sichtbar anzeigen');
+    assert(provenanceView.text.includes('nicht angewendet'),
+        'Reload muss den neutralen Fallback der Fensterhoch-Untergrenze sichtbar benennen');
+    assert(await page.locator('#dynamicFlex').isChecked(), 'Reload muss Dynamic Flex als echtes Boolean true anwenden');
+    assert(!(await page.locator('#goGoActive').isChecked()), 'Reload muss Go-Go als echtes Boolean false anwenden');
+
+    await page.locator('#openDiagnosisBtn').click();
+    await page.locator('#diag-key-params').filter({ hasText: 'Marktdaten-Provenienz' }).waitFor({
+        state: 'visible',
+        timeout: 10000
+    });
+    const diagnosisText = await page.locator('#diag-key-params').textContent();
+    assert(diagnosisText.includes('Hoch-Scope windowHigh'), 'Diagnose muss das CSV-Hoch nach Reload als windowHigh kennzeichnen');
+    assert(diagnosisText.includes('Engine-Referenz nicht angewendet'),
+        'Diagnose muss den neutralen Anwendungsstatus der Engine-Referenz sichtbar benennen');
+
+    smoke.assertNoErrors();
+    await smoke.close();
+}
+
 async function runBalanceCorruptExpenses(browser, baseUrl) {
     const storage = { ...createBalanceStorage(2025), [EXPENSES_KEY]: '{not-json' };
     const smoke = await openSmokePage(browser, baseUrl, 'Balance.html', { storage });
@@ -1101,6 +1205,7 @@ async function main() {
             ['tranche corrupt recovery', runTranchesRecoverySmoke],
             ['Handbuch.html', runManualSmoke],
             ['Balance import reject', runBalanceImportReject],
+            ['Balance CSV import roundtrip', runBalanceCsvImportRoundtrip],
             ['Balance annual commit', runBalanceAnnualCommit]
         ];
 

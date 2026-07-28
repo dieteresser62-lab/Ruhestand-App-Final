@@ -155,6 +155,38 @@
                                     title="Nachrücken rückgängig machen" style="display:none;">↩️</button>
                             </span>
                         </legend>
+                        <details class="details-card" style="margin-bottom: 12px;">
+                            <summary>CSV-Ziel und Datenquelle festlegen</summary>
+                            <div class="form-grid"
+                                style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); margin-top: 10px;">
+                                <div class="form-group">
+                                    <label for="marketCsvMode">CSV-Modus</label>
+                                    <select id="marketCsvMode">
+                                        <option value="current" selected>Aktuelle Planperiode</option>
+                                        <option value="historical">Historische Periode</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="marketCsvTargetYear">Zieljahr</label>
+                                    <input type="number" id="marketCsvTargetYear" min="1900" max="9999" step="1"
+                                        placeholder="z. B. 2025">
+                                </div>
+                                <div class="form-group">
+                                    <label for="marketCsvExpectedAsOf">Erwarteter Stichtag</label>
+                                    <input type="date" id="marketCsvExpectedAsOf">
+                                </div>
+                                <div class="form-group">
+                                    <label for="marketCsvInstrument">Instrument</label>
+                                    <input type="text" id="marketCsvInstrument" value="VWCE.DE" maxlength="32"
+                                        autocomplete="off">
+                                </div>
+                            </div>
+                            <p class="hint" style="margin: 10px 0 0;">
+                                Die letzte CSV-Zeile muss exakt zu Zieljahr und Stichtag passen. Ein manuelles
+                                CSV-Hoch gilt ohne Vollhistoriennachweis nur als Fensterhoch, nicht als
+                                verifiziertes ATH; intern dient es als konservative ATH-Untergrenze.
+                            </p>
+                        </details>
                         <div class="form-grid" style="grid-template-columns: repeat(3, 1fr);">
                             <div class="form-group"><label for="endeVJ">Ende VJ</label><input type="number" id="endeVJ"
                                     min="0" step="0.01" placeholder="0"></div>
@@ -169,6 +201,10 @@
                             <div class="form-group"><label for="jahreSeitAth">Jahre seit ATH</label><input type="number"
                                     id="jahreSeitAth" step="0.01" min="0" placeholder="0"></div>
                         </div>
+                        <p id="marketDataProvenance" class="hint" role="status" aria-live="polite"
+                            data-available="false" style="margin: 12px 0 0;">
+                            Keine persistierte Marktdaten-Provenienz.
+                        </p>
                     </fieldset>
                     <input id="renteAktiv" type="hidden">
                     <input id="renteMonatlich" type="hidden">

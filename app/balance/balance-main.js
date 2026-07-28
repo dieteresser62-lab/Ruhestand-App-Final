@@ -29,6 +29,7 @@ import { initDynamicFlexControls } from '../simulator/simulator-main-dynamic-fle
 import { getPersistenceStatus, init as initPersistence } from '../shared/persistence-facade.js';
 import { PROFILE_VALUE_KEYS } from '../profile/profile-state.js';
 import { postprocessBalanceAction } from './balance-action-postprocessor.js';
+import { ANNUAL_MARKET_DATA_META_KEY } from './balance-annual-marketdata.js';
 import {
     BALANCE_UPDATE_MODE,
     BALANCE_UPDATE_STATUS,
@@ -83,6 +84,7 @@ const dom = {
         entnahmeDetailsContent: document.getElementById('entnahmeDetailsContent'),
         entnahmeBreakdown: document.getElementById('entnahme-breakdown'),
         healthBucketSummary: document.getElementById('healthBucketSummary'),
+        marketDataProvenance: document.getElementById('marketDataProvenance'),
         snapshotList: document.getElementById('snapshotList'),
         printFooter: document.getElementById('print-footer')
     },
@@ -289,9 +291,17 @@ export function update(options = {}) {
             inputData,
             threeBucketDiagnosis
         });
+        if (formattedDiagnosis) {
+            formattedDiagnosis.keyParams = formattedDiagnosis.keyParams || {};
+            formattedDiagnosis.keyParams.marketDataProvenance =
+                persistentState?.[ANNUAL_MARKET_DATA_META_KEY] || null;
+        }
 
         appState.diagnosisData = formattedDiagnosis;
         UIRenderer.renderDiagnosis(appState.diagnosisData);
+        UIReader.renderMarketDataProvenance(
+            persistentState?.[ANNUAL_MARKET_DATA_META_KEY] || null
+        );
 
         const fixedIncomeAnnual = UIUtils.parseCurrency(dom.inputs.fixedIncomeAnnual?.value || 0);
         const { monthlyBudget, annualBudget } = calculateExpensesBudget({
@@ -489,6 +499,9 @@ export async function init() {
     // Lädt letzten Zustand aus localStorage und wendet ihn auf die Formular-Felder an
     const persistentState = StorageManager.loadState();
     UIReader.applyStoredInputs(persistentState.inputs);
+    UIReader.renderMarketDataProvenance(
+        persistentState?.[ANNUAL_MARKET_DATA_META_KEY] || null
+    );
     profileSyncHandlers.syncProfileDerivedInputs();
     syncTranchenToInputs({ silent: true });
     initDynamicFlexControls({ enableLocalPersistence: false });

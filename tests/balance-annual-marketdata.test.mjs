@@ -418,18 +418,51 @@ try {
         assertEqual(dom.controls.btnUndoNachruecken.style.display, 'none', 'Fehlerpfad bietet kein irrefuehrendes Undo an');
     }
 
-    console.log('Test 13: manual source-less rollover invalidates and undo restores as-of metadata');
+    console.log('Test 13: manual source-less rollover invalidates and undo restores CSV provenance');
     {
         global.localStorage = createLocalStorageMock();
         const previousMeta = {
             schemaVersion: 1,
+            acquisitionMode: 'manual_csv',
+            periodMode: 'current',
             periodId: 'calendar-year:2024',
             targetYear: 2024,
             price: 120,
             asOf: '2024-12-30',
             ticker: 'VWCE.DE',
-            source: 'Yahoo Finance (lokaler Proxy)',
-            ath: { value: 150, yearsSince: 2, evaluatedAsOf: '2024-12-30', lastHighAsOf: '2022-12-30' }
+            instrument: 'VWCE.DE',
+            source: 'Manuelle CSV: markt-2024.csv',
+            sourceType: 'manual_csv',
+            sourceFileName: 'markt-2024.csv',
+            importedAt: '2025-01-02T10:00:00.000Z',
+            coverage: {
+                start: '2021-12-30',
+                end: '2024-12-30',
+                calendarYears: [2021, 2022, 2023, 2024],
+                rowCount: 4
+            },
+            highScope: 'windowHigh',
+            high: {
+                scope: 'windowHigh',
+                value: 150,
+                asOf: '2022-12-30',
+                yearsSince: 2,
+                verifiedAllTimeHighAvailable: false
+            },
+            engineReference: {
+                policy: 'window_high_as_conservative_ath_lower_bound',
+                sourceScope: 'windowHigh',
+                value: 150,
+                yearsSince: 2
+            },
+            ath: {
+                value: null,
+                yearsSince: null,
+                evaluatedAsOf: '2024-12-30',
+                lastHighAsOf: null,
+                scope: 'unavailable_manual_window',
+                engineAvailable: false
+            }
         };
         seedAnnualState('calendar-year:2025', previousMeta);
         const dom = createDom();
@@ -437,10 +470,12 @@ try {
 
         handlers.handleNachruecken();
         let stored = JSON.parse(localStorage.getItem(CONFIG.STORAGE.LS_KEY));
-        assertEqual(stored[ANNUAL_MARKET_DATA_META_KEY], undefined, 'Manuelles Nachruecken laesst keine veraltete Online-Metadaten stehen');
+        assertEqual(stored[ANNUAL_MARKET_DATA_META_KEY], undefined, 'Manuelles Nachruecken laesst keine veraltete CSV-Provenienz stehen');
         handlers.handleUndoNachruecken();
         stored = JSON.parse(localStorage.getItem(CONFIG.STORAGE.LS_KEY));
-        assertEqual(stored[ANNUAL_MARKET_DATA_META_KEY].asOf, '2024-12-30', 'Undo stellt die Online-Stichtagsmetadaten wieder her');
+        assertEqual(stored[ANNUAL_MARKET_DATA_META_KEY].asOf, '2024-12-30', 'Undo stellt den CSV-Stichtag wieder her');
+        assertEqual(stored[ANNUAL_MARKET_DATA_META_KEY].sourceFileName, 'markt-2024.csv', 'Undo stellt die CSV-Quelle wieder her');
+        assertEqual(stored[ANNUAL_MARKET_DATA_META_KEY].highScope, 'windowHigh', 'Undo stellt den CSV-Hoch-Scope wieder her');
     }
 
     console.log('Balance annual marketdata tests passed');

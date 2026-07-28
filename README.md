@@ -44,7 +44,23 @@ Netzwerkpfade.
 ### Balance-App
 * Speichert Eingaben ueber die zentrale Persistenz-Facade; im Browser ist IndexedDB die lokale Source of Truth, Tauri nutzt `ruhestand_suite_data.json` im App-Datenverzeichnis. Ein optional verbundenes Browser-Snapshot-Verzeichnis wird in einer eigenen Handle-Datenbank gespeichert; bestehende Handles aus der frueheren `snapshotDB` werden einmalig uebernommen, ohne die Snapshot-Archivmigration zu blockieren.
 * Komplett-Backup und Komplett-Import liegen zentral auf der Startseite unter `Profile > Erweitert`; Jahresabschluss-Snapshots bleiben als fachlicher Sicherungspunkt in einem separaten internen Snapshot-Archiv erhalten.
-* Liest Marktdaten und Ausgaben aus CSV-Dateien ein.
+* Liest Marktdaten und Ausgaben aus CSV-Dateien ein. Manuelle Markt-CSVs verlangen
+  einen ausdruecklichen Modus, Zieljahr, ISO-Stichtag und ein Instrument; der
+  letzte CSV-Punkt muss exakt dazu passen. Quelle, Importzeit, Abdeckung und
+  Hoch-Scope bleiben im State, Export und in der Diagnose erhalten. Ein Hoch aus
+  dem lokalen CSV-Fenster gilt ohne Vollhistoriennachweis nur als `windowHigh`,
+  nicht als verifiziertes ATH. Intern dient es gerichtet als konservative
+  ATH-Untergrenze: Nur ein positiver Fensterabstand wird angewendet, waehrend
+  ein Hoch am letzten Kurs ATH-neutral bleibt. Policy und Anwendung bleiben
+  separat in der Provenienz sichtbar.
+* **Typisierter Balance-Import:** Das aktuelle JSON-Format validiert alle
+  importierbaren Eingabefelder gegen den V2-Typ-/Bounds-/Enum-Vertrag.
+  Booleanfelder akzeptieren nur echte Booleans; Balance-Dateien V1 und die
+  expliziten v21.1-/v22.0-Legacy-Envelopes besitzen benannte Migratoren.
+  Erreichbare Livewerte ausserhalb des strikten Importvertrags verhindern den
+  Recovery-Export nicht, sondern werden darin feldgenau als
+  `validationWarnings` markiert. Preview, Recovery-Snapshot, Replace und
+  bestaetigender Persistenzlauf bilden weiterhin eine fehlersichere Kette.
 * **Fail-safe Jahresprozess mit Online-Datenabruf:** Jahres-Update und Jahresabschluss starten denselben periodengebundenen Ablauf. Nach lokaler Vorprüfung und erfolgreichem Flush entsteht zuerst ein verifizierter Recovery-Snapshot; erst danach werden Alter, Inflationsdaten (ECB, World Bank, OECD), ETF-Kurse (VWCE.DE via Yahoo Finance über lokalen Proxy), CAPE, Bedarf und Ausgabenjahr fortgeschrieben. Das neue Alter wird zugleich im aktiven Profil gespeichert, damit der nachfolgende Profil-Sync es nicht zurücksetzt. Der ETF-Wert für `endeVJ` stammt dabei ausschließlich aus dem letzten verfügbaren Handelstag vom 27. bis 31. Dezember der laufenden Abschlussperiode; Kurs, ISO-Stichtag, Ticker, Quelle und Zieljahr werden gemeinsam gespeichert.
 * **Auto-CAPE im Jahreswechsel:** US-Shiller-CAPE wird im Jahresprozess automatisch geladen (Fallback: Yale → Mirror → letzter gespeicherter Wert). Ein nicht auflösbarer CAPE-/Datenfehler lässt den Recovery-Snapshot und einen sichtbaren unvollständigen Periodenstatus bestehen, statt den Abschluss als erfolgreich zu markieren.
 * **Ausgaben-Check (monatlich):** CSV-Import pro Monat und Profil, Budgetkontrolle je Monat, Detailansicht mit Top-3-Kategorien, Jahreshochrechnung (ab 2 Datenmonaten mit Median), Soll/Ist auf Basis importierter Monate sowie Jahres-Historie per Jahr-Auswahl. Korrupte Ausgabendaten werden nicht als leer interpretiert: Der Bereich bleibt schreibgesperrt und bietet Recovery-Export, bestaetigten Reset oder Abbruch an.

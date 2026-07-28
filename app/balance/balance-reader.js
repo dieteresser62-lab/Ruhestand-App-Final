@@ -92,6 +92,62 @@ export function initUIReader(domRefs) {
     dom = domRefs;
 }
 
+export function getMarketDataProvenanceViewModel(meta) {
+    if (!meta || typeof meta !== 'object' || Array.isArray(meta)) {
+        return {
+            available: false,
+            text: 'Keine persistierte Marktdaten-Provenienz.',
+            schemaVersion: null,
+            periodId: null,
+            asOf: null,
+            source: null,
+            instrument: null,
+            highScope: null,
+            enginePolicy: null,
+            engineReferenceApplied: null
+        };
+    }
+    const instrument = String(meta.instrument || meta.ticker || 'unbekannt');
+    const source = String(meta.source || 'unbekannt');
+    const periodId = String(meta.periodId || 'ohne Periode');
+    const asOf = String(meta.asOf || 'ohne Stichtag');
+    const highScope = String(
+        meta.highScope ||
+        meta.high?.scope ||
+        meta.ath?.scope ||
+        (Number.isFinite(meta.ath?.value) ? 'allTimeHigh' : 'unbekannt')
+    );
+    const coverage = meta.coverage && typeof meta.coverage === 'object'
+        ? `; Abdeckung ${meta.coverage.start || '?'} bis ${meta.coverage.end || '?'} (${meta.coverage.rowCount ?? '?'} Zeilen)`
+        : '';
+    const importTime = meta.importedAt ? `; Import ${meta.importedAt}` : '';
+    const enginePolicy = typeof meta.engineReference?.policy === 'string'
+        ? meta.engineReference.policy
+        : null;
+    const engineReferenceApplied = typeof meta.engineReference?.applied === 'boolean'
+        ? meta.engineReference.applied
+        : null;
+    const engineReference = enginePolicy === 'window_high_as_conservative_ath_lower_bound'
+        ? (
+            engineReferenceApplied === true
+                ? '; Engine-Referenz: konservative ATH-Untergrenze angewendet'
+                : '; Engine-Referenz: nicht angewendet (kein belegter Fensterabstand)'
+        )
+        : '';
+    return {
+        available: true,
+        text: `${instrument} · ${periodId} · Stichtag ${asOf} · ${source} · Hoch-Scope ${highScope}${engineReference}${coverage}${importTime}`,
+        schemaVersion: Number.isInteger(meta.schemaVersion) ? meta.schemaVersion : null,
+        periodId,
+        asOf,
+        source,
+        instrument,
+        highScope,
+        enginePolicy,
+        engineReferenceApplied
+    };
+}
+
 export const UIReader = {
     /**
      * Liest alle Benutzereingaben aus dem Formular
@@ -382,12 +438,14 @@ export const UIReader = {
             const el = dom.inputs[key];
             if (el && key in storedInputs) {
                 if (el.type === 'checkbox') {
-                    el.checked = storedInputs[key];
+                    // Niemals Truthiness fuer persistierte/importierte Booleans.
+                    el.checked = storedInputs[key] === true;
                 } else if (el.classList.contains('currency')) {
                     el.value = UIUtils.formatNumber(UIUtils.parseCurrency(storedInputs[key]));
-                } else if (key === 'renteAktiv' && typeof storedInputs[key] === 'boolean') {
-                    // Fix: Convert saved boolean back to "ja"/"nein" for the select element
-                    el.value = storedInputs[key] ? 'ja' : 'nein';
+                } else if (key === 'renteAktiv') {
+                    // Auch unerwartete Legacy-/Korruptionsstrings duerfen die Rente
+                    // nicht per Truthiness aktivieren.
+                    el.value = storedInputs[key] === true ? 'ja' : 'nein';
                 } else {
                     el.value = storedInputs[key];
                 }
@@ -412,6 +470,35 @@ export const UIReader = {
         }
 
         this.applySideEffectsFromInputs();
+    },
+
+    /**
+     * Rendert persistierte Marktdaten-Provenienz sichtbar und als data-*-
+     * Attribute fuer Browserdiagnose und Reload-Tests.
+     */
+    renderMarketDataProvenance(meta) {
+        const output = dom?.outputs?.marketDataProvenance;
+        if (!output) return getMarketDataProvenanceViewModel(meta);
+        const view = getMarketDataProvenanceViewModel(meta);
+        output.textContent = view.text;
+        const dataset = output.dataset || {};
+        const datasetValues = {
+            available: String(view.available),
+            schemaVersion: view.schemaVersion === null ? '' : String(view.schemaVersion),
+            periodId: view.periodId || '',
+            asOf: view.asOf || '',
+            source: view.source || '',
+            instrument: view.instrument || '',
+            highScope: view.highScope || '',
+            enginePolicy: view.enginePolicy || '',
+            engineReferenceApplied: view.engineReferenceApplied === null
+                ? ''
+                : String(view.engineReferenceApplied)
+        };
+        Object.entries(datasetValues).forEach(([key, value]) => {
+            dataset[key] = value;
+        });
+        return view;
     },
 
     /**

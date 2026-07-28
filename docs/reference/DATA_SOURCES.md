@@ -74,6 +74,33 @@ wrong or stale years, implausible prices and proxy failures fail closed. The
 market-data step restores its previous local input/meta values, while the
 annual coordinator retains the wider snapshot-based recovery responsibility.
 
+### Manual market CSV contract
+
+Manual files are local user-provided sources and do not contact an external
+provider. The import requires an explicit `current` or `historical` mode,
+target calendar year, expected ISO `asOf`, instrument and source filename.
+`current` must match the period derived from the active annual contract (or the
+last completed calendar year outside a running commit); `historical` is valid
+only for an earlier target year. The last CSV observation must exactly match
+both target year and expected `asOf`.
+
+The parser requires a date and close column plus comparison observations for
+the previous three calendar years. Persisted provenance includes source file,
+instrument, import timestamp, coverage start/end, covered calendar years, row
+count and `highScope`. This four-year window can prove only `windowHigh`; it
+does not establish an all-time high. The metadata therefore keeps
+`verifiedAllTimeHighAvailable: false`. Under the user-decided directional D-13
+policy,
+the Engine-facing `ath` and `jahreSeitAth` receive the observed window high and
+its observed age only when the window high is strictly above the latest close.
+That positive gap is a conservative lower bound of the true ATH drawdown. If
+the window high equals the latest close, the ATH inputs remain neutral. This
+directional use is separately marked by `engineReference.policy =
+"window_high_as_conservative_ath_lower_bound"` and
+`engineReference.applied`; it does not upgrade the source claim to an
+all-time high. The metadata is part of the Balance state, JSON export, reload
+display, diagnosis and import recovery/rollback.
+
 CAPE has a separate provenance contract and is not assigned the ETF year-end
 date. It tries the configured primary resource, then its mirror, then an
 existing stored value. `capeAsOf`, `capeSource`, `capeFetchStatus` and
