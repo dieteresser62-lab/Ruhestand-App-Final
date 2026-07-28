@@ -83,7 +83,13 @@ function createBrowserProfileStorage(profiles, currentProfileId) {
             data: {
                 depot_tranchen: profile.tranchesRaw ?? '[]',
                 profile_tagesgeld: profile.tagesgeld ?? '10000',
-                profile_aktuelles_alter: profile.alter ?? '67'
+                profile_aktuelles_alter: profile.alter ?? '67',
+                ...(profile.healthBucketRaw !== undefined
+                    ? { profile_health_bucket: profile.healthBucketRaw }
+                    : {}),
+                ...(profile.balanceStateRaw !== undefined
+                    ? { [BALANCE_STATE_KEY]: profile.balanceStateRaw }
+                    : {})
             }
         }]))
     };
@@ -578,7 +584,8 @@ async function runBalanceCsvImportRoundtrip(browser, baseUrl) {
         mimeType: 'text/csv',
         buffer: Buffer.from(csv, 'utf8')
     });
-    const csvImportStatus = page.locator('#error-container');
+    const csvImportStatus = page.locator('#error-container')
+        .filter({ hasText: 'CSV importiert' });
     await csvImportStatus.waitFor({
         state: 'visible',
         timeout: 10000
@@ -1170,6 +1177,211 @@ async function runTranchesRecoverySmoke(browser, baseUrl) {
     await smoke.close();
 }
 
+async function runProfileRegistryRecoverySmoke(browser, baseUrl) {
+    const corruptRaw = '{synthetisch-profile-registry-not-json';
+    const smoke = await openSmokePage(browser, baseUrl, 'index.html', {
+        storage: { rs_profiles_v1: corruptRaw }
+    });
+    const { page } = smoke;
+    await page.locator('#profileStatus[data-profile-recovery="corrupt"]').waitFor({ state: 'visible' });
+    assert((await readIndexedDb(page, 'kv', 'rs_profiles_v1')).value === corruptRaw,
+        'Profile recovery must preserve corrupt registry bytes before export');
+    assert(await page.locator('[data-profile-recovery-action="reset"]').isDisabled(),
+        'Profile reset must stay disabled before recovery export');
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.locator('[data-profile-recovery-action="export"]').click();
+    const download = await downloadPromise;
+    const recoveryDocument = JSON.parse(await readDownloadText(download));
+    assert(recoveryDocument.schema === 'ruhestand-profile-recovery',
+        'Profile recovery download must use the typed recovery schema');
+    assert(recoveryDocument.recovery.raw === corruptRaw,
+        'Profile recovery download must contain the exact corrupt registry payload');
+    assert(!(await page.locator('[data-profile-recovery-action="reset"]').isDisabled()),
+        'Successful recovery export must unlock the confirmed reset');
+
+    await page.locator('[data-profile-recovery-action="reset"]').click();
+    await page.waitForFunction(() => {
+        const select = document.getElementById('profileSelect');
+        const status = document.getElementById('profileStatus');
+        return select?.querySelector('option[value="default"]')
+            && status?.dataset?.profileRecovery !== 'corrupt';
+    });
+    const registryRow = await readIndexedDb(page, 'kv', 'rs_profiles_v1');
+    const currentRow = await readIndexedDb(page, 'kv', 'rs_current_profile');
+    assert(Boolean(JSON.parse(registryRow.value).profiles.default),
+        'Confirmed registry reset must create a safe default profile');
+    assert(currentRow.value === 'default',
+        'Confirmed registry reset must reconcile the current profile ID');
+    smoke.assertNoErrors();
+    await smoke.close();
+}
+
+async function runBalanceCorruptProfileHealthSmoke(browser, baseUrl) {
+    const profileId = 'browser-slice13-health';
+    const corruptRaw = '{"enabled":"maybe","initialAmount":150000}';
+    const storage = {
+        ...createBalanceStorage(2025),
+        ...createBrowserProfileStorage({
+            [profileId]: {
+                name: 'Browserprofil Pflege-Recovery',
+                healthBucketRaw: corruptRaw
+            }
+        }, profileId)
+    };
+    const registryRaw = storage.rs_profiles_v1;
+    const smoke = await openSmokePage(browser, baseUrl, 'Balance.html', { storage });
+    const { page } = smoke;
+    await page.locator('#error-container')
+        .filter({ hasText: 'Profil-Recovery erforderlich' })
+        .waitFor({ state: 'visible' });
+    const errorText = await page.locator('#error-container').textContent();
+    assert(errorText.includes('Pflegebucket') && errorText.includes('Browserprofil Pflege-Recovery'),
+        'Balance must name the profile and corrupt care area visibly');
+    assert((await readIndexedDb(page, 'kv', 'rs_profiles_v1')).value === registryRaw,
+        'Balance care blocker must not mutate the registry');
+    smoke.assertNoErrors(['Update-Fehler: ProfileRecoveryError']);
+    await smoke.close();
+}
+
+async function runSimulatorCorruptProfileBalanceSmoke(browser, baseUrl) {
+    const profileId = 'browser-slice13-balance';
+    const corruptRaw = '{"inputs":null}';
+    const storage = createBrowserProfileStorage({
+        [profileId]: {
+            name: 'Browserprofil Balance-Recovery',
+            balanceStateRaw: corruptRaw
+        }
+    }, profileId);
+    const registryRaw = storage.rs_profiles_v1;
+    const smoke = await openSmokePage(browser, baseUrl, 'Simulator.html', { storage });
+    const { page } = smoke;
+    await page.locator('#simProfileStatus')
+        .filter({ hasText: 'Profil-Recovery erforderlich' })
+        .waitFor({ state: 'visible' });
+    const statusText = await page.locator('#simProfileStatus').textContent();
+    assert(statusText.includes('Balance-State') && statusText.includes('Browserprofil Balance-Recovery'),
+        `Simulator must name the profile and corrupt balance area visibly: ${JSON.stringify(statusText)}`);
+    assert((await readIndexedDb(page, 'kv', 'rs_profiles_v1')).value === registryRaw,
+        'Simulator balance blocker must not mutate the registry');
+    const blockedControls = [
+        'mcButton',
+        'btButton',
+        'sweepButton',
+        'sweepSelfTestButton',
+        'findBestButton',
+        'sensitivityButton',
+        'paretoButton',
+        'ao_run_btn',
+        'ao_apply_btn'
+    ];
+    for (const controlId of blockedControls) {
+        assert(await page.locator(`#${controlId}`).isDisabled(),
+            `Simulator profile recovery must disable ${controlId}`);
+    }
+    const guardState = await page.evaluate(() => ({
+        result: window.runMonteCarlo(),
+        preferAggregates: window.__profilverbundPreferAggregates,
+        hasBlocker: Boolean(window.__profileRecoveryBlocker)
+    }));
+    assert(guardState.result === false,
+        'Programmatic Monte-Carlo start must be rejected during profile recovery');
+    assert(guardState.preferAggregates === false,
+        'Profile recovery must not discard live tranches in favor of partial aggregates');
+    assert(guardState.hasBlocker,
+        'Simulator must expose one hard profile recovery blocker for all run paths');
+
+    await page.locator('#ao_presets_container .ao-preset-btn').first().dispatchEvent('click');
+    await page.waitForFunction(() => document.getElementById('ao_run_btn')?.disabled === true);
+    const blockedActionCount = await page.evaluate(() => window.__profileRecoveryBlockedActionCount || 0);
+    await page.locator('#ao_run_btn').dispatchEvent('click');
+    await page.waitForFunction(previousCount => (
+        (window.__profileRecoveryBlockedActionCount || 0) > previousCount
+    ), blockedActionCount);
+    assert(await page.locator('#ao_run_btn').isDisabled(),
+        'Auto-Optimize interactions must not re-enable the run button during profile recovery');
+    assert((await page.locator('#ao_progress').textContent()) !== 'Starting...',
+        'Auto-Optimize local click handler must not run during profile recovery');
+    smoke.assertNoErrors();
+    await smoke.close();
+}
+
+async function runBalanceGhostProfileContextSmoke(browser, baseUrl) {
+    const profileId = 'browser-slice13-balance-context';
+    const healthyProfileStorage = createBrowserProfileStorage({
+        [profileId]: {
+            name: 'Gesundes Balance-Profil',
+            tagesgeld: '50000',
+            alter: '67'
+        }
+    }, profileId);
+    const storage = {
+        ...createBalanceStorage(2025),
+        ...healthyProfileStorage,
+        rs_active_profile: 'geloeschtes-balance-profil',
+        profile_tagesgeld: '20000',
+        profile_aktuelles_alter: '61'
+    };
+    const registryRaw = storage.rs_profiles_v1;
+    const smoke = await openSmokePage(browser, baseUrl, 'Balance.html', { storage });
+    const { page } = smoke;
+    await page.locator('#error-container')
+        .filter({ hasText: 'Profil-Recovery erforderlich' })
+        .waitFor({ state: 'visible' });
+    const errorText = await page.locator('#error-container').textContent();
+    assert(errorText.includes('geloeschtes-balance-profil'),
+        'Balance must surface a ghost active profile context visibly');
+
+    await page.evaluate(() => window.dispatchEvent(new Event('beforeunload')));
+    await page.waitForTimeout(100);
+    const registryAfterUnload = (await readIndexedDb(page, 'kv', 'rs_profiles_v1')).value;
+    assert(registryAfterUnload === registryRaw,
+        'Balance beforeunload must not overwrite a healthy profile while active ID is a ghost');
+    const healthyProfile = JSON.parse(registryAfterUnload).profiles[profileId];
+    assert(healthyProfile.data.profile_tagesgeld === '50000',
+        'Balance ghost recovery must retain healthy registry profile data');
+    smoke.assertNoErrors([
+        'Update-Fehler: ProfileRecoveryError',
+        '[ProfileNavigation] Profil-Snapshot fehlgeschlagen:'
+    ]);
+    await smoke.close();
+}
+
+async function runSimulatorGhostProfileContextSmoke(browser, baseUrl) {
+    const profileId = 'browser-slice13-simulator-context';
+    const storage = {
+        ...createBrowserProfileStorage({
+            [profileId]: {
+                name: 'Gesundes Simulator-Profil',
+                tranchesRaw: JSON.stringify([createBrowserTranche({ trancheId: 'healthy-lot' })]),
+                tagesgeld: '50000',
+                alter: '67'
+            }
+        }, profileId),
+        rs_active_profile: 'geloeschtes-simulator-profil',
+        depot_tranchen: JSON.stringify([createBrowserTranche({ trancheId: 'stale-live-lot' })]),
+        profile_tagesgeld: '20000',
+        profile_aktuelles_alter: '61'
+    };
+    const registryRaw = storage.rs_profiles_v1;
+    const smoke = await openSmokePage(browser, baseUrl, 'Simulator.html', { storage });
+    const { page } = smoke;
+    await page.locator('#simProfileStatus')
+        .filter({ hasText: 'Profil-Recovery erforderlich' })
+        .waitFor({ state: 'visible' });
+    const statusText = await page.locator('#simProfileStatus').textContent();
+    assert(statusText.includes('geloeschtes-simulator-profil'),
+        'Simulator must surface a ghost active profile context visibly');
+    assert(await page.locator('#mcButton').isDisabled(),
+        'Simulator ghost context must hard-disable Monte-Carlo execution');
+    assert(await page.evaluate(() => window.runMonteCarlo()) === false,
+        'Simulator ghost context must reject programmatic simulation starts');
+    assert((await readIndexedDb(page, 'kv', 'rs_profiles_v1')).value === registryRaw,
+        'Simulator ghost context must not mutate the healthy registry');
+    smoke.assertNoErrors();
+    await smoke.close();
+}
+
 async function runManualSmoke(browser, baseUrl) {
     const smoke = await openSmokePage(browser, baseUrl, 'Handbuch.html');
     const { page } = smoke;
@@ -1203,6 +1415,11 @@ async function main() {
             ['depot-tranchen-manager.html', runTranchesSmoke],
             ['tranche quote partial/offline', runTranchesQuoteFailureSmoke],
             ['tranche corrupt recovery', runTranchesRecoverySmoke],
+            ['profile registry recovery', runProfileRegistryRecoverySmoke],
+            ['Balance corrupt profile health', runBalanceCorruptProfileHealthSmoke],
+            ['Simulator corrupt profile balance', runSimulatorCorruptProfileBalanceSmoke],
+            ['Balance ghost profile context', runBalanceGhostProfileContextSmoke],
+            ['Simulator ghost profile context', runSimulatorGhostProfileContextSmoke],
             ['Handbuch.html', runManualSmoke],
             ['Balance import reject', runBalanceImportReject],
             ['Balance CSV import roundtrip', runBalanceCsvImportRoundtrip],

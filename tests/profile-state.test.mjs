@@ -2,11 +2,14 @@
 
 import {
     PROFILE_STORAGE_KEYS,
+    PROFILE_LOAD_STATUS,
     PROFILE_HEALTH_BUCKET_KEY,
     PROFILE_TRANCHES_KEY,
     PROFILE_VALUE_KEYS,
     DEFAULT_PROFILE_HEALTH_BUCKET,
     normalizeProfileHealthBucket,
+    loadProfileHealthBucketFromData,
+    loadStoredBalanceStateFromData,
     parseProfileHealthBucketFromData,
     parseProfileOverridesFromData,
     parseStoredBalanceInputsFromData,
@@ -136,5 +139,61 @@ console.log('Test 6: Parse tranches and balance inputs');
     assertEqual(balanceInputs.tagesgeld, 5000, 'Balance tagesgeld should be extracted');
 }
 console.log('✓ Parse tranches and balance inputs OK');
+
+console.log('Test 7: Typed health-bucket and balance-state load results fail closed');
+{
+    const missingHealth = loadProfileHealthBucketFromData({});
+    const emptyHealth = loadProfileHealthBucketFromData({ [PROFILE_HEALTH_BUCKET_KEY]: '' });
+    const corruptHealthRaw = '{"enabled":"definitely","initialAmount":150000}';
+    const corruptHealth = loadProfileHealthBucketFromData({
+        [PROFILE_HEALTH_BUCKET_KEY]: corruptHealthRaw
+    });
+    const unavailableHealth = loadProfileHealthBucketFromData(Object.defineProperty({}, PROFILE_HEALTH_BUCKET_KEY, {
+        enumerable: true,
+        get() {
+            throw new Error('storage offline');
+        }
+    }));
+
+    assertEqual(missingHealth.status, PROFILE_LOAD_STATUS.MISSING, 'Missing health bucket should stay distinguishable');
+    assertEqual(emptyHealth.status, PROFILE_LOAD_STATUS.EMPTY, 'Empty health bucket should stay distinguishable');
+    assertEqual(corruptHealth.status, PROFILE_LOAD_STATUS.CORRUPT, 'Invalid enabled flag should make the health bucket corrupt');
+    assertEqual(corruptHealth.raw, corruptHealthRaw, 'Corrupt health raw payload should remain byte-identical');
+    assertEqual(unavailableHealth.status, PROFILE_LOAD_STATUS.UNAVAILABLE, 'Unreadable health data should be unavailable, not corrupt');
+
+    let corruptHealthError = null;
+    try {
+        parseProfileHealthBucketFromData({ [PROFILE_HEALTH_BUCKET_KEY]: corruptHealthRaw });
+    } catch (error) {
+        corruptHealthError = error;
+    }
+    assertEqual(corruptHealthError?.code, 'PROFILE_HEALTH_BUCKET_INVALID', 'Legacy parser should surface typed health corruption');
+
+    const corruptBalanceRaw = '{"inputs":null}';
+    const corruptBalance = loadStoredBalanceStateFromData({
+        [CONFIG.STORAGE.LS_KEY]: corruptBalanceRaw
+    });
+    const emptyBalance = loadStoredBalanceStateFromData({
+        [CONFIG.STORAGE.LS_KEY]: '{}'
+    });
+    const validBalance = loadStoredBalanceStateFromData({
+        [CONFIG.STORAGE.LS_KEY]: JSON.stringify({ inputs: { aktuellesAlter: 67 } })
+    });
+    const validNullableBalance = loadStoredBalanceStateFromData({
+        [CONFIG.STORAGE.LS_KEY]: JSON.stringify({
+            inputs: { aktuellesAlter: 67 },
+            lastState: null,
+            profilverbundHouseholdInputs: {},
+            profilverbundHouseholdLastState: null
+        })
+    });
+    assertEqual(corruptBalance.status, PROFILE_LOAD_STATUS.CORRUPT, 'Null balance inputs should be corrupt instead of missing');
+    assertEqual(corruptBalance.raw, corruptBalanceRaw, 'Corrupt balance raw payload should remain byte-identical');
+    assertEqual(emptyBalance.status, PROFILE_LOAD_STATUS.EMPTY, 'Structurally empty balance state should remain distinguishable');
+    assertEqual(validBalance.status, PROFILE_LOAD_STATUS.VALID, 'Valid profile balance state should load normally');
+    assertEqual(validNullableBalance.status, PROFILE_LOAD_STATUS.VALID,
+        'Slice-12 nullable last-state fields must remain valid in profile storage');
+}
+console.log('✓ Typed profile-state load results OK');
 
 console.log('✅ Profile state contract validated');

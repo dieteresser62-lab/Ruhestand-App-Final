@@ -29,6 +29,8 @@ import {
     hasProfileScopedDataInLocalStorage,
     ensureProfileRegistry,
     bootstrapProfileContext,
+    createProfileRecoveryDocument,
+    resetProfileRecovery,
     exportProfilesBundle,
     exportProfilesBundleToWindowName,
     importProfilesBundle,
@@ -54,9 +56,11 @@ import {
     createProfile as createRegistryProfile,
     ensureDefaultProfile as ensureRegistryDefaultProfile,
     getProfileRegistry,
+    loadProfileRegistry,
     listProfiles as listRegistryProfiles,
     updateProfileData as updateRegistryProfileData
 } from '../app/profile/profile-registry.js';
+import { PROFILE_LOAD_STATUS } from '../app/profile/profile-state.js';
 import { CONFIG } from '../app/balance/balance-config.js';
 import { loadTranchesFromStorage } from '../app/tranches/tranchen-manager-state.js';
 
@@ -192,6 +196,35 @@ try {
         assert(localStorage.getItem(CONFIG.STORAGE.LS_KEY) === '{"inputs":{"x":2}}', 'Live storage load should restore balance state');
         assert(localStorage.getItem('etfProxyUrl') === 'global', 'Live storage load should not overwrite globals');
         assert(localStorage.getItem('sim_null_key') === null, 'Live storage load should skip null values');
+
+        const atomicStore = new Map([
+            ['sim_existing', 'before'],
+            ['global_setting', 'keep']
+        ]);
+        let failNextProfileWrite = true;
+        const failingStorage = {
+            getItem: key => atomicStore.has(String(key)) ? atomicStore.get(String(key)) : null,
+            setItem(key, value) {
+                if (String(key) === 'sim_target' && failNextProfileWrite) {
+                    failNextProfileWrite = false;
+                    throw new Error('synthetic write failure');
+                }
+                atomicStore.set(String(key), String(value));
+            },
+            removeItem: key => atomicStore.delete(String(key)),
+            key: index => Array.from(atomicStore.keys())[index] || null,
+            get length() { return atomicStore.size; }
+        };
+        let atomicError = null;
+        try {
+            loadLiveProfileData({ sim_target: 'after' }, failingStorage);
+        } catch (error) {
+            atomicError = error;
+        }
+        assertEqual(atomicError?.code, 'PROFILE_LIVE_STORAGE_UNAVAILABLE', 'Partial live write should surface unavailable');
+        assertEqual(failingStorage.getItem('sim_existing'), 'before', 'Failed live load restores the previous profile state');
+        assertEqual(failingStorage.getItem('sim_target'), null, 'Failed live load leaves no partial target state');
+        assertEqual(failingStorage.getItem('global_setting'), 'keep', 'Live rollback preserves global keys');
     }
     console.log('✓ Profile live storage module OK');
 
@@ -349,16 +382,65 @@ try {
     console.log('Test 10: Delete current profile switches');
     {
         localStorage.clear();
+        ensureProfileRegistry();
+        loadProfileIntoLocalStorage('default');
+        localStorage.setItem('profile_tagesgeld', '50000');
+        localStorage.setItem('profile_aktuelles_alter', '67');
+        saveCurrentProfileFromLocalStorage();
+        const defaultDataBeforeDelete = { ...getProfileData('default') };
         const newProfile = createProfile('Aktiv');
+        updateProfileData(newProfile.id, {
+            profile_tagesgeld: '20000',
+            profile_aktuelles_alter: '61'
+        });
         switchProfile(newProfile.id);
 
         assert(getCurrentProfileId() === newProfile.id, 'Neues Profil sollte aktiv sein');
+        assertEqual(getActiveProfileId(), newProfile.id, 'Neues Profil sollte den Live-State besitzen');
 
         deleteProfile(newProfile.id);
 
-        assert(getCurrentProfileId() !== newProfile.id, 'Nach Löschung sollte anderes Profil aktiv sein');
+        assertEqual(getCurrentProfileId(), 'default', 'Nach Löschung sollte das Default-Profil aktuell sein');
+        assertEqual(getActiveProfileId(), 'default', 'Nach Löschung muss der Live-State dem Default-Profil gehören');
+        assertEqual(localStorage.getItem('profile_tagesgeld'), '50000',
+            'Löschen des aktiven Profils muss den gesunden Ziel-Live-State laden');
+        assertEqual(localStorage.getItem('profile_aktuelles_alter'), '67',
+            'Löschen des aktiven Profils darf kein Feld des gelöschten Profils stehen lassen');
+        assertEqual(getProfileData('default').profile_tagesgeld, defaultDataBeforeDelete.profile_tagesgeld,
+            'Das Zielprofil darf beim Löschen nicht mit dem alten Live-State überschrieben werden');
     }
     console.log('✓ Delete current profile switches OK');
+
+    console.log('Test 10b: Delete last custom profile reconciles fallback context');
+    {
+        localStorage.clear();
+        ensureProfileRegistry();
+        loadProfileIntoLocalStorage('default');
+        const onlyOtherProfile = createProfile('Letztes Profil');
+        updateProfileData(onlyOtherProfile.id, {
+            profile_tagesgeld: '20000',
+            profile_aktuelles_alter: '61'
+        });
+
+        assert(deleteProfile('default') === true,
+            'Default-Profil sollte bei vorhandenem Ersatzprofil löschbar sein');
+        assertEqual(getCurrentProfileId(), onlyOtherProfile.id,
+            'Verbleibendes Profil sollte nach erster Löschung aktuell sein');
+        assertEqual(getActiveProfileId(), onlyOtherProfile.id,
+            'Verbleibendes Profil sollte nach erster Löschung den Live-State besitzen');
+
+        assert(deleteProfile(onlyOtherProfile.id) === true,
+            'Letztes benutzerdefiniertes Profil sollte einen frischen Default-Kontext erzeugen');
+        assertEqual(listProfiles().length, 1,
+            'Nach Löschung des letzten Profils sollte genau ein Default-Profil existieren');
+        assertEqual(getCurrentProfileId(), 'default',
+            'Frisch erzeugtes Default-Profil sollte aktuell sein');
+        assertEqual(getActiveProfileId(), 'default',
+            'Frisch erzeugtes Default-Profil muss auch den Live-State besitzen');
+        assertEqual(localStorage.getItem('profile_tagesgeld'), null,
+            'Live-State des gelöschten letzten Profils darf nicht stehen bleiben');
+    }
+    console.log('✓ Delete last custom profile fallback context OK');
 
     // ========== Switch Profile Tests ==========
 
@@ -821,37 +903,245 @@ try {
 
     // ========== Corrupt Data Tests ==========
 
-    // Test 23: Corrupt registry JSON should not crash
-    console.log('Test 23: Corrupt registry JSON');
+    // Test 23: Corrupt registry JSON enters raw-preserving recovery
+    console.log('Test 23: Corrupt registry JSON recovery');
     {
         localStorage.clear();
-        localStorage.setItem('rs_profiles_v1', 'not-json');
-        const profiles = listProfiles();
-        assert(profiles.length >= 1, 'Korrupte Registry sollte auf Default zurückfallen');
-    }
-    console.log('✓ Corrupt registry JSON OK');
+        const corruptRaw = 'not-json';
+        localStorage.setItem('rs_profiles_v1', corruptRaw);
+        const result = bootstrapProfileContext();
+        assertEqual(result.action, 'recovery', 'Korrupte Registry muss den Bootstrap in Recovery versetzen');
+        assertEqual(result.recovery.status, PROFILE_LOAD_STATUS.CORRUPT, 'Syntaxfehler wird als corrupt klassifiziert');
+        assertEqual(result.recovery.raw, corruptRaw, 'Registry-Rohpayload bleibt bytegleich im Recoveryvertrag');
+        assertEqual(localStorage.getItem('rs_profiles_v1'), corruptRaw, 'Korrupter Registrywert wird nicht automatisch überschrieben');
+        assertEqual(localStorage.getItem('rs_current_profile'), null, 'Recovery erzeugt keine neue Current-ID');
 
-    // Test 24: Registry with missing profiles object
-    console.log('Test 24: Registry with missing profiles');
+        const recoveryDocument = createProfileRecoveryDocument(result.recovery, {
+            exportedAt: '2026-07-28T00:00:00.000Z',
+            backend: 'test'
+        });
+        assertEqual(recoveryDocument.recovery.raw, corruptRaw, 'Recovery-Dokument enthält den exakten Registry-Rohpayload');
+        let unconfirmedError = null;
+        try {
+            resetProfileRecovery(result.recovery, {
+                recoveryDocument,
+                confirmed: false
+            });
+        } catch (error) {
+            unconfirmedError = error;
+        }
+        assert(unconfirmedError, 'Reset ohne gesonderte Bestätigung muss blockieren');
+        assertEqual(localStorage.getItem('rs_profiles_v1'), corruptRaw, 'Blockierter Reset erhält die Registry bytegleich');
+
+        localStorage.setItem('rs_profiles_v1', 'changed-after-export');
+        let staleExportError = null;
+        try {
+            resetProfileRecovery(result.recovery, {
+                recoveryDocument,
+                confirmed: true
+            });
+        } catch (error) {
+            staleExportError = error;
+        }
+        assert(staleExportError, 'Reset mit veraltetem Recovery-Export muss blockieren');
+        assertEqual(localStorage.getItem('rs_profiles_v1'), 'changed-after-export',
+            'Blockierter TOCTOU-Reset darf den neueren Registry-Rohinhalt nicht verändern');
+        localStorage.setItem('rs_profiles_v1', corruptRaw);
+
+        const reset = resetProfileRecovery(result.recovery, {
+            recoveryDocument,
+            confirmed: true
+        });
+        assertEqual(reset.action, 'registry_reset', 'Bestätigter Reset nach Recovery-Export darf eine Default-Registry erzeugen');
+        assert(getProfileRegistry().profiles.default, 'Recovery-Reset erzeugt genau den sicheren Default-Kontext');
+    }
+    console.log('✓ Corrupt registry JSON recovery OK');
+
+    // Test 24: Registry with missing profiles object remains untouched
+    console.log('Test 24: Registry with missing profiles recovery');
     {
         localStorage.clear();
-        localStorage.setItem('rs_profiles_v1', JSON.stringify({ version: 1 }));
-
-        const profiles = listProfiles();
-        assert(profiles.length >= 1, 'Registry ohne profiles sollte Default erstellen');
+        const corruptRaw = JSON.stringify({ version: 1 });
+        localStorage.setItem('rs_profiles_v1', corruptRaw);
+        const result = bootstrapProfileContext();
+        assertEqual(result.action, 'recovery', 'Registry ohne profiles muss Recovery auslösen');
+        assertEqual(result.recovery.code, 'PROFILE_REGISTRY_PROFILES_INVALID', 'Registry-Shapefehler bleibt maschinenlesbar');
+        assertEqual(localStorage.getItem('rs_profiles_v1'), corruptRaw, 'Registry-Shapefehler wird nicht automatisch ersetzt');
     }
-    console.log('✓ Registry with missing profiles OK');
+    console.log('✓ Registry with missing profiles recovery OK');
 
-    // Test 25: Registry with null profiles
-    console.log('Test 25: Registry with null profiles');
+    // Test 25: Registry with null profiles and unavailable storage stay distinct
+    console.log('Test 25: Registry null/unavailable distinction');
     {
         localStorage.clear();
-        localStorage.setItem('rs_profiles_v1', JSON.stringify({ version: 1, profiles: null }));
+        const corruptRaw = JSON.stringify({ version: 1, profiles: null });
+        localStorage.setItem('rs_profiles_v1', corruptRaw);
+        const corrupt = loadProfileRegistry();
+        assertEqual(corrupt.status, PROFILE_LOAD_STATUS.CORRUPT, 'Registry mit null profiles ist corrupt');
+        assertEqual(corrupt.raw, corruptRaw, 'Corrupt loader retains exact null-profiles payload');
 
-        const profiles = listProfiles();
-        assert(profiles.length >= 1, 'Registry mit null profiles sollte Default erstellen');
+        let setCalls = 0;
+        const unavailable = loadProfileRegistry({
+            getItem() {
+                throw new Error('backend offline');
+            },
+            setItem() {
+                setCalls += 1;
+            }
+        });
+        assertEqual(unavailable.status, PROFILE_LOAD_STATUS.UNAVAILABLE, 'Technischer Lesefehler bleibt unavailable');
+        assertEqual(unavailable.raw, null, 'Unavailable darf keinen Rohpayload erfinden');
+        assertEqual(setCalls, 0, 'Unavailable loader darf keinen Default schreiben');
+
+        const legacyRaw = JSON.stringify({
+            version: 1,
+            profiles: {
+                legacy: {
+                    meta: { name: 'Legacy' },
+                    data: {}
+                }
+            }
+        });
+        localStorage.setItem('rs_profiles_v1', legacyRaw);
+        const legacy = loadProfileRegistry();
+        assertEqual(legacy.status, PROFILE_LOAD_STATUS.VALID, 'Legacy registry without redundant meta.id remains readable');
+        assertEqual(legacy.value.profiles.legacy.meta.id, 'legacy', 'Legacy registry derives meta.id from the canonical map key');
+        assertEqual(localStorage.getItem('rs_profiles_v1'), legacyRaw, 'Read-time legacy normalization stays mutation-free');
     }
-    console.log('✓ Registry with null profiles OK');
+    console.log('✓ Registry null/unavailable distinction OK');
+
+    console.log('Test 25b: Ghost current/active IDs enter context recovery');
+    {
+        localStorage.clear();
+        ensureProfileRegistry();
+        updateProfileData('default', {
+            profile_tagesgeld: '50000',
+            profile_aktuelles_alter: '67'
+        });
+        const registryRaw = localStorage.getItem('rs_profiles_v1');
+        localStorage.setItem('profile_tagesgeld', '20000');
+        localStorage.setItem('profile_aktuelles_alter', '61');
+        localStorage.setItem('rs_current_profile', 'ghost-profile');
+        localStorage.setItem('rs_active_profile', 'ghost-profile');
+
+        const result = bootstrapProfileContext();
+        assertEqual(result.action, 'recovery', 'Ghost current ID must block normal bootstrap');
+        assertEqual(result.recovery.code, 'PROFILE_CURRENT_GHOST', 'Ghost current ID stays machine-readable');
+        assertEqual(localStorage.getItem('rs_profiles_v1'), registryRaw, 'Context recovery must not mutate the registry');
+        assertEqual(localStorage.getItem('rs_current_profile'), 'ghost-profile', 'Ghost current ID stays unchanged before recovery');
+
+        const recoveryDocument = createProfileRecoveryDocument(result.recovery);
+        resetProfileRecovery(result.recovery, {
+            recoveryDocument,
+            confirmed: true
+        });
+        assertEqual(localStorage.getItem('rs_current_profile'), 'default', 'Confirmed context recovery selects an existing profile');
+        assertEqual(localStorage.getItem('rs_active_profile'), 'default', 'Confirmed context recovery reconciles active and current IDs');
+        assertEqual(localStorage.getItem('profile_tagesgeld'), '50000',
+            'Context recovery must load the selected profile data instead of retaining stale live data');
+        assertEqual(localStorage.getItem('profile_aktuelles_alter'), '67',
+            'Context recovery must replace every stale profile-owned live field');
+
+        localStorage.setItem('rs_active_profile', 'second-ghost-profile');
+        localStorage.setItem('profile_tagesgeld', '12345');
+        const registryBeforeBlockedSave = localStorage.getItem('rs_profiles_v1');
+        let blockedSaveError = null;
+        try {
+            saveCurrentProfileFromLocalStorage();
+        } catch (error) {
+            blockedSaveError = error;
+        }
+        assertEqual(blockedSaveError?.code, 'PROFILE_ACTIVE_GHOST',
+            'A ghost active ID must block save-before-unload');
+        assertEqual(localStorage.getItem('rs_profiles_v1'), registryBeforeBlockedSave,
+            'Blocked save-before-unload must not overwrite the healthy current profile');
+
+        const activeGhostResult = bootstrapProfileContext();
+        assertEqual(activeGhostResult.action, 'recovery', 'Ghost active ID must block normal bootstrap');
+        assertEqual(activeGhostResult.recovery.code, 'PROFILE_ACTIVE_GHOST', 'Ghost active ID stays machine-readable');
+        assertEqual(localStorage.getItem('rs_current_profile'), 'default', 'Active ghost recovery preserves the valid current ID');
+        assertEqual(localStorage.getItem('rs_active_profile'), 'second-ghost-profile',
+            'Ghost active ID stays unchanged before explicit recovery');
+
+        const activeRecoveryDocument = createProfileRecoveryDocument(activeGhostResult.recovery);
+        resetProfileRecovery(activeGhostResult.recovery, {
+            recoveryDocument: activeRecoveryDocument,
+            confirmed: true
+        });
+        assertEqual(localStorage.getItem('profile_tagesgeld'), '50000',
+            'Active-ghost reset must restore the healthy registry profile before future persistence');
+        saveCurrentProfileFromLocalStorage();
+        assertEqual(getProfileData('default').profile_tagesgeld, '50000',
+            'First save after context reset must keep the healthy target profile intact');
+    }
+    console.log('✓ Ghost profile context recovery OK');
+
+    console.log('Test 25c: Corrupt health and balance fields require field-specific recovery');
+    {
+        localStorage.clear();
+        ensureProfileRegistry();
+        const profileId = getCurrentProfileId();
+        const corruptHealthRaw = '{"enabled":"not-a-bool","initialAmount":150000}';
+        updateProfileData(profileId, { profile_health_bucket: corruptHealthRaw });
+        const healthRegistryRaw = localStorage.getItem('rs_profiles_v1');
+
+        const healthResult = bootstrapProfileContext();
+        assertEqual(healthResult.action, 'recovery', 'Corrupt current-profile health bucket blocks bootstrap');
+        assertEqual(healthResult.recovery.storageKey, 'profile_health_bucket', 'Recovery names the corrupt health field');
+        assertEqual(healthResult.recovery.raw, corruptHealthRaw, 'Health recovery retains exact raw payload');
+        assertEqual(localStorage.getItem('rs_profiles_v1'), healthRegistryRaw, 'Health corruption causes no registry mutation');
+
+        const healthDocument = createProfileRecoveryDocument(healthResult.recovery);
+        resetProfileRecovery(healthResult.recovery, {
+            recoveryDocument: healthDocument,
+            confirmed: true
+        });
+        assertEqual(getProfileData(profileId).profile_health_bucket, undefined, 'Confirmed field reset removes only the corrupt health field');
+
+        const corruptBalanceRaw = '{"inputs":null}';
+        updateProfileData(profileId, { [CONFIG.STORAGE.LS_KEY]: corruptBalanceRaw });
+        const balanceRegistryRaw = localStorage.getItem('rs_profiles_v1');
+        const balanceResult = bootstrapProfileContext();
+        assertEqual(balanceResult.action, 'recovery', 'Corrupt current-profile balance state blocks bootstrap');
+        assertEqual(balanceResult.recovery.storageKey, CONFIG.STORAGE.LS_KEY, 'Recovery names the corrupt balance field');
+        assertEqual(balanceResult.recovery.raw, corruptBalanceRaw, 'Balance recovery retains exact raw payload');
+        assertEqual(localStorage.getItem('rs_profiles_v1'), balanceRegistryRaw, 'Balance corruption causes no registry mutation');
+    }
+    console.log('✓ Profile field recovery contract OK');
+
+    console.log('Test 25d: Corrupt live profile fields block save-before-load without registry mutation');
+    {
+        localStorage.clear();
+        ensureProfileRegistry();
+        const profileId = getCurrentProfileId();
+        loadProfileIntoLocalStorage(profileId);
+        const registryRaw = localStorage.getItem('rs_profiles_v1');
+        const corruptHealthRaw = '{"enabled":"maybe"}';
+        localStorage.setItem('profile_health_bucket', corruptHealthRaw);
+
+        const healthResult = bootstrapProfileContext({ preserveLiveProfileData: true });
+        assertEqual(healthResult.action, 'recovery', 'Corrupt live health state must block save-before-load');
+        assertEqual(healthResult.recovery.scope, 'live-profile-field', 'Live corruption is distinct from registry corruption');
+        assertEqual(healthResult.recovery.raw, corruptHealthRaw, 'Live recovery retains the exact raw payload');
+        assertEqual(localStorage.getItem('rs_profiles_v1'), registryRaw, 'Corrupt live state must not overwrite the registry');
+
+        const healthDocument = createProfileRecoveryDocument(healthResult.recovery);
+        resetProfileRecovery(healthResult.recovery, {
+            recoveryDocument: healthDocument,
+            confirmed: true
+        });
+        assertEqual(localStorage.getItem('profile_health_bucket'), null,
+            'Confirmed live-field reset removes only the corrupt live health value');
+
+        const corruptBalanceRaw = '{"inputs":null}';
+        localStorage.setItem(CONFIG.STORAGE.LS_KEY, corruptBalanceRaw);
+        const balanceResult = bootstrapProfileContext({ preserveLiveProfileData: true });
+        assertEqual(balanceResult.action, 'recovery', 'Corrupt live balance state must block save-before-load');
+        assertEqual(balanceResult.recovery.scope, 'live-profile-field', 'Live balance corruption keeps its recovery scope');
+        assertEqual(balanceResult.recovery.raw, corruptBalanceRaw, 'Live balance recovery retains the exact raw payload');
+        assertEqual(localStorage.getItem('rs_profiles_v1'), registryRaw, 'Corrupt live balance must not overwrite the registry');
+    }
+    console.log('✓ Live profile field recovery contract OK');
 
     // ========== Active Profile Tests ==========
 
@@ -947,6 +1237,27 @@ try {
         assert(localStorage.getItem('sim_data') === 'B-Daten', 'Profil B sollte seine eigenen Daten haben');
     }
     console.log('✓ Multiple profile data isolation OK');
+
+    console.log('Test 30a: Profile switches preserve each profile age');
+    {
+        localStorage.clear();
+        ensureProfileRegistry();
+        const firstId = getCurrentProfileId();
+        localStorage.setItem('profile_aktuelles_alter', '67');
+        saveCurrentProfileFromLocalStorage();
+
+        const second = createProfile('Eigenes Alter');
+        updateProfileData(second.id, {
+            profile_aktuelles_alter: '72',
+            [CONFIG.STORAGE.LS_KEY]: JSON.stringify({ inputs: { aktuellesAlter: 99 } })
+        });
+        assert(switchProfile(second.id) === true, 'Second profile with own age should load');
+        assertEqual(localStorage.getItem('profile_aktuelles_alter'), '72', 'Target profile loads its own age override');
+        assert(switchProfile(firstId) === true, 'First profile should load again');
+        assertEqual(localStorage.getItem('profile_aktuelles_alter'), '67', 'Returning profile keeps its original age');
+        assertEqual(getProfileData(second.id).profile_aktuelles_alter, '72', 'Other profile age remains unchanged in registry');
+    }
+    console.log('✓ Per-profile age switching OK');
 
     // Test 30b: Contaminated legacy profile state is scrubbed on profile switch
     console.log('Test 30b: Household metadata ownership survives contaminated legacy profile switch');

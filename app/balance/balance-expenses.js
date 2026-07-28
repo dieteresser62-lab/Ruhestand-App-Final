@@ -100,6 +100,17 @@ function getProfiles() {
     return [{ profileId: 'default', name: 'Profil', inputs: {} }];
 }
 
+function renderProfileRecoveryBlocker(error) {
+    state.profileIds = [];
+    UIRenderer.handleError(new Error(
+        `Profil-Recovery erforderlich: ${error?.message || 'Profildaten konnten nicht sicher geladen werden.'}`
+    ));
+    return {
+        status: 'profile_recovery',
+        error
+    };
+}
+
 async function exportCorruptExpensesRecovery() {
     if (!state.corruption || typeof state.corruption.raw !== 'string') return;
     try {
@@ -487,8 +498,15 @@ export function initExpensesTab(domRefs, options = {}) {
     state.year = Number(initialResult.store?.activeYear) || recoveryOptions.now().getFullYear();
     setExpensesActiveYear(state.year, recoveryOptions.storage);
     bindEvents();
-    renderYearSelect();
-    renderTable();
+    try {
+        renderYearSelect();
+        renderTable();
+    } catch (error) {
+        return {
+            ...initialResult,
+            ...renderProfileRecoveryBlocker(error)
+        };
+    }
     return initialResult;
 }
 

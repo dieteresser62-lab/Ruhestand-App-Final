@@ -7,7 +7,7 @@
  */
 // @ts-check
 
-import { listProfiles, getProfileData } from './profile-storage.js';
+import { assertProfileContextReady, listProfiles, getProfileData } from './profile-storage.js';
 import {
     PROFILE_TRANCHES_KEY,
     parseProfileOverridesFromData,
@@ -38,6 +38,11 @@ function normalizeBalanceInputs(inputs, overrides = {}) {
     const goldFloorOverride = overrides.profileGoldFloor;
     const goldSteuerfreiOverride = overrides.profileGoldSteuerfrei;
     const goldRebalBandOverride = overrides.profileGoldRebalBand;
+    const profileAlterOverride = overrides.profileAlter;
+    const balanceAlter = readNumber(inputs.aktuellesAlter, null);
+    const aktuellesAlter = Number.isFinite(profileAlterOverride)
+        ? profileAlterOverride
+        : balanceAlter;
     const renteMonatlich = Number.isFinite(renteMonatlichOverride)
         ? renteMonatlichOverride
         : readNumber(inputs.renteMonatlich, 0);
@@ -46,6 +51,7 @@ function normalizeBalanceInputs(inputs, overrides = {}) {
         : 0;
     const renteSumme = renteMonatlich + sonstigeEinkuenfte;
     return {
+        ...(Number.isFinite(aktuellesAlter) ? { aktuellesAlter } : {}),
         floorBedarf: readNumber(inputs.floorBedarf, 0),
         flexBedarf: readNumber(inputs.flexBedarf, 0),
         renteAktiv: typeof renteAktivOverride === 'boolean' ? renteAktivOverride : (renteSumme > 0),
@@ -263,13 +269,30 @@ function loadProfileTrancheState(data) {
 
 // Lade alle Profile, die zum Profilverbund gehören
 export function loadProfilverbundProfiles() {
+    assertProfileContextReady();
     const profiles = listProfiles();
     const selected = profiles.filter(p => p.belongsToHousehold !== false);
     return selected.map(meta => {
         const data = getProfileData(meta.id);
-        const balanceState = parseStoredBalanceStateFromData(data);
+        let balanceState;
+        let healthBucket;
+        try {
+            balanceState = parseStoredBalanceStateFromData(data);
+            healthBucket = parseProfileHealthBucketFromData(data);
+        } catch (error) {
+            const profileError = new Error(
+                `Profilverbund: Profil ${meta.name || meta.id} ist im Bereich ${error.storageKey || 'Profildaten'} fehlerhaft. ${error.message || ''}`.trim()
+            );
+            profileError.name = 'ProfilverbundProfileStateError';
+            profileError.code = error.code || 'PROFILE_STATE_LOAD_FAILED';
+            profileError.status = error.status || 'corrupt';
+            profileError.profileId = meta.id;
+            profileError.storageKey = error.storageKey || null;
+            profileError.raw = error.raw ?? null;
+            profileError.cause = error;
+            throw profileError;
+        }
         const overrides = parseProfileOverridesFromData(data);
-        const healthBucket = parseProfileHealthBucketFromData(data);
         const trancheState = loadProfileTrancheState(data);
         const tranches = trancheState.tranches || [];
         const hasExplicitTrancheOverride = trancheState.raw !== null && trancheState.raw !== '';

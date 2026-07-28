@@ -14,11 +14,28 @@ import { readProfileOverridesFromStorage } from '../profile/profile-state.js';
 import { persistenceStorage } from '../shared/persistence-facade.js';
 
 export function createProfileSyncHandlers({ dom, PROFILE_VALUE_KEYS }) {
+    const renderProfileRecoveryBlocker = (error) => {
+        if (typeof window !== 'undefined') {
+            window.__profilverbundTranchenOverride = null;
+        }
+        const container = dom?.containers?.error;
+        if (container) {
+            container.className = 'error-warn';
+            container.textContent = `Profil-Recovery erforderlich: ${error?.message || 'Profildaten konnten nicht sicher geladen werden.'}`;
+        }
+        return false;
+    };
+
     const syncProfileDerivedInputs = () => {
         const overrides = readProfileOverridesFromStorage(persistenceStorage);
         const alterRaw = persistenceStorage.getItem(PROFILE_VALUE_KEYS.alter);
 
-        const profilverbundProfiles = loadProfilverbundProfiles();
+        let profilverbundProfiles;
+        try {
+            profilverbundProfiles = loadProfilverbundProfiles();
+        } catch (error) {
+            return renderProfileRecoveryBlocker(error);
+        }
         if (profilverbundProfiles.length > 0) {
             const assetSummary = buildProfilverbundAssetSummary(profilverbundProfiles);
             const tagesgeld = assetSummary.totalTagesgeld;
@@ -134,6 +151,7 @@ export function createProfileSyncHandlers({ dom, PROFILE_VALUE_KEYS }) {
         if (UIReader.applySideEffectsFromInputs) {
             UIReader.applySideEffectsFromInputs();
         }
+        return true;
     };
 
     return { syncProfileDerivedInputs };

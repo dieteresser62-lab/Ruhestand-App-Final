@@ -37,13 +37,31 @@ import { StorageManager } from './balance-storage.js';
 export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS }) {
     let profilverbundBound = false;
 
+    const renderProfileRecoveryBlocker = (error) => {
+        if (typeof window !== 'undefined') {
+            window.__profilverbundDistribution = null;
+            window.__profilverbundProfileSummaries = null;
+        }
+        const container = dom?.containers?.error;
+        if (container) {
+            container.className = 'error-warn';
+            container.textContent = `Profil-Recovery erforderlich: ${error?.message || 'Profildaten konnten nicht sicher geladen werden.'}`;
+        }
+        return false;
+    };
+
     const refreshProfilverbundBalance = () => {
         const mode = persistenceStorage.getItem(PROFILVERBUND_STORAGE_KEYS.mode) || 'tax_optimized';
 
-        saveCurrentProfileFromLocalStorage();
-        const profileInputs = loadProfilverbundProfiles();
+        let profileInputs;
+        try {
+            saveCurrentProfileFromLocalStorage();
+            profileInputs = loadProfilverbundProfiles();
+        } catch (error) {
+            return renderProfileRecoveryBlocker(error);
+        }
         if (profileInputs.length < 1) {
-            return;
+            return false;
         }
 
         const currentInputs = UIReader.readAllInputs();
@@ -56,6 +74,7 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
         });
         calculateWithdrawalDistribution(profileInputs, aggregated, mode);
         calculateWithdrawalDistribution(profileInputs, aggregated, 'proportional');
+        return true;
     };
 
     const buildProfileEngineInput = (sharedInput, entry) => {
@@ -265,7 +284,13 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
 
         if (!modeSelect || !profileList) return;
 
-        const profiles = listProfiles();
+        let profiles;
+        try {
+            profiles = listProfiles();
+        } catch (error) {
+            renderProfileRecoveryBlocker(error);
+            return;
+        }
         if (profiles.length < 1) {
             toggleProfilverbundMode(false);
             return;

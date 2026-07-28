@@ -1,11 +1,112 @@
 "use strict";
 
 import { syncTranchenToInputs } from '../tranches/depot-tranchen-status.js';
-import { listProfiles, getProfileData, getCurrentProfileId, setProfileVerbundMembership } from '../profile/profile-storage.js';
+import {
+    assertProfileContextReady,
+    listProfiles,
+    getProfileData,
+    getCurrentProfileId,
+    setProfileVerbundMembership
+} from '../profile/profile-storage.js';
 import { buildSimulatorInputsFromProfileData, combineSimulatorProfiles } from './simulator-profile-inputs.js';
 import { updateStartPortfolioDisplay } from './simulator-portfolio.js';
 import { refreshDynamicFlexControls, syncDynamicFlexPresetSelection } from './simulator-main-dynamic-flex.js';
 import { refreshThreeBucketControls } from './simulator-main-3bucket.js';
+
+const PROFILE_RECOVERY_CONTROL_IDS = Object.freeze([
+    'mcButton',
+    'btButton',
+    'sweepButton',
+    'sweepSelfTestButton',
+    'findBestButton',
+    'sensitivityButton',
+    'paretoButton',
+    'ao_run_btn',
+    'ao_apply_btn'
+]);
+
+const PROFILE_RECOVERY_GUARDED_ACTIONS = Object.freeze([
+    'runMonteCarlo',
+    'runBacktest',
+    'runParameterSweep',
+    'runSweepSelfTest',
+    'findAndDisplayBest',
+    'showSensitivityAnalysis',
+    'showParetoDialog'
+]);
+
+function setProfileRecoveryControlsBlocked(blocked) {
+    PROFILE_RECOVERY_CONTROL_IDS.forEach(id => {
+        const control = document.getElementById(id);
+        if (!control) return;
+        if (blocked) {
+            if (!Object.prototype.hasOwnProperty.call(control.dataset, 'profileRecoveryWasDisabled')) {
+                control.dataset.profileRecoveryWasDisabled = control.disabled ? 'true' : 'false';
+            }
+            control.disabled = true;
+            control.setAttribute('aria-disabled', 'true');
+            return;
+        }
+        if (Object.prototype.hasOwnProperty.call(control.dataset, 'profileRecoveryWasDisabled')) {
+            control.disabled = control.dataset.profileRecoveryWasDisabled === 'true';
+            delete control.dataset.profileRecoveryWasDisabled;
+        }
+        control.removeAttribute('aria-disabled');
+    });
+}
+
+function installProfileRecoveryActionGuards(updateStatus) {
+    if (typeof window === 'undefined' || window.__profileRecoveryActionGuardsInstalled) return;
+    PROFILE_RECOVERY_GUARDED_ACTIONS.forEach(actionName => {
+        const action = window[actionName];
+        if (typeof action !== 'function') return;
+        window[actionName] = function guardedProfileAction(...args) {
+            const blocker = window.__profileRecoveryBlocker;
+            if (blocker) {
+                updateStatus(
+                    `Profil-Recovery erforderlich: ${blocker.message || 'Profildaten konnten nicht sicher geladen werden.'}`,
+                    'error'
+                );
+                return false;
+            }
+            return action.apply(this, args);
+        };
+    });
+    window.__profileRecoveryActionGuardsInstalled = true;
+}
+
+function installProfileRecoveryLocalActionGuards(updateStatus) {
+    if (typeof window === 'undefined' || window.__profileRecoveryLocalActionGuardsInstalled) return;
+    document.addEventListener('click', event => {
+        const action = event.target?.closest?.('#ao_run_btn, #ao_apply_btn');
+        const blocker = window.__profileRecoveryBlocker;
+        if (!action || !blocker) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        setProfileRecoveryControlsBlocked(true);
+        window.__profileRecoveryBlockedActionCount =
+            (window.__profileRecoveryBlockedActionCount || 0) + 1;
+        updateStatus(
+            `Profil-Recovery erforderlich: ${blocker.message || 'Profildaten konnten nicht sicher geladen werden.'}`,
+            'error'
+        );
+    }, true);
+
+    const runButton = document.getElementById('ao_run_btn');
+    if (runButton && typeof MutationObserver === 'function') {
+        const observer = new MutationObserver(() => {
+            if (window.__profileRecoveryBlocker && !runButton.disabled) {
+                setProfileRecoveryControlsBlocked(true);
+            }
+        });
+        observer.observe(runButton, {
+            attributes: true,
+            attributeFilter: ['disabled']
+        });
+        window.__profileRecoveryAutoOptimizeObserver = observer;
+    }
+    window.__profileRecoveryLocalActionGuardsInstalled = true;
+}
 
 export function initSimulatorProfileSelection() {
     const listContainer = document.getElementById('simProfileList');
@@ -37,6 +138,28 @@ export function initSimulatorProfileSelection() {
         statusEl.dataset.kind = kind;
     };
 
+    const blockProfileSimulation = (blocker) => {
+        if (typeof window !== 'undefined') {
+            window.__profilverbundTranchenOverride = null;
+            window.__profilverbundPreferAggregates = false;
+            window.__profilverbundMinimumFlexProfiles = null;
+            window.__profileRecoveryBlocker = blocker || {
+                message: 'Profildaten konnten nicht sicher geladen werden.'
+            };
+        }
+        setProfileRecoveryControlsBlocked(true);
+    };
+
+    const unblockProfileSimulation = () => {
+        if (typeof window !== 'undefined') {
+            window.__profileRecoveryBlocker = null;
+        }
+        setProfileRecoveryControlsBlocked(false);
+    };
+
+    installProfileRecoveryActionGuards(updateStatus);
+    installProfileRecoveryLocalActionGuards(updateStatus);
+
     // Enforce at most two profiles per household; keep current if possible.
     const limitSelection = (selected, currentId) => {
         if (selected.length <= MAX_HOUSEHOLD_PROFILES) return selected;
@@ -50,11 +173,13 @@ export function initSimulatorProfileSelection() {
         return limited;
     };
 
-    const applySelection = () => {
+    const applySelectionUnchecked = () => {
+        assertProfileContextReady();
         const profiles = listProfiles();
         if (!profiles.length) {
+            blockProfileSimulation({ message: 'Keine Profile vorhanden.' });
             updateStatus('Keine Profile vorhanden.', 'error');
-            return;
+            return false;
         }
 
         let selected = profiles.filter(p => p.belongsToHousehold !== false);
@@ -80,24 +205,33 @@ export function initSimulatorProfileSelection() {
         // Convert each profile into simulator inputs before aggregation.
         const profileInputs = selected.map(meta => {
             const data = getProfileData(meta.id);
-            const inputs = buildSimulatorInputsFromProfileData(data);
-            return { profileId: meta.id, name: meta.name || meta.id, inputs };
+            try {
+                const inputs = buildSimulatorInputsFromProfileData(data);
+                return { profileId: meta.id, name: meta.name || meta.id, inputs };
+            } catch (error) {
+                const profileError = new Error(
+                    `Profil ${meta.name || meta.id}: ${error?.message || 'Profildaten konnten nicht sicher geladen werden.'}`
+                );
+                profileError.name = 'SimulatorProfileStateError';
+                profileError.code = error?.code || 'PROFILE_STATE_LOAD_FAILED';
+                profileError.profileId = meta.id;
+                profileError.storageKey = error?.storageKey || null;
+                profileError.raw = error?.raw ?? null;
+                profileError.cause = error;
+                throw profileError;
+            }
         });
 
         const primaryId = selected.find(p => p.id === currentId)?.id || selected[0]?.id;
         const { combined, warnings } = combineSimulatorProfiles(profileInputs, primaryId);
 
         if (!combined) {
-            if (typeof window !== 'undefined') {
-                window.__profilverbundTranchenOverride = null;
-                window.__profilverbundPreferAggregates = true;
-                window.__profilverbundMinimumFlexProfiles = null;
-            }
             const blockingMessage = Array.isArray(warnings) && warnings.length
                 ? warnings.join(' ')
                 : 'Profil-Daten fuer Simulator fehlen.';
+            blockProfileSimulation({ message: blockingMessage });
             updateStatus(blockingMessage, 'error');
-            return;
+            return false;
         }
 
         if (typeof window !== 'undefined') {
@@ -113,6 +247,7 @@ export function initSimulatorProfileSelection() {
         applyCombinedInputsToUI(combined, selected.length);
         syncTranchenToInputs({ silent: true });
         updateStartPortfolioDisplay();
+        unblockProfileSimulation();
 
         if (warnings && warnings.length) {
             const combinedWarnings = selectionWarning ? warnings.concat(selectionWarning) : warnings;
@@ -124,7 +259,31 @@ export function initSimulatorProfileSelection() {
         }
     };
 
-    const profiles = listProfiles();
+    const applySelection = () => {
+        try {
+            return applySelectionUnchecked();
+        } catch (error) {
+            listContainer.innerHTML = '';
+            blockProfileSimulation(error);
+            updateStatus(
+                `Profil-Recovery erforderlich: ${error?.message || 'Profildaten konnten nicht sicher geladen werden.'}`,
+                'error'
+            );
+            return false;
+        }
+    };
+
+    let profiles;
+    try {
+        profiles = listProfiles();
+    } catch (error) {
+        blockProfileSimulation(error);
+        updateStatus(
+            `Profil-Recovery erforderlich: ${error?.message || 'Die Profilregistry konnte nicht sicher geladen werden.'}`,
+            'error'
+        );
+        return;
+    }
     renderList(profiles);
     listContainer.addEventListener('change', (event) => {
         const target = event.target;

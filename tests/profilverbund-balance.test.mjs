@@ -19,6 +19,7 @@ import {
 import {
     createProfile,
     ensureProfileRegistry,
+    getCurrentProfileId,
     updateProfileData
 } from '../app/profile/profile-storage.js';
 import { CONFIG } from '../app/balance/balance-config.js';
@@ -248,9 +249,9 @@ global.localStorage = createLocalStorageMock();
     assertClose(selections[0].taxAmount, 100 * 0.5 * 0.7 * 0.26375, 0.0001, 'Selection tax should use the confirmed lot TQF');
 }
 
-// --- TEST 7: Profiles without saved balance state still load via overrides/tranches ---
+// --- TEST 7: Profile overrides/tranches remain authoritative over stale balance inputs ---
 {
-    console.log('\n📋 Test 7: loadProfilverbundProfiles fallback ohne Balance-State');
+    console.log('\n📋 Test 7: loadProfilverbundProfiles per-profile overrides');
     localStorage.clear();
     ensureProfileRegistry();
 
@@ -258,6 +259,8 @@ global.localStorage = createLocalStorageMock();
     updateProfileData(profile.id, {
         profile_tagesgeld: '25000',
         profile_rente_monatlich: '1200',
+        profile_aktuelles_alter: '72',
+        [CONFIG.STORAGE.LS_KEY]: JSON.stringify({ inputs: { aktuellesAlter: 99 } }),
         depot_tranchen: JSON.stringify([
             { trancheId: 't1', name: 'Alt ETF', shares: 100, purchasePrice: 800, currentPrice: 1000, category: 'equity', type: 'aktien_alt', tqf: 0 },
             { trancheId: 't2', name: 'Money Market', shares: 15, purchasePrice: 1000, currentPrice: 1000, category: 'money_market', type: 'geldmarkt', tqf: 0 }
@@ -267,12 +270,26 @@ global.localStorage = createLocalStorageMock();
     const profiles = loadProfilverbundProfiles();
     const loaded = profiles.find(entry => entry.profileId === profile.id);
 
-    assert(loaded, 'Profil sollte auch ohne Balance-State geladen werden');
+    assert(loaded, 'Profil sollte mit per-profile Overrides geladen werden');
     assertEqual(loaded.inputs.tagesgeld, 25000, 'Tagesgeld-Override sollte übernommen werden');
     assertEqual(loaded.inputs.renteMonatlich, 1200, 'Rente-Override sollte übernommen werden');
+    assertEqual(loaded.inputs.aktuellesAlter, 72, 'Per-profile age override must win over a stale household age');
     assertEqual(loaded.inputs.depotwertAlt, 100000, 'Equity-Tranche sollte als Depotwert übernommen werden');
     assertEqual(loaded.inputs.geldmarktEtf, 15000, 'Money-Market-Tranche sollte übernommen werden');
     assertEqual(loaded.tranches.length, 2, 'Tranchen sollten erhalten bleiben');
+
+    const noAgeProfile = createProfile('Alter nicht gesetzt');
+    updateProfileData(noAgeProfile.id, {
+        profile_tagesgeld: '1000',
+        [CONFIG.STORAGE.LS_KEY]: JSON.stringify({ inputs: { floorBedarf: 12000 } })
+    });
+    const loadedWithoutAge = loadProfilverbundProfiles()
+        .find(entry => entry.profileId === noAgeProfile.id);
+    assert(loadedWithoutAge, 'Profil ohne eigenes Alter sollte weiterhin geladen werden');
+    assert(
+        !Object.prototype.hasOwnProperty.call(loadedWithoutAge.inputs, 'aktuellesAlter'),
+        'Fehlendes Profilalter darf nicht still als Alter 0 materialisiert werden'
+    );
 }
 
 // --- TEST 7b: Explicit empty profile tranches never synthesize stale balance holdings ---
@@ -311,6 +328,49 @@ global.localStorage = createLocalStorageMock();
         corruptError = error;
     }
     assertEqual(corruptError?.code, 'TRANCHE_STORAGE_CORRUPT', 'Corrupt profile tranches must fail closed instead of falling back');
+}
+
+// --- TEST 7c: Corrupt selected profile state blocks the complete household ---
+{
+    console.log('\n📋 Test 7c: corrupt selected profile blocks household aggregation');
+    localStorage.clear();
+    ensureProfileRegistry();
+    const validId = getCurrentProfileId();
+    updateProfileData(validId, {
+        profile_tagesgeld: '10000',
+        profile_aktuelles_alter: '67'
+    });
+    const corruptProfile = createProfile('Korrupter Haushaltspartner');
+    const corruptHealthRaw = '{"enabled":"maybe","initialAmount":150000}';
+    updateProfileData(corruptProfile.id, {
+        profile_tagesgeld: '20000',
+        profile_aktuelles_alter: '70',
+        profile_health_bucket: corruptHealthRaw
+    });
+    const registryBefore = localStorage.getItem('rs_profiles_v1');
+    let healthError = null;
+    try {
+        loadProfilverbundProfiles();
+    } catch (error) {
+        healthError = error;
+    }
+    assertEqual(healthError?.profileId, corruptProfile.id, 'Health corruption identifies the blocking selected profile');
+    assertEqual(healthError?.code, 'PROFILE_HEALTH_BUCKET_INVALID', 'Corrupt health bucket blocks instead of becoming disabled');
+    assertEqual(healthError?.raw, corruptHealthRaw, 'Household blocker retains the exact health raw payload');
+    assertEqual(localStorage.getItem('rs_profiles_v1'), registryBefore, 'Failed household load performs no registry mutation');
+
+    updateProfileData(corruptProfile.id, {
+        profile_health_bucket: JSON.stringify({ enabled: false }),
+        [CONFIG.STORAGE.LS_KEY]: '{"inputs":null}'
+    });
+    let balanceError = null;
+    try {
+        loadProfilverbundProfiles();
+    } catch (error) {
+        balanceError = error;
+    }
+    assertEqual(balanceError?.profileId, corruptProfile.id, 'Balance corruption identifies the blocking selected profile');
+    assertEqual(balanceError?.code, 'PROFILE_BALANCE_STATE_INVALID', 'Corrupt balance state blocks instead of omitting one profile');
 }
 
 // --- TEST 8: Asset summaries prefer detailed tranches over aggregate fields ---
