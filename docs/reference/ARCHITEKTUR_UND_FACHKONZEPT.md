@@ -3201,6 +3201,84 @@ beliebige zusätzliche Asset-Klassen.
 | MR-11 | Sampling-, Regime-, CAPE-, VPW- und Guardrail-Parameter sind Modellentscheidungen. | Gute Resultate können parameter- oder historienabhängig statt robust sein. | Mehrere Seeds, Methoden, Stresspfade und Sensitivitäten vergleichen. Modell- und Kalibrierungsrisiko. |
 | MR-12 | Nutzereingaben und reale Ausführung liegen außerhalb der Rechenautomatik. | Falsche Einstandswerte, Netto-/Bruttowerte, Steuerflags oder abweichende Brokerorders übertragen sich direkt auf Ergebnisse. | Eingaben, Vorschläge und Reconciliation getrennt prüfen. Operatives Risiko. |
 
+## Modell-, Datenstands- und Validierungsmatrix
+
+Stand der Inventur: **2026-07-28**. Diese Matrix verwendet drei voneinander
+unabhaengige Statusachsen:
+
+- **technisch getestet** bedeutet, dass Implementierungsvertraege lokal durch
+  Tests beziehungsweise reproduzierbare Laufartefakte belegt sind;
+- **intern plausibilisiert** bedeutet eine begrenzte fachliche
+  Konsistenzpruefung innerhalb des dokumentierten Geltungsbereichs;
+- **extern validiert** verlangt eine unabhaengige fachliche Pruefung oder
+  Replikation gegen geeignete externe Daten.
+
+Ein gruener technischer Test setzt die beiden anderen Statuswerte niemals
+automatisch auf gruen. `Owner` benennt die verantwortliche Rolle; wo noch keine
+Person benannt ist, bleibt dies ausdrücklich als offene Governance-Aufgabe
+sichtbar.
+
+Der maschinenlesbare Auto-Optimize-Contract verwendet das versionierte Mapping
+`ModelValidationStatusVocabularyV1`:
+`technically_tested -> ja`, `partially_plausibilized -> teilweise` und
+`not_validated -> nein`. Ein Custom-Evaluator verwendet fuer technische und
+interne Achse `custom_evaluator_not_assessed -> nicht bewertet`. Diese Codes
+sind voneinander unabhaengig; insbesondere wird externe Validierung nicht aus
+einem technischen Status abgeleitet.
+
+| ID / Domaene | Owner | Implementierte Quelle, Datenstand und Einheit | Geltungsbereich / wesentliche Grenze | Technisch getestet | Intern plausibilisiert | Extern validiert | Naechster Review |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| MS-01 Markt-/Inflationshistorie | Daten-Owner: Nutzer; externe Datenpruefung unbesetzt | `HistoricalDataManifestV1`, Revision `2026-07-18.1`, Jahre 1925-2025; Indexstaende, Prozent p.a., CAPE-Verhaeltnis | 1925-1949 geschaetzt; `msci_eur`-Price-/Net-/Gross-Return-Variante ungeklärt; keine Verteilungsgarantie | ja, Manifest-/Hash-/Samplingvertraege | teilweise, interne Konsistenz und Ausschlussfilter | nein | 2027-01-15 oder vor jeder Datenrevision |
+| MS-02 Steuer | Fach-Owner: Nutzer; Steuerreview unbesetzt | vereinfachte Kapitalertragsteuer in `tax-settlement.mjs` und `sale-engine.mjs`; Vergleich: [Paragraph 32d EStG](https://www.gesetze-im-internet.de/estg/__32d.html), [BMF/LStH 2026 Paragraph 43a](https://lsth.bundesfinanzministerium.de/lsth/2026/A-Einkommensteuergesetz/VI-Steuererhebung-36-47/3-Steuerabzug-vom-Kapitalertrag-KapSt-43-45e/Paragraf-43a/inhalt.html), Abruf 2026-07-28; EUR und Steuersaetze als Verhaeltnis | Planungsnaeherung, keine Veranlagung; Kirchensteuerformel D-10 weicht ab | ja, heutiger Contract | teilweise, nur implementierte Formel | nein | 2026-10-31 oder vor Steuerjahr-/Formelaenderung |
+| MS-03 Ausgaben | Produkt-Owner: Nutzer | importierte Kategorien als vorzeichenbehaftete EUR-Betraege; Monats-/Jahresaggregation; Contractstand 2026-07-28 | aktueller Wert ist Betrag der saldierten Kategorien und damit Netto-Cash-Abfluss, keine Bruttoausgabe; D-12 offen | ja, Metrik-/Importvertraege | teilweise | nein | 2026-10-31 |
+| MS-04 Verkauf/Reconciliation | Produkt-Owner: Nutzer; Accounting-Review unbesetzt | bestaetigte Stuecke, Nettoerloes und Gebuehr in EUR; Contractstand 2026-07-28 | bestaetigte Lots werden entfernt; Verkaufserloes wird nicht automatisch in freie Liquiditaet gebucht; D-15 offen | ja, Reconciliation-Vertraege | teilweise, operativer Ablauf dokumentiert | nein | 2026-10-31 |
+| MS-05 Mortalitaet | Modell-Owner: Nutzer; aktuarielle Pruefung unbesetzt | interne alters-/geschlechtsspezifische Jahreswahrscheinlichkeiten; amtlicher Vergleich: [Destatis Sterbetafel 2023/2025](https://www.destatis.de/DE/Themen/Gesellschaft-Umwelt/Bevoelkerung/Sterbefaelle-Lebenserwartung/sterbetafel.html), Seite 2026-07-07, Abruf 2026-07-28; Wahrscheinlichkeit p.a. | maximal zwei demografische Personen; Periodenmodell, keine individuelle Diagnose und keine belegte Kohortenverbesserung | ja, Lebensereignis-/Runnervertraege | teilweise, Richtungs-/Grenzchecks | nein | 2027-01-15 oder vor Tabellenrevision |
+| MS-06 Pflege | Modell-Owner: Nutzer; Pflege-/Aktuarreview unbesetzt | altersgebucketete Eintritts-/Progressionswahrscheinlichkeiten p.a.; BARMER-Pflegereport-2024-Ableitung im Code; amtliche Kontexte: [BMG-Leistungen, Stand 2026-02-13](https://www.bundesgesundheitsministerium.de/themen/pflege/online-ratgeber-pflege/leistungen-der-pflegeversicherung/leistungen-im-ueberblick/seite), [Destatis Pflegebestand Ende 2023](https://www.destatis.de/DE/Presse/Pressemitteilungen/2024/12/PD24_478_224.html), Abruf 2026-07-28 | Inzidenz wird aus Praevalenz und angenommener Vierjahresdauer angenaehert; Progression, individuelle Kosten und Leistungen nicht extern kalibriert | ja, Care-/Workervertraege | teilweise, interne Grenz-/Monotoniechecks | nein | 2027-01-15 oder vor Parameterrevision |
+| MS-07 Rente | Eingabe-Owner: Nutzer; Fachreview unbesetzt | manuelle Brutto-/Netto-Jahreswerte in EUR und Nutzersteigerung in Prozent p.a.; Referenz: [DRV-Werte](https://www.deutsche-rentenversicherung.de/DRV/DE/Experten/Zahlen-und-Fakten/Werte-der-Rentenversicherung/werte-der-rentenversicherung_node.html), Abruf 2026-07-28 | keine automatische DRV-Datenuebernahme, keine individuelle Bescheid- oder vollstaendige Steuerpruefung | ja, Input-/Pensionsvertraege | teilweise, Nutzereingabe bleibt massgeblich | nein | bei jedem neuen Rentenbescheid, spaetestens 2027-01-15 |
+| MS-08 Sweep/Auto-Optimize | Methoden-Owner: Nutzer; unabhaengiger Statistikreview unbesetzt | MC-Datenhashes, Sampling-/Seed-/CAPE-Contract und Optimizer-Modellversion; dimensionslose Scores sowie Ergebnis-KPIs; Contractstand 2026-07-28 | experimentelle Punktschaetzung beziehungsweise Kandidatensuche; kein globales Optimum und keine Empfehlung | ja, Parameterfidelity/CRN/Ergebnisvertraege | teilweise, synthetische und interne Szenarien | nein | 2026-10-31 oder vor produktiver Entscheidungsnutzung |
+| MS-09 Kosten/FX/Asset-Universum | Produkt-Owner: Nutzer; Portfolio-Review unbesetzt | EUR-Einwaehrungsmodell; keine separate Einheit fuer TER, Spread, Slippage und Gebuehren-Cashflows; Scope-Inventur 2026-07-28 | keine FX-Konvertierung; enges ETF-/Gold-/Cash-/Bond-Proxy-Universum; reale Nettorendite kann niedriger sein | entfaellt, kein Kosten-/FX-/breites Assetmodell vorhanden | nein | nein | 2027-01-15 oder vor Erweiterung des Assetmodells |
+| MS-10 Alarmstaerke | Policy-Owner: Nutzer | `flex-rate-policy.mjs`; dimensionsloser UI-Schweregrad; Contractstand 2026-07-28 | bei jeder nicht negativen Unterdeckung effektiv konstant `10`; D-11 offen | ja, Ist-Verhalten | nein, keine beschlossene monotone Fachfunktion | nein | 2026-10-31 oder vor Engine-Aenderung |
+
+### Offene und bereits gebundene Fachentscheidungen
+
+| Entscheidung | Dokumentierter Ist-Contract | Status / naechster Schritt |
+| --- | --- | --- |
+| D-10 Kirchensteuer | Beide Verkaufs-/Settlementpfade verwenden vereinfacht `25 % * (1 + 5,5 % + Kirchensteuersatz)`. Paragraph 32d Absatz 1 EStG reduziert dagegen bei Kirchensteuerpflicht die tarifliche Einkommensteuer ueber den Nenner `4 + Kirchensteuersatz` und beruecksichtigt anrechenbare auslaendische Steuer. | **offen**; Formel, Steuerjahr, Rundung, auslaendische Steuer und Pfadparitaet benoetigen einen separaten Steuercontract mit Fachreview. |
+| D-11 Alarmstaerke | Fuer eine nicht negative Unterdeckungsquote ergibt `min(10, round(10 + 20 * Quote))` stets `10`. | **offen**; entweder bewusste Konstante benennen oder monotone Funktion in einem eigenen Engine-Slice spezifizieren. |
+| D-12 Ausgabensaldierung | Kategorien werden vorzeichenbehaftet summiert; erst der Gesamtsaldo wird als Betrag dargestellt. Erstattungen beziehungsweise positive Gegenbuchungen mindern die Kennzahl. | **offen**; Netto-Cash-Abfluss und Bruttoausgabe benoetigen getrennte Produktbegriffe, falls beide gebraucht werden. |
+| D-13 Import-Zielintervall | Slice 12 bindet den konservativen Vergleich an den Unterrand des Window-High-Intervalls. | **entschieden und technisch umgesetzt**; keine Neudefinition in Slice 15. |
+| D-14 Ergebnisaggregation | Slice 11 fuehrt disjunkte terminale Outcomes und versionierte Metrikshapes; beobachtete `0` ist kein Missingwert. | **entschieden und technisch umgesetzt**. |
+| D-15 Verkaufserloes | Reconciliation entfernt die bestaetigten Stuecke und protokolliert Nettoerloes/Gebuehr, erhoeht aber nicht automatisch die freie Liquiditaet. | **offen**; bis zu einer Accounting-Entscheidung muss verbleibender Cash separat in den Rahmendaten nachgefuehrt werden. |
+| D-16 mehr als zwei Profile | Finanzielle Profilwerte koennen aggregiert werden. Demografie und individuelle Lebensereignisse werden auf hoechstens zwei Personen abgebildet; bei mehr Profilen erscheint eine Warnung. | **V1-Geltungsbereich dokumentiert**, echte Mehrpersonendemografie bleibt offen. |
+| D-18 Optimizer-Annahmen | Seit Slice 10 erbt Auto-Optimize den kanonischen MC-Sampling-, Seed-, Startjahrfilter- und CAPE-Vertrag und gibt den Evaluation-Contract aus. | **technischer Contract geschlossen**; externe Methodenvalidierung bleibt MS-08/Forschungsbacklog. |
+| D-19 terminale Nullwerte | Erfolgreiche Outcomes werden nach Status klassifiziert; ein beobachteter Endwert von 0 EUR bleibt 0 und wird nicht per Truthiness als fehlend entfernt. | **entschieden und technisch umgesetzt** in Slice 6. |
+
+**Begrenztes D-10-Rechenbeispiel ohne anrechenbare auslaendische Steuer:**
+Bei 100 EUR steuerpflichtigem Kapitalertrag und 8 % Kirchensteuer ergibt die
+implementierte Vereinfachung 28,375 EUR Gesamtbelastung. Eine nur auf der
+Formel des Paragraphen 32d Absatz 1 beruhende Beispielrechnung ergibt rund
+27,819 EUR; bei 9 % sind es vereinfacht 28,625 EUR gegen rund 27,995 EUR.
+Diese Differenz illustriert den Contractbefund, ist keine vollstaendige
+Steuerberechnung und rechtfertigt ohne Fachreview keine Codeaenderung.
+
+### Modellstatus in Ergebnissen und Exporten
+
+- Vollstaendige Monte-Carlo-JSONs enthalten versionierten
+  Request-/Result-/Provenienzvertrag, App-/Engine-Stand, Datenhashes,
+  Samplingdiagnostik, Seedvertrag und Ergebnisfingerprints.
+- Backtest-JSONs enthalten Request, Ergebnis, Dataset-/Engine-Provenienz und
+  die verwendete Beobachtungsperiode.
+- Sweep-Ergebnisse kennzeichnen das Quantilranking als
+  `experimental_point_estimate`.
+- Die Auto-Optimize-Ergebnisanzeige enthaelt
+  `AutoOptimizeModelStatusV1` mit Evaluation-Modellversion,
+  Jahresdaten-/Regimehash des vollstaendigen Datenuniversums, effektiver
+  Startjahr-/Estimated-History-Auswahl,
+  `methodClassification=experimental` sowie getrenntem technischen,
+  internen und externen Validierungsstatus. Der Champion ist nur ein
+  Szenariokandidat. Custom-Evaluatoren erben weder Datenhashes noch den
+  technischen/internen Status des eingebauten Evaluators.
+
 ## Produktmängel aus dem Fachabgleich
 
 | ID | Beobachteter Ist-Zustand | Dokumentarische Behandlung | Erforderliche Produktentscheidung |

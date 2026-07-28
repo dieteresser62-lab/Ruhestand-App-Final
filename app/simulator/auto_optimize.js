@@ -28,6 +28,7 @@
 
 import { rng } from './simulator-utils.js';
 import { getCommonInputs, prepareHistoricalData } from './simulator-portfolio.js';
+import { getDataVersion } from './simulator-engine-helpers.js';
 import { latinHypercubeSample, generateNeighborsReduced } from './auto-optimize-sampling.js';
 import { evaluateCandidate } from './auto-optimize-evaluate.js';
 import { CandidateCache, tieBreaker } from './auto-optimize-utils.js';
@@ -72,7 +73,76 @@ function hasDynamicFlexOptimizerParams(params) {
 
 const AUTO_OPTIMIZE_EVALUATION_CONTRACT_VERSION = 'AutoOptimizeEvaluationContractV1';
 const AUTO_OPTIMIZE_SEED_CONTRACT_VERSION = 'AutoOptimizeSeedContractV1';
+export const AUTO_OPTIMIZE_MODEL_STATUS_VERSION = 'AutoOptimizeModelStatusV1';
+export const AUTO_OPTIMIZE_VALIDATION_STATUS_VOCABULARY = Object.freeze({
+    schemaVersion: 'ModelValidationStatusVocabularyV1',
+    technical: Object.freeze({
+        status: 'technically_tested',
+        matrixValue: 'ja'
+    }),
+    internal: Object.freeze({
+        status: 'partially_plausibilized',
+        matrixValue: 'teilweise'
+    }),
+    external: Object.freeze({
+        status: 'not_validated',
+        matrixValue: 'nein'
+    })
+});
 const CONFIRMATION_SEED_OFFSET = 0x9E3779B9;
+
+export function buildAutoOptimizeModelStatus({
+    evaluationContract,
+    usesCustomEvaluator = false
+} = {}) {
+    const usesBuiltInEvaluator = usesCustomEvaluator !== true;
+    const dataVersion = usesBuiltInEvaluator
+        ? Object.freeze({ ...getDataVersion() })
+        : null;
+    const effectiveDataSelection = evaluationContract?.dataFilter
+        ? Object.freeze({ ...evaluationContract.dataFilter })
+        : null;
+    const technicalTestStatus = usesBuiltInEvaluator
+        ? AUTO_OPTIMIZE_VALIDATION_STATUS_VOCABULARY.technical.status
+        : 'custom_evaluator_not_assessed';
+    const internalPlausibilityStatus = usesBuiltInEvaluator
+        ? AUTO_OPTIMIZE_VALIDATION_STATUS_VOCABULARY.internal.status
+        : 'custom_evaluator_not_assessed';
+
+    return Object.freeze({
+        schemaVersion: AUTO_OPTIMIZE_MODEL_STATUS_VERSION,
+        statusVocabularyVersion: AUTO_OPTIMIZE_VALIDATION_STATUS_VOCABULARY.schemaVersion,
+        modelVersion: usesBuiltInEvaluator
+            ? (evaluationContract?.schemaVersion || AUTO_OPTIMIZE_EVALUATION_CONTRACT_VERSION)
+            : 'custom_evaluator',
+        evaluationMode: usesBuiltInEvaluator ? 'built_in_monte_carlo' : 'custom_evaluator',
+        dataVersion,
+        effectiveDataSelection,
+        methodClassification: 'experimental',
+        technicalTestStatus,
+        internalPlausibilityStatus,
+        externalValidationStatus: AUTO_OPTIMIZE_VALIDATION_STATUS_VOCABULARY.external.status,
+        decisionUse: 'scenario_comparison_only',
+        statusMapping: Object.freeze({
+            technical: Object.freeze({
+                status: technicalTestStatus,
+                matrixValue: usesBuiltInEvaluator
+                    ? AUTO_OPTIMIZE_VALIDATION_STATUS_VOCABULARY.technical.matrixValue
+                    : 'nicht bewertet'
+            }),
+            internal: Object.freeze({
+                status: internalPlausibilityStatus,
+                matrixValue: usesBuiltInEvaluator
+                    ? AUTO_OPTIMIZE_VALIDATION_STATUS_VOCABULARY.internal.matrixValue
+                    : 'nicht bewertet'
+            }),
+            external: AUTO_OPTIMIZE_VALIDATION_STATUS_VOCABULARY.external
+        }),
+        evidenceBoundary: usesBuiltInEvaluator
+            ? 'repository_contract_evidence_not_live_test_health'
+            : 'custom_evaluator_outside_built_in_evidence'
+    });
+}
 
 function readControlChecked(id, fallback, doc = globalThis.document) {
     const element = doc?.getElementById?.(id);
@@ -531,6 +601,10 @@ export async function runAutoOptimize(config) {
         seedContract
     });
     return {
+        modelStatus: buildAutoOptimizeModelStatus({
+            evaluationContract: reportedEvaluationContract,
+            usesCustomEvaluator: typeof evaluateCandidateFn === 'function'
+        }),
         championCfg: champion.candidate,
         metricsTest: champion.testResults,
         deltaVsCurrent: delta,

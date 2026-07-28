@@ -18,6 +18,12 @@ const formatFixed = (value, digits = 1) => Number(value).toFixed(digits);
 const formatPercentFromRatio = (value, digits = 1) => `${formatFixed((value ?? 0) * 100, digits)}%`;
 const formatSignedPercentFromRatio = (value, digits = 2) => `${value >= 0 ? '+' : ''}${formatPercentFromRatio(value, digits)}`;
 const formatBoolean = value => value === true ? 'ja' : 'nein';
+const MODEL_STATUS_LABELS = Object.freeze({
+    technically_tested: 'technisch getestet',
+    partially_plausibilized: 'teilweise intern plausibilisiert',
+    not_validated: 'extern nicht validiert',
+    custom_evaluator_not_assessed: 'bei benutzerdefiniertem Evaluator nicht bewertet'
+});
 
 function escapeHtml(value) {
     return String(value ?? '')
@@ -130,7 +136,8 @@ export function renderAutoOptimizeResult({ resultEl, result, objective }) {
         deltaVsCurrent,
         stability,
         optimizationContext,
-        parameterFidelity
+        parameterFidelity,
+        modelStatus
     } = result;
     const stabilityPct = Math.round(stability * 100);
     const stabilityColor = stabilityPct >= 80 ? '#4caf50' : stabilityPct >= 60 ? '#ff9800' : '#f44336';
@@ -143,6 +150,14 @@ export function renderAutoOptimizeResult({ resultEl, result, objective }) {
     const seedContract = evaluationContract?.seedContract;
     const dataFilter = evaluationContract?.dataFilter;
     const fixedModelAssumptions = evaluationContract?.fixedModelAssumptions;
+    const dataVersion = modelStatus?.dataVersion;
+    const effectiveDataSelection = modelStatus?.effectiveDataSelection || dataFilter;
+    const technicalStatus = modelStatus?.technicalTestStatus ?? 'nicht ausgewiesen';
+    const internalStatus = modelStatus?.internalPlausibilityStatus ?? 'nicht ausgewiesen';
+    const externalStatus = modelStatus?.externalValidationStatus ?? 'nicht ausgewiesen';
+    const technicalStatusLabel = MODEL_STATUS_LABELS[technicalStatus] || technicalStatus;
+    const internalStatusLabel = MODEL_STATUS_LABELS[internalStatus] || internalStatus;
+    const externalStatusLabel = MODEL_STATUS_LABELS[externalStatus] || externalStatus;
     const trainSeeds = Array.isArray(seedContract?.trainSeeds) ? seedContract.trainSeeds.join(', ') : 'nicht ausgewiesen';
     const confirmationSeeds = Array.isArray(seedContract?.confirmationSeeds)
         ? seedContract.confirmationSeeds.join(', ')
@@ -167,9 +182,44 @@ export function renderAutoOptimizeResult({ resultEl, result, objective }) {
     resultEl.innerHTML = `
         <div style="border: 2px solid var(--secondary-color); border-radius: 8px; padding: 20px; background: #f9f9f9; margin-top: 20px;">
             <h3 style="margin-top: 0; color: var(--secondary-color);">🏆 Champion Configuration</h3>
+            <div role="note" data-auto-optimize-model-warning
+                style="background: #fff1f0; border: 2px solid #d93025; color: #7a1d16; padding: 12px; border-radius: 6px; margin-bottom: 14px; font-size: 0.92rem;">
+                <strong>Experimenteller Szenariokandidat – keine Finanzempfehlung:</strong>
+                Dieser Champion gilt nur fuer den ausgewiesenen Modell-, Daten-, Filter-, Seed- und Parameterraum.
+                Er ist weder ein globales Optimum noch extern validiert.
+            </div>
             <div style="background: #eef6ff; border: 1px solid #cddff8; color: #244f7a; padding: 10px 12px; border-radius: 6px; margin-bottom: 14px; font-size: 0.9rem;">
                 <strong>Dynamic-Flex Modus:</strong> ${dynamicFlexModeLabel} (${dynamicFlexStateLabel})
                 <br><strong>Safety-Guards:</strong> ${safetyLabel}
+            </div>
+
+            <div data-auto-optimize-model-status
+                style="background: #f3f0ff; border: 1px solid #c8bcef; color: #35275f; padding: 12px; border-radius: 6px; margin-bottom: 14px; font-size: 0.88rem;">
+                <strong>Modell- und Validierungsstatus:</strong>
+                <br>Schema: <code>${escapeHtml(modelStatus?.schemaVersion ?? 'nicht ausgewiesen')}</code>
+                · Modellversion: <code>${escapeHtml(modelStatus?.modelVersion ?? 'nicht ausgewiesen')}</code>
+                · Modus: <code>${escapeHtml(modelStatus?.evaluationMode ?? 'nicht ausgewiesen')}</code>
+                <br>Methode: <strong>${escapeHtml(modelStatus?.methodClassification ?? 'nicht ausgewiesen')}</strong>
+                · Entscheidungsnutzung: <code>${escapeHtml(modelStatus?.decisionUse ?? 'nicht ausgewiesen')}</code>
+                <br>Technisch: ${escapeHtml(technicalStatusLabel)}
+                (<code>${escapeHtml(technicalStatus)}</code>)
+                · Intern: ${escapeHtml(internalStatusLabel)}
+                (<code>${escapeHtml(internalStatus)}</code>)
+                · Extern: ${escapeHtml(externalStatusLabel)}
+                (<code>${escapeHtml(externalStatus)}</code>)
+                <br>Datenuniversum:
+                annualDataHash <code>${escapeHtml(dataVersion?.annualDataHash ?? 'nicht anwendbar')}</code>
+                · regimeHash <code>${escapeHtml(dataVersion?.regimeHash ?? 'nicht anwendbar')}</code>
+                <br>Effektive Datenauswahl:
+                ${escapeHtml(effectiveDataSelection?.startYearMode ?? 'nicht ausgewiesen')}
+                · Startjahr ${escapeHtml(effectiveDataSelection?.startYearFilter ?? 'nicht ausgewiesen')}
+                · Halbwertszeit ${escapeHtml(effectiveDataSelection?.startYearHalfLife ?? 'nicht ausgewiesen')}
+                · geschaetzte Historie ausgeschlossen:
+                ${formatBoolean(effectiveDataSelection?.excludeEstimatedHistory)}
+                <br><small>Statusvokabular:
+                <code>${escapeHtml(modelStatus?.statusVocabularyVersion ?? 'nicht ausgewiesen')}</code>
+                · Evidenzgrenze:
+                <code>${escapeHtml(modelStatus?.evidenceBoundary ?? 'nicht ausgewiesen')}</code></small>
             </div>
 
             <div style="background: #fff8e8; border: 1px solid #ead39b; color: #5f4b19; padding: 12px; border-radius: 6px; margin-bottom: 14px; font-size: 0.88rem;">
@@ -252,8 +302,8 @@ export function renderAutoOptimizeResult({ resultEl, result, objective }) {
 export function appendAutoOptimizeApplySuccess({ resultEl, doc = globalThis.document }) {
     if (!resultEl) return;
     const successMsg = doc.createElement('div');
-    successMsg.style.cssText = 'background: #4caf50; color: white; padding: 10px; border-radius: 6px; margin-top: 10px; text-align: center;';
-    successMsg.textContent = '✓ Konfiguration übernommen. Eine spätere Profilauswahl kann profilgebundene Felder erneut setzen.';
+    successMsg.style.cssText = 'background: #7a4f00; color: white; padding: 10px; border-radius: 6px; margin-top: 10px; text-align: center;';
+    successMsg.textContent = '✓ Experimenteller Szenariokandidat übernommen – keine Finanzempfehlung. Eine spätere Profilauswahl kann profilgebundene Felder erneut setzen.';
     resultEl.appendChild(successMsg);
 
     setTimeout(() => {

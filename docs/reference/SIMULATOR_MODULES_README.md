@@ -891,7 +891,33 @@ app/simulator/simulator-main.js
 ### Parameter-Sweep
 1. `simulator-main.js`: Sweep-Button bindet `runParameterSweep()` aus `simulator-sweep.js`.
 2. `simulator-sweep.js`: Iteriert über Whitelist-Parameter, nutzt Worker-Jobs (Fallback seriell).
-3. `simulator-heatmap.js`: `renderHeatmapSVG()` visualisiert Ergebnisse.
+3. `simulator-heatmap.js`: `renderHeatmapSVG()` visualisiert Ergebnisse und
+   kennzeichnet Quantilrankings als experimentelle Punktschaetzer.
+
+### Auto-Optimize
+
+1. `auto_optimize.js` erbt den kanonischen Monte-Carlo-Sampling-, Seed-,
+   Startjahrfilter- und CAPE-Vertrag, bewertet Kandidaten mehrphasig und
+   veraendert die Eingaben nicht automatisch.
+2. Die Ergebnisanzeige enthaelt `AutoOptimizeModelStatusV1` mit
+   Evaluation-Modellversion, Jahresdaten-/Regimehash des gesamten
+   Datenuniversums, effektiver Startjahr-/Estimated-History-Auswahl,
+   `methodClassification=experimental` und getrennten technischen, internen
+   und externen Validierungsstatuswerten. Ein Custom-Evaluator wird getrennt
+   ausgewiesen und erbt keine eingebauten Datenhashes.
+3. Der Champion ist der beste gefundene Szenariokandidat im untersuchten
+   Suchraum. Er ist weder ein globales Optimum noch eine fachlich validierte
+   Strategie oder Finanzempfehlung.
+
+### Profilverbund und Demografie
+
+Finanzielle Werte ausgewaehlter Profile koennen haushaltsweit aggregiert
+werden. Der V1-Demografiecontract modelliert jedoch hoechstens zwei Personen:
+ein Primaerprofil und optional ein Sekundaerprofil. Bei mehr als zwei
+ausgewaehlten Profilen bleibt die Simulation lauffaehig, zeigt aber die
+Warnung, dass die Demografie auf zwei Personen begrenzt ist. Zusaetzliche
+Profile sind deshalb keine zusaetzlichen individuellen Mortalitaets-,
+Pflege- oder Rentenpfade (D-16).
 
 ### Backtest
 1. `simulator-main.js`: Backtest-Controls triggern `runBacktest()` aus `simulator-backtest.js`.

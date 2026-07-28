@@ -83,11 +83,17 @@ try {
     const { readAutoOptimizeConfigFromUI } = await import('../app/simulator/auto-optimize-config-ui.js');
     const { AUTO_OPTIMIZE_PRESETS } = await import('../app/simulator/auto-optimize-presets.js');
     const {
+        appendAutoOptimizeApplySuccess,
         createAutoOptimizeParameterBlock,
-        formatAutoOptimizeProgress
+        formatAutoOptimizeProgress,
+        renderAutoOptimizeResult
     } = await import('../app/simulator/auto-optimize-renderer.js');
     const { rng } = await import('../app/simulator/simulator-utils.js');
-    const { runAutoOptimize } = await import('../app/simulator/auto_optimize.js');
+    const {
+        AUTO_OPTIMIZE_VALIDATION_STATUS_VOCABULARY,
+        buildAutoOptimizeModelStatus,
+        runAutoOptimize
+    } = await import('../app/simulator/auto_optimize.js');
     const createVersionedMetricResult = (overrides = {}) => ({
         metricContract: { schemaVersion: AUTO_OPTIMIZE_METRIC_RESULT_VERSION },
         medianEndWealth: 500000,
@@ -204,6 +210,114 @@ try {
         assertEqual(controls.runwayMinMonths.value, 24, 'Apply sollte runwayMinM auf Formularfeld schreiben');
         assertEqual(controls.goGoActive.checked, true, 'Apply sollte goGoActive bei goGoMultiplier aktivieren');
         assert(events.some(([id]) => id === 'goGoActive'), 'Apply sollte Change-Events dispatchen');
+
+        const dataFilter = {
+            startYearMode: 'FILTER',
+            startYearFilter: 1950,
+            startYearHalfLife: 20,
+            excludeEstimatedHistory: true
+        };
+        const modelStatus = buildAutoOptimizeModelStatus({
+            evaluationContract: {
+                schemaVersion: 'AutoOptimizeEvaluationContractV1',
+                dataFilter
+            }
+        });
+        const resultEl = {
+            innerHTML: '',
+            style: {},
+            appendChild(node) {
+                this.appended = node;
+            }
+        };
+        renderAutoOptimizeResult({
+            resultEl,
+            objective: { metric: 'EndWealth_P50' },
+            result: {
+                modelStatus,
+                championCfg: { targetEq: 60 },
+                metricsTest: createVersionedMetricResult(),
+                deltaVsCurrent: {
+                    successRate: 0,
+                    drawdownP90: 0,
+                    endWealthP50: 0,
+                    timeShareWRgt45: 0
+                },
+                stability: 0.9,
+                parameterFidelity: { requestFingerprint: 'request-test' },
+                optimizationContext: {
+                    dynamicFlexMode: 'inherit',
+                    dynamicFlexActive: false,
+                    safetyGuardsActive: false,
+                    evaluationContract: {
+                        dataFilter,
+                        monteCarloParameters: {
+                            methode: 'stationary',
+                            rngMode: 'per-run-seed',
+                            anzahl: 10,
+                            blockSize: 5
+                        },
+                        seedContract: {
+                            trainSeeds: [1, 2],
+                            confirmationSeeds: [3]
+                        },
+                        fixedModelAssumptions: {
+                            capeRatio: 30,
+                            stressPreset: 'NONE',
+                            horizonMethod: 'survival_quantile',
+                            maxDauer: 25
+                        },
+                        useCapeSampling: false
+                    }
+                }
+            }
+        });
+        assert(resultEl.innerHTML.includes('Experimenteller Szenariokandidat'),
+            'Ergebnisansicht sollte den Experimentstatus sichtbar wiederholen');
+        assert(resultEl.innerHTML.includes('keine Finanzempfehlung'),
+            'Ergebnisansicht sollte den Nicht-Empfehlungsvorbehalt sichtbar wiederholen');
+        assert(resultEl.innerHTML.includes('AutoOptimizeModelStatusV1'),
+            'Ergebnisansicht sollte das Modellstatusschema rendern');
+        assert(resultEl.innerHTML.includes(modelStatus.dataVersion.annualDataHash),
+            'Ergebnisansicht sollte den Jahresdatenhash rendern');
+        assert(resultEl.innerHTML.includes(modelStatus.dataVersion.regimeHash),
+            'Ergebnisansicht sollte den Regimehash rendern');
+        assert(
+            resultEl.innerHTML.includes('technically_tested')
+                && resultEl.innerHTML.includes('partially_plausibilized')
+                && resultEl.innerHTML.includes('not_validated'),
+            'Ergebnisansicht sollte alle drei getrennten Validierungsachsen rendern'
+        );
+        assert(
+            resultEl.innerHTML.includes('Startjahr 1950')
+                && resultEl.innerHTML.includes('geschaetzte Historie ausgeschlossen'),
+            'Ergebnisansicht sollte die effektive Datenauswahl zusammen mit den Datenhashes rendern'
+        );
+
+        const previousSetTimeout = global.setTimeout;
+        global.setTimeout = () => 0;
+        try {
+            appendAutoOptimizeApplySuccess({
+                resultEl,
+                doc: {
+                    createElement() {
+                        return { style: {}, textContent: '', remove() { } };
+                    }
+                }
+            });
+        } finally {
+            global.setTimeout = previousSetTimeout;
+        }
+        assert(
+            resultEl.appended.textContent.includes('Experimenteller Szenariokandidat')
+                && resultEl.appended.textContent.includes('keine Finanzempfehlung'),
+            'Apply-Bestaetigung sollte Experiment- und Nicht-Empfehlungsvorbehalt wiederholen'
+        );
+        assertEqual(
+            AUTO_OPTIMIZE_VALIDATION_STATUS_VOCABULARY.technical.matrixValue,
+            'ja',
+            'technischer Laufzeitcode sollte auf das Matrixvokabular abgebildet sein'
+        );
     }
     console.log('✓ UI renderer/apply helpers OK');
 
@@ -718,6 +832,24 @@ try {
         assert(result && result.championCfg, 'Sollte Champion zurückgeben');
         assert('targetEq' in result.championCfg && 'rebalBand' in result.championCfg,
             'Champion sollte beide Parameter haben');
+        assertEqual(result.modelStatus?.schemaVersion, 'AutoOptimizeModelStatusV1',
+            'Auto-Optimize sollte einen versionierten Modellstatus ausgeben');
+        assertEqual(result.modelStatus?.methodClassification, 'experimental',
+            'Auto-Optimize sollte als experimentelles Verfahren gekennzeichnet sein');
+        assertEqual(result.modelStatus?.evaluationMode, 'custom_evaluator',
+            'Testhook sollte als benutzerdefinierter Evaluator ausgewiesen sein');
+        assertEqual(result.modelStatus?.technicalTestStatus, 'custom_evaluator_not_assessed',
+            'Testhook sollte nicht den technischen Status des eingebauten Evaluators erben');
+        assertEqual(result.modelStatus?.internalPlausibilityStatus, 'custom_evaluator_not_assessed',
+            'Testhook sollte nicht die interne Plausibilisierung des eingebauten Evaluators erben');
+        assertEqual(result.modelStatus?.externalValidationStatus, 'not_validated',
+            'externe Validierung sollte nicht aus technischen Tests abgeleitet werden');
+        assertEqual(result.modelStatus?.decisionUse, 'scenario_comparison_only',
+            'Auto-Optimize sollte keine fachliche Empfehlung behaupten');
+        assertEqual(result.modelStatus?.dataVersion, null,
+            'Testhook sollte keine eingebauten Datenhashes als verwendet ausgeben');
+        assertEqual(result.modelStatus?.effectiveDataSelection?.startYearFilter, 1980,
+            'Modellstatus sollte die effektive Datenauswahl des Evaluation-Contracts binden');
     }
     console.log('✓ runAutoOptimize Multi-Parameter OK');
 

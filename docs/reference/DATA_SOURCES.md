@@ -163,6 +163,26 @@ All source and license statuses above are intentionally unresolved. The
 manifest improves traceability but is not evidence that external provenance,
 index variant, or usage rights have been established.
 
+### Cross-domain model source snapshots
+
+The machine-readable market manifest and the following official snapshots are
+different evidence classes. Official context is not automatically imported
+into the application, does not calibrate the embedded tables by citation, and
+does not make a technically tested model externally validated. Retrieval date
+for all links below is 2026-07-28.
+
+| Domain | Source / data date | Unit and intended comparison | Current implementation status | Owner / next review |
+| --- | --- | --- | --- | --- |
+| Capital-income tax | [EStG section 32d](https://www.gesetze-im-internet.de/estg/__32d.html) and [BMF/LStH 2026 section 43a](https://lsth.bundesfinanzministerium.de/lsth/2026/A-Einkommensteuergesetz/VI-Steuererhebung-36-47/3-Steuerabzug-vom-Kapitalertrag-KapSt-43-45e/Paragraf-43a/inhalt.html), legal/handbook state 2026 | EUR tax base and rate ratios | church-tax calculation remains a documented simplified formula; not a complete assessment | user / tax reviewer unassigned; 2026-10-31 |
+| Mortality | [Destatis period life table 2023/2025](https://www.destatis.de/DE/Themen/Gesellschaft-Umwelt/Bevoelkerung/Sterbefaelle-Lebenserwartung/sterbetafel.html), page dated 2026-07-07 | annual death probabilities and life expectancy by age/sex | official comparator not imported; embedded table is technically exercised but externally unvalidated | user / actuarial reviewer unassigned; 2027-01-15 |
+| Long-term care benefits | [BMG benefits overview](https://www.bundesgesundheitsministerium.de/themen/pflege/online-ratgeber-pflege/leistungen-der-pflegeversicherung/leistungen-im-ueberblick/seite), page updated 2026-02-13 | EUR benefit amounts by care grade | benefit amounts are not an incidence/progression calibration and are not automatically imported | user / care reviewer unassigned; 2027-01-15 |
+| Long-term care population | [Destatis care population at end-2023](https://www.destatis.de/DE/Presse/Pressemitteilungen/2024/12/PD24_478_224.html), released 2024-12-18 | persons and shares at a population stock date | stock data do not establish individual annual transition probabilities | user / care-actuarial reviewer unassigned; 2027-01-15 |
+| Statutory pension | [German Pension Insurance values](https://www.deutsche-rentenversicherung.de/DRV/DE/Experten/Zahlen-und-Fakten/Werte-der-Rentenversicherung/werte-der-rentenversicherung_node.html), retrieved 2026-07-28 | EUR and official ratios/dates | the suite uses user-entered pension amounts and escalation; no automatic official-value import | user / next pension notice, no later than 2027-01-15 |
+
+The normative cross-domain inventory, validation axes, scope and decision
+status are maintained in
+[`ARCHITEKTUR_UND_FACHKONZEPT.md`](ARCHITEKTUR_UND_FACHKONZEPT.md#modell--datenstands--und-validierungsmatrix).
+
 ### Research-gate status
 
 The

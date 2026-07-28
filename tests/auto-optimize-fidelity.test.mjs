@@ -534,6 +534,10 @@ console.log('Test 6: UI copy states horizon and MC-assumption limits');
         'normal simulator UI should make the inapplicable direct field read-only');
     assert(simulatorHtml.includes('Auto-Optimize übernimmt Samplingmethode'),
         'optimizer UI should disclose that MC model assumptions are inherited');
+    assert(simulatorHtml.includes('Experimentelles Vergleichsverfahren'),
+        'optimizer UI should visibly mark the method as experimental');
+    assert(simulatorHtml.includes('keine Finanzempfehlung'),
+        'optimizer UI should not present a model champion as professional advice');
     assert(!AUTO_OPTIMIZE_PARAMETER_OPTIONS.some(option => option.key === 'horizonYears'),
         'actuarial optimizer parameter picker should not expose direct horizon');
     assert(!AUTO_OPTIMIZE_PARAMETER_OPTIONS.some(option => option.key === 'maxBearRefillPct'),
@@ -630,6 +634,49 @@ console.log('Test 7: registry domains and range preflight match canonical input 
     const simulatorHtml = fs.readFileSync(new URL('../Simulator.html', import.meta.url), 'utf8');
     assert(/id="rebalBand"[^>]*max="20"/.test(simulatorHtml),
         'Rebal-Band form maximum should match the engine and optimizer domain');
+}
+
+console.log('Test 8: Slice-15 model matrix and backlog links remain complete');
+{
+    const architectureText = fs.readFileSync(
+        new URL('../docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md', import.meta.url),
+        'utf8'
+    );
+    const matrixRows = architectureText
+        .split(/\r?\n/)
+        .filter(line => /^\| MS-\d{2} /.test(line));
+    assertEqual(matrixRows.length, 10,
+        'model matrix should retain exactly the declared MS-01 through MS-10 inventory');
+
+    const expectedIds = Array.from({ length: 10 }, (_, index) => `MS-${String(index + 1).padStart(2, '0')}`);
+    const observedIds = [];
+    for (const row of matrixRows) {
+        const cells = row.split('|').slice(1, -1).map(cell => cell.trim());
+        const id = cells[0].split(' ')[0];
+        observedIds.push(id);
+        assert(cells.length === 8, `${id} should retain all eight model-matrix columns`);
+        assert(cells[1].length > 0, `${id} should retain an owner`);
+        assert(/\b(?:19|20)\d{2}\b/.test(cells[2]), `${id} should retain a source or contract data date`);
+        assert(cells[3].length > 0, `${id} should retain a scope/limit`);
+        assert(cells[4].length > 0 && cells[5].length > 0 && cells[6].length > 0,
+            `${id} should retain separate technical, internal and external status cells`);
+        assert(/\b20\d{2}-\d{2}-\d{2}\b/.test(cells[7]), `${id} should retain a next-review date`);
+    }
+    assertEqual(JSON.stringify(observedIds), JSON.stringify(expectedIds),
+        'model matrix should retain the contiguous MS-01 through MS-10 ids');
+    const ms09Cells = matrixRows.find(row => row.startsWith('| MS-09 ')).split('|').slice(1, -1).map(cell => cell.trim());
+    assert(ms09Cells[4].startsWith('entfaellt'),
+        'missing cost/FX/asset models should not claim a positive technical-test status');
+
+    const backlogUrl = new URL('../docs/internal/archive/FORSCHUNGSVALIDIERUNGS_BACKLOG.md', import.meta.url);
+    const backlogText = fs.readFileSync(backlogUrl, 'utf8');
+    const localTargets = Array.from(backlogText.matchAll(/\]\(([^)]+\.md(?:#[^)]+)?)\)/g), match => match[1]);
+    assert(localTargets.length >= 5, 'research backlog should expose its normative and operational local links');
+    for (const localTarget of localTargets) {
+        const resolved = new URL(localTarget, backlogUrl);
+        resolved.hash = '';
+        assert(fs.existsSync(resolved), `research backlog link should resolve: ${localTarget}`);
+    }
 }
 
 console.log('--- Auto-Optimize Fidelity Tests Completed ---');

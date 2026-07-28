@@ -471,7 +471,7 @@ Die Slice-Dateien werden gemaess `SLICE_EXECUTION_RULES.md` jeweils vor Beginn d
 | 12 | [SLICE_SUITE_DATA_12_BALANCE_IMPORT_PROVENANCE.md](./SLICE_SUITE_DATA_12_BALANCE_IMPORT_PROVENANCE.md) | Typisierte Balance-Importe und Marktprovenienz | P1 | 1, 3, D-13 | 5 | neue Re-Review-Blocker technisch nachgebessert - erneutes Re-Review ausstehend |
 | 13 | [SLICE_SUITE_DATA_13_PROFILE_RECOVERY.md](./SLICE_SUITE_DATA_13_PROFILE_RECOVERY.md) | Sichtbare Profilkorruption und sichere Recovery | P1 | 4, D-09, D-17 | 10 | technisch umgesetzt - Review ausstehend |
 | 14 | [SLICE_SUITE_DATA_14_BUNDLE_BACKUP_VALIDATION.md](./SLICE_SUITE_DATA_14_BUNDLE_BACKUP_VALIDATION.md) | Atomare Bundle-/Vollbackup-Wiederherstellung und Statevalidierung | P1 | 12, 13 | 9 | U14-1 bis U14-5 nachgebessert - Re-Review ausstehend |
-| 15 | `SLICE_SUITE_DATA_15_MODEL_DECISIONS.md` | Fachentscheidungen und Modelltransparenz | Entscheidung | 6, 10-12, D-10 bis D-13, D-15, D-16, D-18, D-19 | 4 | geplant |
+| 15 | [SLICE_SUITE_DATA_15_MODEL_TRANSPARENCY.md](./SLICE_SUITE_DATA_15_MODEL_TRANSPARENCY.md) | Fachentscheidungen und Modelltransparenz | Entscheidung | 6, 10-12, D-10 bis D-13, D-15, D-16, D-18, D-19 | 5 | Basisfreigabe erteilt; T15-1 technisch nachgebessert - gezieltes Re-Review ausstehend |
 | 16 | `SLICE_SUITE_DATA_16_INTEGRATION_DOCUMENTATION.md` | Gesamtintegration, Browser, Evidenz und Doku | P1/P2 | 1-15 | 3 | geplant |
 
 ### Abhaengigkeitsbild
@@ -1533,12 +1533,16 @@ die genehmigte neunte Datei ist ausschliesslich
 
 ### Geplanter Scope
 
-Primaer Dokumentation und gegebenenfalls kleine Anzeige-/Metadatenanpassungen, maximal vier Programmdateien:
+Primaer Dokumentation und gegebenenfalls kleine Anzeige-/Metadatenanpassungen.
+Das urspruengliche Maximum von vier Programmdateien wurde fuer T15-1 am
+2026-07-28 durch ausdrueckliche Nutzerentscheidung auf fuenf erweitert:
 
 - `docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md`
 - `docs/internal/archive/FORSCHUNGSVALIDIERUNGS_BACKLOG.md`
 - relevante Referenz-/Nutzerdokumentation
 - gegebenenfalls Ergebnis-/Export-Metadaten fuer Modellstatus
+- `scripts/check-architecture-evidence.mjs` fuer den separat
+  datumssensitiven T15-1-Doku-Gate
 
 ### Arbeitspakete
 
@@ -1579,6 +1583,40 @@ Mindestens zu pruefende amtliche Ausgangsquellen, jeweils mit im Slice dokumenti
 ### Stop-/Reviewpunkt
 
 Jede Aenderung von Steuerformel, Mortalitaets-, Pflege-, Rendite- oder Kostenmodell erfordert einen eigenen freigegebenen Folgeplan beziehungsweise klar getrennten Slice mit fachlichem Oracle. Dieser Dokumentationsslice darf solche Semantik nicht nebenbei aendern.
+
+### Rueckdokumentation Slice 15 (2026-07-28)
+
+- Arbeitsdokument:
+  [SLICE_SUITE_DATA_15_MODEL_TRANSPARENCY.md](./SLICE_SUITE_DATA_15_MODEL_TRANSPARENCY.md).
+- Auto-Optimize-Ergebnisse rendern mit `AutoOptimizeModelStatusV1`
+  Evaluation-Modellversion, Hashes des Datenuniversums, effektive
+  Filterauswahl, Experimentstatus und getrennte technische, interne sowie
+  externe Validierungsachsen. Die Simulator-Oberflaeche bezeichnet den
+  Champion in Eingabe, Ergebnis und Apply-Bestaetigung sichtbar als
+  experimentellen Szenariokandidaten statt als fachliches Optimum oder
+  Finanzempfehlung. Custom-Evaluatoren erben weder die eingebauten Datenhashes
+  noch deren technische/interne Bewertung.
+- Die zentrale Modell-/Datenstandsmatrix inventarisiert Markt, Steuer,
+  Ausgaben, Reconciliation, Mortalitaet, Pflege, Rente, Optimierungsverfahren,
+  Kosten/FX/Assetraum und Alarm mit Owner, Quelle/Datenstand, Einheit,
+  Geltungsbereich, drei Statusachsen und Reviewtermin.
+- D-10 bis D-12 und D-15 bleiben offen; D-16 ist nur als
+  Zwei-Personen-V1-Geltungsbereich gebunden. D-13, D-14, D-18 und D-19 sind
+  entsprechend der bereits umgesetzten technischen Slices rueckdokumentiert.
+  Keine Steuer-, Pflege-, Mortalitaets-, Rendite-, Kosten- oder
+  Entnahmesemantik wurde geaendert.
+- Die Reviewfindings S15-1 bis S15-10 sind technisch nachgebessert und durch
+  Claude/Gemini freigegeben. Fuer T15-1 entschied der Nutzer, dass
+  `npm test` reproduzierbar bleibt und die kalenderabhaengige
+  Matrixfaelligkeit in `npm run docs:evidence` liegt. Die dafuer erforderliche
+  fuenfte Programmdatei `scripts/check-architecture-evidence.mjs` ist
+  ausdruecklich genehmigt; gezieltes Re-Review der Erweiterung ausstehend.
+- Gates: fokussiert 101/101, 192/192 und 23/23 Assertions,
+  `npm run docs:evidence` gruen inklusive zehn Matrixterminen, `npm test`
+  8.823/8.823 Assertions bei 0 offenen Handles, Browser 23/23,
+  drei Syntaxchecks und Diffcheck gruen. Exakt fuenf genehmigte produktnahe
+  Dateien; generierte und verbotene Bereiche sind unveraendert.
+
 
 ## Slice 16 - Gesamtintegration, Browser, Evidenz und Dokumentation
 
@@ -1968,26 +2006,53 @@ Drittes Restrisiko ist Recovery, das bei transientem IO-Fehler faelschlich Korru
 | 2026-07-28 | Slice 14 U14-Nachbesserung durch Codex technisch umgesetzt | U14-1: Die Obergrenze 20 gilt nur noch fuer Persistenz und Import; SpendingPlanner und Simulator akzeptieren korrekt fortgeschriebene endliche Runtimefaktoren groesser 20. `advance(19.9, 5)` liefert 20,895 und der 80-Jahres-Witness mit 10 Prozent Inflation laeuft ohne Chunk-Abbruch. U14-2: Inflationsraten sind echte endliche Zahlen oder `undefined` als Missing; `null`, Strings, `NaN` und Infinity liefern `SIMULATOR_INFLATION_RATE_INVALID`. U14-3: Der V1-Vollbackup-Migrator stringifiziert Nicht-String-Werte nicht mehr. U14-5: Backendverifikation ohne `adapter.loadAll` bricht mit `persistence_backend_read_unavailable` ab. U14-4 bleibt wegen der Acht-Programmdateien-Stopregel offen und benoetigt fuer `snapshot-archive.js` einen Folgeslice. `npm test` 8.725/8.725 Assertions, 0 offene Handles, Browser 23/23, Engine-Build, Syntax- und Diffchecks gruen; weiterhin exakt acht Programmdateien und keine Aenderung an generierten oder verbotenen Bereichen. Unabhaengiges Re-Review, Commit und Push ausstehend. |
 | 2026-07-28 | Slice 14 U14-Nachbesserung durch Claude re-reviewt | Status freigegeben; keine Blocker. U14-1 geschlossen: Der Vertrag ist in eine Persistenzvariante (`0 < Faktor <= 20`) und eine Runtimevariante (endlich, groesser 0) geteilt; gemessen laufen 80 Jahre mit 15 Prozent Inflation bis Faktor 71.800 ohne Abbruch, waehrend `99` an der Speichergrenze weiterhin sichtbar abgewiesen wird. U14-2 geschlossen: `null`, Strings, `NaN` und `Infinity` werfen typisiert mit `SIMULATOR_INFLATION_RATE_INVALID`, nur `undefined` bleibt Missing. U14-3 geschlossen: Der Schema-1-Migrator weist Nicht-String-Werte ab. U14-4 geschlossen: `SNAPSHOT_KINDS` registriert beide Import-Recovery-Kinds, alle Stellen nutzen die Registrykonstante, `toSnapshotIndexEntry` fuehrt den `restoreScope` mit. U14-5 geschlossen: kein stiller Cachefallback mehr, sondern `persistence_backend_read_unavailable`. Neue Restrisiken V14-1 (Vertragsverletzungen im Rechenpfad werfen weiterhin statt ein zaehlbares `technical_error`-Ergebnis zu liefern; gemessen liegen alle 101 historischen Inflationswerte zwischen -9,9 und 14,4, der Ausloeser ist aus den heutigen Daten nicht erreichbar), V14-2 (fail-closed fuer Adapter ohne `loadAll`) und V14-3 (Dateiscope auf neun Programmdateien erweitert; die im Dokument festgehaltene Nutzerfreigabe fuer `app/shared/snapshot-archive.js` ist fuer den Reviewer nicht verifizierbar und sollte vor dem Commit bestaetigt werden). S14-5, S14-13 und S14-15 bleiben offen. Gates unabhaengig reproduziert: `npm test` 8.730/8.730, Browser 23/23 in zwei von drei Laeufen - ein Lauf endete mit `net::ERR_NO_BUFFER_SPACE` im slice-fremden, unveraenderten `simulator-monte-carlo-browser.mjs` und wird als Umgebungsflake gefuehrt -, Engine-Build und `git diff --check` gruen, verbotene Bereiche unveraendert. |
 | 2026-07-28 | Nutzer genehmigt neunte Programmdatei; U14-4 durch Codex technisch nachgebessert | Der Nutzer akzeptiert `app/shared/snapshot-archive.js` als neunte Programmdatei. `SNAPSHOT_KINDS` registriert Balance- und Vollbackup-Import-Recovery zentral; `persistence-backup.js` und `balance-storage.js` verwenden diese Registry statt eigener Literale. `toSnapshotIndexEntry` erhaelt den normalisierten `restoreScope`, sodass die beiden `replace-all-rollback`-Auswerter auch im Listen-/UI-Pfad wirksam sind. Unit-Witness 26/26 und Chromium-IndexedDB-Witness gruen; `npm test` 8.730/8.730 Assertions, Browser 23/23, Engine-Build, Syntax- und Diffchecks gruen. Exakt neun genehmigte Programmdateien, keine Aenderung an generierten oder verbotenen Bereichen; unabhaengiges Re-Review, Commit und Push ausstehend. |
+| 2026-07-28 | Slice 15 durch Codex technisch umgesetzt | `AutoOptimizeModelStatusV1` fuehrt Evaluation-Modellversion, Jahresdaten-/Regimehash, Experimentstatus und getrennte technische, interne sowie externe Validierungsachsen; die UI bezeichnet den Champion als experimentellen Szenariokandidaten, nicht als fachliches Optimum oder Empfehlung. Die zentrale Modell-/Datenstandsmatrix nennt fuer Markt, Steuer, Ausgaben, Reconciliation, Mortalitaet, Pflege, Rente, Optimierungsverfahren, Kosten/FX/Assetraum und Alarm Owner, Quelle/Datenstand, Einheit, Geltungsbereich, Status und Reviewtermin. D-10 bis D-12 und D-15 bleiben offen, D-16 auf den Zwei-Personen-V1-Geltungsbereich begrenzt; D-13, D-14, D-18 und D-19 sind entsprechend bereits umgesetzter Slices rueckdokumentiert. Keine Fachsemantik geaendert. Fokussiert 91/91 und 123/123, Doku-Evidenz gruen, `npm test` 8.740/8.740 Assertions bei 0 offenen Handles, Browser 23/23, Syntax- und Diffcheck gruen. Drei produktnahe Dateien, generierte/verbotene Bereiche unveraendert; unabhaengiges Review, Commit und Push ausstehend. |
+| 2026-07-28 | Slice 15 durch Claude reviewt | Status blockiert; drei Blocker. S15-1: `AutoOptimizeModelStatusV1` hat ausserhalb der Erzeugungsstelle keinen Konsumenten. Gemessen enthaelt das gerenderte Ergebnis-HTML (5.018 Zeichen) keines der Felder - weder `experimental`, `not_validated`, `partial`, `scenario_comparison_only` noch die Hashes `614993a3`/`50aa7f99`; einen Auto-Optimize-Export gibt es nicht, das Feld ist nur ueber `window.aoChampionResult` in der Konsole erreichbar. Handbuch, README, TECHNICAL.md, AUTO_OPTIMIZE_DETAILS.md, SIMULATOR_MODULES_README.md und das Fachkonzept behaupten dagegen, das Ergebnis nenne Modellversion, Datenhashes und die drei Validierungsachsen; das Handbuch fordert ausdruecklich zum Lesen auf. AK-3 ist fuer Nutzer- und Exportsicht nicht erfuellt. S15-2: AK-7 ist nur fuer die Eingabesicht erfuellt - die Champion-Anzeige und die gruene Apply-Bestaetigung tragen keinen Experiment- oder Nicht-Empfehlungsvorbehalt. S15-3: Der in diesem Slice neu eingefuegte Verweis vom Forschungsbacklog auf die zentrale Modellmatrix zeigt ins Leere (`../reference/` aus `docs/internal/archive/`); zwei gleichartige Altlinks bestehen bereits. Restrisiken S15-4 (Modellstatus ist eine Konstante ohne Laufkopplung; der neue Test assertiert den "verwendeten Jahresdatenhash" ausgerechnet in einem Lauf mit Mock-Evaluation), S15-5 (der Hash beschreibt die ungefilterte Historie 1925-2025 und aendert sich durch Startjahrfilter oder `excludeEstimatedHistory` nicht), S15-6 (zwei Statusvokabulare ohne Mapping, Enum oder Test), S15-7 (der Evidence-Checker kennt nur MKT-/FOR-/MAP-IDs; die neuen MS-01 bis MS-10 und alle Reviewtermine liegen ausserhalb jedes Gates), S15-8 (TECHNICAL.md geaendert, aber nicht im Scope; Dateiumbenennung nicht als Abweichung gefuehrt), S15-9 (keine Zuordnung MOD-01 bis MOD-08, ENG-07, OPT-05, SIM-06 und IMP-03 zu Behandlungsorten), S15-10 (MS-09 fuehrt "technisch getestet: ja" fuer ein nicht modelliertes Kosten-/FX-/Assetuniversum). Nachgerechnet und bestaetigt: das D-10-Steuerbeispiel (28,375 gegen 27,8186 EUR bei 8 Prozent; 28,625 gegen 27,9951 EUR bei 9 Prozent), die D-11-Konstante `10`, die D-12-Betragsbildung, die Pfadaussage zur Kirchensteuerformel und die Manifestangaben; acht eigene Verdachtsmomente wurden gemessen und zurueckgezogen. Gates unabhaengig reproduziert: fokussiert 91/91 und 123/123, `npm run docs:evidence` gruen (69 MKT, 55 FOR, 17 MAP), `npm test` 8.740/8.740 bei 0 offenen Handles, Browser 23/23, Syntax- und Diffcheck gruen, drei produktnahe Dateien, verbotene Bereiche unveraendert. |
+| 2026-07-28 | Slice 15 S15-Nachbesserung durch Codex technisch umgesetzt | S15-1/S15-2: Der Champion-Renderer zeigt `AutoOptimizeModelStatusV1` mit Modell-/Datenversion, Datenuniversum, effektiver Filterauswahl, drei Statusachsen, Mapping und Evidenzgrenze; Ergebnis und Apply-Bestaetigung nennen experimentellen Szenariokandidaten und keine Finanzempfehlung. S15-3: Backloglinks korrigiert und automatisiert aufloesbar. S15-4 bis S15-10: Custom-Evaluator-Provenienz, Filterkontext, Statusvokabular, Matrix-/Fristengate, Scope/Abweichungen, Finding-Traceability und MS-09 `entfaellt` technisch nachgebessert. Keine Fachsemantik geaendert. Fokussiert 101/101 und 202/202, Doku-Evidenz gruen, `npm test` 8.829/8.829 Assertions bei 0 offenen Handles, Browser 23/23, Syntax- und Diffchecks gruen. Exakt vier produktnahe Dateien, generierte/verbotene Bereiche unveraendert; unabhaengiges Re-Review, Commit und Push ausstehend. |
+| 2026-07-28 | Slice 15 Nachbesserung durch Claude re-reviewt | Status freigegeben; keine Blocker. S15-1 geschlossen: Der Champion-Renderer konsumiert `modelStatus`; gemessen enthaelt das Ergebnis-HTML (6.631 statt 5.018 Zeichen) Schema, Statusvokabular, alle drei Achsen, beide Hashes `614993a3`/`50aa7f99`, die effektive Datenauswahl und die Evidenzgrenze. S15-2 geschlossen: Ergebnisnotiz und Apply-Bestaetigung nennen "Experimenteller Szenariokandidat - keine Finanzempfehlung". S15-3 geschlossen: alle fuenf lokalen Backloglinks loesen auf, inklusive der zwei Altlasten. S15-4 geschlossen und umgekehrt: Custom-Evaluatoren liefern `dataVersion=null`, `custom_evaluator_not_assessed` und Matrixwert `nicht bewertet`. S15-5 geschlossen: Datenuniversum und effektive Auswahl stehen getrennt nebeneinander. S15-6 geschlossen: `ModelValidationStatusVocabularyV1` bildet die Laufzeitcodes auf `ja`/`teilweise`/`nein` ab. S15-7 bis S15-10 geschlossen: Matrix-Fidelity-Gate, Scopeergaenzung um TECHNICAL.md, Finding-Traceability und MS-09 auf `entfaellt`. Neue Restrisiken T15-1 (der Terminassert macht `npm test` kalenderabhaengig rot - nachgestellt brechen am 2026-11-01 fuenf von zehn Matrixzeilen und ab 2027-01-16 alle zehn; ein Lauf ist damit nicht mehr reproduzierbar und der bequemste Ausweg ist genau die ungepruefte Terminverlaengerung, die die Matrix verbietet - Codex hat die Abhaengigkeit offengelegt, die Prozessentscheidung liegt beim Nutzer), T15-2 (`experimental`, `scenario_comparison_only`, `built_in_monte_carlo` und die Evidenzgrenze erscheinen als unuebersetzte Rohbezeichner), T15-3 (der Gate prueft je Statusachse nur Nichtleere, erzwingt das Vokabular also nicht), T15-4 (Matrix- und Linkgate liegen in `auto-optimize-fidelity.test.mjs` und damit thematisch fremd), T15-5 (`formatBoolean` rendert ein fehlendes `excludeEstimatedHistory` als `nein` statt als nicht ausgewiesen). Eine eigene Fehlbeobachtung wurde geprueft und zurueckgezogen. Gates unabhaengig reproduziert: fokussiert 101/101 und 202/202, `npm run docs:evidence` gruen, `npm test` 8.829/8.829 bei 0 offenen Handles, Browser 23/23, beide Syntaxchecks und `git diff --check` gruen, exakt vier Programmdateien, verbotene Bereiche unveraendert. |
+| 2026-07-28 | Nutzer entscheidet T15-1; Codex setzt den separaten Doku-Gate technisch um | `npm test` bleibt fuer denselben Commit unabhaengig vom Systemdatum reproduzierbar; die Matrixfaelligkeit liegt in `npm run docs:evidence` und meldet ueberfaellige Zeilen als `OVERDUE_MODEL_REVIEW`. Der Nutzer genehmigt `scripts/check-architecture-evidence.mjs` ausdruecklich als fuenfte Programmdatei innerhalb Slice 15. Der deterministische 2026-11-01-Witness meldet exakt fuenf ueberfaellige Matrixzeilen. Fokussiert 101/101, 192/192 und 23/23, Doku-Evidenz inklusive zehn Matrixterminen gruen, `npm test` 8.823/8.823 bei 0 offenen Handles, Browser 23/23, Syntax- und Diffchecks gruen; gezieltes Re-Review der T15-1-Erweiterung vor Commit ausstehend. |
+| 2026-07-28 | Slice 15 T15-1-Nachbesserung durch Claude re-reviewt | Status freigegeben; keine Blocker. T15-1 geschlossen: Die Systemuhr ist aus der Testsuite entfernt - der Fidelity-Test enthaelt keinen `currentDate`- oder `new Date`-Bezug mehr und faellt von 202 auf 192 Assertions, also genau um die zehn Terminvergleiche. Die Faelligkeit wirkt jetzt im benannten Doku-Gate: gemessen liefert `validateEvidenceDocuments` am 2026-07-28 null Befunde, am 2026-11-01 exakt fuenf `OVERDUE_MODEL_REVIEW` (MS-02, MS-03, MS-04, MS-08, MS-10) und ab 2027-01-16 alle zehn; die CLI quittiert beide Faelle mit Exit 1. Die zuvor gemessenen Zahlen treten damit unveraendert auf, nur mit stabilem Fehlercode, Datei- und Zeilenangabe statt als Suitefehlschlag. Die Platzierung ist richtig gewaehlt: `docs:evidence` ist bereits ab dem 2026-10-31 durch elf bestehende `OVERDUE_REVIEW_SCOPE` rot, die Modellmatrix reiht sich also in ein vorhandenes Faelligkeitsregime ein. Alle dreizehn Testaufrufe injizieren ein Datum, der November-Witness prueft festverdrahtet die Zahl fuenf, `modelMatrixRows === 10` bindet den Checker an das Inventar, `getBerlinDate` behandelt die Mitternachtsgrenze korrekt (22:30Z -> 31.10., 23:30Z -> 01.11.), und eine fehlende achte Spalte faellt fail-closed mit `INVALID_MODEL_REVIEW_DATE`. Neue Restrisiken U15-1 (entfernt man alle MS-Zeilen, meldet der Checker `ok: true` mit `modelMatrixRows: 0` und keinem Fehler - eine verschwundene Matrix faellt im Gate selbst nicht auf; ein `MISSING_MODEL_MATRIX` waere ein Einzeiler), U15-2 (die Suite als Ganzes ist weiterhin nicht datumsunabhaengig: gemessen zwanzig Systemuhrbezuege in `tests/`, davon zwei mit abgeleiteten Pruefdaten in slice-fremden Balance-Tests - Slice 15 hat seinen eigenen Beitrag vollstaendig entfernt), U15-3 (die im Dokument festgehaltene Nutzerentscheidung und die Genehmigung von `scripts/check-architecture-evidence.mjs` als fuenfter Programmdatei sind fuer den Reviewer nicht verifizierbar und sollten vor dem Commit bestaetigt werden) und U15-4 (kein Zustand "ueberfaellig, bewusst getragen"; der Anreiz zur ungeprueften Terminverlaengerung bleibt, ist aber besser lokalisiert). T15-2, T15-3, T15-4 und T15-5 bleiben offen; T15-4 ist teilweise entspannt. Gates unabhaengig reproduziert: 101/101, 192/192 und 23/23 fokussiert, `npm run docs:evidence` gruen mit zehn Matrix-Reviewterminen, `npm test` 8.823/8.823 bei 0 offenen Handles, Browser 23/23, alle drei Syntaxchecks und `git diff --check` gruen, verbotene Bereiche unveraendert. |
+| 2026-07-28 | Nutzer bestaetigt die T15-1-Genehmigung; Claude schliesst U15-3 | Der Nutzer hat gegenueber dem Reviewer bestaetigt, dass er die Genehmigung fuer T15-1 einschliesslich `scripts/check-architecture-evidence.mjs` als fuenfter Programmdatei erteilt hat. Das einzige vom Reviewer vor dem Commit zurueckgehaltene Element entfaellt damit; U15-3 ist geschlossen. Der Status des zweiten Re-Reviews bleibt unveraendert freigegeben ohne Blocker. Offen bleiben die Restrisiken U15-1 (eine verschwundene Modellmatrix faellt im Doku-Gate nicht auf), U15-2 (die Suite als Ganzes ist weiterhin nicht datumsunabhaengig), U15-4 (kein Zustand "ueberfaellig, bewusst getragen") sowie T15-2 bis T15-5; sie sind Planungsentscheidungen und blockieren den Commit nicht. |
 
 ## Review-Feedback von Gemini
 
-Ausstehend. Das Review muss die Pflichtstruktur aus `SLICE_EXECUTION_RULES.md` enthalten:
-
-1. Pruefdimensionen;
-2. nummerierte Findings;
-3. Pre-Mortem;
-4. Review-Ergebnis mit Status, Blockern und Restrisiken.
+Das Review ist im Slice-Dokument festgehalten. Letzter vorliegender Status:
+Basisfreigabe fuer S15-1 bis S15-10, keine Blocker. T15-1 bis T15-5 wurden als
+neue Restrisiken dokumentiert. T15-1 ist nach Nutzerentscheidung technisch
+nachgebessert und wartet auf gezieltes Re-Review.
 
 ## Review-Feedback von Claude
 
-Ausstehend beziehungsweise durch Nutzer abzubedingen. Pflichtstruktur analog Gemini.
+Das vollstaendige Review einschliesslich Pruefdimensionen, Findings,
+Pre-Mortem und Review-Ergebnis steht im Slice-Dokument. S15-1 bis S15-10 sind
+freigegeben; Claude verlangte vor Commit eine Nutzerentscheidung zu T15-1.
+Der Nutzer entschied den separaten Doku-Gate und genehmigte die fuenfte
+Programmdatei. Die technische Umsetzung wartet auf gezieltes Re-Review.
 
 ## Review-Antworten von Codex
 
-Ausstehend. Antworten aendern einen Reviewerstatus nicht eigenmaechtig.
+| ID | Antwort / Behandlung |
+| --- | --- |
+| S15-1 | Angenommen: `modelStatus` wird nun in der Champion-Ergebnissicht gerendert und durch einen Renderer-Witness abgesichert. |
+| S15-2 | Angenommen: Ergebnis und Apply-Bestaetigung wiederholen Experiment- und Nicht-Empfehlungshinweis. |
+| S15-3 | Angenommen: Matrix- und Protokollpfade korrigiert; alle lokalen Backloglinks werden automatisiert aufgeloest. |
+| S15-4 | Angenommen: eingebaute und benutzerdefinierte Evaluation besitzen getrennte Provenienz und Bewertung. |
+| S15-5 | Angenommen: Datenuniversum-Hashes und effektive Filterauswahl werden getrennt ausgegeben. |
+| S15-6 | Angenommen: maschinenlesbares Statusvokabular mit explizitem Matrixmapping und Tests. |
+| S15-7 | Angenommen: MS-01 bis MS-10 und ihre Reviewtermine liegen im Fidelity-/Gesamttest-Gate. |
+| S15-8 | Angenommen: `TECHNICAL.md`, Dateibenennung und Renderer-Erweiterung sind in Scope/Abweichungen nachgetragen. |
+| S15-9 | Angenommen: vollstaendige Finding-Traceability im Slice-Dokument. |
+| S15-10 | Angenommen: MS-09 verwendet fuer das nicht vorhandene Modell `entfaellt`. |
+| T15-1 | Nutzerentscheidung umgesetzt: keine Systemuhrabhaengigkeit in `npm test`; Matrixfaelligkeit im separaten `npm run docs:evidence` mit `OVERDUE_MODEL_REVIEW`. Fuenfte Programmdatei ausdruecklich genehmigt. |
+
+Diese Antworten dokumentieren die technische Behandlung und aendern keinen
+Reviewerstatus. Fuer die T15-1-Erweiterung bleibt ein gezieltes
+unabhaengiges Re-Review erforderlich.
 
 ## Review-Entscheidungen
 
 | ID | Quelle | Finding | Entscheidung | Umsetzung |
 | --- | --- | --- | --- | --- |
-| - | - | noch kein Review | ausstehend | - |
+| S15-1 bis S15-3 | Claude/Gemini | Blocker | technisch nachbessern | umgesetzt und im Re-Review freigegeben |
+| S15-4 bis S15-10 | Claude/Gemini | Restrisiken | gekoppelt technisch absichern/dokumentieren | umgesetzt und im Re-Review freigegeben |
+| T15-1 | Claude, Nutzer | Kalenderabhaengigkeit der Gesamtsuite | Nutzer entscheidet separaten datumssensitiven Doku-Gate; fuenfte Programmdatei genehmigt | technisch umgesetzt, gezieltes Re-Review ausstehend |

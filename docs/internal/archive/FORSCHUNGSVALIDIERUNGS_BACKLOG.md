@@ -1,16 +1,17 @@
 # Forschungsvalidierungs-Backlog
 
-**Stand:** 2026-07-19<br>
-**Status:** operationalisiert; Slice-09-Gates dokumentiert, alle Pakete offen<br>
+**Stand:** 2026-07-28<br>
+**Status:** operationalisiert; Slice-09-Gates und Slice-15-Modellinventur
+dokumentiert, alle externen Validierungspakete offen<br>
 **Owner des Backlogs:** Nutzer für Priorität und Freigaben; Codex für eine
 später ausdrücklich beauftragte Umsetzung; unabhängiger Methodikreview für
 V4-/V5-Aussagen<br>
 **Normative Quellen:**
-[Architektur und Fachkonzept](../reference/ARCHITEKTUR_UND_FACHKONZEPT.md#e6-forschungs--und-modellrisiken)
+[Architektur und Fachkonzept](../../reference/ARCHITEKTUR_UND_FACHKONZEPT.md#e6-forschungs--und-modellrisiken)
 und
-[Forschungs-Evidenzregister](../reference/FORSCHUNGSABGLEICH_EVIDENZREGISTER.md).<br>
+[Forschungs-Evidenzregister](../../reference/FORSCHUNGSABGLEICH_EVIDENZREGISTER.md).<br>
 **Operationales Gate-Protokoll:**
-[Simulator-Backtest-Forschungsprotokoll](./SIMULATOR_BACKTEST_FORSCHUNGSPROTOKOLL.md)
+[Simulator-Backtest-Forschungsprotokoll](./2026-simulator-backtest-hardening/SIMULATOR_BACKTEST_FORSCHUNGSPROTOKOLL.md)
 
 ## 1. Zweck und Statusgrenze
 
@@ -64,6 +65,29 @@ eine ausdrücklich dokumentierte externe Evidenzsynthese.
 - Jede Statusanhebung und jede neue Wirksamkeitsformulierung ist ein eigener
   Freigabepunkt für Nutzer und Reviewer.
 
+### 1.3 Slice-15-Owner-, Quellen- und Reviewinventur
+
+Die vollstaendige operative Matrix steht im
+[Architektur- und Fachkonzept](../../reference/ARCHITEKTUR_UND_FACHKONZEPT.md#modell--datenstands--und-validierungsmatrix).
+Fuer diesen Forschungsbacklog gelten daraus folgende noch unbesetzte
+Fachrollen und Termine. Ein Rollenname ist keine externe Validierung und keine
+Freigabe durch Codex.
+
+| Paket / Modellgrenze | Fach-Owner | Primaere Evidenzbasis | Aktueller Status | Naechster Review / ausloesendes Ereignis |
+| --- | --- | --- | --- | --- |
+| Marktserie, Returnvariante, Kosten, FX, Assetraum | Nutzer benennt Daten-/Kapitalmarktmethodik-Owner | `HistoricalDataManifestV1`, `DATA_SOURCES.md`, primaere Index-/Lizenzunterlagen noch offen | FV0; technisch inventarisiert, extern nicht validiert | 2027-01-15 oder vor Datenrevision |
+| Steuer und Kirchensteuer D-10 | Nutzer; externer Steuerreview unbesetzt | Paragraph 32d EStG, BMF/LStH Paragraph 43a, implementierte Pfadinventur | FV0; Formelabweichung dokumentiert | 2026-10-31 oder vor Steuerjahr-/Contractaenderung |
+| Ausgaben D-12 und Verkaufserloes D-15 | Nutzer als Produkt-Owner; Accounting-Review unbesetzt | aktuelle Metrik-/Reconciliationvertraege | FV0; Ist-Semantik technisch getestet, Fachentscheidung offen | 2026-10-31 |
+| Mortalitaet und >2-Personen-Demografie D-16 | Nutzer benennt Aktuar-Owner | interne Tabelle; Destatis Periodensterbetafel 2023/2025 als noch nicht importierter Vergleich | FV0; technisch getestet, extern nicht validiert | 2027-01-15 oder vor Tabellen-/Personenmodellaenderung |
+| Pflege | Nutzer benennt Pflege-/Aktuar-Owner | interne BARMER-Ableitung; BMG 2026 und Destatis Pflegebestand 2023 als Kontext | FV0; heuristische Kalibrierung | 2027-01-15 oder vor Parameterrevision |
+| Rente | Nutzer als Eingabe-Owner; Rentenfachreview unbesetzt | Nutzer-/Bescheidwerte; DRV-Werte als nicht automatisch importierte Referenz | FV0; Inputpfad technisch getestet | bei neuem Bescheid, spaetestens 2027-01-15 |
+| Sweep/Auto-Optimize | Nutzer benennt unabhaengigen Statistik-/Methodikreview | versionierte Datenhashes, Seed-/Samplingvertrag, Trial-/Holdout-Gates | FV0; intern experimentell, kein externer Holdout | 2026-10-31 oder vor Entscheidungsnutzung |
+| Alarmstaerke D-11 | Nutzer als Policy-Owner | heutige konstante Implementierung; monotone Funktion noch ohne fachliches Oracle | FV0; Fachfunktion offen | 2026-10-31 oder vor Engine-Aenderung |
+
+Kein Termin hebt einen Status automatisch an. Bei Fristablauf bleibt der
+Eintrag offen beziehungsweise ueberfaellig, bis Owner, Quelle, Artefakt und
+unabhaengiges Review dokumentiert sind.
+
 ## 2. Gemeinsame Eingangsgates
 
 Kein Forschungspaket darf in die bestätigende Auswertung wechseln, bevor alle
@@ -90,7 +114,7 @@ kaschiert werden.
 ### 2.1 Operationaler Gate-Status aus Slice 09
 
 Das
-[Simulator-Backtest-Forschungsprotokoll](./SIMULATOR_BACKTEST_FORSCHUNGSPROTOKOLL.md)
+[Simulator-Backtest-Forschungsprotokoll](./2026-simulator-backtest-hardening/SIMULATOR_BACKTEST_FORSCHUNGSPROTOKOLL.md)
 inventarisiert die aktuelle Blockierwirkung feld- und rollenbezogen. Es hebt
 keine Nachweisstufe an:
 

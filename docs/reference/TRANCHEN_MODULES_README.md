@@ -103,6 +103,12 @@ den letzten bestaetigten sichtbaren Cache-/Registrystand wieder her und laesst d
 Vorgang retryfaehig. Wiederholte Initialisierung, BFCache und Tab-Rueckkehr duerfen
 keine doppelten Listener oder Polling-Intervalle erzeugen.
 
+Reconcile reduziert beziehungsweise entfernt das bestaetigte reale Lot und
+protokolliert Brutto-/Nettoerloes sowie Kosten. Es bucht den Nettoerloes nicht
+automatisch als freie Liquiditaet. Verbleibt der Brokererloes als Cash, muss
+dieser bis zur offenen Fachentscheidung D-15 separat in den Rahmendaten
+nachgefuehrt werden.
+
 ## 5. Quote-Grenze
 
 Automatische Kursupdates akzeptieren ausschliesslich normalisierte Yahoo-Symbole

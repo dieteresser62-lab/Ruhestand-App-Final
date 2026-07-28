@@ -38,6 +38,7 @@ assertEqual(baseline.counts.researchRecords, 55, 'validator should find exactly 
 assertEqual(baseline.counts.mapAnchors, 17, 'validator should find MAP-01 through MAP-17');
 assertEqual(baseline.counts.marketReviewScopes, 11, 'every market record family should have one review scope');
 assertEqual(baseline.counts.researchReviewScopes, 7, 'every research record family should have one review scope');
+assertEqual(baseline.counts.modelMatrixRows, 10, 'validator should find MS-01 through MS-10 review dates');
 
 const repeated = validateEvidenceDocuments(documents, { today: fixedToday, repoRoot });
 assertEqual(
@@ -85,6 +86,26 @@ const overdueReport = validateEvidenceDocuments(overdueReview, { today: fixedTod
 assert(
     errorCodes(overdueReport).has('OVERDUE_REVIEW_SCOPE'),
     'an overdue record scope should block the static gate'
+);
+
+const overdueModelReview = mutateDocument(documents, EVIDENCE_PATHS.main, content => content.replace(
+    '| 2026-10-31 oder vor Steuerjahr-/Formelaenderung |',
+    '| 2026-07-16 oder vor Steuerjahr-/Formelaenderung |'
+));
+const overdueModelReport = validateEvidenceDocuments(overdueModelReview, { today: fixedToday, repoRoot });
+assert(
+    errorCodes(overdueModelReport).has('OVERDUE_MODEL_REVIEW'),
+    'an overdue model-matrix row should block the date-sensitive documentation gate'
+);
+
+const novemberModelReport = validateEvidenceDocuments(documents, {
+    today: '2026-11-01',
+    repoRoot
+});
+assertEqual(
+    novemberModelReport.errors.filter(error => error.code === 'OVERDUE_MODEL_REVIEW').length,
+    5,
+    'the documentation gate should deterministically report the five matrix rows due by 2026-10-31'
 );
 
 const brokenLocalLink = mutateDocument(documents, EVIDENCE_PATHS.market, content => content.replace(
@@ -145,6 +166,10 @@ assertEqual(overdueCli.status, 1, 'CLI should exit non-zero when review scopes a
 assert(
     `${overdueCli.stdout}${overdueCli.stderr}`.includes('[OVERDUE_REVIEW_SCOPE]'),
     'CLI failure should print the stable overdue-scope error code'
+);
+assert(
+    `${overdueCli.stdout}${overdueCli.stderr}`.includes('[OVERDUE_MODEL_REVIEW]'),
+    'CLI failure should print the stable overdue-model error code'
 );
 
 console.log('✅ Architecture evidence contract tests passed');

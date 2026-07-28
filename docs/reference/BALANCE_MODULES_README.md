@@ -260,6 +260,12 @@ Ausgaben-Check für monatliche CSV-Importe und Budgettracking.
   - Jahresverbrauch, Restbudget
   - Jahreshochrechnung (ab 2 Datenmonaten Median statt Mittelwert)
   - Soll/Ist auf Basis importierter Monate
+- Die Kennzahl `spent` summiert die vorzeichenbehafteten Kategorien eines
+  Monats und bildet danach den Betrag. Positive Gegenbuchungen/Erstattungen
+  saldieren negative Ausgaben. Der aktuelle Vertrag beschreibt daher einen
+  **Netto-Cash-Abfluss**, keine Bruttoausgabe. Eine getrennte
+  Bruttoausgabenmetrik ist die offene Fachentscheidung D-12 und wird nicht
+  still aus demselben Feld abgeleitet.
 - Detaildialog mit sortierter Kategorieliste und „Top 3 Kategorien“.
 - Ein JSON-/Shape-Fehler liefert ueber `loadExpensesStoreResult()` einen strukturierten `corrupt`-Status samt unveraendertem Rohinhalt. Der kompatible `loadExpensesStore()` wirft in diesem Fall, statt einen Leerzustand zu erfinden.
 - Die Recovery-UI nennt Ausgabenbereich und Backend. Ein Reset bleibt bis zum erfolgreichen Rohdatenexport gesperrt, verlangt danach eine explizite Bestaetigung und gilt erst nach erfolgreichem Facade-Flush als abgeschlossen; Abbruch und Flush-Fehler lassen den Store im gesperrten Recovery-Zustand.

@@ -219,6 +219,11 @@ Tranchennamen, ISIN, Ticker, Notizen oder exportierte Rohdaten werden nicht
 dupliziert. Eine identische `actionId` mit denselben Daten ist ein No-op; dieselbe
 ID mit abweichenden Daten ist ein Konflikt.
 
+Der Reconcile-Write veraendert ausschliesslich Lot-/Profilbestand und Auditstate.
+Er bucht den erfassten Nettoerloes nicht automatisch in die freie Liquiditaet.
+Ein nach der Broker-Ausfuehrung verbleibender Cashbetrag muss bis zur offenen
+Fachentscheidung D-15 separat in den Rahmendaten nachgefuehrt werden.
+
 ### Entscheidungsdiagnose (Balance)
 
 Die Balance-App bezeichnet das Diagnose-Panel als `Entscheidungsdiagnose`, um die regelbasierte, pruefbare Logik klar von einer Blackbox-Interpretation abzugrenzen.
@@ -304,7 +309,7 @@ Diese Grenze ist fachlich gewollt: Balance kennt derzeit keinen belastbaren aktu
 * `app/simulator/simulator-sweep.js` – Sweep-Logik inkl. Whitelist/Blocklist, Heatmap und Worker-Orchestrierung.
 * `app/simulator/sweep-runner.js` – DOM-freier Sweep-Runner (kombinierbar in Worker-Jobs).
 * `app/simulator/simulator-optimizer.js` – Auto-Optimize-Kernlogik; Kandidatensuche und Bewertung laufen mehrphasig über LHS-Kandidaten, Quick-Filter, volle Evaluation, lokale Verfeinerung und Validierung.
-* `app/simulator/auto_optimize.js` – Auto-Optimize-Orchestrator inkl. Worker-Parallelisierung, Kandidatenbewertung und Champion-Auswahl.
+* `app/simulator/auto_optimize.js` – Auto-Optimize-Orchestrator inkl. Worker-Parallelisierung, Kandidatenbewertung und Champion-Auswahl. Ergebnisse fuehren `AutoOptimizeModelStatusV1` mit Evaluation-Modellversion, Hashes des vollstaendigen Datenuniversums, effektiver Datenauswahl, Experimentstatus sowie getrennten technischen, internen und externen Validierungsstatuswerten. Ein injizierter Test-/Custom-Evaluator erbt weder die Datenhashes noch den technischen beziehungsweise internen Status des eingebauten MC-Evaluators.
 * `app/simulator/auto-optimize-{evaluate,metrics,utils}.js` – `AutoOptimizeMetricResultV1` poolt kanonische Run-Rohverteilungen ueber Train- bzw. Bestaetigungsseeds. Endvermoegen P1 bis P99 und MC-Drawdown P90 verwenden lineare Interpolation bei `(n-1)q`. `MonteCarloFinancialRunDistributionV1` schliesst technische Pfade aus Finanzverteilungen aus und inventarisiert `sampleSize`, `excludedRuns` sowie `missingness.technical_error`; der Optimizer weist einen Batch mit technischer Missingness fail-closed ab. `MedianWithdrawalRateD14V1` bildet die arithmetische mittlere realisierte Entnahmequote je auswertbarem Run und danach den Median ueber Runs; Beobachtungszahl und Missingness bleiben getrennt von echter 0. Das tatsaechlich berechnete finale Ruinjahr verwendet ausschliesslich die tatsaechlich ausgezahlte `jahresEntnahmeEffektiv` als Zaehler und den Depotwert vor Auszahlung als Nenner; ein Ruin vor dem Auszahlungsschritt traegt deshalb eine beobachtete Auszahlung von 0. Der Nenner umfasst Aktien-, Anleihen- und Goldtranchen, nicht Liquiditaet oder Pflegebucket. Objective, aktive Constraints, Dynamic-Flex-Safety-Penalty und Tiebreaker akzeptieren nur endliche primitive Zahlen aus explizit versionierten Resultaten und schlagen sonst fail-closed fehl.
 * `app/simulator/auto_optimize_ui.js` und `app/simulator/auto-optimize-{presets,param-meta,config-ui,renderer,apply}.js` – Auto-Optimize UI-Fassade, Preset-Konfigurationen, Config-Parsing, Ergebnis-Rendering und Champion-Apply-Flow (1-7 dynamische Parameter).
 * `app/simulator/simulator-heatmap.js` – SVG-Rendering für Parameter-Sweeps inkl. Warnhinweise bei Verstößen.
@@ -469,6 +474,7 @@ Die Worker-Pools bieten ein opt-in Telemetrie-System für lokale Performance-Ana
 * **Dynamic-Flex-Modus:** `inherit`, `force_on`, `force_off`; Dynamic-Flex-Parameter sind nur bei effektiv aktivem Dynamic-Flex zulässig.
 * **Safety-Guards:** Zusätzliche Zielstrafen verhindern überaggressive Dynamic-Flex-Lösungen in Top-Ergebnissen.
 * **Longevity-Grenze:** Langlebigkeitsparameter sind in Version 1 bewusst keine Optimizer-Variablen. Auto-Optimize bewertet Kandidaten mit den aktuellen Basiswerten, darf `longevityMode`, `longevityQuantileShift`, `longevityRelativePct` und `longevityBufferYears` aber nicht selbst verändern.
+* **Validierungsgrenze:** Sweep-Rankings sind experimentelle Punktschaetzer. Auto-Optimize ist ein experimentelles Szenariovergleichsverfahren; der Champion ist weder ein globales Optimum noch eine fachlich validierte Empfehlung.
 
 ### Ergebnisdarstellung
 

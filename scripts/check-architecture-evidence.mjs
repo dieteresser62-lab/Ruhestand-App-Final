@@ -131,6 +131,22 @@ function parseScheduleRows(content) {
     return rows;
 }
 
+function parseModelMatrixRows(content) {
+    const rows = [];
+    const lines = content.split(/\r?\n/);
+    for (let index = 0; index < lines.length; index++) {
+        const cells = parseMarkdownRow(lines[index]);
+        const id = cells?.[0]?.match(/^(MS-\d{2})\b/)?.[1];
+        if (!id) continue;
+        rows.push({
+            id,
+            cells,
+            line: index + 1
+        });
+    }
+    return rows;
+}
+
 function validateRecords({ content, file, spec, errors }) {
     const rows = parseRecordRows(content, spec);
     const byId = new Map();
@@ -343,6 +359,32 @@ function validateSchedules({ content, file, records, today, errors }) {
     return byScope;
 }
 
+function validateModelMatrixReviewDates({ content, file, today, errors }) {
+    const rows = parseModelMatrixRows(content);
+    for (const row of rows) {
+        const reviewCell = row.cells[7] || '';
+        const reviewDate = reviewCell.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0] || '';
+        if (!parseIsoDate(reviewDate)) {
+            errors.push(createError(
+                'INVALID_MODEL_REVIEW_DATE',
+                `${row.id} has no valid next-review date in its matrix review field.`,
+                file,
+                row.line
+            ));
+            continue;
+        }
+        if (reviewDate < today) {
+            errors.push(createError(
+                'OVERDUE_MODEL_REVIEW',
+                `${row.id} was due on ${reviewDate}; check date is ${today}.`,
+                file,
+                row.line
+            ));
+        }
+    }
+    return rows;
+}
+
 function extractLocalLinks(content) {
     const links = [];
     const lines = content.split(/\r?\n/);
@@ -532,6 +574,12 @@ export function validateEvidenceDocuments(
         today,
         errors
     });
+    const modelMatrixRows = validateModelMatrixReviewDates({
+        content: documents[EVIDENCE_PATHS.main],
+        file: EVIDENCE_PATHS.main,
+        today,
+        errors
+    });
 
     validateLocalLinks({ documents, repoRoot, errors });
     validateIdReferences({
@@ -549,7 +597,8 @@ export function validateEvidenceDocuments(
             researchRecords: research.byId.size,
             mapAnchors: maps.size,
             marketReviewScopes: marketSchedules.size,
-            researchReviewScopes: researchSchedules.size
+            researchReviewScopes: researchSchedules.size,
+            modelMatrixRows: modelMatrixRows.length
         },
         errors
     };
@@ -569,6 +618,7 @@ export function formatValidationReport(report) {
             `Architecture evidence validation passed for ${report.today}.`,
             `MKT records: ${report.counts.marketRecords}; FOR records: ${report.counts.researchRecords}; MAP anchors: ${report.counts.mapAnchors}.`,
             `Review scopes: ${report.counts.marketReviewScopes} market; ${report.counts.researchReviewScopes} research.`,
+            `Model matrix review dates: ${report.counts.modelMatrixRows}.`,
             'Network access: none (static local validation).'
         ].join('\n');
     }

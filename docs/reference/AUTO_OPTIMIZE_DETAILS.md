@@ -1,6 +1,21 @@
 # Auto-Optimize: Technische Details
 
-Die Auto-Optimierung ("Auto-Optimize") ist ein Feature des Simulators, das automatisch geeignete Parameterkombinationen für eine gegebene Rentenstrategie ermittelt. Statt manuell hunderte Kombinationen im Sweep-Modus durchzuprobieren, nutzt der Auto-Optimizer Algorithmen, um den Suchraum systematisch zu durchlaufen.
+Die Auto-Optimierung ("Auto-Optimize") ist ein experimentelles Feature des
+Simulators, das Parameterkombinationen fuer eine gegebene Rentenstrategie
+innerhalb eines begrenzten Suchraums vergleicht. Statt manuell hunderte
+Kombinationen im Sweep-Modus durchzuprobieren, durchlaeuft der Auto-Optimizer
+den Suchraum systematisch. Der ausgegebene Champion ist ein modellinterner
+Szenariokandidat, kein globales Optimum, keine extern validierte Strategie und
+keine Finanzempfehlung.
+
+Die Ergebnisanzeige fuehrt `AutoOptimizeModelStatusV1`: Evaluation-Modellversion,
+Jahresdaten-/Regimehash des vollstaendigen Datenuniversums, die effektive
+Startjahr-/Estimated-History-Auswahl, `methodClassification=experimental` und
+getrennte Statuswerte fuer technische Tests, interne Plausibilisierung und
+externe Validierung. Technische Tests heben die beiden fachlichen Statusachsen
+nicht automatisch an. Ein injizierter Custom-Evaluator wird als
+`custom_evaluator` ausgewiesen und darf weder die eingebauten Datenhashes noch
+deren technischen beziehungsweise internen Status beanspruchen.
 
 ## Architektur
 
@@ -38,7 +53,7 @@ Die Optimierung verläuft mehrphasig. LHS erzeugt zuerst den Kandidatenraum; dan
 
 ### Stage 3: Refinement (Verfeinerung)
 - **Methode**: Lokale Suche um die besten vollständig evaluierten Kandidaten.
-- **Ziel**: Das lokale Optimum in den identifizierten Regionen finden.
+- **Ziel**: In den identifizierten Regionen weitere lokal bessere Kandidaten suchen.
 - **Details**: Für Top-Kandidaten werden neue Kandidaten in der unmittelbaren "Nachbarschaft" generiert und erneut bewertet.
 
 ### Stage 4: Final Verification (Validierung)

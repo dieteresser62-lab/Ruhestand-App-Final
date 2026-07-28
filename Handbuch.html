@@ -1053,8 +1053,9 @@
                     <div class="detail-block" id="simulator-sweep">
                         <h3>Parameter Sweep &amp; Szenarien</h3>
                         <p>Der Parameter Sweep testet systematisch mehrere Sparraten, Ruhestandsalter oder
-                            Aktienquoten. Die Heatmap zeigt sofort, welche Kombinationen Zielwahrscheinlichkeiten
-                            erreichen.</p>
+                            Aktienquoten. Die Heatmap zeigt, welche Kombinationen im gewählten Modell und
+                            Stichprobenlauf die Zielkennzahlen erreichen. Quantilrankings sind experimentelle
+                            Punktschätzer, keine extern validierte Rangfolge.</p>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
                             <li><strong>Konvergenz:</strong> Der Sweep wiederverwendet die gleichen Zufallssamen, um
@@ -1062,11 +1063,15 @@
                                 entscheidend.</li>
                             <li><strong>Szenario-Speicher:</strong> Speichern Sie interessante Konfigurationen als
                                 benannte Szenarien, um sie später in der Balance-App gegenzuprüfen.</li>
-                            <li><strong>Optimierer:</strong> Aktivieren Sie den eingebauten Optimierer, um Sparrate oder
-                                Aktienquote automatisch auf eine modellinterne Floor-Deckungs-Schwelle einzustellen.
-                            </li>
+                            <li><strong>Optimierer:</strong> Auto-Optimize ist ein experimentelles
+                                Vergleichsverfahren. Es sucht modellinterne Kandidaten unter den gewählten Daten,
+                                Seeds, Parametern und Constraints; der Champion ist kein globales Optimum und keine
+                                Finanzempfehlung.</li>
                             <li><strong>Auto-Optimize-Details:</strong> Der Optimierer arbeitet in drei Stufen
-                                (Grob/Raffiniert/Verifikation) und gibt eine Champion-Konfiguration als Vorlage aus.</li>
+                                (Grob/Raffiniert/Verifikation) und gibt eine Champion-Konfiguration als Vorlage aus.
+                                Die Ergebnisanzeige nennt Modellversion, Hashes des gesamten Datenuniversums,
+                                die effektive Filterauswahl sowie getrennte technische, interne und externe
+                                Validierungsstatuswerte.</li>
                             <li><strong>Preset-Setups:</strong> Vordefinierte Sweep-Presets und eine dynamische
                                 Parameter-Auswahl (1-7 Parameter) beschleunigen den Einstieg.</li>
                             <li><strong>Schutzmechanismen:</strong> Whitelist + Rente-2-Invarianz verhindern, dass
@@ -1667,6 +1672,33 @@
                         Whitelist. So bleiben Zweitpersonen-Parameter konsistent. Auch Langlebigkeitsfelder bleiben
                         feste Sicherheitsannahmen statt Sweep-Variablen. Blockierte Variationen erscheinen als
                         Heatmap-Badges.</dd>
+
+                    <dt>Warum sind Sweep und Auto-Optimize als experimentell gekennzeichnet?</dt>
+                    <dd>Technische Tests belegen reproduzierbare Berechnungs- und Datenverträge, aber keine externe
+                        fachliche Gültigkeit. Rankings und Champion gelten nur für den untersuchten Daten-, Seed-,
+                        Parameter- und Modellraum. Lesen Sie deshalb Modellstatus, Datenhashes und Ergebnisbündel und
+                        übernehmen Sie keinen Kandidaten ungeprüft als reale Strategie.</dd>
+
+                    <dt>Was bedeutet „Ausgaben“ im Ausgaben-Check?</dt>
+                    <dd>Die aktuelle Kennzahl summiert vorzeichenbehaftete Kategorien und bildet danach den Betrag.
+                        Erstattungen und positive Gegenbuchungen mindern den Wert. Es handelt sich um den
+                        Netto-Cash-Abfluss, nicht um eine getrennt ermittelte Bruttoausgabe.</dd>
+
+                    <dt>Wird ein bestätigter Verkaufserlös automatisch als Liquidität gebucht?</dt>
+                    <dd>Nein. Die Reconciliation entfernt die bestätigten Stücke und protokolliert Nettoerlös und
+                        Gebühr, erhöht aber nicht automatisch die freie Liquidität. Wenn der Erlös als Cash verbleibt,
+                        führen Sie ihn in den Rahmendaten separat nach.</dd>
+
+                    <dt>Kann der Simulator mehr als zwei Personen abbilden?</dt>
+                    <dd>Finanzwerte aus mehr als zwei Profilen können aggregiert werden. Individuelle Demografie-,
+                        Mortalitäts-, Pflege- und Rentenpfade werden in Version 1 jedoch auf höchstens zwei Personen
+                        begrenzt; bei mehr Profilen erscheint eine Warnung.</dd>
+
+                    <dt>Ist die Kirchensteuerberechnung eine Steuerberechnung nach aktuellem Recht?</dt>
+                    <dd>Nein. Die Suite verwendet eine vereinfachte Planungsformel. Insbesondere die
+                        Kirchensteuerwirkung weicht von der Formel in Paragraph 32d EStG ab. Prüfen Sie reale
+                        Verkaufsvorgänge und Steuerfälle fachlich; die Suite ersetzt weder Steuerbescheid noch
+                        Steuerberatung.</dd>
 
                     <dt>Wie oft sollte ich Rebalancing machen?</dt>
                     <dd>Ein jährlicher Rhythmus (z.B. zum Jahreswechsel) balanciert Aufwand, Steuern und
