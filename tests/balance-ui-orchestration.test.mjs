@@ -418,7 +418,7 @@ async function runBalanceUiOrchestrationTests() {
             },
             lastState: {
                 guardrailMarker: 'included-keep',
-                cumulativeInflationFactor: 99,
+                cumulativeInflationFactor: 2.99,
                 taxState: { lossCarry: 111 }
             },
             profilverbundHouseholdLastState: { householdGuardrail: 'household-keep' },
@@ -598,8 +598,8 @@ async function runBalanceUiOrchestrationTests() {
             'Input-only Profilverbund-Write erhaelt die Inflationsmetadaten im Haupt-State');
         assertEqual(mainAfterInputPersistence.inputs.depotLastUpdate, 123456,
             'Profilverbund persistiert den Depot-Zeitstempel auch im Haupt-State');
-        assertEqual(mainAfterInputPersistence.lastState.cumulativeInflationFactor, 1,
-            'Input-only Write schreibt die migrierte Main-State-Sicht nicht aus rohen Profildaten zurueck');
+        assertEqual(mainAfterInputPersistence.lastState.cumulativeInflationFactor, 2.99,
+            'Input-only Write erhaelt einen plausiblen kumulierten Inflationsfaktor bytegetreu');
         assert(migratedMainStateLoads > 0,
             'Aktiver Profilverbund-Write liest seine Merge-Basis ueber den migrierenden StorageManager');
 
@@ -804,7 +804,7 @@ async function runBalanceUiOrchestrationTests() {
             payload: {
                 ...validState,
                 lastState: {
-                    cumulativeInflationFactor: 9,
+                    cumulativeInflationFactor: 2.9,
                     lastInflationAppliedAtAge: null,
                     taxState: { lossCarry: -1 }
                 }
@@ -813,7 +813,8 @@ async function runBalanceUiOrchestrationTests() {
         const normalizedLegacy = normalizeBalanceImportDocument(legacyDocument);
         assertEqual(normalizedLegacy.sourceFormat, 'legacy-balance-export-v0', 'Unterstuetztes Legacy-Format laeuft ueber explizite Migration');
         assertEqual(normalizedLegacy.migrated, true, 'Legacy-Import wird als migriert markiert');
-        assertEqual(normalizedLegacy.payload.lastState.cumulativeInflationFactor, 1, 'Legacy-Migration repariert den historischen Inflationsfaktor');
+        assertEqual(normalizedLegacy.payload.lastState.cumulativeInflationFactor, 2.9,
+            'Legacy-Migration erhaelt einen plausiblen kumulierten Inflationsfaktor');
         assertEqual(normalizedLegacy.payload.lastState.lastInflationAppliedAtAge, 0, 'Legacy-Migration repariert das historische Inflationsalter');
         assertEqual(normalizedLegacy.payload.lastState.taxState.lossCarry, 0, 'Legacy-Migration repariert den historischen Verlustvortrag');
 
@@ -883,6 +884,20 @@ async function runBalanceUiOrchestrationTests() {
             payload: { ...validState, inputs: { ...validState.inputs, floorBedarf: -1 } }
         });
         assertEqual(invalidCoreError?.code, 'invalid_input_bounds', 'Ungueltige finanzielle Kernwerte werden vor der Mutation blockiert');
+        [0, -1, 20.0001, 99, Number.NaN, Number.POSITIVE_INFINITY].forEach(invalidFactor => {
+            const invalidInflationError = captureImportError({
+                ...currentDocument,
+                payload: {
+                    ...validState,
+                    lastState: { cumulativeInflationFactor: invalidFactor }
+                }
+            });
+            assertEqual(
+                invalidInflationError?.code,
+                'invalid_last_state',
+                `Ungueltiger kumulierter Inflationsfaktor ${String(invalidFactor)} wird vor der Mutation blockiert`
+            );
+        });
         ['false', '0', 0, 1, null].forEach(value => {
             const invalidBooleanError = captureImportError({
                 ...currentDocument,

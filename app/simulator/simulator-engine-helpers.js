@@ -9,15 +9,30 @@
 
 import { HISTORICAL_DATA, PFLEGE_GRADE_PROBABILITIES, PFLEGE_GRADE_LABELS, PFLEGE_GRADE_PROGRESSION_PROBABILITIES, SUPPORTED_PFLEGE_GRADES, annualData, REGIME_DATA, REGIME_TRANSITIONS, MORTALITY_TABLE } from './simulator-data.js';
 import { initializePortfolio, prepareHistoricalData } from './simulator-portfolio.js';
+import {
+    assertRuntimeCumulativeInflationFactor,
+    resolveRuntimeCumulativeInflationFactor
+} from '../../types/cumulative-inflation-contract.js';
 
 let historicalDataPrepared = false;
+export const SIMULATOR_INFLATION_RATE_ERROR_CODE = 'SIMULATOR_INFLATION_RATE_INVALID';
+
+export class SimulatorInflationRateError extends RangeError {
+    constructor(value, path = 'inflationPct') {
+        super(`${path} muss als endliche Zahl vorliegen.`);
+        this.name = 'SimulatorInflationRateError';
+        this.code = SIMULATOR_INFLATION_RATE_ERROR_CODE;
+        this.path = path;
+        this.value = value;
+    }
+}
 
 function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
 }
 
-function isValidCumulativeInflationFactor(value) {
-    return Number.isFinite(value) && value > 0;
+function hasOwn(value, key) {
+    return Boolean(value) && Object.prototype.hasOwnProperty.call(value, key);
 }
 
 /**
@@ -26,30 +41,40 @@ function isValidCumulativeInflationFactor(value) {
  * a compatibility fallback for states created before the simulator contract.
  */
 export function resolveSimulatorCumulativeInflationFactor(state) {
-    const appFactor = Number(state?.cumulativeInflationFactor);
-    if (isValidCumulativeInflationFactor(appFactor)) return appFactor;
-
-    const engineFactor = Number(state?.lastState?.cumulativeInflationFactor);
-    if (isValidCumulativeInflationFactor(engineFactor)) return engineFactor;
+    if (hasOwn(state, 'cumulativeInflationFactor') && state.cumulativeInflationFactor !== undefined) {
+        return assertRuntimeCumulativeInflationFactor(state.cumulativeInflationFactor, {
+            path: 'simulatorState.cumulativeInflationFactor'
+        });
+    }
+    if (hasOwn(state?.lastState, 'cumulativeInflationFactor')
+        && state.lastState.cumulativeInflationFactor !== undefined) {
+        return assertRuntimeCumulativeInflationFactor(state.lastState.cumulativeInflationFactor, {
+            path: 'simulatorState.lastState.cumulativeInflationFactor'
+        });
+    }
 
     return 1;
 }
 
 /**
  * Advances the factor for the next simulator year exactly once.
- * Invalid source data keeps the current valid factor; validation of market
- * inputs remains at the existing input/data boundaries.
+ * Missing inflation data keeps the current valid factor. Present values must
+ * already use the canonical numeric runtime contract.
  */
 export function advanceSimulatorCumulativeInflationFactor(currentFactor, inflationPct) {
-    const current = isValidCumulativeInflationFactor(Number(currentFactor))
-        ? Number(currentFactor)
-        : 1;
-    const rate = Number(inflationPct);
-    if (!Number.isFinite(rate)) return current;
+    const current = resolveRuntimeCumulativeInflationFactor(currentFactor, {
+        path: 'currentCumulativeInflationFactor'
+    });
+    if (inflationPct === undefined) return current;
+    if (typeof inflationPct !== 'number' || !Number.isFinite(inflationPct)) {
+        throw new SimulatorInflationRateError(inflationPct);
+    }
 
-    const annualFactor = 1 + (rate / 100);
+    const annualFactor = 1 + (inflationPct / 100);
     const next = current * annualFactor;
-    return isValidCumulativeInflationFactor(next) ? next : current;
+    return assertRuntimeCumulativeInflationFactor(next, {
+        path: 'nextCumulativeInflationFactor'
+    });
 }
 
 export function prepareHistoricalDataOnce() {

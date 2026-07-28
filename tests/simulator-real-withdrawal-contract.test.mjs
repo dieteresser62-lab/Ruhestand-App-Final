@@ -128,6 +128,20 @@ assertClose(
 );
 assertClose(
     resolveSimulatorCumulativeInflationFactor({
+        cumulativeInflationFactor: undefined,
+        lastState: { cumulativeInflationFactor: 1.4 }
+    }),
+    1.4,
+    1e-12,
+    'Explicit undefined top-level factor should remain a missing value and use the nested fallback'
+);
+assertEqual(
+    resolveSimulatorCumulativeInflationFactor({ cumulativeInflationFactor: undefined }),
+    1,
+    'Explicit undefined without nested state should use the missing-value default'
+);
+assertClose(
+    resolveSimulatorCumulativeInflationFactor({
         cumulativeInflationFactor: 1.2,
         lastState: { cumulativeInflationFactor: 9 }
     }),
@@ -135,12 +149,78 @@ assertClose(
     1e-12,
     'Top-level simulator factor should own the contract'
 );
+assertEqual(
+    resolveSimulatorCumulativeInflationFactor({ cumulativeInflationFactor: 99 }),
+    99,
+    'Runtime simulator factor may exceed the persisted plausibility ceiling'
+);
+for (const invalidFactor of [0, -1, Number.NaN, Number.POSITIVE_INFINITY, null, '1']) {
+    let topLevelError = null;
+    try {
+        resolveSimulatorCumulativeInflationFactor({
+            cumulativeInflationFactor: invalidFactor,
+            lastState: { cumulativeInflationFactor: 1.5 }
+        });
+    } catch (error) {
+        topLevelError = error;
+    }
+    assertEqual(topLevelError?.code, 'CUMULATIVE_INFLATION_FACTOR_INVALID',
+        `Invalid top-level factor ${String(invalidFactor)} must not fall back to nested state`);
+
+    let nestedError = null;
+    try {
+        resolveSimulatorCumulativeInflationFactor({
+            lastState: { cumulativeInflationFactor: invalidFactor }
+        });
+    } catch (error) {
+        nestedError = error;
+    }
+    assertEqual(nestedError?.code, 'CUMULATIVE_INFLATION_FACTOR_INVALID',
+        `Invalid nested factor ${String(invalidFactor)} must not fall back to one`);
+}
 assertClose(
     advanceSimulatorCumulativeInflationFactor(1.2, -2),
     1.176,
     1e-12,
     'Deflation should use the same multiplicative contract'
 );
+assertClose(
+    advanceSimulatorCumulativeInflationFactor(19.9, 5),
+    20.895,
+    1e-12,
+    'Runtime inflation progression must not stop at the persisted plausibility ceiling'
+);
+let longRunningFactor = 1;
+for (let year = 0; year < 80; year++) {
+    longRunningFactor = advanceSimulatorCumulativeInflationFactor(longRunningFactor, 10);
+}
+assert(Number.isFinite(longRunningFactor) && longRunningFactor > 20,
+    'Long high-inflation simulations must remain valid after crossing factor 20');
+assertEqual(
+    advanceSimulatorCumulativeInflationFactor(1.2, undefined),
+    1.2,
+    'Missing inflation rate should retain the factor without classifying absence as NaN'
+);
+let nonFiniteRateError = null;
+try {
+    advanceSimulatorCumulativeInflationFactor(1.2, Number.NaN);
+} catch (error) {
+    nonFiniteRateError = error;
+}
+assert(nonFiniteRateError instanceof RangeError,
+    'Non-finite inflation rate must fail visibly instead of silently retaining the previous factor');
+assertEqual(nonFiniteRateError?.code, 'SIMULATOR_INFLATION_RATE_INVALID',
+    'Invalid inflation rates should expose the simulator contract error code');
+for (const invalidRate of [null, '2', Number.POSITIVE_INFINITY]) {
+    let invalidRateError = null;
+    try {
+        advanceSimulatorCumulativeInflationFactor(1.2, invalidRate);
+    } catch (error) {
+        invalidRateError = error;
+    }
+    assertEqual(invalidRateError?.code, 'SIMULATOR_INFLATION_RATE_INVALID',
+        `Present inflation rate ${String(invalidRate)} must be a finite number`);
+}
 
 let state = createState();
 const expectedFactors = [1, 1.1, 1.21];

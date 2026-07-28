@@ -16,12 +16,19 @@
 import { CONFIG, StorageError } from './balance-config.js';
 import { PersistenceFacade, persistenceStorage } from '../shared/persistence-facade.js';
 import { SnapshotArchive, SNAPSHOT_KINDS } from '../shared/snapshot-archive.js';
-import { isAllowedSnapshotRestoreLiveKey } from '../shared/persistence-key-policy.js';
+import {
+    isAllowedPersistenceImportKey,
+    isAllowedSnapshotRestoreLiveKey
+} from '../shared/persistence-key-policy.js';
 import { PROFILE_STORAGE_KEYS } from '../profile/profile-state.js';
 import { isProfileScopedKey } from '../profile/profile-key-policy.js';
 import { saveCurrentProfileFromLocalStorage } from '../profile/profile-storage.js';
+import {
+    assertCumulativeInflationFactor,
+    CumulativeInflationFactorError
+} from '../../types/cumulative-inflation-contract.js';
 
-export const BALANCE_IMPORT_RECOVERY_KIND = 'balance-import-recovery';
+export const BALANCE_IMPORT_RECOVERY_KIND = SNAPSHOT_KINDS.balanceImportRecovery;
 const SNAPSHOT_HANDLE_DB_NAME = 'ruhestand-suite-snapshot-handles';
 const LEGACY_SNAPSHOT_HANDLE_DB_NAME = 'snapshotDB';
 const SNAPSHOT_HANDLE_STORE_NAME = 'handles';
@@ -59,6 +66,17 @@ function hasOwn(value, key) {
     return Object.prototype.hasOwnProperty.call(value, key);
 }
 
+function validateStoredCumulativeInflationFactor(data) {
+    const state = data?.lastState;
+    if (!state || typeof state !== 'object' || Array.isArray(state)) return data;
+    if (hasOwn(state, 'cumulativeInflationFactor')) {
+        assertCumulativeInflationFactor(state.cumulativeInflationFactor, {
+            path: 'lastState.cumulativeInflationFactor'
+        });
+    }
+    return data;
+}
+
 function captureCurrentSnapshotRecords() {
     return SnapshotArchive.captureCurrentRecords({
         keys: getPersistenceKeys,
@@ -83,6 +101,17 @@ async function createArchiveSnapshot({ label = '', kind = SNAPSHOT_KINDS.manual,
 }
 
 async function restoreImportRecoverySnapshot(snapshot) {
+    if (isFullImportRecoverySnapshot(snapshot)) {
+        const targetRecords = Object.fromEntries(
+            Object.entries(snapshot.records || {})
+                .filter(([key]) => isAllowedPersistenceImportKey(key))
+                .map(([key, value]) => [key, String(value)])
+        );
+        return PersistenceFacade.replaceRecordsTransactional(targetRecords, {
+            allowKey: isAllowedPersistenceImportKey
+        });
+    }
+
     const currentRegistry = parseJsonObject(persistenceStorage.getItem(PROFILE_STORAGE_KEYS.registry), null);
     if (snapshot.activeProfileId && registryHasProfile(currentRegistry, snapshot.activeProfileId)) {
         const { deleteKeys, upserts, allowKey } = buildStandardRestorePlan(snapshot, currentRegistry);
@@ -101,6 +130,14 @@ async function restoreImportRecoverySnapshot(snapshot) {
         allowKey,
         restoreLock: true
     });
+}
+
+function isFullImportRecoverySnapshot(snapshot) {
+    return snapshot?.kind === SNAPSHOT_KINDS.fullBackupImportRecovery
+        || (
+            snapshot?.restoreScope?.profileRegistryMode === 'replace-all-rollback'
+            && snapshot?.restoreScope?.profileLiveDataMode === 'replace-all-rollback'
+        );
 }
 
 function getSnapshotStatusText() {
@@ -303,8 +340,10 @@ export const StorageManager = {
         try {
             const data = persistenceStorage.getItem(CONFIG.STORAGE.LS_KEY);
             const parsed = data ? JSON.parse(data) : {};
+            validateStoredCumulativeInflationFactor(parsed);
             return this._runMigrations(parsed);
         } catch (e) {
+            if (e instanceof CumulativeInflationFactorError) throw e;
             throw new StorageError("Fehler beim Laden des Zustands aus dem LocalStorage.", { originalError: e });
         }
     },
@@ -317,8 +356,10 @@ export const StorageManager = {
      */
     saveState(state) {
         try {
+            validateStoredCumulativeInflationFactor(state);
             persistenceStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify(state));
         } catch (e) {
+            if (e instanceof CumulativeInflationFactorError) throw e;
             throw new StorageError("Fehler beim Speichern des Zustands im LocalStorage.", { originalError: e });
         }
     },
@@ -326,15 +367,16 @@ export const StorageManager = {
     /**
      * Führt Daten-Migrationen für ältere localStorage-Versionen durch
      *
-     * Bereinigt fehlerhafte Werte:
-     * - Inflationsfaktor > 3 → 1 (Reset bei fehlerhaften Werten)
-     * - Nicht-finite Werte → Standardwerte
+     * Historische Einmalmigrationen duerfen nur fehlende Metadaten ergaenzen.
+     * Ein vorhandener Inflationsfaktor wird vor der Migration strikt validiert
+     * und niemals still durch einen Default ersetzt.
      *
      * @param {Object} data - Rohdaten aus localStorage
      * @returns {Object} Migrierte Daten
      * @private
      */
     _runMigrations(data) {
+        validateStoredCumulativeInflationFactor(data);
         const ensureTaxState = (payload) => {
             if (!payload || typeof payload !== 'object') return payload;
             const state = payload.lastState;
@@ -353,9 +395,6 @@ export const StorageManager = {
 
         let state = data.lastState || {};
         if (state) {
-            if (!isFinite(state.cumulativeInflationFactor) || state.cumulativeInflationFactor > 3) {
-                state.cumulativeInflationFactor = 1;
-            }
             if (!Number.isFinite(state.lastInflationAppliedAtAge)) {
                 state.lastInflationAppliedAtAge = 0;
             }
@@ -448,7 +487,7 @@ export const StorageManager = {
         }
         try {
             const snapshot = await SnapshotArchive.readSnapshot(recoverySnapshotId);
-            if (snapshot.kind !== BALANCE_IMPORT_RECOVERY_KIND) {
+            if (snapshot.kind !== BALANCE_IMPORT_RECOVERY_KIND && !isFullImportRecoverySnapshot(snapshot)) {
                 throw new StorageError('Der angegebene Snapshot ist kein Balance-Import-Recovery-Punkt.');
             }
             await restoreImportRecoverySnapshot(snapshot);
@@ -518,7 +557,7 @@ export const StorageManager = {
             const li = document.createElement('li');
             const nameSpan = document.createElement('span');
             nameSpan.textContent = formatSnapshotName(entry);
-            if (!entry.standardRestorable) {
+            if (!entry.standardRestorable && !isFullImportRecoverySnapshot(entry)) {
                 const restoreHint = document.createElement('small');
                 restoreHint.textContent = 'Standard-Restore nur nach Profilzuordnung moeglich.';
                 restoreHint.style.display = 'block';
@@ -603,8 +642,13 @@ export const StorageManager = {
      * @returns {Promise<void>}
      */
     async restoreSnapshot(key, handle) {
-        saveCurrentProfileFromLocalStorage();
         const snapshot = await SnapshotArchive.readSnapshot(key);
+        if (isFullImportRecoverySnapshot(snapshot)) {
+            await restoreImportRecoverySnapshot(snapshot);
+            location.reload();
+            return;
+        }
+        saveCurrentProfileFromLocalStorage();
         const currentRegistry = parseJsonObject(persistenceStorage.getItem(PROFILE_STORAGE_KEYS.registry), null);
         const { deleteKeys, upserts, allowKey } = buildStandardRestorePlan(snapshot, currentRegistry);
         await PersistenceFacade.replaceLiveRecords(snapshot.records, {

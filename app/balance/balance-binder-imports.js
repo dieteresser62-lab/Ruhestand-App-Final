@@ -20,6 +20,7 @@ import {
     deriveCompletedCalendarYear
 } from './balance-annual-period.js';
 import { normalizeTrancheCollection } from '../../types/tranche-contract.js';
+import { isValidCumulativeInflationFactor } from '../../types/cumulative-inflation-contract.js';
 
 export const BALANCE_EXPORT_APP_ID = 'ruhe-stand-suite.balance';
 export const BALANCE_EXPORT_SCHEMA = 'balance-state';
@@ -789,13 +790,6 @@ function migrateLegacyStateV0(payload) {
 
     if (!isRecord(migrated.lastState)) return migrated;
     const state = migrated.lastState;
-    if (
-        !Number.isFinite(state.cumulativeInflationFactor) ||
-        state.cumulativeInflationFactor <= 0 ||
-        state.cumulativeInflationFactor > 3
-    ) {
-        state.cumulativeInflationFactor = 1;
-    }
     if (!Number.isFinite(state.lastInflationAppliedAtAge)) {
         state.lastInflationAppliedAtAge = 0;
     }
@@ -917,7 +911,7 @@ function validateBalanceState(payload) {
     const state = payload.lastState;
     if (isRecord(state) && hasOwn(state, 'cumulativeInflationFactor')) {
         const factor = state.cumulativeInflationFactor;
-        if (!Number.isFinite(factor) || factor <= 0 || factor > 3) {
+        if (!isValidCumulativeInflationFactor(factor)) {
             failImport('invalid_last_state', 'Der gespeicherte Inflationsfaktor ist ungültig. Bitte eine intakte Exportdatei verwenden.');
         }
     }

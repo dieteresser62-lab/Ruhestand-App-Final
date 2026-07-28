@@ -826,6 +826,48 @@ function clone(value) {
     console.log('✅ Incomplete initialized legacy state uses the full-flex fallback contract');
 }
 
+// --- TEST 9e: cumulative inflation factor is fail-closed ---
+{
+    const baseParams = {
+        gesamtwert: 100000,
+        depotwertGesamt: 100000,
+        inflatedBedarf: { floor: 12000, flex: 12000 },
+        market: { sKey: 'NORMAL' },
+        renteJahr: 0
+    };
+    for (const invalidFactor of [0, -1, Number.NaN, Number.POSITIVE_INFINITY, null, '1']) {
+        let thrown = null;
+        try {
+            SpendingPlanner._initializeOrLoadState({
+                initialized: true,
+                cumulativeInflationFactor: invalidFactor
+            }, baseParams, () => {});
+        } catch (error) {
+            thrown = error;
+        }
+        assertEqual(thrown?.code, 'CUMULATIVE_INFLATION_FACTOR_INVALID',
+            `Planner muss Inflationsfaktor ${String(invalidFactor)} vor der Berechnung blockieren`);
+    }
+    const missingFactor = SpendingPlanner._initializeOrLoadState({
+        initialized: true
+    }, baseParams, () => {});
+    assertEqual(missingFactor.keyParams.cumulativeInflationFactor, 1,
+        'Nur ein fehlender Legacy-Inflationsfaktor darf den Initialwert 1 verwenden');
+    const highRuntimeFactor = SpendingPlanner._initializeOrLoadState({
+        initialized: true,
+        cumulativeInflationFactor: 99
+    }, baseParams, () => {});
+    assertEqual(highRuntimeFactor.keyParams.cumulativeInflationFactor, 99,
+        'Runtime-Zustand darf den Persistenz-Plausibilitaetswert von 20 ueberschreiten');
+    const uninitializedState = SpendingPlanner._initializeOrLoadState({
+        initialized: false,
+        cumulativeInflationFactor: null
+    }, baseParams, () => {});
+    assertEqual(uninitializedState.keyParams.cumulativeInflationFactor, 1,
+        'Nicht initialisierter Zustand validiert keinen unbenutzten Altwert und startet mit Faktor 1');
+    console.log('✅ Spending planner cumulative inflation domain works');
+}
+
 // --- TEST 10: Alarm + Flex-Budget + Final-Limits interaction ---
 {
     const decisions = [];

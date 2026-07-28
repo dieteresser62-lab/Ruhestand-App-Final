@@ -90,10 +90,20 @@ class StorageError extends Error {
 const StorageManager = {
     _idbHelper: new MockIDBHelper(),
 
+    _validateInflationFactor(data) {
+        const state = data?.lastState;
+        if (!state || !Object.prototype.hasOwnProperty.call(state, 'cumulativeInflationFactor')) return;
+        const factor = state.cumulativeInflationFactor;
+        if (typeof factor !== 'number' || !Number.isFinite(factor) || factor <= 0 || factor > 20) {
+            throw new RangeError('lastState.cumulativeInflationFactor muss groesser 0 und hoechstens 20 sein.');
+        }
+    },
+
     loadState() {
         try {
             const data = localStorage.getItem(CONFIG.STORAGE.LS_KEY);
             const parsed = data ? JSON.parse(data) : {};
+            this._validateInflationFactor(parsed);
             return this._runMigrations(parsed);
         } catch (e) {
             throw new StorageError("Fehler beim Laden des Zustands aus dem LocalStorage.", { originalError: e });
@@ -102,6 +112,7 @@ const StorageManager = {
 
     saveState(state) {
         try {
+            this._validateInflationFactor(state);
             localStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify(state));
         } catch (e) {
             throw new StorageError("Fehler beim Speichern des Zustands im LocalStorage.", { originalError: e });
@@ -109,13 +120,11 @@ const StorageManager = {
     },
 
     _runMigrations(data) {
+        this._validateInflationFactor(data);
         if (localStorage.getItem(CONFIG.STORAGE.MIGRATION_FLAG)) return data;
 
         let state = data.lastState || {};
         if (state) {
-            if (!isFinite(state.cumulativeInflationFactor) || state.cumulativeInflationFactor > 3) {
-                state.cumulativeInflationFactor = 1;
-            }
             if (!Number.isFinite(state.lastInflationAppliedAtAge)) {
                 state.lastInflationAppliedAtAge = 0;
             }
@@ -226,23 +235,56 @@ console.log('Test 2: loadState - Leerer Storage');
     console.log('✓ loadState Leerer Storage OK');
 }
 
-// Test 3: Migration - Ungültiger cumulativeInflationFactor
-console.log('Test 3: Migration - Ungültiger cumulativeInflationFactor');
+// Test 3: Inflationsfaktor-Domain blockiert korrupte Rohdaten
+console.log('Test 3: Inflationsfaktor-Domain blockiert korrupte Rohdaten');
 {
     mockLocalStorage.clear();
 
-    const brokenState = {
+    const highButValidState = {
         lastState: {
-            cumulativeInflationFactor: 5.0, // Ungültig (> 3)
+            cumulativeInflationFactor: 20.0,
             lastInflationAppliedAtAge: 70
         }
     };
 
-    localStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify(brokenState));
-    const loaded = StorageManager.loadState();
+    localStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify(highButValidState));
+    const loadedHigh = StorageManager.loadState();
+    assertEqual(loadedHigh.lastState.cumulativeInflationFactor, 20,
+        'Inflationsfaktor an der Plausibilitaetsgrenze bleibt unveraendert');
 
-    assertEqual(loaded.lastState.cumulativeInflationFactor, 1, 'cumulativeInflationFactor > 3 sollte auf 1 zurückgesetzt werden');
-    console.log('✓ Migration Ungültiger cumulativeInflationFactor OK');
+    for (const invalidFactor of [0, -1, 20.0001, 99, null, 'NaN', 'Infinity']) {
+        mockLocalStorage.clear();
+        const raw = JSON.stringify({
+            lastState: {
+                cumulativeInflationFactor: invalidFactor,
+                lastInflationAppliedAtAge: 70
+            }
+        });
+        localStorage.setItem(CONFIG.STORAGE.LS_KEY, raw);
+        let thrown = null;
+        try {
+            StorageManager.loadState();
+        } catch (error) {
+            thrown = error;
+        }
+        assert(thrown instanceof StorageError,
+            `Inflationsfaktor ${String(invalidFactor)} muss den Load sichtbar blockieren`);
+        assertEqual(localStorage.getItem(CONFIG.STORAGE.LS_KEY), raw,
+            `Inflationsfaktor ${String(invalidFactor)} darf das Rohpayload nicht veraendern`);
+        assertEqual(localStorage.getItem(CONFIG.STORAGE.MIGRATION_FLAG), null,
+            `Inflationsfaktor ${String(invalidFactor)} darf den One-shot-Marker nicht setzen`);
+    }
+
+    let saveThrown = null;
+    try {
+        StorageManager.saveState({
+            lastState: { cumulativeInflationFactor: Number.POSITIVE_INFINITY }
+        });
+    } catch (error) {
+        saveThrown = error;
+    }
+    assert(saveThrown instanceof StorageError, 'Infinity muss bereits an der Save-Grenze blockieren');
+    console.log('✓ Inflationsfaktor-Domain und Raw-Erhalt OK');
 }
 
 // Test 4: Migration - NaN lastInflationAppliedAtAge
@@ -270,17 +312,17 @@ console.log('Test 5: Migration - Wird nur einmal ausgeführt');
     mockLocalStorage.clear();
 
     // Erste Migration
-    const state1 = { lastState: { cumulativeInflationFactor: 5.0 } };
+    const state1 = { lastState: { cumulativeInflationFactor: 2.5 } };
     localStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify(state1));
     StorageManager.loadState();
 
     // Setze ungültigen Wert erneut
-    const state2 = { lastState: { cumulativeInflationFactor: 10.0 } };
+    const state2 = { lastState: { cumulativeInflationFactor: 2.8 } };
     localStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify(state2));
     const loaded = StorageManager.loadState();
 
     // Migration sollte nicht erneut laufen (Flag gesetzt)
-    assertEqual(loaded.lastState.cumulativeInflationFactor, 10.0, 'Zweite Migration sollte nicht laufen');
+    assertEqual(loaded.lastState.cumulativeInflationFactor, 2.8, 'Zweite Migration sollte nicht laufen');
     console.log('✓ Migration Wird nur einmal ausgeführt OK');
 }
 

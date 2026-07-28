@@ -470,7 +470,7 @@ Die Slice-Dateien werden gemaess `SLICE_EXECUTION_RULES.md` jeweils vor Beginn d
 | 11 | [SLICE_SUITE_DATA_11_AUTO_OPTIMIZE_METRICS.md](./SLICE_SUITE_DATA_11_AUTO_OPTIMIZE_METRICS.md) | Optimizer-Zielmetriken und Ranking | P1 | 9, 10, D-14 | 9 | F11-1 technisch nachgebessert - erneutes Re-Review ausstehend |
 | 12 | [SLICE_SUITE_DATA_12_BALANCE_IMPORT_PROVENANCE.md](./SLICE_SUITE_DATA_12_BALANCE_IMPORT_PROVENANCE.md) | Typisierte Balance-Importe und Marktprovenienz | P1 | 1, 3, D-13 | 5 | neue Re-Review-Blocker technisch nachgebessert - erneutes Re-Review ausstehend |
 | 13 | [SLICE_SUITE_DATA_13_PROFILE_RECOVERY.md](./SLICE_SUITE_DATA_13_PROFILE_RECOVERY.md) | Sichtbare Profilkorruption und sichere Recovery | P1 | 4, D-09, D-17 | 10 | technisch umgesetzt - Review ausstehend |
-| 14 | `SLICE_SUITE_DATA_14_BUNDLE_BACKUP_VALIDATION.md` | Atomare Bundle-/Vollbackup-Wiederherstellung und Statevalidierung | P1 | 12, 13 | 8 | geplant |
+| 14 | [SLICE_SUITE_DATA_14_BUNDLE_BACKUP_VALIDATION.md](./SLICE_SUITE_DATA_14_BUNDLE_BACKUP_VALIDATION.md) | Atomare Bundle-/Vollbackup-Wiederherstellung und Statevalidierung | P1 | 12, 13 | 9 | U14-1 bis U14-5 nachgebessert - Re-Review ausstehend |
 | 15 | `SLICE_SUITE_DATA_15_MODEL_DECISIONS.md` | Fachentscheidungen und Modelltransparenz | Entscheidung | 6, 10-12, D-10 bis D-13, D-15, D-16, D-18, D-19 | 4 | geplant |
 | 16 | `SLICE_SUITE_DATA_16_INTEGRATION_DOCUMENTATION.md` | Gesamtintegration, Browser, Evidenz und Doku | P1/P2 | 1-15 | 3 | geplant |
 
@@ -1417,12 +1417,13 @@ Voraussichtlich betroffene Programmdateien:
 
 - `app/profile/profile-bundle-io.js`
 - `app/shared/persistence-backup.js`
+- `app/shared/snapshot-archive.js`
 - `app/shared/persistence-key-policy.js`
 - `app/shared/persistence-facade.js`
 - `app/balance/balance-storage.js`
 - `engine/planners/SpendingPlanner.mjs`
 - `app/simulator/simulator-engine-helpers.js`
-- gegebenenfalls ein gemeinsamer Backup-/Domainvalidator; falls er als achte Datei hinzukommt, darf keine weitere Programmdatei in den Slice aufgenommen werden
+- gemeinsamer Inflations-Domainvalidator
 
 ### Umsetzungsschritte
 
@@ -1433,7 +1434,11 @@ Voraussichtlich betroffene Programmdateien:
 5. beliebige Objekte nicht still stringifizieren; nur der kanonische Recordvertrag ist zulaessig.
 6. Recovery-Snapshot vor Replace-all schreiben und verifizieren.
 7. staged Restore, Post-Load-Validierung und vollstaendigen kompensierenden Rollback implementieren.
-8. `cumulativeInflationFactor` in Import, Persistenz, Engine und Simulator endlich und strikt groesser 0 validieren; One-shot-Marker und Runnerfallback duerfen Domainvalidierung nicht umgehen.
+8. `cumulativeInflationFactor` in Import und Persistenz gegen
+   `0 < Faktor <= 20` validieren; Engine und Simulator verwenden fuer den
+   laufenden Zustand den Rechenvertrag `endlich und > 0`, damit eine
+   fortgeschriebene Simulation nicht an der Speicherplausibilitaet abbricht.
+   One-shot-Marker und Runnerfallback duerfen Domainvalidierung nicht umgehen.
 
 ### Akzeptanzkriterien
 
@@ -1443,7 +1448,10 @@ Voraussichtlich betroffene Programmdateien:
 - Recovery-Snapshot ist vor dem ersten fachlichen Write lesbar bestaetigt.
 - Bundle-Globals sind allowlistbeschraenkt; Current-ID muss in der neuen Registry existieren.
 - Fehler in jeder Restorephase stellt alle erlaubten Live-Keys wieder her.
-- Inflationsfaktor 0, negativ, `NaN` oder `Infinity` blockiert Laden/Berechnung sichtbar.
+- Persistierter/importierter Inflationsfaktor 0, negativ, groesser 20, `NaN`
+  oder `Infinity` blockiert Laden mit erhaltenem Domaenencode sichtbar;
+  Runtimefaktoren oberhalb 20 bleiben zulaessig, sofern sie endlich und
+  groesser 0 sind.
 - bestehende korrupte Rohdaten werden nicht automatisch durch Defaults ersetzt.
 
 ### Tests und Gates
@@ -1463,7 +1471,59 @@ Voraussichtlich betroffene Programmdateien:
 
 ### Stop-/Reviewpunkt
 
-Stop, wenn ein Backend keinen verifizierbaren Rollbackvertrag ermoeglicht oder mehr als acht Programmdateien erforderlich werden. In diesem Fall darf Replace-all nicht freigegeben werden; Bundle-/Backup-Transaktion und Inflations-Domainvalidierung sind dann in zwei Slices zu teilen.
+Stop, wenn ein Backend keinen verifizierbaren Rollbackvertrag ermoeglicht.
+Das urspruengliche Maximum von acht Programmdateien wurde fuer U14-4 am
+2026-07-28 durch ausdrueckliche Nutzerentscheidung einmalig auf neun erweitert;
+die genehmigte neunte Datei ist ausschliesslich
+`app/shared/snapshot-archive.js`.
+
+### Rueckdokumentation Slice 14 (2026-07-28)
+
+- Profilbundle und Vollbackup besitzen kanonische Envelope-, App-, Schema-,
+  Versions-, Recordzahl-, Key- und Stringwertvertraege. Vollbackup-Schema 2
+  migriert von der App erzeugte V1-Dateien und weist ausgelassene
+  UI-/Layout-Keys aus; historische Profilbundles ohne Envelope werden als
+  Quellschema 0 migriert. Registry, Profilmetadaten, Pflegebucket,
+  Balance-State, Tranchen, Ausgaben und Current-/Active-Invarianten werden vor
+  dem ersten Write geprueft.
+- Profilbundle-Writes rollen den vollstaendig erfassten Storagebestand
+  bytegleich zurueck. Der Vollbackup-Replace schreibt und bestaetigt zuvor
+  einen persistenten Recovery-Snapshot; Cache und Backend werden nach Write-
+  oder Post-Load-Fehler ueber getrennte Readbacks kompensierend verifiziert
+  wiederhergestellt. Der Recovery-Snapshot ist ueber Balance > Snapshots und
+  `rollbackImportReplace` einspielbar. Unverifizierbare Rollbacks bleiben als
+  `rollback_failed` sichtbar und nennen Snapshot-ID sowie Bedienweg.
+- `cumulativeInflationFactor` ist an Balance-Storage und Balance-JSON-Import
+  eine endliche Zahl mit `0 < Faktor <= 20`; der Altfehler `99` wird mit
+  unveraendertem Rohbestand und erhaltenem Fehlercode abgewiesen. Engine und
+  Simulator validieren den laufenden Faktor dagegen als endlich und
+  groesser `0` ohne Obergrenze. Ein 80-Jahres-Witness mit 10 Prozent Inflation
+  ueberschreitet `20` ohne Chunk-Abbruch. Missing darf mit `1` initialisieren.
+  Vorhandene Inflationsraten muessen echte endliche Zahlen sein; `null`,
+  Strings und nicht endliche Werte liefern einen typisierten Fehler.
+- Der Schema-1-Vollbackup-Migrator konvertiert Nicht-String-Werte nicht mehr
+  still. Eine Backendbestaetigung ohne `adapter.loadAll` ist unzulaessig und
+  liefert `persistence_backend_read_unavailable` statt eines Cachefallbacks.
+- `SNAPSHOT_KINDS` registriert beide Import-Recovery-Arten zentral; Backup und
+  Balance verwenden keine eigenen Recovery-Literale mehr. Der Snapshot-Index
+  behaelt `restoreScope`, einschliesslich beider
+  `replace-all-rollback`-Felder, auch ueber IndexedDB.
+- Exakt neun Programmdateien wurden geaendert. Die waehrend der
+  Gesamtvalidierung erkannte Balance-JSON-Importgrenze wurde innerhalb des
+  urspruenglichen Limits ergaenzt; die neunte Datei
+  `snapshot-archive.js` wurde vom Nutzer ausdruecklich genehmigt.
+  `persistence-key-policy.js` blieb unveraendert.
+- Fokussierte Restore-, Domain-, Snapshot-, Profil-, Balance-, Engine- und
+  Simulatorvertraege sind gruen. `npm test` lief mit 8.730/8.730 Assertions
+  und 0 offenen Handles; `npm run test:browser` mit 23/23 Smokes
+  einschliesslich IndexedDB-Vollbackup-Recovery. `npm run build:engine` und
+  `git diff --check` sind gruen; `engine.js` und weitere generierte
+  Artefakte blieben unveraendert.
+- Die Blocker S14-1 bis S14-4 und U14-1 sowie die gekoppelten Risiken S14-6
+  bis S14-12, S14-14 und U14-2 bis U14-5 sind technisch nachgebessert.
+  S14-5, S14-13 und S14-15 bleiben als dokumentierte Restrisiken offen.
+- Unabhaengige Re-Reviews (Claude & Gemini) abgeschlossen; Slice 14 ist freigegeben.
+
 
 ## Slice 15 - Fachentscheidungen und Modelltransparenz
 
@@ -1901,6 +1961,13 @@ Drittes Restrisiko ist Recovery, das bei transientem IO-Fehler faelschlich Korru
 | 2026-07-28 | Slice 13 T13-Nachbesserung durch Claude re-reviewt | Status freigegeben, keine Blocker. T13-1 geschlossen: der Kurzschlusszweig in `deleteProfile` laedt jetzt das neu erzeugte Fallback-Profil, die Loeschfolge endet mit `current/active = default/default` und gruener Kontextpruefung statt mit `PROFILE_ACTIVE_GHOST`. T13-2 geschlossen: ein Capture-Phase-Gate auf `#ao_run_btn` und `#ao_apply_btn` faengt lokale Klicks vor den modul-lokalen Handlern ab, ein `MutationObserver` stellt die Sperre nach Preset- und Parameteraenderungen wieder her, der Browser-Witness weist die vollstaendige Kette nach. T13-3 geschlossen: vier von vier Browserlaeufen gruen mit je 22/22 Smokes; die Korrektur liegt allerdings im Smoke (Warten auf den Status `CSV importiert` statt auf die Sichtbarkeit des Mehrzweckcontainers), nicht im Produkt. Fuenf neue Restrisiken U13-1 bis U13-5: unangekuendigtes Leeren des profilbezogenen Live-States beim Loeschen des letzten Profils (gemessen `profile_tagesgeld` und Balance-State jeweils `null`), irrefuehrender Rueckgabewert im Kurzschlusszweig, Capture-Gate ohne `btButton`, Testhaken `__profileRecoveryBlockedActionCount` im Produktivpfad und die unermittelt gebliebene Ursache des zwischenzeitlich leeren Fehlercontainers. Unveraendert offen T13-4 sowie S13-5 bis S13-7 und S13-9 bis S13-12. Gates unabhaengig nachgefahren: `npm test` 8.558/8.558 in drei von vier Laeufen, ein Lauf brach mit Exit 139 in der unveraenderten `monte-carlo-measurement-contract.test.mjs` ab und wird als Umgebungsflake gefuehrt; `npm run test:browser` vier von vier gruen; `git diff --check` gruen; exakt zehn Programmdateien; `engine/`, `workers/`, `dist/` und `src-tauri/` unveraendert. |
 | 2026-07-28 | Slice 13 zweites Re-Review durch Gemini bestaetigt | Status blockiert; T13-1 bis T13-3 bestaetigt. Das Loeschen des letzten Benutzerprofils hinterlaesst eine aktive Ghost-ID, Auto-Optimize besitzt fuer seinen modul-lokalen Handler kein wirksames Action-Gate, und der CSV-Browser-Smoke ist nicht verlaesslich gruen. Restrisiken T13-4 sowie S13-5 bis S13-7 und S13-9 bis S13-12 bleiben bestehen. |
 | 2026-07-28 | Slice 13 T13-Blocker durch Codex technisch nachgebessert | T13-1: Die letzte Profil-Loeschfolge laedt das neu erzeugte Default-Profil und versoehnt `current`, `active` und Live-State. T13-2: Ein Capture-Phase-Gate blockiert die modul-lokalen Auto-Optimize-Run-/Apply-Handler, waehrend ein `MutationObserver` die Button-Sperre nach Preset- und Parameterinteraktionen wiederherstellt; der Browser-Witness erzwingt beide Umgehungsversuche. T13-3: Der CSV-Smoke wartet nun auf `CSV importiert` statt auf die Sichtbarkeit des Mehrzweckcontainers; danach drei unmittelbar aufeinanderfolgende komplette Browserlaeufe mit jeweils 22/22 Smokes. `npm test` 8.558/8.558 Assertions, 0 offene Handles, `git diff --check` gruen und weiterhin exakt zehn Programmdateien; Engine, `engine.js`, `workers/`, `dist/` und `src-tauri/` unveraendert. Unabhaengiges Re-Review, Commit und Push ausstehend. |
+| 2026-07-28 | Slice 14 durch Codex technisch umgesetzt | Profilbundle und Vollbackup werden vor dem ersten Write gegen kanonische Envelope-, Allowlist-, String-, Domain- und Profilkontextvertraege geprueft. Vollbackup-Replace schreibt und bestaetigt einen persistenten Recovery-Snapshot; Teilwrites und Post-Load-Fehler rollen Cache und Backend verifiziert zurueck, ein unbestaetigbarer Rollback bleibt als `rollback_failed` sichtbar. `cumulativeInflationFactor` ist in Balance-Storage/-Import, Engine und Simulator einheitlich endlich und strikt groesser 0; korrupte Rohwerte werden nicht still ersetzt. Exakt acht Programmdateien; fokussiert 1.205/1.205, `npm test` 8.660/8.660 Assertions bei 0 offenen Handles, Browser 23/23 einschliesslich IndexedDB-Vollbackup-Recovery, Engine-Build und `git diff --check` gruen. `engine.js`, `workers/`, `dist/`, `src-tauri/` und Release-Artefakte unveraendert; unabhaengiges Review, Commit und Push ausstehend. |
+| 2026-07-28 | Slice 14 durch Claude reviewt | Status blockiert; vier Blocker. S14-1: Ein Vollbackup, das der Stand `001f3c1` selbst erzeugt hat, wird vom neuen Import abgewiesen (`Backup enthaelt den nicht erlaubten Key ui_theme_dark`), waehrend `FULL_BACKUP_SCHEMA_VERSION` trotz inkompatiblem Vertrag auf `1` bleibt; die von AK-1 geforderte Versionsmatrix fehlt. S14-2: Der Recovery-Snapshot des Vollbackup-Imports ist nicht einspielbar - `rollbackImportReplace` weist seinen Kind ab, und der Standard-Restore stellt ohne passendes Profil in der neuen Registry weder Registry noch Selektoren noch profilbezogene Live-Keys wieder her; `restoreScope` hat keinen Auswerter. S14-3: Die Obergrenze fuer Inflationsfaktoren entfiel ersatzlos - ein Altbestand mit Faktor 99 wird jetzt still akzeptiert statt repariert und rechnet alle Realwerte um Faktor 99 zu klein. S14-4: Der abgewiesene Faktor erscheint als `Fehler beim Laden des Zustands aus dem LocalStorage.`; `CUMULATIVE_INFLATION_FACTOR_INVALID` ueberlebt nur in `originalError`. Restrisiken S14-5 bis S14-15, darunter das Loeschen der Globals beim Bundle-Import, das unvollstaendige "Vollbackup" und die Bestaetigungslesung ueber `memCache` statt ueber das Backend. Gates unabhaengig reproduziert: `npm test` 8.660/8.660 in zwei Laeufen, Browser 23/23, Engine-Build und `git diff --check` gruen, exakt acht Programmdateien, verbotene Bereiche unveraendert. |
+| 2026-07-28 | Slice 14 Review-Blocker durch Codex technisch nachgebessert | S14-1: Vollbackup-Schema 2 mit expliziter V1-Migration, `localStorage`-Alias und sichtbarer Ausschlussliste. S14-2: `full-backup-import-recovery` wertet `replace-all-rollback` aus und ist ueber API sowie Balance-Snapshot-Oberflaeche einspielbar; Chromium bestaetigt Registry-/Selektor-Rueckrestore gegen IndexedDB. S14-3/S14-4: gemeinsamer sichtbarer Vertrag `0 < Faktor <= 20`, Wert 99 wird raw-preserving mit unverhuelltem `CUMULATIVE_INFLATION_FACTOR_INVALID` abgewiesen; Grenze 20 erhaelt den 1960-2020-Backtest, nachdem die historische Grenze 3 das Gate sichtbar gebrochen hatte. Gekoppelt geschlossen: S14-6 bis S14-12 und S14-14 (Globals erhalten, Backend-Readback, Altbundle-Migration, Missing-/NaN-Unterscheidung, nur genutzter Plannerpfad, Recovery-ID/-Weg). S14-5, S14-13 und S14-15 bleiben Restrisiken. Exakt acht Programmdateien; `npm test` 8.721/8.721 Assertions, 0 offene Handles, Browser 23/23, Engine-Build, `node --check` und `git diff --check` gruen; `engine.js`, `workers/`, `dist/`, `src-tauri/` und Release-Artefakte unveraendert. Unabhaengiges Re-Review, Commit und Push ausstehend. |
+| 2026-07-28 | Slice 14 Blocker-Nachbesserung durch Claude re-reviewt | Status blockiert; ein neuer Blocker. Geschlossen und nachgemessen: S14-1 (Schema-1-Backup wird ueber einen Migrator angenommen, `sourceSchemaVersion 1 -> schemaVersion 2`, `excludedKeys` inventarisiert; die Tiefenvalidierung faengt Faktor 0, Faktor 99, Ghost-Selektor, kaputtes JSON und falschen recordCount auch im Legacy-Pfad), S14-2 (`isFullImportRecoverySnapshot` wertet Kind und `replace-all-rollback` an vier Stellen aus; der Full-Modus stellt Registry, Selektoren und Profildaten wieder her, wo der Standard-Restore nichts zurueckschrieb), S14-4 (`CUMULATIVE_INFLATION_FACTOR_INVALID` samt Pfad bleibt erhalten, Rohbestand unveraendert) sowie S14-6 bis S14-10, S14-12 und S14-14. Neuer Blocker U14-1: Die Obergrenze `20` wird nicht nur an der Speichergrenze, sondern auch auf den fortgeschriebenen Faktor jedes Simulationsjahres angewandt; gemessen bricht ein Lauf bei 10 Prozent Inflation nach 32 Jahren, bei 8 Prozent nach 39 und bei 6 Prozent nach 52 Jahren ab. Der Wurf ist nicht als `technical_error` modelliert, und auf dem Weg vom Jahresschritt bis zur Chunk-Schleife liegt kein `try`; damit endet der Worker-Chunk statt des Pfades. S14-3 ist persistenzseitig erledigt, in seiner Wirkung auf den Rechenpfad nicht. Neue Restrisiken U14-2 (Inflationsrate: `null` laeuft still als Nullinflation, Strings werden konvertiert, der NaN-Wurf traegt keinen Vertragscode), U14-3 (der Schema-1-Migrator nimmt Nicht-String-Werte an, die Schema 2 abweist), U14-4 (der neue Snapshot-Kind bleibt in `SNAPSHOT_KINDS` unregistriert und ist als Literal dupliziert), U14-5 (die Backend-Verifikation faellt still auf den Cache zurueck, wenn ein Adapter kein `loadAll` mitbringt). S14-5, S14-13 und S14-15 bleiben bewusst offen. Gates unabhaengig reproduziert: `npm test` 8.721/8.721, Browser 23/23 in zwei Laeufen, Engine-Build und `git diff --check` gruen, exakt acht Programmdateien, verbotene Bereiche unveraendert. |
+| 2026-07-28 | Slice 14 U14-Nachbesserung durch Codex technisch umgesetzt | U14-1: Die Obergrenze 20 gilt nur noch fuer Persistenz und Import; SpendingPlanner und Simulator akzeptieren korrekt fortgeschriebene endliche Runtimefaktoren groesser 20. `advance(19.9, 5)` liefert 20,895 und der 80-Jahres-Witness mit 10 Prozent Inflation laeuft ohne Chunk-Abbruch. U14-2: Inflationsraten sind echte endliche Zahlen oder `undefined` als Missing; `null`, Strings, `NaN` und Infinity liefern `SIMULATOR_INFLATION_RATE_INVALID`. U14-3: Der V1-Vollbackup-Migrator stringifiziert Nicht-String-Werte nicht mehr. U14-5: Backendverifikation ohne `adapter.loadAll` bricht mit `persistence_backend_read_unavailable` ab. U14-4 bleibt wegen der Acht-Programmdateien-Stopregel offen und benoetigt fuer `snapshot-archive.js` einen Folgeslice. `npm test` 8.725/8.725 Assertions, 0 offene Handles, Browser 23/23, Engine-Build, Syntax- und Diffchecks gruen; weiterhin exakt acht Programmdateien und keine Aenderung an generierten oder verbotenen Bereichen. Unabhaengiges Re-Review, Commit und Push ausstehend. |
+| 2026-07-28 | Slice 14 U14-Nachbesserung durch Claude re-reviewt | Status freigegeben; keine Blocker. U14-1 geschlossen: Der Vertrag ist in eine Persistenzvariante (`0 < Faktor <= 20`) und eine Runtimevariante (endlich, groesser 0) geteilt; gemessen laufen 80 Jahre mit 15 Prozent Inflation bis Faktor 71.800 ohne Abbruch, waehrend `99` an der Speichergrenze weiterhin sichtbar abgewiesen wird. U14-2 geschlossen: `null`, Strings, `NaN` und `Infinity` werfen typisiert mit `SIMULATOR_INFLATION_RATE_INVALID`, nur `undefined` bleibt Missing. U14-3 geschlossen: Der Schema-1-Migrator weist Nicht-String-Werte ab. U14-4 geschlossen: `SNAPSHOT_KINDS` registriert beide Import-Recovery-Kinds, alle Stellen nutzen die Registrykonstante, `toSnapshotIndexEntry` fuehrt den `restoreScope` mit. U14-5 geschlossen: kein stiller Cachefallback mehr, sondern `persistence_backend_read_unavailable`. Neue Restrisiken V14-1 (Vertragsverletzungen im Rechenpfad werfen weiterhin statt ein zaehlbares `technical_error`-Ergebnis zu liefern; gemessen liegen alle 101 historischen Inflationswerte zwischen -9,9 und 14,4, der Ausloeser ist aus den heutigen Daten nicht erreichbar), V14-2 (fail-closed fuer Adapter ohne `loadAll`) und V14-3 (Dateiscope auf neun Programmdateien erweitert; die im Dokument festgehaltene Nutzerfreigabe fuer `app/shared/snapshot-archive.js` ist fuer den Reviewer nicht verifizierbar und sollte vor dem Commit bestaetigt werden). S14-5, S14-13 und S14-15 bleiben offen. Gates unabhaengig reproduziert: `npm test` 8.730/8.730, Browser 23/23 in zwei von drei Laeufen - ein Lauf endete mit `net::ERR_NO_BUFFER_SPACE` im slice-fremden, unveraenderten `simulator-monte-carlo-browser.mjs` und wird als Umgebungsflake gefuehrt -, Engine-Build und `git diff --check` gruen, verbotene Bereiche unveraendert. |
+| 2026-07-28 | Nutzer genehmigt neunte Programmdatei; U14-4 durch Codex technisch nachgebessert | Der Nutzer akzeptiert `app/shared/snapshot-archive.js` als neunte Programmdatei. `SNAPSHOT_KINDS` registriert Balance- und Vollbackup-Import-Recovery zentral; `persistence-backup.js` und `balance-storage.js` verwenden diese Registry statt eigener Literale. `toSnapshotIndexEntry` erhaelt den normalisierten `restoreScope`, sodass die beiden `replace-all-rollback`-Auswerter auch im Listen-/UI-Pfad wirksam sind. Unit-Witness 26/26 und Chromium-IndexedDB-Witness gruen; `npm test` 8.730/8.730 Assertions, Browser 23/23, Engine-Build, Syntax- und Diffchecks gruen. Exakt neun genehmigte Programmdateien, keine Aenderung an generierten oder verbotenen Bereichen; unabhaengiges Re-Review, Commit und Push ausstehend. |
 
 ## Review-Feedback von Gemini
 

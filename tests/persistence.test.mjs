@@ -27,6 +27,7 @@ import {
     removeItemSync,
     resetPersistenceForTests,
     resetPersistenceRuntimeForTests,
+    replaceRecordsTransactional,
     setItemSync
 } from '../app/shared/persistence-facade.js';
 import {
@@ -35,6 +36,9 @@ import {
     buildRecoveryPersistenceBackup,
     createFullBackupFilename,
     createRecoveryBackupFilename,
+    FULL_BACKUP_APP_ID,
+    FULL_BACKUP_LEGACY_SCHEMA_VERSION,
+    FULL_BACKUP_SCHEMA_VERSION,
     FULL_BACKUP_TYPE,
     importFullPersistenceBackup,
     normalizeFullPersistenceBackup
@@ -76,15 +80,19 @@ class MockStorage {
 function createMemoryAdapter(initial = {}, options = {}) {
     const store = new Map(Object.entries(initial).map(([key, value]) => [key, String(value)]));
     const batches = [];
+    const snapshots = new Map();
+    let saveCalls = 0;
     return {
         name: 'memory',
         batches,
+        snapshots,
         store,
         async open() {},
         async loadAll() {
             return Object.fromEntries(store.entries());
         },
         async saveBatch(batch) {
+            saveCalls += 1;
             batches.push({
                 upserts: batch.upserts.map(([key, value]) => [key, value]),
                 deletes: [...batch.deletes]
@@ -93,13 +101,38 @@ function createMemoryAdapter(initial = {}, options = {}) {
                 throw new Error('save failed');
             }
             batch.deletes.forEach(key => store.delete(key));
-            batch.upserts.forEach(([key, value]) => store.set(key, String(value)));
+            const appliedUpserts = options.acknowledgeWithoutFirstUpsertOnce && saveCalls === 1
+                ? batch.upserts.slice(1)
+                : batch.upserts;
+            appliedUpserts.forEach(([key, value]) => store.set(key, String(value)));
+            if (options.failAfterApplyOnce && saveCalls === 1) {
+                throw new Error('save failed after partial apply');
+            }
+            if (options.failAfterApplyAlways) {
+                throw new Error('save failed after every apply');
+            }
         },
         async readMetadata(key) {
             return store.get(`metadata.${key}`) || null;
         },
         async writeMetadata(key, value) {
             store.set(`metadata.${key}`, JSON.stringify(value));
+        },
+        async listSnapshots() {
+            return Array.from(snapshots.values()).map(({ records, ...entry }) => entry);
+        },
+        async readSnapshot(id) {
+            const snapshot = snapshots.get(String(id));
+            if (!snapshot) throw new Error(`Snapshot ${id} fehlt.`);
+            return snapshot;
+        },
+        async writeSnapshot(snapshot) {
+            if (options.failSnapshotWrite) throw new Error('snapshot write failed');
+            snapshots.set(String(snapshot.id), structuredClone(snapshot));
+            return true;
+        },
+        async deleteSnapshot(id) {
+            return snapshots.delete(String(id));
         }
     };
 }
@@ -116,6 +149,24 @@ function deferred() {
 
 function nextTick() {
     return new Promise(resolve => setTimeout(resolve, 0));
+}
+
+function createFullBackupPayload(records, overrides = {}) {
+    const canonicalRecords = { ...records };
+    return {
+        backupType: FULL_BACKUP_TYPE,
+        schemaVersion: FULL_BACKUP_SCHEMA_VERSION,
+        app: FULL_BACKUP_APP_ID,
+        exportedAt: '2026-07-28T12:00:00.000Z',
+        runtime: 'browser',
+        recordScope: 'authorized-application-records',
+        recordCount: Object.keys(canonicalRecords).length,
+        excludedRecordCount: 0,
+        excludedKeys: [],
+        records: canonicalRecords,
+        localStorage: { ...canonicalRecords },
+        ...overrides
+    };
 }
 
 function createFakeIndexedDB(options = {}) {
@@ -490,17 +541,28 @@ try {
 
     console.log('Test 11: full persistence backup contains all records and runtime metadata');
     {
-        const adapter = createMemoryAdapter({ alpha: '1', beta: '2' });
+        const adapter = createMemoryAdapter({
+            sim_alpha: '1',
+            featureFlags: '{"strict":true}',
+            unknown_runtime_key: 'not-exported'
+        });
         resetPersistenceForTests(adapter);
         await init();
 
         const backup = buildFullPersistenceBackup({ window: { __TAURI__: {} } });
         assertEqual(backup.backupType, FULL_BACKUP_TYPE, 'Backup-Typ ist eindeutig');
+        assertEqual(backup.app, FULL_BACKUP_APP_ID, 'Backup schreibt die stabile App-ID');
+        assertEqual(backup.schemaVersion, FULL_BACKUP_SCHEMA_VERSION, 'Backup schreibt das aktuelle Schema');
         assertEqual(backup.runtime, 'tauri', 'Runtime-Metadaten werden geschrieben');
-        assertEqual(backup.recordCount, 2, 'Backup zaehlt alle Records');
-        assertEqual(backup.records.alpha, '1', 'Backup enthaelt ersten Key');
-        assertEqual(backup.records.beta, '2', 'Backup enthaelt zweiten Key');
-        assertEqual(backup.localStorage.alpha, '1', 'Legacy localStorage-Alias bleibt im Backup');
+        assertEqual(backup.recordCount, 2, 'Backup zaehlt ausschliesslich erlaubte Records');
+        assertEqual(backup.recordScope, 'authorized-application-records',
+            'Backup benennt seinen fachlichen Record-Scope');
+        assertEqual(backup.excludedRecordCount, 1, 'Backup weist ausgeschlossene UI-/Fremdkeys aus');
+        assertEqual(backup.excludedKeys[0], 'unknown_runtime_key', 'Backup nennt den ausgeschlossenen Key');
+        assertEqual(backup.records.sim_alpha, '1', 'Backup enthaelt erlaubten Simulator-Key');
+        assertEqual(backup.records.featureFlags, '{"strict":true}', 'Backup enthaelt erlaubten technischen Key');
+        assertEqual(backup.records.unknown_runtime_key, undefined, 'Backup exportiert keinen unbekannten Runtime-Key');
+        assertEqual(backup.localStorage.sim_alpha, '1', 'Legacy localStorage-Alias bleibt im Backup');
         const recovery = buildRecoveryPersistenceBackup({ reason: 'test-import' });
         assertEqual(recovery.backupPurpose, 'recovery-before-import', 'Recovery-Backup markiert seinen Zweck');
         assertEqual(recovery.recoveryReason, 'test-import', 'Recovery-Backup uebernimmt den Grund');
@@ -516,37 +578,110 @@ try {
 
     console.log('Test 11: full persistence backup import replaces current records');
     {
-        const adapter = createMemoryAdapter({ old: 'remove-me' });
+        const adapter = createMemoryAdapter({ sim_old: 'remove-me' });
         resetPersistenceForTests(adapter);
         await init();
 
         const invalid = normalizeFullPersistenceBackup({ records: { x: '1' } });
         assertEqual(invalid.ok, false, 'Import lehnt Dateien ohne Backup-Typ ab');
 
-        const result = await importFullPersistenceBackup({
+        const numericValue = normalizeFullPersistenceBackup(createFullBackupPayload({ sim_next: 42 }));
+        assertEqual(numericValue.ok, false, 'Import stringifiziert numerische Werte nicht still');
+        const unknownKey = normalizeFullPersistenceBackup(createFullBackupPayload({ arbitrary: 'blocked' }));
+        assertEqual(unknownKey.ok, false, 'Import weist unbekannte Keys ab');
+        const legacyGeneratedRecords = {
+            sim_legacy: '42',
+            ui_theme_dark: 'true'
+        };
+        const legacyGenerated = normalizeFullPersistenceBackup({
             backupType: FULL_BACKUP_TYPE,
-            schemaVersion: 1,
-            records: {
-                next: 42,
-                flag: true,
-                __proto__: 'blocked',
-                constructor: 'blocked',
-                prototype: 'blocked'
-            }
+            schemaVersion: FULL_BACKUP_LEGACY_SCHEMA_VERSION,
+            app: FULL_BACKUP_APP_ID,
+            exportedAt: '2026-07-27T12:00:00.000Z',
+            recordCount: Object.keys(legacyGeneratedRecords).length,
+            records: legacyGeneratedRecords,
+            localStorage: { ...legacyGeneratedRecords }
         });
+        assertEqual(legacyGenerated.ok, true, 'App-generiertes Schema-1-Backup wird definiert migriert');
+        assertEqual(legacyGenerated.backup.schemaVersion, FULL_BACKUP_SCHEMA_VERSION,
+            'Schema-1-Backup wird auf den aktuellen Vertrag normalisiert');
+        assertEqual(legacyGenerated.backup.sourceSchemaVersion, FULL_BACKUP_LEGACY_SCHEMA_VERSION,
+            'Migration behaelt die Quellversion fuer Diagnose');
+        assertEqual(legacyGenerated.backup.records.sim_legacy, '42',
+            'Schema-1-Migration behaelt gueltige String-Werte unveraendert');
+        assertEqual(legacyGenerated.backup.records.ui_theme_dark, undefined,
+            'Schema-1-Migration verwirft nicht mehr autorisierte UI-Keys kontrolliert');
+        assertEqual(legacyGenerated.backup.excludedKeys[0], 'ui_theme_dark',
+            'Schema-1-Migration weist ausgelassene Keys aus');
+        const legacyNumericValue = normalizeFullPersistenceBackup({
+            backupType: FULL_BACKUP_TYPE,
+            schemaVersion: FULL_BACKUP_LEGACY_SCHEMA_VERSION,
+            app: FULL_BACKUP_APP_ID,
+            exportedAt: '2026-07-27T12:00:00.000Z',
+            recordCount: 1,
+            records: { sim_legacy_numeric: 42 },
+            localStorage: { sim_legacy_numeric: 42 }
+        });
+        assertEqual(legacyNumericValue.ok, false,
+            'Schema-1-Migration darf numerische Werte nicht still stringifizieren');
+
+        const legacyLocalStorageOnly = normalizeFullPersistenceBackup({
+            backupType: FULL_BACKUP_TYPE,
+            schemaVersion: FULL_BACKUP_LEGACY_SCHEMA_VERSION,
+            app: FULL_BACKUP_APP_ID,
+            exportedAt: '2026-07-27T12:00:00.000Z',
+            recordCount: 1,
+            localStorage: { sim_legacy_alias: 'ok' }
+        });
+        assertEqual(legacyLocalStorageOnly.ok, true,
+            'Schema-1-Backup mit historischem localStorage-Alias bleibt importierbar');
+        assertEqual(legacyLocalStorageOnly.backup.records.sim_legacy_alias, 'ok',
+            'localStorage-only-Migration uebernimmt erlaubte Records');
+        const wrongCount = normalizeFullPersistenceBackup(createFullBackupPayload(
+            { sim_next: '42' },
+            { recordCount: 99 }
+        ));
+        assertEqual(wrongCount.ok, false, 'Import weist einen falschen recordCount ab');
+        const wrongApp = normalizeFullPersistenceBackup(createFullBackupPayload(
+            { sim_next: '42' },
+            { app: 'fremde-app' }
+        ));
+        assertEqual(wrongApp.ok, false, 'Import weist eine fremde App-ID ab');
+        const wrongSchema = normalizeFullPersistenceBackup(createFullBackupPayload(
+            { sim_next: '42' },
+            { schemaVersion: 99 }
+        ));
+        assertEqual(wrongSchema.ok, false, 'Import weist eine unbekannte Schemaversion ab');
+        const corruptContext = normalizeFullPersistenceBackup(createFullBackupPayload({
+            [PROFILE_STORAGE_KEYS.registry]: 'not-json',
+            [PROFILE_STORAGE_KEYS.current]: 'ghost'
+        }));
+        assertEqual(corruptContext.ok, false, 'Korrupte Registry und Ghost-Current werden im Preflight abgewiesen');
+        const corruptInflation = normalizeFullPersistenceBackup(createFullBackupPayload({
+            [CONFIG.STORAGE.LS_KEY]: JSON.stringify({
+                lastState: { cumulativeInflationFactor: 0 }
+            })
+        }));
+        assertEqual(corruptInflation.ok, false, 'Vollbackup-Preflight weist Inflationsfaktor 0 fachlich ab');
+
+        const result = await importFullPersistenceBackup(createFullBackupPayload({
+            sim_next: '42',
+            enableWorkerTelemetry: 'true'
+        }));
 
         assertEqual(result.ok, true, 'Komplettimport ist erfolgreich');
-        assertEqual(getItemSync('old'), null, 'Komplettimport ersetzt alte Daten');
-        assertEqual(getItemSync('next'), '42', 'Komplettimport schreibt numerische Werte als String');
-        assertEqual(getItemSync('flag'), 'true', 'Komplettimport schreibt Boolean-Werte als String');
-        assertEqual(getItemSync('__proto__'), null, 'Komplettimport filtert __proto__');
-        assertEqual(getItemSync('constructor'), null, 'Komplettimport filtert constructor');
-        assertEqual(getItemSync('prototype'), null, 'Komplettimport filtert prototype');
+        assertEqual(getItemSync('sim_old'), null, 'Komplettimport ersetzt alte erlaubte Daten');
+        assertEqual(getItemSync('sim_next'), '42', 'Komplettimport schreibt kanonischen Stringwert');
+        assertEqual(getItemSync('enableWorkerTelemetry'), 'true', 'Komplettimport schreibt erlaubten globalen Key');
+        assert(Boolean(result.recoverySnapshotId), 'Komplettimport liefert den bestaetigten Recovery-Snapshot');
+        assertEqual(adapter.snapshots.size, 1, 'Recovery-Snapshot wurde persistent im Adapterarchiv geschrieben');
+        const recoverySnapshot = adapter.snapshots.get(result.recoverySnapshotId);
+        assertEqual(recoverySnapshot.records.sim_old, 'remove-me', 'Recovery-Snapshot enthaelt den vorherigen Livebestand');
     }
 
     console.log('Test 11b: full backup import UI creates recovery backup before replacing records');
     {
-        const adapter = createMemoryAdapter({ old: 'keep-me' });
+        const adapter = createMemoryAdapter({ sim_old: 'keep-me' });
         resetPersistenceForTests(adapter);
         await init();
 
@@ -582,9 +717,7 @@ try {
             global.FileReader = class {
                 readAsText() {
                     this.result = JSON.stringify({
-                        backupType: FULL_BACKUP_TYPE,
-                        schemaVersion: 1,
-                        records: { next: 'imported' }
+                        ...createFullBackupPayload({ sim_next: 'imported' })
                     });
                     setTimeout(() => this.onload?.(), 0);
                 }
@@ -595,7 +728,7 @@ try {
                 confirmImport: () => true,
                 reload: () => { reloadCount += 1; },
                 createRecoveryBackup: async () => {
-                    recoverySawOldValue = getItemSync('old') === 'keep-me';
+                    recoverySawOldValue = getItemSync('sim_old') === 'keep-me';
                     return { filename: 'recovery.json', backup: buildRecoveryPersistenceBackup(), skipped: false };
                 }
             });
@@ -604,13 +737,139 @@ try {
             await new Promise(resolve => setTimeout(resolve, 10));
 
             assertEqual(recoverySawOldValue, true, 'Recovery-Backup wird vor dem Ersetzen erzeugt');
-            assertEqual(getItemSync('old'), null, 'Import ersetzt nach Recovery die alten Daten');
-            assertEqual(getItemSync('next'), 'imported', 'Import schreibt die neuen Daten nach Recovery');
+            assertEqual(getItemSync('sim_old'), null, 'Import ersetzt nach Recovery die alten Daten');
+            assertEqual(getItemSync('sim_next'), 'imported', 'Import schreibt die neuen Daten nach Recovery');
             assertEqual(reloadCount, 1, 'Import triggert nach Erfolg einen Reload');
             assert(status.textContent.includes('Recovery-Backup wurde vorher erstellt'), 'Status nennt vorheriges Recovery-Backup');
         } finally {
             if (prevFileReader === undefined) delete global.FileReader; else global.FileReader = prevFileReader;
         }
+    }
+
+    console.log('Test 11c: full backup fault injection restores every allowed live key');
+    {
+        const adapter = createMemoryAdapter({
+            sim_old: 'keep-me',
+            enableWorkerTelemetry: 'false',
+            unknown_runtime_key: 'untouched'
+        }, { failAfterApplyOnce: true });
+        resetPersistenceForTests(adapter);
+        await init();
+
+        const result = await importFullPersistenceBackup(createFullBackupPayload({
+            sim_next: 'new-value',
+            enableWorkerTelemetry: 'true'
+        }));
+
+        assertEqual(result.ok, false, 'Teilweiser Backendfehler laesst den Import scheitern');
+        assertEqual(result.code, 'restore_rolled_back', 'Teilweiser Backendfehler meldet bestaetigten Rollback');
+        assertEqual(getItemSync('sim_old'), 'keep-me', 'Facade-Cache enthaelt wieder den alten Simulator-Key');
+        assertEqual(getItemSync('sim_next'), null, 'Facade-Cache enthaelt keinen partiellen Ziel-Key');
+        assertEqual(adapter.store.get('sim_old'), 'keep-me', 'Backend enthaelt wieder den alten Simulator-Key');
+        assertEqual(adapter.store.has('sim_next'), false, 'Backend enthaelt keinen partiellen Ziel-Key');
+        assertEqual(adapter.store.get('enableWorkerTelemetry'), 'false', 'Backend stellt den alten Globalwert wieder her');
+        assertEqual(adapter.store.get('unknown_runtime_key'), 'untouched', 'Nicht erlaubter Fremdkey bleibt unangetastet');
+        assertEqual(adapter.snapshots.size, 1, 'Recovery-Snapshot bleibt nach dem Rollback lesbar');
+        assertEqual(result.recoverySnapshotId, Array.from(adapter.snapshots.keys())[0],
+            'Fehlerresultat nennt den persistenten Recovery-Snapshot');
+        assert(result.message.includes('Balance > Snapshots'),
+            'Fehlerresultat nennt den bedienbaren Recovery-Weg');
+    }
+
+    console.log('Test 11c2: backend verification rejects acknowledged but unapplied writes');
+    {
+        const adapter = createMemoryAdapter({
+            sim_old: 'keep-backend'
+        }, { acknowledgeWithoutFirstUpsertOnce: true });
+        resetPersistenceForTests(adapter);
+        await init();
+
+        const result = await importFullPersistenceBackup(createFullBackupPayload({
+            sim_next: 'must-be-verified'
+        }));
+
+        assertEqual(result.ok, false, 'Ein nur bestaetigter, aber nicht persistierter Write darf nicht erfolgreich sein');
+        assertEqual(result.code, 'restore_rolled_back', 'Backend-Mismatch loest einen bestaetigten Rollback aus');
+        assertEqual(adapter.store.get('sim_old'), 'keep-backend', 'Rollback stellt den Backend-Altbestand wieder her');
+        assertEqual(adapter.store.has('sim_next'), false, 'Nicht persistiertes Ziel bleibt auch nach Rollback abwesend');
+        assertEqual(getItemSync('sim_old'), 'keep-backend', 'Facade-Cache wird auf den bestaetigten Altbestand zurueckgesetzt');
+    }
+
+    console.log('Test 11c3: transactional replacement requires backend readback support');
+    {
+        const adapterWithoutReadback = {
+            name: 'memory-without-readback',
+            async open() {},
+            async saveBatch() {}
+        };
+        resetPersistenceForTests(adapterWithoutReadback);
+
+        let readbackError = null;
+        try {
+            await replaceRecordsTransactional(
+                { sim_next: 'must-be-verifiable' },
+                { allowKey: isAllowedPersistenceImportKey }
+            );
+        } catch (error) {
+            readbackError = error;
+        }
+
+        assertEqual(readbackError?.code, 'persistence_backend_read_unavailable',
+            'Transaktionaler Ersatz darf ohne Backend-Readback nicht auf den Cache ausweichen');
+    }
+
+    console.log('Test 11d: recovery and post-load fault injection remain fail-closed');
+    {
+        const snapshotFailureAdapter = createMemoryAdapter({
+            sim_old: 'keep-before-snapshot'
+        }, { failSnapshotWrite: true });
+        resetPersistenceForTests(snapshotFailureAdapter);
+        await init();
+
+        const snapshotFailure = await importFullPersistenceBackup(createFullBackupPayload({
+            sim_next: 'must-not-write'
+        }));
+        assertEqual(snapshotFailure.ok, false, 'Fehlender Recovery-Snapshot blockiert den Import');
+        assertEqual(getItemSync('sim_old'), 'keep-before-snapshot', 'Snapshotfehler erhaelt den Livebestand');
+        assertEqual(getItemSync('sim_next'), null, 'Snapshotfehler schreibt kein Zielrecord');
+        assertEqual(snapshotFailureAdapter.batches.length, 0, 'Snapshotfehler tritt vor dem ersten fachlichen Batch ein');
+
+        const postLoadAdapter = createMemoryAdapter({
+            sim_old: 'keep-after-validation'
+        });
+        resetPersistenceForTests(postLoadAdapter);
+        await init();
+        const postLoadFailure = await importFullPersistenceBackup(createFullBackupPayload({
+            sim_next: 'rollback-after-validation'
+        }), {
+            validateAfterLoad: () => ({ ok: false, message: 'fault after post-load validation' })
+        });
+        assertEqual(postLoadFailure.ok, false, 'Post-Load-Fehler laesst den Import scheitern');
+        assertEqual(postLoadFailure.code, 'restore_rolled_back', 'Post-Load-Fehler meldet bestaetigten Rollback');
+        assertEqual(getItemSync('sim_old'), 'keep-after-validation', 'Post-Load-Rollback stellt alten Key wieder her');
+        assertEqual(getItemSync('sim_next'), null, 'Post-Load-Rollback entfernt den Ziel-Key');
+        assertEqual(postLoadAdapter.store.get('sim_old'), 'keep-after-validation',
+            'Post-Load-Rollback stellt auch den Backendbestand wieder her');
+        assertEqual(postLoadAdapter.store.has('sim_next'), false,
+            'Post-Load-Rollback entfernt den Ziel-Key auch im Backend');
+    }
+
+    console.log('Test 11e: unverifiable rollback is surfaced explicitly');
+    {
+        const adapter = createMemoryAdapter({
+            sim_old: 'old-value'
+        }, { failAfterApplyAlways: true });
+        resetPersistenceForTests(adapter);
+        await init();
+
+        const result = await importFullPersistenceBackup(createFullBackupPayload({
+            sim_next: 'new-value'
+        }));
+
+        assertEqual(result.ok, false, 'Dauerhafter Backendfehler darf nicht als Erfolg erscheinen');
+        assertEqual(result.code, 'rollback_failed', 'Nicht verifizierbarer Rollback bleibt explizit sichtbar');
+        assert(Boolean(result.rollbackError), 'Rollbackfehler bleibt fuer Recovery-Diagnose erhalten');
+        assertEqual(adapter.snapshots.size, 1, 'Recovery-Snapshot bleibt trotz Rollbackfehler lesbar');
     }
 
     console.log('Test 12: IndexedDB adapter stores kv records and metadata');

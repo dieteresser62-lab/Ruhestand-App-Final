@@ -8,6 +8,8 @@ export const SNAPSHOT_SCHEMA_VERSION = 1;
 export const SNAPSHOT_TYPE = 'persistence-records-v1';
 export const SNAPSHOT_KINDS = Object.freeze({
     annualClosePreMutation: 'annual-close-pre-mutation',
+    balanceImportRecovery: 'balance-import-recovery',
+    fullBackupImportRecovery: 'full-backup-import-recovery',
     manual: 'manual'
 });
 
@@ -171,6 +173,7 @@ export function toSnapshotIndexEntry(snapshot) {
         activeProfileId: source.activeProfileId ? String(source.activeProfileId) : '',
         activeProfileName: source.activeProfileName ? String(source.activeProfileName) : '',
         recordCount: Number(source.recordCount) || 0,
+        restoreScope: normalizeRestoreScope(source.restoreScope),
         standardRestorable: Boolean(source.activeProfileId)
     };
 }

@@ -54,6 +54,10 @@ console.log('Test 1: buildSnapshot normalisiert Schema und erzeugt stabile ID');
     assert(snapshot.id.startsWith('snapshot_2026-06-02T18-00-00-000Z--Profil-2026'), 'ID wird aus Zeit und bereinigtem Label gebildet');
     assertEqual(snapshot.schemaVersion, 1, 'Schema-Version ist 1');
     assertEqual(snapshot.snapshotType, SNAPSHOT_TYPE, 'Snapshot-Type ist kanonisch');
+    assertEqual(SNAPSHOT_KINDS.balanceImportRecovery, 'balance-import-recovery',
+        'Balance-Import-Recovery ist im kanonischen Kind-Register enthalten');
+    assertEqual(SNAPSHOT_KINDS.fullBackupImportRecovery, 'full-backup-import-recovery',
+        'Vollbackup-Recovery ist im kanonischen Kind-Register enthalten');
     assertEqual(snapshot.recordCount, 2, 'recordCount ignoriert null/undefined Records');
     assertEqual(snapshot.records.balance_expenses_v1, '42', 'Record-Werte werden als Strings normalisiert');
     assertEqual(snapshot.restoreScope.profileRegistryMode, 'preserve-by-default', 'Default-Restore-Scope wird gesetzt');
@@ -136,12 +140,23 @@ console.log('Test 5: toSnapshotIndexEntry markiert fehlende activeProfileId als 
 {
     const snapshot = buildSnapshot({
         label: 'Ohne Profil',
+        kind: SNAPSHOT_KINDS.fullBackupImportRecovery,
         createdAt: '2026-06-02T18:00:00.000Z',
-        records: { balance_expenses_v1: 'x' }
+        records: { balance_expenses_v1: 'x' },
+        restoreScope: {
+            profileRegistryMode: 'replace-all-rollback',
+            profileLiveDataMode: 'replace-all-rollback'
+        }
     });
     const indexEntry = toSnapshotIndexEntry(snapshot);
     assertEqual(indexEntry.standardRestorable, false, 'Snapshot ohne activeProfileId ist nicht standard-restore-faehig');
     assertEqual(indexEntry.recordCount, 1, 'Index enthaelt recordCount');
+    assertEqual(indexEntry.kind, SNAPSHOT_KINDS.fullBackupImportRecovery,
+        'Index behaelt den registrierten Vollbackup-Recovery-Kind');
+    assertEqual(indexEntry.restoreScope.profileRegistryMode, 'replace-all-rollback',
+        'Index behaelt den Registry-Restore-Scope');
+    assertEqual(indexEntry.restoreScope.profileLiveDataMode, 'replace-all-rollback',
+        'Index behaelt den Profil-Livedaten-Restore-Scope');
 }
 
 console.log('Snapshot archive tests passed.');

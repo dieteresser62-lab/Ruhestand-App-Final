@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runMonteCarloBrowserRegression } from './simulator-monte-carlo-browser.mjs';
+import { SNAPSHOT_KINDS } from '../app/shared/snapshot-archive.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -315,6 +316,106 @@ async function runIndexSmoke(browser, baseUrl) {
     await page.locator('h1').filter({ hasText: 'Ruhestand-Apps Suite' }).waitFor({ state: 'visible' });
     await page.locator('a[href="Balance.html"]').waitFor({ state: 'visible' });
     await page.locator('a[href="Simulator.html"]').waitFor({ state: 'visible' });
+    smoke.assertNoErrors();
+    await smoke.close();
+}
+
+async function runFullBackupRecoverySmoke(browser, baseUrl) {
+    const oldProfileId = 'browser-backup-old';
+    const newProfileId = 'browser-backup-new';
+    const storage = createBrowserProfileStorage({
+        [oldProfileId]: {
+            name: 'Browser Backup Alt',
+            tagesgeld: '15000',
+            alter: '66'
+        }
+    }, oldProfileId);
+    const smoke = await openSmokePage(browser, baseUrl, 'index.html', { storage });
+    const { page } = smoke;
+    await page.locator('#fullBackupImportBtn').waitFor({ state: 'attached' });
+    const previousRegistryRaw = (await readIndexedDb(page, 'kv', 'rs_profiles_v1')).value;
+    const newRegistry = {
+        version: 1,
+        profiles: {
+            [newProfileId]: {
+                meta: {
+                    id: newProfileId,
+                    name: 'Browser Backup Neu',
+                    createdAt: '2026-07-28T00:00:00.000Z',
+                    updatedAt: '2026-07-28T00:00:00.000Z',
+                    belongsToHousehold: true
+                },
+                data: {
+                    profile_tagesgeld: '42000',
+                    profile_aktuelles_alter: '67'
+                }
+            }
+        }
+    };
+    const records = {
+        rs_profiles_v1: JSON.stringify(newRegistry),
+        rs_current_profile: newProfileId,
+        rs_active_profile: newProfileId
+    };
+    const importResult = await page.evaluate(async ({ records }) => {
+        const {
+            FULL_BACKUP_APP_ID,
+            FULL_BACKUP_SCHEMA_VERSION,
+            FULL_BACKUP_TYPE,
+            importFullPersistenceBackup
+        } = await import('./app/shared/persistence-backup.js');
+        return importFullPersistenceBackup({
+            backupType: FULL_BACKUP_TYPE,
+            app: FULL_BACKUP_APP_ID,
+            schemaVersion: FULL_BACKUP_SCHEMA_VERSION,
+            exportedAt: '2026-07-28T00:00:00.000Z',
+            recordCount: Object.keys(records).length,
+            records,
+            localStorage: records
+        });
+    }, { records });
+    assert(importResult.ok, `Browser full-backup restore must succeed: ${JSON.stringify(importResult)}`);
+    assert(typeof importResult.recoverySnapshotId === 'string' && importResult.recoverySnapshotId,
+        'Browser full-backup restore must return a persistent recovery snapshot ID');
+
+    const importedRegistryRaw = (await readIndexedDb(page, 'kv', 'rs_profiles_v1')).value;
+    assert(Boolean(JSON.parse(importedRegistryRaw).profiles[newProfileId]),
+        'Browser full-backup restore must replace the live profile registry');
+    assert((await readIndexedDb(page, 'kv', 'rs_current_profile')).value === newProfileId,
+        'Browser full-backup restore must replace the current profile selector');
+
+    const recoveryRow = await readIndexedDb(page, 'snapshots', importResult.recoverySnapshotId);
+    const recoverySnapshot = recoveryRow?.snapshot || recoveryRow;
+    assert(recoverySnapshot?.kind === SNAPSHOT_KINDS.fullBackupImportRecovery,
+        'Browser full-backup restore must persist the typed recovery snapshot');
+    assert(recoverySnapshot?.records?.rs_profiles_v1 === previousRegistryRaw,
+        'Browser full-backup recovery snapshot must preserve the previous registry byte-for-byte');
+    assert(recoverySnapshot?.records?.rs_current_profile === oldProfileId,
+        'Browser full-backup recovery snapshot must preserve the previous profile selector');
+    const recoveryIndexEntry = await page.evaluate(async ({ recoverySnapshotId }) => {
+        const { SnapshotArchive } = await import('./app/shared/snapshot-archive.js');
+        const snapshots = await SnapshotArchive.listSnapshots();
+        return snapshots.find(entry => entry.id === recoverySnapshotId) || null;
+    }, { recoverySnapshotId: importResult.recoverySnapshotId });
+    assert(recoveryIndexEntry?.kind === SNAPSHOT_KINDS.fullBackupImportRecovery,
+        'Browser snapshot index must retain the registered full-backup recovery kind');
+    assert(recoveryIndexEntry?.restoreScope?.profileRegistryMode === 'replace-all-rollback',
+        'Browser snapshot index must retain the full registry restore scope');
+    assert(recoveryIndexEntry?.restoreScope?.profileLiveDataMode === 'replace-all-rollback',
+        'Browser snapshot index must retain the full profile-live-data restore scope');
+
+    const rollbackResult = await page.evaluate(async ({ recoverySnapshotId }) => {
+        const { StorageManager } = await import('./app/balance/balance-storage.js');
+        return StorageManager.rollbackImportReplace({ recoverySnapshotId });
+    }, { recoverySnapshotId: importResult.recoverySnapshotId });
+    assert(rollbackResult.ok, `Browser full-backup recovery must be restorable: ${JSON.stringify(rollbackResult)}`);
+    const restoredRegistryRaw = (await readIndexedDb(page, 'kv', 'rs_profiles_v1')).value;
+    assert(restoredRegistryRaw === previousRegistryRaw,
+        'Browser full-backup recovery must restore the previous registry byte-for-byte');
+    assert((await readIndexedDb(page, 'kv', 'rs_current_profile')).value === oldProfileId,
+        'Browser full-backup recovery must restore the previous current profile selector');
+    assert((await readIndexedDb(page, 'kv', 'rs_active_profile')).value === oldProfileId,
+        'Browser full-backup recovery must restore the previous active profile selector');
     smoke.assertNoErrors();
     await smoke.close();
 }
@@ -1403,6 +1504,7 @@ async function main() {
         browser = await chromium.launch();
         const smokes = [
             ['index.html', runIndexSmoke],
+            ['full backup recovery', runFullBackupRecoverySmoke],
             ['Balance.html', runBalanceSmoke],
             ['Balance membership reload', runBalanceMembershipReload],
             ['Balance shared tranche ids', runBalanceSharedTrancheIds],

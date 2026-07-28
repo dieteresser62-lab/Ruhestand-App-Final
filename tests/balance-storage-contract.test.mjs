@@ -2,7 +2,7 @@ import { CONFIG, StorageError } from '../app/balance/balance-config.js';
 import { BALANCE_IMPORT_RECOVERY_KIND, StorageManager } from '../app/balance/balance-storage.js';
 import { createLocalStorageAdapter } from '../app/shared/persistence-adapter-localstorage.js';
 import { resetPersistenceForTests } from '../app/shared/persistence-facade.js';
-import { SnapshotArchive, SNAPSHOT_TYPE } from '../app/shared/snapshot-archive.js';
+import { SnapshotArchive, SNAPSHOT_KINDS, SNAPSHOT_TYPE } from '../app/shared/snapshot-archive.js';
 import { PROFILE_STORAGE_KEYS } from '../app/profile/profile-state.js';
 import { ANNUAL_MARKET_DATA_META_KEY } from '../app/balance/balance-annual-marketdata.js';
 
@@ -113,20 +113,21 @@ const prevLocation = global.location;
 const prevIndexedDb = global.indexedDB;
 
 try {
-    console.log('Test 1: real migration sanitizes inflation state and creates taxState');
+    console.log('Test 1: real migration preserves valid inflation state and creates taxState');
     {
         installMockLocalStorage();
         localStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify({
             inputs: { floorBedarf: 24000 },
             lastState: {
-                cumulativeInflationFactor: 9,
+                cumulativeInflationFactor: 20,
                 lastInflationAppliedAtAge: null
             }
         }));
 
         const loaded = StorageManager.loadState();
 
-        assertEqual(loaded.lastState.cumulativeInflationFactor, 1, 'Migration setzt zu hohen Inflationsfaktor zurueck');
+        assertEqual(loaded.lastState.cumulativeInflationFactor, 20,
+            'Migration erhaelt den Inflationsfaktor an der Plausibilitaetsgrenze');
         assertEqual(loaded.lastState.lastInflationAppliedAtAge, 0, 'Migration setzt ungueltiges Inflationsalter zurueck');
         assertEqual(loaded.lastState.taxState.lossCarry, 0, 'Migration ergaenzt fehlenden TaxState');
         assertEqual(localStorage.getItem(CONFIG.STORAGE.MIGRATION_FLAG), '1', 'Migration setzt das Flag');
@@ -138,7 +139,7 @@ try {
         localStorage.setItem(CONFIG.STORAGE.MIGRATION_FLAG, '1');
         localStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify({
             lastState: {
-                cumulativeInflationFactor: 12,
+                cumulativeInflationFactor: 2.9,
                 lastInflationAppliedAtAge: 99,
                 taxState: { lossCarry: -50 }
             }
@@ -146,9 +147,52 @@ try {
 
         const loaded = StorageManager.loadState();
 
-        assertEqual(loaded.lastState.cumulativeInflationFactor, 12, 'Alte Inflation-Migration laeuft bei gesetztem Flag nicht erneut');
+        assertEqual(loaded.lastState.cumulativeInflationFactor, 2.9,
+            'Alte Inflation-Migration laeuft bei gesetztem Flag nicht erneut');
         assertEqual(loaded.lastState.lastInflationAppliedAtAge, 99, 'Altes Inflationsalter bleibt bei gesetztem Flag unveraendert');
         assertEqual(loaded.lastState.taxState.lossCarry, 0, 'TaxState wird trotz gesetztem Flag repariert');
+    }
+
+    console.log('Test 2b: invalid inflation factors fail closed before migration or save');
+    {
+        for (const invalidFactor of [0, -1, 20.0001, 99, null, 'NaN', 'Infinity']) {
+            installMockLocalStorage();
+            const raw = JSON.stringify({
+                lastState: {
+                    cumulativeInflationFactor: invalidFactor,
+                    taxState: { lossCarry: 5 }
+                }
+            });
+            localStorage.setItem(CONFIG.STORAGE.LS_KEY, raw);
+            let thrown = null;
+            try {
+                StorageManager.loadState();
+            } catch (error) {
+                thrown = error;
+            }
+            assertEqual(thrown?.code, 'CUMULATIVE_INFLATION_FACTOR_INVALID',
+                `Load muss den Domaenenfehler fuer Inflationsfaktor ${String(invalidFactor)} unverhuellt erhalten`);
+            assert(thrown?.message.includes('nicht veraendert'),
+                `Load-Fehler fuer ${String(invalidFactor)} muss den Rohdatenerhalt erklaeren`);
+            assertEqual(localStorage.getItem(CONFIG.STORAGE.LS_KEY), raw,
+                `Load muss das korrupte Rohpayload ${String(invalidFactor)} erhalten`);
+            assertEqual(localStorage.getItem(CONFIG.STORAGE.MIGRATION_FLAG), null,
+                `Load darf fuer ${String(invalidFactor)} keinen Migrationsmarker setzen`);
+        }
+
+        installMockLocalStorage();
+        let saveThrown = null;
+        try {
+            StorageManager.saveState({
+                lastState: { cumulativeInflationFactor: Number.POSITIVE_INFINITY }
+            });
+        } catch (error) {
+            saveThrown = error;
+        }
+        assertEqual(saveThrown?.code, 'CUMULATIVE_INFLATION_FACTOR_INVALID',
+            'Save muss den Inflations-Domaenenfehler vor JSON.stringify unverhuellt erhalten');
+        assertEqual(localStorage.getItem(CONFIG.STORAGE.LS_KEY), null,
+            'Fehlgeschlagener Save darf kein null-normalisiertes Inflationspayload schreiben');
     }
 
     console.log('Test 3: valid taxState.lossCarry is preserved');
@@ -400,6 +444,56 @@ try {
         assertEqual(JSON.parse(localStorage.getItem(CONFIG.STORAGE.LS_KEY)).inputs.floorBedarf, 18000, 'Full-Fallback stellt den alten Balance-State wieder her');
         assertEqual(JSON.parse(localStorage.getItem('balance_expenses_2026')).marker, 'before-import', 'Full-Fallback stellt weitere erlaubte Snapshot-Daten wieder her');
         assertEqual(localStorage.getItem('profile_tagesgeld'), null, 'Full-Fallback entfernt nach dem Snapshot neu entstandene erlaubte Live-Daten');
+    }
+
+    console.log('Test 9b: full-backup recovery restores registry and all authorized records');
+    {
+        installMockLocalStorage();
+        const oldRegistry = {
+            version: 1,
+            profiles: {
+                old: { meta: { id: 'old', name: 'Alt' }, data: { profile_tagesgeld: '15000' } }
+            }
+        };
+        const newRegistry = {
+            version: 1,
+            profiles: {
+                next: { meta: { id: 'next', name: 'Neu' }, data: { profile_tagesgeld: '42000' } }
+            }
+        };
+        const snapshot = await SnapshotArchive.createSnapshot({
+            id: 'full-backup-recovery-contract',
+            kind: SNAPSHOT_KINDS.fullBackupImportRecovery,
+            activeProfileId: 'old',
+            records: {
+                [PROFILE_STORAGE_KEYS.registry]: JSON.stringify(oldRegistry),
+                [PROFILE_STORAGE_KEYS.current]: 'old',
+                [PROFILE_STORAGE_KEYS.active]: 'old',
+                sim_old: 'before'
+            },
+            restoreScope: {
+                profileRegistryMode: 'replace-all-rollback',
+                profileLiveDataMode: 'replace-all-rollback'
+            }
+        });
+        localStorage.setItem(PROFILE_STORAGE_KEYS.registry, JSON.stringify(newRegistry));
+        localStorage.setItem(PROFILE_STORAGE_KEYS.current, 'next');
+        localStorage.setItem(PROFILE_STORAGE_KEYS.active, 'next');
+        localStorage.setItem('sim_next', 'after');
+
+        const result = await StorageManager.rollbackImportReplace({
+            recoverySnapshotId: snapshot.id
+        });
+
+        assertEqual(result.ok, true, 'Vollbackup-Recovery wird als bedienbarer Rollback akzeptiert');
+        assertEqual(localStorage.getItem(PROFILE_STORAGE_KEYS.registry), JSON.stringify(oldRegistry),
+            'Vollbackup-Recovery stellt die alte Registry bytegleich wieder her');
+        assertEqual(localStorage.getItem(PROFILE_STORAGE_KEYS.current), 'old',
+            'Vollbackup-Recovery stellt den Current-Selektor wieder her');
+        assertEqual(localStorage.getItem('sim_old'), 'before',
+            'Vollbackup-Recovery stellt weitere autorisierte Records wieder her');
+        assertEqual(localStorage.getItem('sim_next'), null,
+            'Vollbackup-Recovery entfernt erst nach dem Snapshot entstandene autorisierte Records');
     }
 
     console.log('Test 10: legacy directory handle migrates to a dedicated IndexedDB and releases snapshotDB');

@@ -16,6 +16,7 @@ import { applyGuardrails } from './spending-guardrails.mjs';
 import { applySpendingPolicyPipeline } from './spending-policy-pipeline.mjs';
 import { calcFlexShare, calculateFinalWithdrawal, quantizeMonthly, smoothstep } from './spending-policy-helpers.mjs';
 import { calculateWealthAdjustedReductionFactor } from './wealth-reduction.mjs';
+import { resolveRuntimeCumulativeInflationFactor } from '../../types/cumulative-inflation-contract.js';
 
 export const SpendingPlanner = {
     /**
@@ -138,7 +139,10 @@ export const SpendingPlanner = {
     _initializeOrLoadState(lastState, params, addDecision) {
         const p = params;
         if (lastState && lastState.initialized) {
-            const cumulativeInflationFactor = lastState.cumulativeInflationFactor || 1;
+            const cumulativeInflationFactor = resolveRuntimeCumulativeInflationFactor(
+                lastState.cumulativeInflationFactor,
+                { path: 'lastState.cumulativeInflationFactor' }
+            );
             const realVermögen = p.gesamtwert / cumulativeInflationFactor;
             const peakRealVermoegen = lastState.peakRealVermoegen || realVermögen;
             const realerDepotDrawdown = (peakRealVermoegen > 0)
@@ -310,7 +314,7 @@ export const SpendingPlanner = {
             jahresentnahme: endgueltigeEntnahme
         };
 
-        const entnahmeReal = endgueltigeEntnahme / (cumulativeInflationFactor || 1);
+        const entnahmeReal = endgueltigeEntnahme / cumulativeInflationFactor;
         const newState = {
             ...state,
             flexRate,

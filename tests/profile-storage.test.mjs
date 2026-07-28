@@ -50,7 +50,10 @@ import {
     exportProfilesBundle as exportBundleDirect,
     exportProfilesBundleToWindowName as exportBundleToWindowNameDirect,
     importProfilesBundle as importBundleDirect,
-    importProfilesBundleFromWindowName as importBundleFromWindowNameDirect
+    importProfilesBundleFromWindowName as importBundleFromWindowNameDirect,
+    PROFILE_BUNDLE_APP_ID,
+    PROFILE_BUNDLE_SCHEMA_VERSION,
+    PROFILE_BUNDLE_TYPE
 } from '../app/profile/profile-bundle-io.js';
 import {
     createProfile as createRegistryProfile,
@@ -76,6 +79,15 @@ function createLocalStorageMock() {
         key: (index) => Array.from(store.keys())[index] || null,
         get length() { return store.size; }
     };
+}
+
+function serializeStorage(storage) {
+    const entries = [];
+    for (let index = 0; index < storage.length; index += 1) {
+        const key = storage.key(index);
+        if (key) entries.push([key, storage.getItem(key)]);
+    }
+    return JSON.stringify(entries.sort(([left], [right]) => left.localeCompare(right)));
 }
 
 const prevLocalStorage = global.localStorage;
@@ -811,8 +823,13 @@ try {
         localStorage.clear();
 
         const bundle = {
+            bundleType: PROFILE_BUNDLE_TYPE,
+            schemaVersion: PROFILE_BUNDLE_SCHEMA_VERSION,
+            app: PROFILE_BUNDLE_APP_ID,
+            profileVersion: 1,
             version: 1,
             exportedAt: new Date().toISOString(),
+            recordCount: 1,
             registry: {
                 version: 1,
                 profiles: {
@@ -863,8 +880,30 @@ try {
         localStorage.clear();
         ensureProfileRegistry();
         const tranches = [
-            { trancheId: 't1', marketValue: 12345, costBasis: 10000, type: 'aktien_alt' },
-            { trancheId: 'g1', marketValue: 5000, costBasis: 4000, type: 'gold', category: 'gold' }
+            {
+                schemaVersion: 1,
+                trancheId: 't1',
+                name: 'ETF Alt',
+                shares: 123.45,
+                purchasePrice: 81,
+                currentPrice: 100,
+                purchaseDate: '2020-01-02',
+                category: 'equity',
+                type: 'aktien_alt',
+                tqf: 0.3
+            },
+            {
+                schemaVersion: 1,
+                trancheId: 'g1',
+                name: 'Gold',
+                shares: 50,
+                purchasePrice: 80,
+                currentPrice: 100,
+                purchaseDate: '2021-02-03',
+                category: 'gold',
+                type: 'gold',
+                tqf: 0
+            }
         ];
         localStorage.setItem('depot_tranchen', JSON.stringify(tranches));
         localStorage.setItem('profile_tagesgeld', '32100');
@@ -892,7 +931,10 @@ try {
     {
         localStorage.clear();
 
-        const badBundle = { version: 1, registry: 'not-an-object' };
+        const badBundle = {
+            ...exportProfilesBundle(),
+            registry: 'not-an-object'
+        };
         const result = importProfilesBundle(badBundle);
 
         assert(result.ok === false, 'Import mit ungültiger Registry sollte fehlschlagen');
@@ -900,6 +942,105 @@ try {
             'Fehlermeldung sollte Registry erwähnen');
     }
     console.log('✓ Import invalid registry OK');
+
+    // Test 22b: Import preflight and rollback are mutation-safe
+    console.log('Test 22b: Import preflight and rollback are mutation-safe');
+    {
+        localStorage.clear();
+        ensureProfileRegistry();
+        localStorage.setItem('profile_tagesgeld', '123');
+        saveCurrentProfileFromLocalStorage();
+        localStorage.setItem('unrelated_live_key', 'preserve');
+        const validBundle = exportProfilesBundle();
+        const before = serializeStorage(localStorage);
+
+        const unknownGlobal = importProfilesBundle({
+            ...validBundle,
+            globals: {
+                ...validBundle.globals,
+                arbitraryGlobal: 'forbidden'
+            }
+        });
+        assertEqual(unknownGlobal.ok, false, 'Unbekannter Bundle-Global-Key wird vor dem ersten Write abgewiesen');
+        assertEqual(serializeStorage(localStorage), before,
+            'Fehlgeschlagener Global-Preflight mutiert keine Live-Daten');
+
+        const wrongEnvelope = importProfilesBundle({
+            ...validBundle,
+            app: 'fremde-app'
+        });
+        assertEqual(wrongEnvelope.ok, false, 'Fremde Bundle-App-ID wird abgewiesen');
+        const wrongRecordCount = importProfilesBundle({
+            ...validBundle,
+            recordCount: validBundle.recordCount + 1
+        });
+        assertEqual(wrongRecordCount.ok, false, 'Falscher Bundle-recordCount wird abgewiesen');
+
+        const ghostCurrent = importProfilesBundle({
+            ...validBundle,
+            currentProfileId: 'ghost'
+        });
+        assertEqual(ghostCurrent.ok, false, 'Ghost-Current wird vor dem ersten Write abgewiesen');
+        assertEqual(serializeStorage(localStorage), before,
+            'Ghost-Current mutiert keine Live-Daten');
+
+        const objectProfileValue = structuredClone(validBundle);
+        const currentId = objectProfileValue.currentProfileId;
+        objectProfileValue.registry.profiles[currentId].data.profile_tagesgeld = { amount: 999 };
+        const invalidValue = importProfilesBundle(objectProfileValue);
+        assertEqual(invalidValue.ok, false, 'Beliebige Profilobjekte werden nicht still stringifiziert');
+        assertEqual(serializeStorage(localStorage), before,
+            'Ungueltiger Profilwert mutiert keine Live-Daten');
+
+        const invalidInflation = structuredClone(validBundle);
+        invalidInflation.registry.profiles[invalidInflation.currentProfileId].data[CONFIG.STORAGE.LS_KEY] = JSON.stringify({
+            lastState: { cumulativeInflationFactor: 0 }
+        });
+        const invalidInflationResult = importProfilesBundle(invalidInflation);
+        assertEqual(invalidInflationResult.ok, false, 'Bundle-Preflight weist Inflationsfaktor 0 fachlich ab');
+        assertEqual(serializeStorage(localStorage), before,
+            'Ungueltiger Bundle-Inflationsstate mutiert keine Live-Daten');
+        const implausibleInflation = structuredClone(validBundle);
+        implausibleInflation.registry.profiles[implausibleInflation.currentProfileId].data[CONFIG.STORAGE.LS_KEY] = JSON.stringify({
+            lastState: { cumulativeInflationFactor: 99 }
+        });
+        const implausibleInflationResult = importProfilesBundle(implausibleInflation);
+        assertEqual(implausibleInflationResult.ok, false,
+            'Bundle-Preflight weist einen Inflationsfaktor oberhalb der Plausibilitaetsgrenze ab');
+        assertEqual(serializeStorage(localStorage), before,
+            'Ueberhoehter Bundle-Inflationsstate mutiert keine Live-Daten');
+
+        const rollback = importBundleDirect(validBundle, {
+            storage: localStorage,
+            loadProfileIntoLocalStorage: () => true,
+            validateAfterLoad: () => ({ ok: false, message: 'fault after load' })
+        });
+        assertEqual(rollback.ok, false, 'Fehler in der Abschlussvalidierung laesst den Bundle-Import scheitern');
+        assertEqual(rollback.code, 'bundle_import_rolled_back', 'Abschlussfehler meldet kompensierenden Rollback');
+        assertEqual(serializeStorage(localStorage), before,
+            'Kompensierender Bundle-Rollback stellt alle Live-Keys bytegleich wieder her');
+
+        const {
+            bundleType: _bundleType,
+            schemaVersion: _schemaVersion,
+            app: _app,
+            profileVersion: _profileVersion,
+            recordCount: _recordCount,
+            ...legacyBundle
+        } = validBundle;
+        legacyBundle.globals = {};
+        localStorage.setItem('etfProxyUrl', 'https://existing.example');
+        const legacyResult = importBundleDirect(legacyBundle, {
+            storage: localStorage,
+            loadProfileIntoLocalStorage: () => true
+        });
+        assertEqual(legacyResult.ok, true, 'Historisches Profilbundle ohne Envelope wird definiert migriert');
+        assertEqual(legacyResult.bundle.migrated, true, 'Legacy-Profilbundle kennzeichnet die Migration');
+        assertEqual(legacyResult.bundle.sourceSchemaVersion, 0, 'Legacy-Profilbundle dokumentiert die Quellversion');
+        assertEqual(localStorage.getItem('etfProxyUrl'), 'https://existing.example',
+            'Im Bundle fehlende globale Einstellungen bleiben beim Import erhalten');
+    }
+    console.log('✓ Import preflight and rollback mutation safety OK');
 
     // ========== Corrupt Data Tests ==========
 

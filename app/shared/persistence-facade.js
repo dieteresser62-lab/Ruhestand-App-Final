@@ -325,6 +325,144 @@ export function exportAllSync() {
     };
 }
 
+function captureRecordsByPolicy(allowKey) {
+    const records = Object.create(null);
+    keysSync().forEach(key => {
+        if (!allowKey(key)) return;
+        const value = getItemSync(key);
+        if (value !== null && value !== undefined) records[key] = value;
+    });
+    return records;
+}
+
+async function capturePersistedRecordsByPolicy(allowKey) {
+    if (typeof adapter?.loadAll !== 'function') {
+        const error = new Error('Der Persistenzadapter unterstuetzt keinen verifizierenden Backend-Readback.');
+        error.name = 'PersistenceBackendReadError';
+        error.code = 'persistence_backend_read_unavailable';
+        throw error;
+    }
+    const loaded = await adapter.loadAll();
+    const records = Object.create(null);
+    Object.entries(loaded || {}).forEach(([key, value]) => {
+        const normalizedKey = String(key);
+        if (!allowKey(normalizedKey)) return;
+        if (typeof value !== 'string') {
+            throw new Error(`Persistierter Wert ${normalizedKey} liegt nicht im kanonischen Stringformat vor.`);
+        }
+        records[normalizedKey] = value;
+    });
+    return records;
+}
+
+function recordsMatch(expected, actual) {
+    const expectedKeys = Object.keys(expected).sort();
+    const actualKeys = Object.keys(actual).sort();
+    if (expectedKeys.length !== actualKeys.length) return false;
+    return expectedKeys.every((key, index) => (
+        key === actualKeys[index] &&
+        expected[key] === actual[key]
+    ));
+}
+
+function createFullReplacePlan(targetRecords, currentRecords, allowKey) {
+    const targetKeys = new Set(Object.keys(targetRecords));
+    return {
+        deleteKeys: Object.keys(currentRecords).filter(key => allowKey(key) && !targetKeys.has(key)),
+        upserts: Object.entries(targetRecords),
+        allowKey
+    };
+}
+
+function createRestoreError(cause, rollbackError = null) {
+    const error = new Error(
+        rollbackError
+            ? 'Persistenz-Restore fehlgeschlagen; auch der kompensierende Rollback konnte nicht verifiziert werden.'
+            : 'Persistenz-Restore fehlgeschlagen; der vorherige Livebestand wurde wiederhergestellt.'
+    );
+    error.name = 'PersistenceRestoreError';
+    error.code = rollbackError ? 'rollback_failed' : 'restore_rolled_back';
+    error.cause = cause;
+    error.rollbackError = rollbackError;
+    return error;
+}
+
+export async function replaceRecordsTransactional(records, options = {}) {
+    const allowKey = typeof options.allowKey === 'function' ? options.allowKey : () => true;
+    if (!records || typeof records !== 'object' || Array.isArray(records)) {
+        throw new Error('Restore-Records muessen ein Objekt sein.');
+    }
+
+    const targetRecords = Object.create(null);
+    Object.entries(records).forEach(([key, value]) => {
+        const normalizedKey = String(key);
+        if (!allowKey(normalizedKey)) {
+            throw new Error(`Persistenz-Key ${normalizedKey} ist fuer diesen Restore nicht erlaubt.`);
+        }
+        if (typeof value !== 'string') {
+            throw new Error(`Persistenzwert ${normalizedKey} muss als String vorliegen.`);
+        }
+        targetRecords[normalizedKey] = value;
+    });
+
+    await flush();
+    const previousRecords = await capturePersistedRecordsByPolicy(allowKey);
+    const replacePlan = createFullReplacePlan(targetRecords, previousRecords, allowKey);
+
+    try {
+        await replaceLiveRecords(targetRecords, {
+            ...options,
+            ...replacePlan,
+            restoreLock: true
+        });
+        const confirmedRecords = await capturePersistedRecordsByPolicy(allowKey);
+        const confirmedCache = captureRecordsByPolicy(allowKey);
+        if (!recordsMatch(targetRecords, confirmedRecords) || !recordsMatch(targetRecords, confirmedCache)) {
+            throw new Error('Backend oder Cache stimmt nicht mit dem Restore-Ziel ueberein.');
+        }
+        if (typeof options.postValidate === 'function') {
+            const validationResult = await options.postValidate(confirmedRecords);
+            if (validationResult === false || validationResult?.ok === false) {
+                throw new Error(validationResult?.message || 'Die Post-Load-Validierung ist fehlgeschlagen.');
+            }
+        }
+        return {
+            ok: true,
+            previousRecords,
+            records: confirmedRecords,
+            deletedCount: replacePlan.deleteKeys.length,
+            upsertCount: replacePlan.upserts.length
+        };
+    } catch (cause) {
+        let rollbackError = null;
+        try {
+            const currentRecords = await capturePersistedRecordsByPolicy(allowKey);
+            const rollbackVisibleKeys = Object.fromEntries(
+                [...new Set([
+                    ...Object.keys(currentRecords),
+                    ...Object.keys(targetRecords)
+                ])].map(key => [key, currentRecords[key] ?? targetRecords[key]])
+            );
+            const rollbackPlan = createFullReplacePlan(previousRecords, rollbackVisibleKeys, allowKey);
+            await replaceLiveRecords(previousRecords, {
+                ...options,
+                ...rollbackPlan,
+                postValidate: undefined,
+                restoreLock: true
+            });
+            const confirmedRollback = await capturePersistedRecordsByPolicy(allowKey);
+            const confirmedRollbackCache = captureRecordsByPolicy(allowKey);
+            if (!recordsMatch(previousRecords, confirmedRollback)
+                || !recordsMatch(previousRecords, confirmedRollbackCache)) {
+                throw new Error('Backend oder Cache ist nach dem Rollback nicht bytegleich zum vorherigen Livebestand.');
+            }
+        } catch (error) {
+            rollbackError = error;
+        }
+        throw createRestoreError(cause, rollbackError);
+    }
+}
+
 export async function importAll(bundle, options = {}) {
     const records = bundle?.records || {};
     const allowKey = typeof options.allowKey === 'function' ? options.allowKey : () => true;
@@ -436,6 +574,9 @@ export async function replaceLiveRecords(records, options = {}) {
 
     if (typeof adapter?.replaceLiveRecords === 'function') {
         const result = await adapter.replaceLiveRecords(records, { ...options, deleteKeys, upserts, allowKey });
+        if (result?.ok === false) {
+            throw new Error(result.message || 'Der Persistenzadapter hat den Replace-Vorgang abgewiesen.');
+        }
         deleteKeys.forEach(key => {
             delete memCache[key];
         });
@@ -635,6 +776,7 @@ export const PersistenceFacade = {
     clearSync,
     exportAllSync,
     importAll,
+    replaceRecordsTransactional,
     listSnapshots,
     readSnapshot,
     writeSnapshot,
