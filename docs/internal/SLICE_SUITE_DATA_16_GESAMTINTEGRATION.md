@@ -947,3 +947,260 @@ ueber Modellguete oder KPI-Wirkung der Sweep-Parameter.
 - Pre-Mortem: Eine spätere Wiedereinführung von sweepHorizonYears läuft in die unbedingte Persistenzräumung in initSweepDefaultsWithLocalStorageFallback.
 ```
 
+## Slice-uebergreifende Gesamtreview-Blocker-Nachbesserung durch Codex
+
+**Stand:** 2026-07-29
+**Anlass:** Claude-Gesamtreview und unabhaengige Gemini-Bestaetigung der
+Blocker G-01 bis G-03
+**Status:** technisch nachgebessert; unabhaengiges Re-Review ausstehend
+
+### Technische Nachmessung vor der Korrektur
+
+- Das Findings-Register enthaelt 65 eindeutige Ausgangsbefunde und die
+  vollstaendige Traceability-Tabelle ebenfalls 65 Zeilen.
+- Exakt 38 dieser Zeilen benennen Slice 16 als ergaenzenden Nachweis. Keiner
+  dieser 38 Bezeichner steht im bisherigen Slice-16-Dokument.
+- Die Bezeichner I-01 bis I-08 kommen ausserhalb des Reviewtexts nur an ihren
+  acht Definitionsstellen im Hauptplan vor; Inventar und Contract-Test kennen
+  sie nicht.
+- Der Produktpfad bestimmt bei fehlendem `pendingCommit` das aktuelle
+  Markt-CSV-Zieljahr als abgeschlossenes Kalenderjahr. Die zwei Tests setzen
+  dagegen 2025 fest und werden deshalb ab 2027 mit
+  `market_csv_period_mismatch` abbrechen.
+
+Damit sind G-01, G-02 und G-03 technisch angenommen. G-04 bis G-10 sind im
+Gesamtreview ausdruecklich Restrisiken und nicht Scope dieser
+Blocker-Nachbesserung.
+
+### Branch- und Statuscheck vor Coding
+
+Ausgefuehrt am 2026-07-29:
+
+```text
+git branch --show-current
+codex/suite-datenintegritaet-hardening
+
+git status --short
+ M docs/internal/SUITE_DATENINTEGRITAET_HARDENING_PLAN.md
+?? docs/internal/SUITE_DATENINTEGRITAET_GESAMTREVIEW.md
+```
+
+Der aktive Branch entspricht dem Feature-Branch des Arbeitsplans. Die zwei
+vorhandenen Dokumentaenderungen stammen aus dem Gesamtreview. Das
+Reviewdokument wird durch Codex nicht veraendert; der bereits vorhandene
+Hauptplan-Diff wird nur append-only um die spaetere technische Rueckmeldung
+ergaenzt.
+
+### Diff-Risiko vor Coding
+
+```text
+Geplante Dateien:
+- tests/fixtures/suite-data-integrity/oracle-traceability-v1.json
+- tests/suite-data-integration-contract.test.mjs
+- tests/balance-ui-orchestration.test.mjs
+- tests/browser-smoke.test.mjs
+- tests/README.md
+- docs/internal/SLICE_SUITE_DATA_16_GESAMTINTEGRATION.md
+- docs/internal/SUITE_DATENINTEGRITAET_HARDENING_PLAN.md
+
+Voraussichtliche Aenderungstiefe:
+- mittel; zwei Testkorrekturen und eine fail-closed Erweiterung des
+  Nachweisinventars, keine Produktiv- oder Engine-Semantik
+
+Gefaehrdete bestehende Tests:
+- suite-data-integration-contract.test.mjs
+- balance-ui-orchestration.test.mjs
+- browser-smoke.test.mjs
+- npm test und npm run test:browser
+
+Nicht anfassen:
+- Produktivmodule und Engine-Semantik
+- engine.js, workers/, dist/, src-tauri/ und RuheStandSuite.exe
+- docs/internal/SUITE_DATENINTEGRITAET_GESAMTREVIEW.md
+- G-04 bis G-10 ohne eigene Nutzer-/Reviewentscheidung
+
+Rollback-Strategie:
+- git checkout -- fuer die geaenderten Bestandsdateien
+- keine neuen Dateien; Reviewer-Diffs bleiben unangetastet
+```
+
+Die Stop-Regeln greifen nicht: Es werden keine produktiven Programmdateien
+geaendert, der Contract ist durch die bestaetigten Blocker eindeutig, und die
+erforderlichen Node-/Browsergates sind ausfuehrbar.
+
+### Finding-Traceability nach G-01
+
+Die folgende Tabelle ist die lesbare Projektion des normativen Inventars
+`tests/fixtures/suite-data-integrity/oracle-traceability-v1.json`. Der
+Contract-Test erzwingt alle 65 IDs in dieser Reihenfolge, die Fix- und
+Nachweisslices, aufloesbare Orakel beziehungsweise direkte Witness-Marker und
+deren tatsaechliches Gate. Die 38 im Hauptplan explizit Slice 16 zugeordneten
+Ergaenzungsnachweise werden als exakte Teilmenge separat assertiert.
+
+| Finding | Fix-/Nachweisslices | Orakel oder direkter Witness | Gate |
+| --- | --- | --- | --- |
+| BAL-01 | 1 / 1, 16 | O-01, O-02 | Node + Browser |
+| BAL-02 | 2 / 2, 16 | O-03 | Node + Browser |
+| BAL-03 | 2 / 2 | O-03 | Node + Browser |
+| BAL-04 | 2 / 2, 16 | O-04 | Node |
+| BAL-05 | 2 / 2, 5 | `spending-planner.test.mjs`: handberechnete Nettoentnahme | Node |
+| BAL-06 | 3 / 3, 16 | O-08 | Node |
+| DAT-01 | 3 / 3, 16 | O-05 | Node |
+| DAT-02 | 4 / 4, 16 | O-06 | Node + Browser |
+| DAT-03 | 4 / 4, 16 | O-07 | Node |
+| DAT-04 | 3 / 3, 10 | O-08 | Node |
+| DAT-05 | 13 / 13, 16 | `profile-storage.test.mjs`: Profilalter beim Wechsel | Node |
+| ENG-01 | 5 / 1, 5, 16 | O-01, O-19 | Node + Browser |
+| ENG-02 | 2 / 2 | O-09 | Node |
+| ENG-03 | 2 / 2, 3, 10 | O-08, O-19 | Node |
+| ENG-04 | 5 / 2, 5 | `spending-planner.test.mjs`: handberechnete Nettoentnahme | Node |
+| ENG-05 | 5 / 5, 16 | O-19 | Node |
+| ENG-06 | 5 / 5, 16 | O-19 | Node |
+| ENG-07 | 15 / 15 | Modellmatrix-Witness | Node |
+| ENG-08 | 5 / 5, 12, 13 | Negative-Core-Contract fuer aktive ungueltige Rente | Node |
+| ENG-09 | 2 / 2, 3, 10 | O-08, O-19 | Node |
+| SWP-01 | 9 / 9, 16 | O-14 | Node |
+| SWP-02 | 7 / 7, 16 | O-11 | Node |
+| SWP-03 | 8 / 8, 16 | O-12 | Node |
+| SWP-04 | 8 / 8, 16 | O-13 | Node |
+| SWP-05 | 8 / 8, 10 | O-20 | Node |
+| SWP-06 | 7 / 7, 16 | Startjahr-/Estimated-History-Witness | Node |
+| SWP-07 | 7 / 7, 16 | Seed-0-Witness | Node |
+| SWP-08 | 9 / 9, 10 | deterministischer Parameterwitness | Node |
+| SWP-09 | 9 / 9, 16 | O-14 | Node |
+| SWP-10 | 8 / 8, 16 | Pflege-Flex-/Floor-Paritaet | Node |
+| SWP-11 | 7 / 7, 16 | O-11 | Node |
+| OPT-01 | 10 / 10, 16 | O-15 | Node + Browser |
+| OPT-02 | 11 / 9, 11 | O-21 | Node |
+| OPT-03 | 10 / 10, 15 | O-20 | Node |
+| OPT-04 | 10 / 3, 10 | O-08, O-15 | Node + Browser |
+| OPT-05 | 10, 15 / 10, 15 | Modellstatus-Witness | Node |
+| OPT-06 | 11 / 11 | O-21 | Node |
+| OPT-07 | 11 / 11, 16 | O-21 plus Quantilselector-Witness | Node |
+| OPT-08 | 11 / 9, 11 | O-21 plus Missing-Drawdown-Witness | Node |
+| SIM-01 | 6 / 6, 9 | O-22 | Node |
+| SIM-02 | 6 / 6, 16 | O-10 | Node |
+| SIM-03 | 6 / 6, 16 | O-22 | Node |
+| SIM-04 | 6 / 6, 16 | O-22 | Node |
+| SIM-05 | 6 / 6, 16 | O-22 | Node |
+| SIM-06 | 6 / 6, 15 | O-22 | Node |
+| SIM-07 | 10 / 10 | O-20 | Node |
+| IMP-01 | 12 / 12, 16 | O-16 | Node |
+| IMP-02 | 12 / 12, 16 | O-17 | Node |
+| IMP-03 | 12, 15 / 12, 15 | O-17 | Node |
+| PER-01 | 13 / 13, 14 | O-18 | Node + Browser |
+| PER-02 | 13 / 13, 16 | O-18 plus typisierter Pflege-/Balance-State | Node + Browser |
+| PER-03 | 13 / 4, 13 | O-18 plus korrupter Profilverbund | Node + Browser |
+| PER-04 | 14 / 14 | O-18 plus atomarer Import-/Rollback-Witness | Node + Browser |
+| PER-05 | 14 / 14, 16 | Vollbackup-Preflight plus Full-Recovery-Browserwitness | Node + Browser |
+| PER-06 | 14 / 5, 14 | Inflationsfaktor-Domaincontract | Node |
+| MOD-01 | 15 / 15, 16 | Architektur-Evidenzcontract | Node |
+| MOD-02 | 15 / 15, 16 | Architektur-Evidenzcontract | Node |
+| MOD-03 | 15 / 15, 16 | Architektur-Evidenzcontract | Node |
+| MOD-04 | 15 / 15, 16 | Architektur-Evidenzcontract | Node |
+| MOD-05 | 15, 16 / 15, 16 | Modellmatrix-Witness | Node |
+| MOD-06 | 15, 16 / 15, 16 | Modellmatrix-Witness | Node |
+| MOD-07 | 15, 16 / 15, 16 | Modellmatrix-Witness | Node |
+| MOD-08 | 15, 16 / 15, 16 | Nutzerseitiger Modellstatus-Witness | Node |
+| QA-01 | 16 / Orakelbestand | O-01 bis O-22 | Node + Browser |
+| QA-02 | 16 / Coverage-Inventar | fail-closed Coverage-Dateigate | Node |
+
+Damit stehen insbesondere die zuvor in keinem Slice-Dokument genannten
+OPT-07, IMP-02, PER-02, PER-05, QA-01 und QA-02 jetzt mit konkretem Nachweis im
+Abschluss-Slice.
+
+### Invarianten-Traceability nach G-02
+
+| Invariante | Maschinenpruefbare Abbildung | Gate |
+| --- | --- | --- |
+| I-01 Preview ist nicht Commit | O-01, O-02 | Node + Browser |
+| I-02 Eine finale Aktion | O-03, O-04 | Node + Browser |
+| I-03 Bestands- und Geldinvarianten | O-03, O-04, O-09, O-10 | Node + Browser |
+| I-04 Kanonische Zahlengrenze | O-05, O-08, O-10, O-22 | Node |
+| I-05 Profilaggregation erhaelt Werte und Provenienz | O-06, O-07, O-18 | Node + Browser |
+| I-06 Parameterfidelity | O-11, O-12, O-13, O-15, O-20, O-21 | Node + Browser |
+| I-07 Ergebnis- und Missingness-Semantik | O-14, O-21, O-22 | Node |
+| I-08 Import und Recovery | O-16, O-17, O-18 plus zwei direkte Fault-Injection-Witnesses | Node + Browser |
+
+Das Inventar darf fuer keine Invariante leer sein. Jeder referenzierte
+Oracle-Identifier muss im O-01-bis-O-22-Inventar existieren; direkte Witnesses
+muessen Datei, Marker und das vom Test-Runner tatsaechlich verwendete Gate
+treffen.
+
+### Durchgefuehrte Korrekturen
+
+1. G-01:
+   - Das versionierte Inventar fuehrt jetzt alle 65 Ausgangsbefunde in
+     Planreihenfolge mit Fix-/Nachweisslices und mindestens einem Orakel oder
+     direkten Witness.
+   - Die vorhandene V1-Struktur wird additiv erweitert; alle bisherigen
+     Oracle-, Browser-, Paritaets-, Parameter- und Deltafelder bleiben
+     unveraendert, sodass bestehende V1-Leser die neuen Top-Level-Felder
+     weiterhin ignorieren koennen.
+   - Der Contract liest das Findings-Register und die vollstaendige
+     Traceability-Tabelle direkt aus dem Hauptplan. Inventar und Plan duerfen
+     nicht getrennt fortgeschrieben werden.
+   - Die exakt 38 im Hauptplan Slice 16 zugeordneten Ergaenzungsnachweise
+     bilden eine eigene fail-closed Assertion.
+   - Die sechs zuvor in keinem Slice-Dokument genannten IDs OPT-07, IMP-02,
+     PER-02, PER-05, QA-01 und QA-02 sind jetzt in diesem Dokument und im
+     Inventar enthalten.
+2. G-02:
+   - I-01 bis I-08 stehen als eigene Inventarsektion mit exaktem Plantitel und
+     konkreten Orakel-/Witness-Zuordnungen zur Verfuegung.
+   - Der Contract liest die acht Invarianten direkt aus dem Hauptplan, prueft
+     Reihenfolge und Titel und loest jeden Oracle-Identifier sowie jeden
+     direkten Witness bis zum realen Gate auf.
+3. G-03:
+   - Der Node-Roundtrip erzeugt Zieljahr, Stichtag, CSV-Zeilen, Dateiname und
+     Erwartungen aus dem tatsaechlich abgeschlossenen Kalenderjahr.
+   - Der Browser-Roundtrip liest dasselbe Jahr aus dem Browserkontext, in dem
+     auch der Produktcode den Import validiert.
+   - Die fruehere feste Zeichenkette 2025 wurde in beiden Roundtrips entfernt;
+     der Test wurde zusaetzlich mit auf 2030-05-05 eingefrorener Node-Uhr
+     ausgefuehrt.
+4. `tests/README.md` beschreibt Findings- und Invarianten-Traceability als
+   verbindlichen Bestandteil des Integrationscontracts.
+
+Es wurden keine Produktivdatei, kein Engine-Modul, kein Worker, kein
+generiertes Artefakt und kein Releasebestand geaendert.
+
+### Ausgefuehrte Tests
+
+| Gate | Ergebnis |
+| --- | --- |
+| `node tests/run-single.mjs tests/suite-data-integration-contract.test.mjs` | 1.066/1.066 Assertions, 0 Fehler |
+| `node tests/run-single.mjs tests/balance-ui-orchestration.test.mjs` | 238/238 Assertions, 0 Fehler |
+| derselbe Balance-Test mit eingefrorener Uhr `2030-05-05` | 238/238 Assertions, 0 Fehler |
+| `npm test` | 9.892/9.892 Assertions, 137 Testdateien, 0 Fehler, 0 offene Handles |
+| `npm run test:browser` | 27/27 Browserfaelle, 0 Fehler |
+| `npm run docs:evidence` | gruen; 69 MKT, 55 FOR, 17 MAP, 10 Matrixtermine |
+| Syntaxchecks der drei geaenderten `.mjs`-Dateien | gruen |
+| JSON-Parse und Inventarzaehlung | 22 Orakel, 65 Findings, 8 Invarianten, 38 Slice-16-Ergaenzungsnachweise |
+| `git diff --check` | gruen |
+
+### Review-Antworten von Codex auf das Gesamtreview
+
+- G-01: technisch angenommen und wie oben maschinenpruefbar nachgebessert.
+- G-02: technisch angenommen und wie oben maschinenpruefbar nachgebessert.
+- G-03: technisch angenommen; die Kalenderfalle ist fuer Node und Browser
+  entfernt und mit einem zukuenftigen Datum nachgemessen.
+- G-04 bis G-10: nicht veraendert. Claude und Gemini fuehren diese Punkte als
+  Restrisiken, nicht als Blocker. Ihre Behandlung benoetigt einen separaten
+  Scope beziehungsweise die dort genannten Fachentscheidungen.
+
+### Review-Entscheidungen der Gesamtreview-Nachbesserung
+
+| ID | Quelle | Finding | Entscheidung | Umsetzung |
+| --- | --- | --- | --- | --- |
+| G-01 | Claude/Gemini | 38 Slice-16-Nachweise und Gesamtabbildung der 65 Befunde fehlen | angenommen | Plan-gekoppeltes Inventar, Contract und lesbare Tabelle ergaenzt |
+| G-02 | Claude/Gemini | I-01 bis I-08 besitzen keine Abnahmeabbildung | angenommen | exakte Plantitel sowie Oracle-/Witness-/Gate-Mapping ergaenzt |
+| G-03 | Claude/Gemini | feste CSV-Jahresfixture kippt ab 2027 | angenommen | beide Roundtrips kalenderrelativ; 2030-Witness gruen |
+| G-04 bis G-10 | Claude/Gemini | bestaetigte Restrisiken | separater Scope | unveraendert und weiterhin offen |
+
+### Freigabestatus der Gesamtreview-Nachbesserung
+
+Technisch nachgebessert. Die formale Feststellung, ob G-01 bis G-03 geschlossen
+sind und das Gesamtvorhaben abgeschlossen werden kann, bleibt dem unabhaengigen
+Re-Review durch Claude/Gemini beziehungsweise dem Nutzer vorbehalten. Codex
+erteilt keine eigene Freigabe. Commit und Push stehen aus.

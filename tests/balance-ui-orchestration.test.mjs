@@ -1142,9 +1142,19 @@ async function runBalanceUiOrchestrationTests() {
             assertEqual(receipt.recoverySnapshotId, 'csv-import-recovery-test', 'CSV-Rollback nutzt den Recovery-Receipt');
             return { ok: true };
         };
+        const csvTargetYear = new Date().getFullYear() - 1;
+        const csvExpectedAsOf = `${csvTargetYear}-12-30`;
+        const csvSourceFileName = `markt-${csvTargetYear}.csv`;
+        const csvRows = [
+            'Datum;Schluss',
+            `30.12.${csvTargetYear - 3};100`,
+            `30.12.${csvTargetYear - 2};110`,
+            `30.12.${csvTargetYear - 1};120`,
+            `30.12.${csvTargetYear};130`
+        ];
         dom.inputs.marketCsvMode.value = 'current';
-        dom.inputs.marketCsvTargetYear.value = '2025';
-        dom.inputs.marketCsvExpectedAsOf.value = '2025-12-30';
+        dom.inputs.marketCsvTargetYear.value = String(csvTargetYear);
+        dom.inputs.marketCsvExpectedAsOf.value = csvExpectedAsOf;
         dom.inputs.marketCsvInstrument.value = 'vwce.de';
         const csvUpdateOptions = [];
         const csvHandlers = createImportExportHandlers({
@@ -1171,14 +1181,8 @@ async function runBalanceUiOrchestrationTests() {
         });
         const csvSuccessTarget = {
             files: [{
-                name: 'markt-2025.csv',
-                text: async () => [
-                    'Datum;Schluss',
-                    '30.12.2022;100',
-                    '30.12.2023;110',
-                    '30.12.2024;120',
-                    '30.12.2025;130'
-                ].join('\n')
+                name: csvSourceFileName,
+                text: async () => csvRows.join('\n')
             }],
             value: 'selected'
         };
@@ -1192,9 +1196,9 @@ async function runBalanceUiOrchestrationTests() {
             'Ein Fensterhoch am letzten Kurs wird nicht als Allzeithoch gespeichert');
         assertEqual(csvStoredState.inputs.jahreSeitAth, 0,
             'Ohne gerichteten Fensterabstand bleibt die ATH-Referenz neutral');
-        assertEqual(csvStoredState[ANNUAL_MARKET_DATA_META_KEY].sourceFileName, 'markt-2025.csv',
+        assertEqual(csvStoredState[ANNUAL_MARKET_DATA_META_KEY].sourceFileName, csvSourceFileName,
             'CSV-Dateiname bleibt als persistierte Quellenangabe erhalten');
-        assertEqual(csvStoredState[ANNUAL_MARKET_DATA_META_KEY].periodId, 'calendar-year:2025',
+        assertEqual(csvStoredState[ANNUAL_MARKET_DATA_META_KEY].periodId, `calendar-year:${csvTargetYear}`,
             'CSV-Provenienz bleibt an die explizite Zielperiode gebunden');
         assertEqual(csvStoredState[ANNUAL_MARKET_DATA_META_KEY].highScope, 'windowHigh',
             'CSV-Provenienz kennzeichnet das lokale Fensterhoch');
@@ -1211,7 +1215,7 @@ async function runBalanceUiOrchestrationTests() {
         const csvExportDocument = createBalanceExportDocument(csvStoredState);
         assertEqual(
             csvExportDocument.payload[ANNUAL_MARKET_DATA_META_KEY].sourceFileName,
-            'markt-2025.csv',
+            csvSourceFileName,
             'JSON-Export erhält die persistierte CSV-Provenienz vollständig'
         );
         const versionOneCsvDocument = JSON.parse(JSON.stringify(csvExportDocument));
@@ -1250,7 +1254,7 @@ async function runBalanceUiOrchestrationTests() {
         const tamperedCsvError = captureImportError(tamperedCsvExport);
         assertEqual(tamperedCsvError?.code, 'invalid_market_provenance',
             'Ein Export kann windowHigh nicht durch manipulierte Metadaten zum ATH hochstufen');
-        assertEqual(dom.outputs.marketDataProvenance.dataset.asOf, '2025-12-30',
+        assertEqual(dom.outputs.marketDataProvenance.dataset.asOf, csvExpectedAsOf,
             'Erfolgreiche CSV rendert die persistierte Provenienz sichtbar');
         assertEqual(
             dom.outputs.marketDataProvenance.dataset.enginePolicy,
@@ -1264,18 +1268,12 @@ async function runBalanceUiOrchestrationTests() {
         );
 
         const staleStateBeforeImport = JSON.stringify(csvStoredState);
-        dom.inputs.marketCsvExpectedAsOf.value = '2025-12-31';
+        dom.inputs.marketCsvExpectedAsOf.value = `${csvTargetYear}-12-31`;
         errors.length = 0;
         await csvHandlers.handleCsvImport({ target: {
             files: [{
                 name: 'markt-stale.csv',
-                text: async () => [
-                    'Datum;Schluss',
-                    '30.12.2022;100',
-                    '30.12.2023;110',
-                    '30.12.2024;120',
-                    '30.12.2025;130'
-                ].join('\n')
+                text: async () => csvRows.join('\n')
             }],
             value: 'selected'
         } });

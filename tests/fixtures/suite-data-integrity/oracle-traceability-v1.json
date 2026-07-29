@@ -329,6 +329,433 @@
       ]
     }
   ],
+  "findings": [
+    { "id": "BAL-01", "fixSlices": [1], "evidenceSlices": [1, 16], "oracleIds": ["O-01", "O-02"] },
+    { "id": "BAL-02", "fixSlices": [2], "evidenceSlices": [2, 16], "oracleIds": ["O-03"] },
+    { "id": "BAL-03", "fixSlices": [2], "evidenceSlices": [2], "oracleIds": ["O-03"] },
+    { "id": "BAL-04", "fixSlices": [2], "evidenceSlices": [2, 16], "oracleIds": ["O-04"] },
+    {
+      "id": "BAL-05",
+      "fixSlices": [2],
+      "evidenceSlices": [2, 5],
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/spending-planner.test.mjs",
+          "marker": "No-pension case should use hand-calculated 2.4% net withdrawal"
+        }
+      ]
+    },
+    { "id": "BAL-06", "fixSlices": [3], "evidenceSlices": [3, 16], "oracleIds": ["O-08"] },
+    { "id": "DAT-01", "fixSlices": [3], "evidenceSlices": [3, 16], "oracleIds": ["O-05"] },
+    { "id": "DAT-02", "fixSlices": [4], "evidenceSlices": [4, 16], "oracleIds": ["O-06"] },
+    { "id": "DAT-03", "fixSlices": [4], "evidenceSlices": [4, 16], "oracleIds": ["O-07"] },
+    { "id": "DAT-04", "fixSlices": [3], "evidenceSlices": [3, 10], "oracleIds": ["O-08"] },
+    {
+      "id": "DAT-05",
+      "fixSlices": [13],
+      "evidenceSlices": [13, 16],
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/profile-storage.test.mjs",
+          "marker": "Profile switches preserve each profile age"
+        }
+      ]
+    },
+    { "id": "ENG-01", "fixSlices": [5], "evidenceSlices": [1, 5, 16], "oracleIds": ["O-01", "O-19"] },
+    { "id": "ENG-02", "fixSlices": [2], "evidenceSlices": [2], "oracleIds": ["O-09"] },
+    { "id": "ENG-03", "fixSlices": [2], "evidenceSlices": [2, 3, 10], "oracleIds": ["O-08", "O-19"] },
+    {
+      "id": "ENG-04",
+      "fixSlices": [5],
+      "evidenceSlices": [2, 5],
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/spending-planner.test.mjs",
+          "marker": "No-pension case should use hand-calculated 2.4% net withdrawal"
+        }
+      ]
+    },
+    { "id": "ENG-05", "fixSlices": [5], "evidenceSlices": [5, 16], "oracleIds": ["O-19"] },
+    { "id": "ENG-06", "fixSlices": [5], "evidenceSlices": [5, 16], "oracleIds": ["O-19"] },
+    {
+      "id": "ENG-07",
+      "fixSlices": [15],
+      "evidenceSlices": [15],
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/auto-optimize-fidelity.test.mjs",
+          "marker": "Slice-15 model matrix and backlog links remain complete"
+        }
+      ]
+    },
+    {
+      "id": "ENG-08",
+      "fixSlices": [5],
+      "evidenceSlices": [5, 12, 13],
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/core-negative-contracts.test.mjs",
+          "marker": "Invalid active pension"
+        }
+      ]
+    },
+    { "id": "ENG-09", "fixSlices": [2], "evidenceSlices": [2, 3, 10], "oracleIds": ["O-08", "O-19"] },
+    { "id": "SWP-01", "fixSlices": [9], "evidenceSlices": [9, 16], "oracleIds": ["O-14"] },
+    { "id": "SWP-02", "fixSlices": [7], "evidenceSlices": [7, 16], "oracleIds": ["O-11"] },
+    { "id": "SWP-03", "fixSlices": [8], "evidenceSlices": [8, 16], "oracleIds": ["O-12"] },
+    { "id": "SWP-04", "fixSlices": [8], "evidenceSlices": [8, 16], "oracleIds": ["O-13"] },
+    { "id": "SWP-05", "fixSlices": [8], "evidenceSlices": [8, 10], "oracleIds": ["O-20"] },
+    {
+      "id": "SWP-06",
+      "fixSlices": [7],
+      "evidenceSlices": [7, 16],
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/simulator-sweep.test.mjs",
+          "marker": "Sweep Startjahrfilter und Estimated-History-Ausschluss"
+        }
+      ]
+    },
+    {
+      "id": "SWP-07",
+      "fixSlices": [7],
+      "evidenceSlices": [7, 16],
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/simulator-sweep.test.mjs",
+          "marker": "Sweep Seed 0 Reproduzierbarkeit"
+        }
+      ]
+    },
+    {
+      "id": "SWP-08",
+      "fixSlices": [9],
+      "evidenceSlices": [9, 10],
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/auto-optimize-fidelity.test.mjs",
+          "marker": "every interactive parameter has a deterministic causal witness"
+        }
+      ]
+    },
+    { "id": "SWP-09", "fixSlices": [9], "evidenceSlices": [9, 16], "oracleIds": ["O-14"] },
+    {
+      "id": "SWP-10",
+      "fixSlices": [8],
+      "evidenceSlices": [8, 16],
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/simulator-sweep.test.mjs",
+          "marker": "Sweep Pflege-Flex-/Floor-Paritaet"
+        }
+      ]
+    },
+    { "id": "SWP-11", "fixSlices": [7], "evidenceSlices": [7, 16], "oracleIds": ["O-11"] },
+    { "id": "OPT-01", "fixSlices": [10], "evidenceSlices": [10, 16], "oracleIds": ["O-15"] },
+    { "id": "OPT-02", "fixSlices": [11], "evidenceSlices": [9, 11], "oracleIds": ["O-21"] },
+    { "id": "OPT-03", "fixSlices": [10], "evidenceSlices": [10, 15], "oracleIds": ["O-20"] },
+    { "id": "OPT-04", "fixSlices": [10], "evidenceSlices": [3, 10], "oracleIds": ["O-08", "O-15"] },
+    {
+      "id": "OPT-05",
+      "fixSlices": [10, 15],
+      "evidenceSlices": [10, 15],
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/auto-optimizer.test.mjs",
+          "marker": "AutoOptimizeModelStatusV1"
+        }
+      ]
+    },
+    { "id": "OPT-06", "fixSlices": [11], "evidenceSlices": [11], "oracleIds": ["O-21"] },
+    {
+      "id": "OPT-07",
+      "fixSlices": [11],
+      "evidenceSlices": [11, 16],
+      "oracleIds": ["O-21"],
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/auto-optimize-metrics-contract.test.mjs",
+          "marker": "The additional quantile field should select P10 instead of being ignored"
+        }
+      ]
+    },
+    {
+      "id": "OPT-08",
+      "fixSlices": [11],
+      "evidenceSlices": [9, 11],
+      "oracleIds": ["O-21"],
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/auto-optimize-metrics-contract.test.mjs",
+          "marker": "A versioned shape with a missing drawdown should fail closed instead of becoming zero"
+        }
+      ]
+    },
+    { "id": "SIM-01", "fixSlices": [6], "evidenceSlices": [6, 9], "oracleIds": ["O-22"] },
+    { "id": "SIM-02", "fixSlices": [6], "evidenceSlices": [6, 16], "oracleIds": ["O-10"] },
+    { "id": "SIM-03", "fixSlices": [6], "evidenceSlices": [6, 16], "oracleIds": ["O-22"] },
+    { "id": "SIM-04", "fixSlices": [6], "evidenceSlices": [6, 16], "oracleIds": ["O-22"] },
+    { "id": "SIM-05", "fixSlices": [6], "evidenceSlices": [6, 16], "oracleIds": ["O-22"] },
+    { "id": "SIM-06", "fixSlices": [6], "evidenceSlices": [6, 15], "oracleIds": ["O-22"] },
+    { "id": "SIM-07", "fixSlices": [10], "evidenceSlices": [10], "oracleIds": ["O-20"] },
+    { "id": "IMP-01", "fixSlices": [12], "evidenceSlices": [12, 16], "oracleIds": ["O-16"] },
+    { "id": "IMP-02", "fixSlices": [12], "evidenceSlices": [12, 16], "oracleIds": ["O-17"] },
+    { "id": "IMP-03", "fixSlices": [12, 15], "evidenceSlices": [12, 15], "oracleIds": ["O-17"] },
+    { "id": "PER-01", "fixSlices": [13], "evidenceSlices": [13, 14], "oracleIds": ["O-18"] },
+    {
+      "id": "PER-02",
+      "fixSlices": [13],
+      "evidenceSlices": [13, 16],
+      "oracleIds": ["O-18"],
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/profile-state.test.mjs",
+          "marker": "Typed health-bucket and balance-state load results fail closed"
+        }
+      ]
+    },
+    {
+      "id": "PER-03",
+      "fixSlices": [13],
+      "evidenceSlices": [4, 13],
+      "oracleIds": ["O-18"],
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/profilverbund-balance.test.mjs",
+          "marker": "corrupt selected profile blocks household aggregation"
+        }
+      ]
+    },
+    {
+      "id": "PER-04",
+      "fixSlices": [14],
+      "evidenceSlices": [14],
+      "oracleIds": ["O-18"],
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/balance-storage-contract.test.mjs",
+          "marker": "import replace creates confirmed recovery and rollback restores all captured live data"
+        }
+      ]
+    },
+    {
+      "id": "PER-05",
+      "fixSlices": [14],
+      "evidenceSlices": [14, 16],
+      "oracleIds": ["O-18"],
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/persistence.test.mjs",
+          "marker": "Vollbackup-Preflight weist Inflationsfaktor 0 fachlich ab"
+        },
+        {
+          "gate": "browser",
+          "file": "tests/browser-smoke.test.mjs",
+          "marker": "Browser full-backup recovery must restore the previous registry byte-for-byte"
+        }
+      ]
+    },
+    {
+      "id": "PER-06",
+      "fixSlices": [14],
+      "evidenceSlices": [5, 14],
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/balance-storage-contract.test.mjs",
+          "marker": "invalid inflation factors fail closed before migration or save"
+        }
+      ]
+    },
+    {
+      "id": "MOD-01",
+      "fixSlices": [15],
+      "evidenceSlices": [15, 16],
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/architecture-evidence.test.mjs",
+          "marker": "repository evidence should satisfy the offline contract"
+        }
+      ]
+    },
+    {
+      "id": "MOD-02",
+      "fixSlices": [15],
+      "evidenceSlices": [15, 16],
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/architecture-evidence.test.mjs",
+          "marker": "repository evidence should satisfy the offline contract"
+        }
+      ]
+    },
+    {
+      "id": "MOD-03",
+      "fixSlices": [15],
+      "evidenceSlices": [15, 16],
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/architecture-evidence.test.mjs",
+          "marker": "repository evidence should satisfy the offline contract"
+        }
+      ]
+    },
+    {
+      "id": "MOD-04",
+      "fixSlices": [15],
+      "evidenceSlices": [15, 16],
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/architecture-evidence.test.mjs",
+          "marker": "repository evidence should satisfy the offline contract"
+        }
+      ]
+    },
+    {
+      "id": "MOD-05",
+      "fixSlices": [15, 16],
+      "evidenceSlices": [15, 16],
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/auto-optimize-fidelity.test.mjs",
+          "marker": "Slice-15 model matrix and backlog links remain complete"
+        }
+      ]
+    },
+    {
+      "id": "MOD-06",
+      "fixSlices": [15, 16],
+      "evidenceSlices": [15, 16],
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/auto-optimize-fidelity.test.mjs",
+          "marker": "Slice-15 model matrix and backlog links remain complete"
+        }
+      ]
+    },
+    {
+      "id": "MOD-07",
+      "fixSlices": [15, 16],
+      "evidenceSlices": [15, 16],
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/auto-optimize-fidelity.test.mjs",
+          "marker": "Slice-15 model matrix and backlog links remain complete"
+        }
+      ]
+    },
+    {
+      "id": "MOD-08",
+      "fixSlices": [15, 16],
+      "evidenceSlices": [15, 16],
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/auto-optimizer.test.mjs",
+          "marker": "AutoOptimizeModelStatusV1"
+        }
+      ]
+    },
+    {
+      "id": "QA-01",
+      "fixSlices": [16],
+      "evidenceSlices": [],
+      "oracleIds": [
+        "O-01", "O-02", "O-03", "O-04", "O-05", "O-06", "O-07", "O-08",
+        "O-09", "O-10", "O-11", "O-12", "O-13", "O-14", "O-15", "O-16",
+        "O-17", "O-18", "O-19", "O-20", "O-21", "O-22"
+      ]
+    },
+    {
+      "id": "QA-02",
+      "fixSlices": [16],
+      "evidenceSlices": [],
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/coverage-report.test.mjs",
+          "marker": "Coverage file gates should fail closed when a required file is absent"
+        }
+      ]
+    }
+  ],
+  "invariants": [
+    {
+      "id": "I-01",
+      "title": "Preview ist nicht Commit",
+      "oracleIds": ["O-01", "O-02"]
+    },
+    {
+      "id": "I-02",
+      "title": "Eine finale Aktion",
+      "oracleIds": ["O-03", "O-04"]
+    },
+    {
+      "id": "I-03",
+      "title": "Bestands- und Geldinvarianten",
+      "oracleIds": ["O-03", "O-04", "O-09", "O-10"]
+    },
+    {
+      "id": "I-04",
+      "title": "Kanonische Zahlengrenze",
+      "oracleIds": ["O-05", "O-08", "O-10", "O-22"]
+    },
+    {
+      "id": "I-05",
+      "title": "Profilaggregation erhaelt Werte und Provenienz",
+      "oracleIds": ["O-06", "O-07", "O-18"]
+    },
+    {
+      "id": "I-06",
+      "title": "Parameterfidelity",
+      "oracleIds": ["O-11", "O-12", "O-13", "O-15", "O-20", "O-21"]
+    },
+    {
+      "id": "I-07",
+      "title": "Ergebnis- und Missingness-Semantik",
+      "oracleIds": ["O-14", "O-21", "O-22"]
+    },
+    {
+      "id": "I-08",
+      "title": "Import und Recovery",
+      "oracleIds": ["O-16", "O-17", "O-18"],
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/persistence.test.mjs",
+          "marker": "full backup fault injection restores every allowed live key"
+        },
+        {
+          "gate": "node",
+          "file": "tests/balance-storage-contract.test.mjs",
+          "marker": "failed recovery snapshot blocks replace without changing Balance live state"
+        }
+      ]
+    }
+  ],
   "browserContracts": [
     {
       "id": "preview_commit",

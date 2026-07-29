@@ -775,6 +775,11 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 **Zweck:** Bindet den Abschluss der Suite-Datenintegritaet an ein
 maschinenlesbares Traceability-Inventar.
 - ordnet O-01 bis O-22 konkreten Dateien und Witness-Markern zu;
+- bindet alle 65 Ausgangsbefunde des Arbeitsplans an Fix-/Nachweisslices,
+  Orakel beziehungsweise direkte Witnesses und das tatsaechliche Node- oder
+  Browsergate;
+- bildet die acht verbindlichen Zielvertraege I-01 bis I-08
+  maschinenpruefbar auf ihre Orakel und direkten Recovery-Witnesses ab;
 - prueft die Browservertraege Preview/Commit, 3-Bucket, Hybridprofil,
   Import/Recovery, Sweep und Optimizer;
 - inventarisiert Single-/Multi-Profil-, Main-/Worker-,
@@ -943,7 +948,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `balance-storage.test.mjs` | ~490 | localStorage-Persistenz |
 | `balance-ui-orchestration.test.mjs` | ~225 | Balance-UI-Bindings, Import-/Export-Control-Pfade, Schema-V1/V2-Migration, CSV-Provenienz und Profilverbund-Hooks |
 | `browser-smoke.test.mjs` | ~1070 | Playwright-Gate fuer HTML-Einstiege, MC-/Backtest-UI, A11y/Negativpfade sowie zentrale Balance-/Tranchenflows |
-| `suite-data-integration-contract.test.mjs` | ~220 | O-01 bis O-22, Browser-/Paritaetsinventar, fail-closed Parameterpfade, Gate-Zuordnung und unveraenderte Delta-Baselines |
+| `suite-data-integration-contract.test.mjs` | ~330 | 65 Findings, I-01 bis I-08, O-01 bis O-22, Browser-/Paritaetsinventar, fail-closed Parameterpfade, Gate-Zuordnung und unveraenderte Delta-Baselines |
 | `simulator-monte-carlo-browser.mjs` | ~360 | Vier isolierte MC-Browserfaelle fuer Worker, Fallback, Technikfehler, Cancel/Restart, Download und A11y |
 | `care-meta.test.mjs` | ~200 | Pflegefall-Logik |
 | `health-bucket.test.mjs` | ~160 | Pflegebucket-Trigger, Deckung, Verzinsung und Diagnose |

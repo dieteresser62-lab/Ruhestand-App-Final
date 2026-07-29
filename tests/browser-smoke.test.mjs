@@ -717,24 +717,27 @@ async function runBalanceCsvImportRoundtrip(browser, baseUrl) {
     const { page } = smoke;
     await page.locator('#profilverbund-profile-list input').waitFor({ state: 'visible' });
     await page.waitForTimeout(750);
+    const csvTargetYear = await page.evaluate(() => new Date().getFullYear() - 1);
+    const csvExpectedAsOf = `${csvTargetYear}-12-30`;
+    const csvSourceFileName = `markt-${csvTargetYear}.csv`;
     await page.locator('#marketCsvMode').evaluate(element => {
         const details = element.closest('details');
         if (details) details.open = true;
     });
     await page.locator('#marketCsvMode').selectOption('current');
-    await page.locator('#marketCsvTargetYear').fill('2025');
-    await page.locator('#marketCsvExpectedAsOf').fill('2025-12-30');
+    await page.locator('#marketCsvTargetYear').fill(String(csvTargetYear));
+    await page.locator('#marketCsvExpectedAsOf').fill(csvExpectedAsOf);
     await page.locator('#marketCsvInstrument').fill('vwce.de');
 
     const csv = [
         'Datum;Schluss',
-        '30.12.2022;100',
-        '30.12.2023;110',
-        '30.12.2024;120',
-        '30.12.2025;130'
+        `30.12.${csvTargetYear - 3};100`,
+        `30.12.${csvTargetYear - 2};110`,
+        `30.12.${csvTargetYear - 1};120`,
+        `30.12.${csvTargetYear};130`
     ].join('\n');
     await page.locator('#csvFileInput').setInputFiles({
-        name: 'markt-2025.csv',
+        name: csvSourceFileName,
         mimeType: 'text/csv',
         buffer: Buffer.from(csv, 'utf8')
     });
@@ -757,10 +760,10 @@ async function runBalanceCsvImportRoundtrip(browser, baseUrl) {
         'Ein CSV-Fensterhoch am letzten Kurs darf nicht als Allzeithoch persistiert werden');
     assert(imported.inputs.jahreSeitAth === 0,
         'Jahre seit der Engine-Untergrenze müssen aus dem beobachteten CSV-Fenster stammen');
-    assert(meta?.periodId === 'calendar-year:2025', 'CSV-Provenienz muss die explizite Zielperiode persistieren');
-    assert(meta?.asOf === '2025-12-30', 'CSV-Provenienz muss den bestätigten Stichtag persistieren');
+    assert(meta?.periodId === `calendar-year:${csvTargetYear}`, 'CSV-Provenienz muss die explizite Zielperiode persistieren');
+    assert(meta?.asOf === csvExpectedAsOf, 'CSV-Provenienz muss den bestätigten Stichtag persistieren');
     assert(meta?.instrument === 'VWCE.DE', 'CSV-Provenienz muss das normalisierte Instrument persistieren');
-    assert(meta?.sourceFileName === 'markt-2025.csv', 'CSV-Provenienz muss die Quelldatei persistieren');
+    assert(meta?.sourceFileName === csvSourceFileName, 'CSV-Provenienz muss die Quelldatei persistieren');
     assert(meta?.highScope === 'windowHigh', 'Vier CSV-Zeilen dürfen nur ein windowHigh belegen');
     assert(meta?.ath?.engineAvailable === false, 'Manueller Fensterimport darf weiterhin kein echtes ATH behaupten');
     assert(
@@ -786,13 +789,13 @@ async function runBalanceCsvImportRoundtrip(browser, baseUrl) {
         highScope: element.dataset.highScope,
         engineReferenceApplied: element.dataset.engineReferenceApplied
     }));
-    assert(provenanceView.periodId === 'calendar-year:2025', 'Reload muss die persistierte CSV-Periode wieder anzeigen');
-    assert(provenanceView.asOf === '2025-12-30', 'Reload muss den persistierten Stichtag wieder anzeigen');
+    assert(provenanceView.periodId === `calendar-year:${csvTargetYear}`, 'Reload muss die persistierte CSV-Periode wieder anzeigen');
+    assert(provenanceView.asOf === csvExpectedAsOf, 'Reload muss den persistierten Stichtag wieder anzeigen');
     assert(provenanceView.instrument === 'VWCE.DE', 'Reload muss das persistierte Instrument wieder anzeigen');
     assert(provenanceView.highScope === 'windowHigh', 'Reload muss die eingeschränkte Hoch-Semantik wieder anzeigen');
     assert(provenanceView.engineReferenceApplied === 'false',
         'Reload muss den neutralen Anwendungsstatus der Engine-Referenz anzeigen');
-    assert(provenanceView.text.includes('markt-2025.csv'), 'Reload muss die persistierte Quelle sichtbar anzeigen');
+    assert(provenanceView.text.includes(csvSourceFileName), 'Reload muss die persistierte Quelle sichtbar anzeigen');
     assert(provenanceView.text.includes('nicht angewendet'),
         'Reload muss den neutralen Fallback der Fensterhoch-Untergrenze sichtbar benennen');
     assert(await page.locator('#dynamicFlex').isChecked(), 'Reload muss Dynamic Flex als echtes Boolean true anwenden');
