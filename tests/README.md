@@ -647,6 +647,21 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 - **Unresolved-Gate:** Keine leeren `known`-Werte und keine erfundenen Werte unter `unresolved`.
 - **Hash:** Browser-kompatibles SHA-256 gegen Node-`crypto` und den manifestierten Post-Normalisierungs-Datenbestand.
 - **Lookup:** Lueckenlose 1925-2025-Baseline, abgeleitete technische Bounds 1929-2025, Provenienz und Non-Mutation.
+- **Inventarbruecke:** Alle sechs Runtime-Reihen sind mit eigenem Wert-Hash und
+  Qualitaetssegmenten in `SimulationDataInventoryV1` verknuepft.
+
+#### `simulation-data-inventory.test.mjs`
+**Zweck:** Testet das simulationsweite Evidenzinventar und seine Quell-Gates.
+- **Historieninventar:** Sechs eigene, lueckenlose 1925-2025-Segmentvertraege
+  einschliesslich D-15- und Gold-Nullwert-Risiken.
+- **Statische Klassen:** Demografie, Pflege, Hinterbliebene, Steuern/Tranchen,
+  Rente/Sozialversicherung, Stress/Regime und Default-/Fallbackwerte besitzen
+  Implementierungsabdeckung und getrennte Evidenzklassen.
+- **Wertfingerprints:** Historienreihen und exportierte statische Daten werden
+  kanonisch gegen SHA-256 geprueft; lokale UI-/Steuerdefaults werden gegen
+  ihre produktiven Quellen abgeglichen.
+- **Negativ-Gates:** Erfundenes `unresolved`, unbelegte externe Validierung und
+  statische Wertdrift schlagen fail-closed fehl.
 
 #### `historical-backtest-metrics.test.mjs`
 **Zweck:** Testet das vollstaendige `HistoricalBacktestMetricsV1`-Woerterbuch und die reine Ableitung aus kanonischen Rohzeilen.
@@ -970,6 +985,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `historical-backtest-export.test.mjs` | ~310 | Raw-JSON/CSV, Fingerprints, Provenienz, Roundtrip, HTML-/Formelinjektionsschutz |
 | `historical-data-manifest.test.mjs` | ~165 | Manifestvollstaendigkeit, unresolved-Gates, kanonischer SHA-256 und immutable Lookup |
 | `historical-data-robustness.test.mjs` | ~60 | Fehlende Marktdaten |
+| `simulation-data-inventory.test.mjs` | ~330 | Historien-/Statik-Inventar, Evidenzklassen, Wertfingerprints und fail-closed Quell-/Lizenz-Gates |
 | `liquidity-guardrail.test.mjs` | ~100 | Liquiditäts-Guardrails |
 | `market-analyzer.test.mjs` | ~150 | Markt-Regime-Klassifizierung |
 | `mc-worker-contract.test.mjs` | ~170 | MC-Worker-Entrypoint, Lifecycle und Fehlervertraege |

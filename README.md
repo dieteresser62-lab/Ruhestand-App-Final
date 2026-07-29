@@ -88,6 +88,14 @@ Netzwerkpfade.
 * **CAPE-Return-Policy fuer VPW:** Die kontinuierliche CAPE-to-Return-Policy ist als expliziter Config-Modus `cape_continuous` verfuegbar. Default bleibt `legacy_step`, weil lokale Backtest-Vergleiche sichtbare Entnahme-/Endvermoegens-Deltas zeigen und der Default-Wechsel fachlich freigegeben werden muss.
 * **Mindest-Flex p.a.:** Wird in Backtest, Monte Carlo, Sweep und Profilverbund bis in die Engine durchgereicht; Scenario-/Backtest-Logs zeigen Status, Blockiergrund und effektive Mindest-Flex-Wirkung.
 * **Historische Backtest-Zeitachse:** Der Backtest verwendet validierte Jahresrecords mit realisierten Aktien-, Gold-, Cash-/Bond-, Inflations- und Lohnwerten aus dem Simulationsjahr `t`; CAPE bleibt als zu Jahresbeginn bekannter Policywert auf `t-1`. Unvollstaendige Perioden oder Lookback-Fenster werden vor der Rechnung als `incomplete` abgewiesen. Monte Carlo, Sweep und Worker verwenden weiterhin ihre eigenen Recordpfade.
+* **Dateninventar und Evidenz-Gates:** `SimulationDataInventoryV1` inventarisiert
+  die sechs historischen Reihen mit eigenen 1925-2025-Qualitaetssegmenten
+  sowie Demografie-, Pflege-, Hinterbliebenen-, Steuer-/Tranchen-,
+  Renten-/Sozial-, Stress-/Regime- und Default-/Fallbackklassen. Kanonische
+  SHA-256-Wertfingerprints belegen nur technische Reproduzierbarkeit.
+  Ungeklaerte Quelle, Reihenkennung, Lizenz oder Abrufstand bleiben
+  `unresolved` und blockieren eine Behauptung externer Validierung oder einen
+  Datenersatz. Details: `docs/reference/DATA_SOURCES.md`.
 * **Reproduzierbarer Backtest-Export:** Die Backtest-Buttons erzeugen nur auf ausdrueckliche Nutzeraktion ein versioniertes Raw-JSON oder eine technische CSV-Rohdatenansicht. JSON enthaelt Request, Outcome, Daten-/Zeitachsen-/Engineprovenienz, Portfolio-Snapshots, Jahresrecords/-zeilen und Metriken als echte Zahlen. Run-/Request-ID und SHA-256-Fingerprint identifizieren den kanonischen Lauf; der Exportzeitpunkt gehoert nicht zum Result-Fingerprint. Der Export enthaelt die vollstaendigen lokalen Finanzannahmen und sollte entsprechend vertraulich behandelt werden.
 * **Backtest-Status und Rolling Cohorts:** Die Zeitraumfelder zeigen manifestabgeleitete Grenzen und feldnahe Fehler. Ein fokussierbarer Live-Status trennt `completed`, `ruin`, `incomplete` und `technical_error`; Nutzertexte nennen einen stabilen Code, Ursache und naechsten Schritt ohne Stacktrace. Optional lassen sich feste, ueberlappende Rolling Cohorts fuer den gewaehlten Zeitraum auswerten. Das Inventar trennt Outcomes und Ausschluesse; historische Einzelpfade und Cohorts bleiben In-sample-Diagnosen, keine unabhaengigen Versuche und keine Erfolgswahrscheinlichkeit.
 * **Auto-Optimize Dynamic-Flex-Modus:** `inherit`, `force_on`, `force_off`; Dynamic-Flex-Parameter sind nur bei effektiv aktivem Dynamic-Flex optimierbar, inklusive Safety-Guards gegen zu aggressive Lösungen.

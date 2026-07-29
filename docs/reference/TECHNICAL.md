@@ -324,6 +324,14 @@ Diese Grenze ist fachlich gewollt: Balance kennt derzeit keinen belastbaren aktu
 * `app/shared/runtime-env.js` – Laufzeiterkennung fuer Browser/Tauri-Featureauswahl.
 * `app/simulator/simulator-data.js` – Historische Daten (inkl. 1925-1949 Schwarze-Schwan-Erweiterung), tief eingefrorenes `HistoricalDataManifestV1`, Mortalitäts- und Stress-Presets.
 * `app/simulator/historical-backtest-contract.js` – DOM-freier, im Produktbacktest aktivierter Manifest-/SHA-256-/`HistoricalYearRecordV1`-Contract. Validiert das Dataset einmal je Revision/Hash, liefert immutable Records und prueft Einzelpfad- bzw. Cohort-Batch-Perioden vor der Rechenschleife. Die aktive Zeitachse `realized_t_decision_t_minus_1_v1` verwendet realisierte Markt-/Makrowerte aus `t` und CAPE decision-as-of aus `t-1`.
+* `app/simulator/simulation-data-inventory.js` – DOM-freier
+  `SimulationDataInventoryV1`-Evidenzvertrag fuer alle sechs historischen
+  Reihen sowie Demografie-, Pflege-, Hinterbliebenen-, Steuer-/Tranchen-,
+  Renten-/Sozial-, Stress-/Regime- und Default-/Fallbackklassen. Eigene
+  Reihen-Segmente und kanonische SHA-256-Wertfingerprints sichern
+  Reproduzierbarkeit; `unresolved` blockiert externe Validierungs- und
+  Datenersatzbehauptungen, ohne den bestehenden Runtime-Backtest zu
+  veraendern.
 
 Browser-Persistenz seit Phase 2:
 

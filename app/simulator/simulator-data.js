@@ -241,6 +241,14 @@ export const PFLEGE_GRADE_PROBABILITIES = {
   95: { 1: 0.140, 2: 0.090, 3: 0.060, 4: 0.0350, 5: 0.0150 }
 };
 
+export const REGIME_CLASSIFICATION_THRESHOLDS = Object.freeze({
+  inflationHighPct: 5,
+  equityPoorRatio: 0,
+  equityCrashRatio: -0.15,
+  equityBoomRatio: 0.15,
+  labels: Object.freeze(['BULL', 'BEAR', 'SIDEWAYS', 'STAGFLATION'])
+});
+
 /**
  * Historische Marktdaten (1925-2025)
  *
@@ -519,10 +527,10 @@ export const BREAK_ON_RUIN = true;
 
     // Determine Regime
     let regime = 'SIDEWAYS';
-    const inflHigh = inflation > 5.0;
-    const equityPoor = rendite < 0;
-    const equityCrash = rendite < -0.15;
-    const equityBoom = rendite > 0.15;
+    const inflHigh = inflation > REGIME_CLASSIFICATION_THRESHOLDS.inflationHighPct;
+    const equityPoor = rendite < REGIME_CLASSIFICATION_THRESHOLDS.equityPoorRatio;
+    const equityCrash = rendite < REGIME_CLASSIFICATION_THRESHOLDS.equityCrashRatio;
+    const equityBoom = rendite > REGIME_CLASSIFICATION_THRESHOLDS.equityBoomRatio;
 
     if (inflHigh && equityPoor) {
       regime = 'STAGFLATION';
@@ -553,7 +561,7 @@ export const BREAK_ON_RUIN = true;
   });
 
   // Initialize Transitions
-  const regimes = ['BULL', 'BEAR', 'SIDEWAYS', 'STAGFLATION'];
+  const regimes = REGIME_CLASSIFICATION_THRESHOLDS.labels;
   regimes.forEach(r => {
     REGIME_TRANSITIONS[r] = { total: 0 };
     regimes.forEach(target => REGIME_TRANSITIONS[r][target] = 0);

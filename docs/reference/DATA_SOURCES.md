@@ -163,6 +163,76 @@ All source and license statuses above are intentionally unresolved. The
 manifest improves traceability but is not evidence that external provenance,
 index variant, or usage rights have been established.
 
+### Simulation-wide data inventory
+
+`app/simulator/simulation-data-inventory.js` adds the wider, immutable
+`SimulationDataInventoryV1`, revision `2026-07-29.1`. The existing
+`HistoricalDataManifestV1` remains the active runtime/backtest record contract;
+the wider inventory is an evidence and change gate around that runtime
+contract and the productively used static model-data classes. Slice 01 changes
+no embedded historical value and no financial formula.
+
+Each inventory entry carries:
+
+- internal ID, category, unit and implementation locations;
+- source, external series identifier, currency, annual convention,
+  transformation, license and retrieval date as resolution fields;
+- a `rawDataHash` resolution field and a separate canonical
+  `embeddedValueHash` over the current in-app value when that value exists;
+- evidence class and a separate external-validation status.
+
+Resolution fields use `known`, `unresolved` or `not_applicable`. An
+`unresolved` field always has `value: null`; a guessed label is invalid. The
+evidence vocabulary keeps `official`, `derived`, `backtested`, `proxy`,
+`estimated`, `model_assumption`, `user_input`, `stress_parameter`, `missing`
+and `unresolved` distinct. A matching embedded-value hash proves technical
+reproduction only. It does not prove the external identity, correctness or
+usage right of the value.
+
+The six historical entries own separate, contiguous `qualitySegments` for
+1925-2025:
+
+| Series | Current segment contract | Important gate |
+| --- | --- | --- |
+| `msci_eur` | 1925-1949 `estimated`; 1950-2023 `unresolved`; 2024-2025 separately `unresolved` | D-15 placeholder/inherited-level risk; source, return variant and license unresolved |
+| `inflation_de` | 1925-1949 `estimated`; 1950-2023 `unresolved`; 2024-2025 separately `unresolved` | single German VPI identity, territory/method bridges and retrieval chain unresolved |
+| `zinssatz_de` | 1925-1949 `estimated`; 1950-1998 DM-era `unresolved`; 1999-2025 EUR-era `unresolved` | investable instrument, accrual and annualization conventions unresolved |
+| `lohn_de` | 1925-1949 `estimated`; 1950-2023 `unresolved`; 2024-2025 separately `unresolved` | nominal wage/pension-adjustment identity and D-20 reconciliation unresolved |
+| `gold_eur_perf` | zero ranges 1925-1932, 1934-1960 and 1962-1968 separately `unresolved`; remaining ranges separately inventoried | 42 zeros, gold-price source, market regime and USD/DM/EUR conversion unresolved |
+| `cape` | 1925-1949 `estimated`; 1950-2025 `unresolved` | productive `t-1` use is known; external region, series and reconstruction are unresolved |
+
+`qualitySegments` are evidence segments, not a rewrite of the runtime
+`HistoricalYearRecordV1` completeness statuses. In particular, a finite
+post-1950 number can still be technically present while its external evidence
+remains `unresolved`.
+
+The static inventory covers these product classes:
+
+| Category | Inventory entries | Evidence boundary |
+| --- | --- | --- |
+| Demography | `mortality_table` | embedded period-table proxy; exact external table, transformation, license and retrieval unresolved |
+| Care | `care_grade_taxonomy`, `care_incidence_probabilities`, `care_progression_probabilities`, `care_cost_presets` | taxonomy/proxy, estimated prevalence-to-incidence conversion and explicit model assumptions stay separate |
+| Survivor | `widow_benefit_parameters` | user-input/default contract, not an observed benefit entitlement |
+| Tax/tranches | `capital_income_tax_parameters` | current parameterized approximation; no historical-tax simulation or external tax validation |
+| Pension/social | `pension_user_defaults`, `social_insurance_parameters` | user inputs are authoritative; an automatic social-insurance table is explicitly `missing`, not fabricated |
+| Stress/regime | `stress_presets`, `regime_classification_thresholds`, `regime_transition_matrix` | stress parameters, model thresholds and derived transition counts use different classes |
+| Defaults/fallbacks | `engine_policy_defaults`, `monte_carlo_defaults`, `longevity_defaults`, `tail_risk_defaults`, `health_bucket_defaults` | policy assumptions and stress defaults are hash-gated without being promoted to observations |
+
+The source gate deliberately separates three questions:
+
+1. `technicallyReproducible` requires a matching embedded-value hash.
+2. `externallyValidated` requires the validation status plus resolved source,
+   external identifier, license and retrieval date and a compatible evidence
+   class.
+3. `replacementAllowed` is false until the external-validation gate passes.
+
+Therefore all six currently embedded historical series can continue to replay
+deterministically, but none may be described as externally validated or used
+as a licensed replacement source by this inventory. The later data-replacement
+slices must update their exact series entry, raw-data and embedded-value
+hashes,
+segments, transformation and source/license evidence together.
+
 ### Cross-domain model source snapshots
 
 The machine-readable market manifest and the following official snapshots are

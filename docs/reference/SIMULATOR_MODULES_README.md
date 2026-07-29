@@ -2,7 +2,7 @@
 
 Die Simulator-App ist inzwischen in mehrere spezialisierte ES6-Module zerlegt. Die zentralen Abläufe (Monte-Carlo, Sweep, Backtests, Pflege-UI) leben nicht mehr als Monolith in `simulator-main.js`, sondern wurden in klar abgegrenzte Dateien ausgelagert. Dieses Dokument beschreibt Zweck, Haupt-Exports, Einbindungspunkte und die gewünschte Aufteilung neuer Features.
 
-**Stand:** 2026-07-26 (einschliesslich Langlebigkeit, Stationary Bootstrap, Tail-Risk-Overlay, Realentnahmevertrag, getrennter Pflege-KPI-Semantik, vollstaendigem historischen Backtest-Contract sowie verlustfreier Profilasset-/Goldzielaggregation)
+**Stand:** 2026-07-29 (einschliesslich Langlebigkeit, Stationary Bootstrap, Tail-Risk-Overlay, Realentnahmevertrag, getrennter Pflege-KPI-Semantik, vollstaendigem historischen Backtest-Contract, SimulationDataInventoryV1 sowie verlustfreier Profilasset-/Goldzielaggregation)
 
 **Pfadkonvention:** Simulator-Module liegen unter `app/simulator/`, Profilmodule unter `app/profile/`, Shared-Utilities unter `app/shared/`, Tranchen-Status unter `app/tranches/`. Im Dokument werden Dateinamen aus Lesbarkeit meist ohne Präfix genannt.
 
@@ -588,6 +588,38 @@ Historische Daten (inkl. 1925-1949 Schwarze-Schwan-Erweiterung), Mortalitätstaf
 - `STRESS_PRESETS` – Stresstest-Szenarien (GFC, Stagflation, Lost Decade, System-Krise etc.)
 
 **Dependencies:** keine
+
+---
+
+## 23a. `simulation-data-inventory.js`
+
+DOM-freier, unveraenderlicher Evidenz- und Quell-Gate-Contract fuer
+historische Reihen und statische Simulationsdaten. Das Modul ersetzt weder
+`simulator-data.js` noch den produktiven `HistoricalDataManifestV1`-
+Backtestcontract.
+
+**Exporte:**
+
+- `SIMULATION_DATA_INVENTORY` – `SimulationDataInventoryV1`, Revision
+  `2026-07-29.1`, mit sechs reihenspezifischen Historieneintraegen und sieben
+  statischen Kategorien;
+- `validateSimulationDataInventory()` – prueft Pflichtfelder,
+  Evidenzvokabular, lueckenlose 1925-2025-Qualitaetssegmente,
+  Implementierungsabdeckung sowie fail-closed External-Validation-Gates;
+- `computeSimulationDataValueHash()` /
+  `assertSimulationDataValueHash()` – kanonischer SHA-256-Abgleich gegen
+  `embeddedValueHash`; ein nicht vorhandener externer `rawDataHash` bleibt
+  davon getrennt `unresolved`;
+- `evaluateSimulationDataSourceGate()` – trennt technische
+  Reproduzierbarkeit, externe Validierung und Erlaubnis zum Datenersatz.
+
+`unresolved` bleibt technisch reproduzierbar, darf aber weder eine externe
+Validierung noch einen lizenzierten Datenersatz behaupten. Modellannahmen,
+Nutzereingaben, Stressparameter, abgeleitete Werte und fehlende Modelle tragen
+getrennte Evidenzklassen.
+
+**Dependencies:** `historical-backtest-contract.js` fuer kanonische
+Serialisierung und browserkompatibles SHA-256.
 
 ---
 

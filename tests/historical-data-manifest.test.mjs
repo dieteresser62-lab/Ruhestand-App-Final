@@ -12,6 +12,10 @@ import {
     HISTORICAL_DATA,
     HISTORICAL_DATA_MANIFEST
 } from '../app/simulator/simulator-data.js';
+import {
+    SIMULATION_DATA_INVENTORY,
+    validateSimulationDataInventory
+} from '../app/simulator/simulation-data-inventory.js';
 
 console.log('--- Historical Data Manifest Tests ---');
 
@@ -159,5 +163,17 @@ assertEqual(DATASET_META.historicalData.manifestId, HISTORICAL_DATA_MANIFEST.dat
 assertEqual(DATASET_META.historicalData.revision, HISTORICAL_DATA_MANIFEST.revision, 'Legacy metadata should reference manifest revision');
 assertEqual(DATASET_META.historicalData.contentHash.value, HISTORICAL_DATA_MANIFEST.contentHash.value, 'Legacy metadata should reference manifest hash');
 console.log('✓ metadata bridge OK');
+
+console.log('Test 8: the V1 runtime manifest is covered by the wider simulation-data inventory');
+validateSimulationDataInventory(SIMULATION_DATA_INVENTORY);
+for (const seriesId of requiredSeries) {
+    const inventorySeries = SIMULATION_DATA_INVENTORY.historicalSeries[seriesId];
+    assert(inventorySeries, `${seriesId} should be linked into the wider data inventory`);
+    assertEqual(inventorySeries.id, HISTORICAL_DATA_MANIFEST.series[seriesId].id, `${seriesId} inventory identity should match runtime manifest`);
+    assertEqual(inventorySeries.rawDataHash.status, 'unresolved', `${seriesId} should not invent an unavailable external raw-data hash`);
+    assertEqual(inventorySeries.embeddedValueHash.status, 'known', `${seriesId} should have a series-specific embedded-value hash`);
+    assert(Array.isArray(inventorySeries.qualitySegments), `${seriesId} should own quality segments`);
+}
+console.log('✓ wider inventory bridge OK');
 
 console.log('✅ Historical data manifest tests passed');
