@@ -129,6 +129,14 @@ Bei `dynamicFlex=false` bleibt das bisherige Flex-Verhalten unverändert.
 npm run build:engine
 ```
 
+Der Suite-Datenintegritaets-Abschluss aendert keine Engine-Semantik. Er bindet
+die bestehenden Engine-Orakel fuer Jahressettlement, 3-Bucket-Final-Action,
+Flex-/Renteninvarianten und Requestparitaet an
+`tests/fixtures/suite-data-integrity/oracle-traceability-v1.json`. Nach dem
+Slice-16-Build blieb der Git-Blob-Hash von `engine.js`
+`ec49961ed58134928723be5ddb6185e11f7fbcb5`; das Artefakt wurde ausschliesslich
+ueber `build-engine.mjs` erzeugt.
+
 Das Skript versucht zuerst einen esbuild-Bundle-Lauf (IIFE, globale Exporte). Wenn `esbuild` nicht verfügbar ist (z. B. Offline-Umgebung), wird automatisch ein Modul-Fallback geschrieben, der die Globals per `engine.js` bereitstellt.
 
 Für CI/Release sollte Strict-Mode genutzt werden:

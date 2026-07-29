@@ -42,7 +42,6 @@ export function initSweepUIControls() {
             maxSkimPct: document.getElementById('sweepMaxSkimPct').value,
             maxBearRefillPct: document.getElementById('sweepMaxBearRefillPct').value,
             goldTargetPct: document.getElementById('sweepGoldTargetPct').value,
-            horizonYears: document.getElementById('sweepHorizonYears').value,
             survivalQuantile: document.getElementById('sweepSurvivalQuantile').value,
             goGoMultiplier: document.getElementById('sweepGoGoMultiplier').value
         };
@@ -87,7 +86,7 @@ export function initSweepUIControls() {
     const sweepInputIds = [
         'sweepRunwayMin', 'sweepRunwayTarget', 'sweepTargetEq', 'sweepRebalBand',
         'sweepMaxSkimPct', 'sweepMaxBearRefillPct', 'sweepGoldTargetPct',
-        'sweepHorizonYears', 'sweepSurvivalQuantile', 'sweepGoGoMultiplier'
+        'sweepSurvivalQuantile', 'sweepGoGoMultiplier'
     ];
 
     sweepInputIds.forEach(id => {

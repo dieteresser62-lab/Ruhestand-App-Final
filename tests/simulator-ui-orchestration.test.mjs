@@ -1,8 +1,10 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PersistenceFacade, persistenceStorage } from '../app/shared/persistence-facade.js';
 
 const __filename = fileURLToPath(import.meta.url);
+const projectRoot = path.resolve(path.dirname(__filename), '..');
 
 class MockClassList {
     constructor() {
@@ -163,22 +165,35 @@ function registerElement(documentRef, id, options = {}) {
 }
 
 function registerSweepDom(documentRef) {
-    [
-        ['sweepMetric', 'successProbFloor'],
-        ['sweepAxisX', 'runwayMin'],
-        ['sweepAxisY', 'targetEq'],
+    const rangeFields = [
         ['sweepRunwayMin', '18'],
         ['sweepRunwayTarget', '24'],
         ['sweepTargetEq', '60'],
         ['sweepRebalBand', '5'],
         ['sweepMaxSkimPct', '10'],
-        ['sweepMaxBearRefillPct', '5'],
+        ['sweepMaxBearRefillPct', '2'],
         ['sweepGoldTargetPct', '0'],
-        ['sweepHorizonYears', '30'],
         ['sweepSurvivalQuantile', '0.85'],
         ['sweepGoGoMultiplier', '1']
+    ];
+    [
+        ['sweepMetric', 'successProbFloor'],
+        ['sweepAxisX', 'runwayMin'],
+        ['sweepAxisY', 'targetEq'],
+        ...rangeFields
     ].forEach(([id, value]) => registerElement(documentRef, id, { value }));
     registerElement(documentRef, 'sweepGridSize', { tagName: 'span' });
+    return rangeFields.map(([id]) => id);
+}
+
+function readRealSweepRangeIds() {
+    const simulatorHtml = fs.readFileSync(path.join(projectRoot, 'Simulator.html'), 'utf8');
+    const fieldset = simulatorHtml.match(
+        /<legend><span[^>]*>[^<]*<\/span>Sweep-Ranges<\/legend>([\s\S]*?)<\/fieldset>/
+    );
+    assert(fieldset, 'Simulator.html enthaelt das erwartete Sweep-Ranges-Fieldset');
+    return [...fieldset[1].matchAll(/<input\b[^>]*\bid="(sweep[A-Za-z0-9_-]+)"/g)]
+        .map(match => match[1]);
 }
 
 const previousGlobals = {
@@ -206,6 +221,7 @@ async function runSimulatorUiOrchestrationTests() {
         partnerModule,
         stressModule,
         persistModule,
+        sweepModule,
         sweepUiModule,
         optimizerModule,
         monteCarloUiModule,
@@ -217,6 +233,7 @@ async function runSimulatorUiOrchestrationTests() {
         import('../app/simulator/simulator-main-partner.js'),
         import('../app/simulator/simulator-main-stress.js'),
         import('../app/simulator/simulator-main-input-persist.js'),
+        import('../app/simulator/simulator-sweep.js'),
         import('../app/simulator/simulator-main-sweep-ui.js'),
         import('../app/simulator/simulator-optimizer.js'),
         import('../app/simulator/monte-carlo-ui.js'),
@@ -323,7 +340,19 @@ async function runSimulatorUiOrchestrationTests() {
         stressModule.initStressPresetOptions();
         assert(stressSelect.children.length > 0, 'Stress-Presets werden in das Select geschrieben');
 
-        registerSweepDom(documentRef);
+        const mockSweepIds = registerSweepDom(documentRef);
+        assertEqual(
+            JSON.stringify([...mockSweepIds].sort()),
+            JSON.stringify(readRealSweepRangeIds().sort()),
+            'Sweep Mock-DOM bleibt exakt mit Simulator.html synchron'
+        );
+        persistenceStorage.setItem('sim.sweep.horizonYears', '30');
+        sweepModule.initSweepDefaultsWithLocalStorageFallback();
+        assertEqual(
+            persistenceStorage.getItem('sim.sweep.horizonYears'),
+            null,
+            'Entferntes Direkt-Horizon-Feld laesst keinen verwaisten Persistenzwert zurueck'
+        );
         sweepUiModule.initSweepUIControls();
         const gridSize = documentRef.getElementById('sweepGridSize');
         assertEqual(gridSize.textContent, 'Grid: 1 Kombis', 'Sweep-Grid zeigt gueltige Kombinationszahl');

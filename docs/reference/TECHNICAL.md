@@ -482,6 +482,30 @@ Die Worker-Pools bieten ein opt-in Telemetrie-System für lokale Performance-Ana
 * **Heatmap (Renten-Fokus):** Die Heatmap visualisiert die Verteilung der Entnahmeraten. Um bei aktivierter Ansparphase (0% Entnahme) keine leeren Spalten zu zeigen, beginnt die Aufzeichnung der Heatmap erst mit dem ersten Jahr der Rentenphase.
 * Pflegefall-Szenarien mit zusätzlichen Kostenverläufen.
 
+### Suite-Datenintegritaet: Abschlussvertrag
+
+`tests/fixtures/suite-data-integrity/oracle-traceability-v1.json` ist das
+maschinenlesbare Abschlussinventar fuer O-01 bis O-22. Es bindet jedes Orakel
+an eine konkrete Testdatei, einen Witness-Marker und das richtige Node- oder
+Browsergate. Der zugehoerige Integrationscontract prueft ausserdem die
+Paritaetsachsen Single-/Multi-Profil, Main-/Worker, MC-/Ein-Zellen-Sweep und
+Optimizer-Evaluate/-Apply sowie die unveraenderten Backtest-, Monte-Carlo-,
+FlowDelta- und Engine-Bundle-Baselines.
+
+Im Browser werden Preview/Commit, 3-Bucket mit echter Engine-Rendite,
+Hybridprofil-Blocker, Import/Recovery, Sweep-Provenienz und
+Optimizer-Apply-Fingerprint mit synthetischen Daten ausgefuehrt. Der
+interaktive Sweep besitzt genau neun Dimensionen mit geprueftem kanonischem
+Datenpfad; dazu gehoert die maximale Bear-Refill-Quote, damit der Sweep diese
+sichtbare Basisannahme nicht still auf 0 setzt. Nur der direkte Horizont bleibt
+ein programmatisches Requestfeld, weil die Browseroberflaeche ihn aktuarisch
+bestimmt. Die Matrix prueft Zuordnung, Consumer und Provenienz, nicht
+eigenstaendig KPI-Wirkung oder fachliche Modellguete.
+
+Der V8-Coverage-Report misst nur die Node-Suite. Browser-only Module koennen
+dort trotz bestandenem Playwright-Witness 0% aufweisen; Coverage bleibt daher
+eine Risikomessung und niemals ein Korrektheits- oder Freigabebeweis.
+
 ### Pflegebucket / Health Bucket
 
 Der Pflegebucket ist eine gesperrte Geldmarkt-/Cash-Reserve, die als Selbstversicherungsbaustein gegen schwere Pflegefälle modelliert wird. Die Core-Engine bleibt dabei unverändert: Sie erhält nur operative Liquidität. Die zweckgebundene Reserve wird außerhalb der Engine im Simulator-State geführt.

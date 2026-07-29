@@ -4,7 +4,7 @@
 
 This directory contains the comprehensive testing infrastructure for the Ruhestand-App-Final project. The tests are designed to be zero-dependency, using native Node.js ESM and a custom test runner, avoiding the need for heavy frameworks like Jest or Mocha.
 
-**Test-Statistik:** 136 entdeckte Testdateien, davon 135 im Node-Gate ausgefuehrt, mit 8.290 von 8.290 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (in Suite-Datenintegritaet Slice 11 mit `npm test` am 2026-07-27 verifiziert). `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen und bestand mit 16/16 Einstiegspunkt-/Zusatzflows, darunter vier isolierte Monte-Carlo-Browserfaelle.
+**Test-Statistik:** 137 entdeckte Testdateien, davon 136 im Node-Gate ausgefuehrt, mit 9.184 von 9.184 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (in der Slice-16-Review-Nachbesserung mit `npm test` am 2026-07-29 verifiziert). `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen und bestand mit 27/27 Einstiegspunkt-/Zusatzflows, darunter Preview/Commit, realer 3-Bucket-Bear-Pfad, Hybridprofil-Blocker, Import/Recovery, Sweep, Optimizer-Apply sowie vier isolierte Monte-Carlo-Browserfaelle.
 
 Die Zahl beschreibt nur die Node-Standardsuite. `npm run test:browser`, `npm run test:coverage` und ein echter Tauri-Build sind getrennte Gates und in den Assertions nicht enthalten.
 
@@ -45,12 +45,18 @@ Der Runner sortiert alle Dateien deterministisch und meldet fuer jede Datei Modu
 
 Jede tatsaechlich ausgefuehrte Datei muss mindestens eine gezaehlte Assertion liefern. Null Assertions beenden sowohl `npm test` als auch `run-single.mjs` mit Fehler. Der Legacy-Loader gilt nur fuer die im Policy-Manifest benannten Dateien; unbekannte Import-only-Tests erhalten keinen stillen Ausnahmeweg.
 
+Der Slice-16-Integrationscontract liest alle Inputs im realen
+Sweep-Ranges-Fieldset generisch und gleicht jeden sichtbaren Parameter
+fail-closed mit der Traceability-Matrix ab. Witness-Gates werden gegen
+`TEST_EXECUTION_POLICY` geprueft. Die Matrix belegt kanonische Zuordnung,
+Consumer und Provenienz, nicht eigenstaendig eine KPI-Wirkung.
+
 ### Coverage-Baseline
 ```bash
 npm run test:coverage
 ```
 
-Der Coverage-Runner loescht `.coverage/`, startet die Standardsuite mit `NODE_V8_COVERAGE` und schreibt bei gruener Standardsuite `.coverage/summary.json`. Der Report wertet Projektdateien unter `app/`, `engine/`, `workers/` und `types/` aus. Die Suite-Datenintegritaet-Slice-11-Messung liegt bei 78,29% approximativer Coverage aus ausfuehrbaren V8-Zeilenbereichen (36.097/46.105 Zeilen). `npm run test:coverage` erzwingt zusaetzlich ein 50-Prozent-Dateigate fuer `worker-job-runner.js` und `results-renderers.js`; ein fehlender Inventareintrag oder eine Unterschreitung beendet den Lauf rot. Playwright-Ausfuehrung fliesst nicht in diese Node-V8-Zahl ein. Coverage bleibt ein Transparenz- und Review-Gate, keine Wirksamkeits- oder Eignungsaussage und insbesondere keine echte JavaScript-Statement-Metrik.
+Der Coverage-Runner loescht `.coverage/`, startet die Standardsuite mit `NODE_V8_COVERAGE` und schreibt bei gruener Standardsuite `.coverage/summary.json`. Der Report wertet Projektdateien unter `app/`, `engine/`, `workers/` und `types/` aus. Die Messung nach der Slice-16-Review-Nachbesserung liegt bei 77,89% approximativer Coverage aus ausfuehrbaren V8-Zeilenbereichen (38.479/49.403 Zeilen in 207 Dateien). `npm run test:coverage` erzwingt zusaetzlich ein 50-Prozent-Dateigate fuer `worker-job-runner.js` und `results-renderers.js`; ein fehlender Inventareintrag oder eine Unterschreitung beendet den Lauf rot. Playwright-Ausfuehrung fliesst nicht in diese Node-V8-Zahl ein. Der durch den neuen DOM-Vertrag teilweise in Node ausgefuehrte Orchestrierungspfad `app/simulator/simulator-sweep.js` erreicht dort 6,22%; Browseranteile bleiben ausserhalb dieser Messung. Coverage bleibt eine Risikomessung, kein Freigabe-, Wirksamkeits- oder Eignungsnachweis und insbesondere keine echte JavaScript-Statement-Metrik.
 
 Monte-Carlo-Abschlussgate in Slice 12:
 
@@ -83,7 +89,7 @@ Bekannte Coverage-Ausnahmen:
 npm run test:browser
 ```
 
-Das Browser-Gate nutzt Playwright mit einem vom Test verwalteten lokalen HTTP-Server. Jeder Fall erhaelt einen isolierten Browser-Context und eine eigene Storage-Baseline. Neben den zentralen Einstiegspunkten (`index.html`, `Balance.html`, `Simulator.html`, `depot-tranchen-manager.html`, `Handbuch.html`) prueft es in `Balance.html` Profilabwahl nach Reload, Engine-Mismatch, mutationsfreien Jahres-Preflight, sichtbare korrupte Ausgaben, sichtbaren Import-Reject, einen Markt-CSV-Roundtrip mit periodengebundener Provenienz/`windowHigh`/sichtbarer gerichteter ATH-Untergrenze samt Anwendungsstatus/Boolean-Reload sowie einen Doppelklick mit genau einem Jahrescommit und Recovery-Snapshot. Der Simulatorfall wartet auf den synchron gesetzten fachlichen Status statt auf feste Millisekunden: Er reconciliiert sichtbare Periode, Outcome, Jahrinventar, exakte 10-%-Metrik, Pflegebucket und Cohort-Inventar mit Raw-JSON, prueft JSON/CSV ohne HTML, stabilen Detailtoggle-Fingerprint, Tabellen-/Fokussemantik, leere/NaN-/nicht-ganzzahlige/rueckwaertige/out-of-bounds Eingaben, synthetische Datenluecke, Ruin, `technical_error`, null Alerts sowie Realbestands-Non-Mutation. Die Tranchenkette deckt mit synthetischen Profilen A/B Manager-Handoff, CRUD, Dialogfokus und Tastaturbedienung, EUR-Quote, Reload, 390-Pixel-Layout, schreibfreie Balance-/Simulatorlaeufe, bestaetigten Reconcile genau einmal, Quote-Teilerfolg/Offline und raw-preserving Corrupt-Recovery ab. Inflation, Yahoo-Proxy und CAPE werden deterministisch geroutet; andere externe Requests werden blockiert. Es ersetzt keine Node-Unit-Tests und laeuft bewusst getrennt von `npm test`.
+Das Browser-Gate nutzt Playwright mit einem vom Test verwalteten lokalen HTTP-Server. Jeder Fall erhaelt einen isolierten Browser-Context und eine eigene Storage-Baseline. Neben den zentralen Einstiegspunkten (`index.html`, `Balance.html`, `Simulator.html`, `depot-tranchen-manager.html`, `Handbuch.html`) prueft es in `Balance.html` Profilabwahl nach Reload, Engine-Mismatch, mutationsfreien Jahres-Preflight, sichtbare korrupte Ausgaben, sichtbaren Import-Reject, einen Markt-CSV-Roundtrip mit periodengebundener Provenienz/`windowHigh`/sichtbarer gerichteter ATH-Untergrenze samt Anwendungsstatus/Boolean-Reload, einen Doppelklick mit genau einem Jahrescommit und Recovery-Snapshot sowie die 3-Bucket-Bear-Diagnose aus der realen Engine-Rendite. Die Simulatorfaelle warten auf fachliche Statuswerte statt auf feste Millisekunden: Sie pruefen Hybridprofile fail-closed, versionierte Sweep-Request-/Resultprovenienz mit allen neun sichtbaren Parametern und den Evaluate-/Apply-Fingerprint des experimentellen Optimizers. Der Backtestfall reconciliiert sichtbare Periode, Outcome, Jahrinventar, exakte 10-%-Metrik, Pflegebucket und Cohort-Inventar mit Raw-JSON und deckt die Negativpfade ab. Die Tranchenkette prueft mit synthetischen Profilen A/B Manager-Handoff, CRUD, Dialogfokus und Tastaturbedienung, EUR-Quote, Reload, 390-Pixel-Layout, schreibfreie Balance-/Simulatorlaeufe, bestaetigten Reconcile genau einmal, Quote-Teilerfolg/Offline und raw-preserving Corrupt-Recovery. Inflation, Yahoo-Proxy und CAPE werden deterministisch geroutet; andere externe Requests werden blockiert. Das Gate ersetzt keine Node-Unit-Tests und laeuft bewusst getrennt von `npm test`.
 
 Wichtig fuer CI/Release: Weil `npm test` dieses Gate nicht ausfuehrt, muss `npm run test:browser` explizit als eigener Job oder Release-Schritt laufen, wenn Browser-Regressionen blockierend sein sollen.
 
@@ -765,6 +771,20 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 
 ### 10. Integration & Parity
 
+#### `suite-data-integration-contract.test.mjs`
+**Zweck:** Bindet den Abschluss der Suite-Datenintegritaet an ein
+maschinenlesbares Traceability-Inventar.
+- ordnet O-01 bis O-22 konkreten Dateien und Witness-Markern zu;
+- prueft die Browservertraege Preview/Commit, 3-Bucket, Hybridprofil,
+  Import/Recovery, Sweep und Optimizer;
+- inventarisiert Single-/Multi-Profil-, Main-/Worker-,
+  MC-/Ein-Zellen-Sweep- und Evaluate-/Apply-Paritaet;
+- vergleicht alle sichtbaren Sweep-/Optimizerparameter mit kanonischen Keys,
+  Domains, Consumern und Provenienz-Witnesses; dieser Datenpfadnachweis ist
+  kein eigenstaendiger KPI-Wirkungsnachweis;
+- haelt die freigegebenen Backtest-, Monte-Carlo-, FlowDelta- und
+  `engine.js`-Blob-Baselines unveraendert.
+
 #### `portfolio.test.mjs`
 **Zweck:** Unit-Tests für Portfolio-Operationen.
 - buyGold, sumDepot
@@ -923,6 +943,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `balance-storage.test.mjs` | ~490 | localStorage-Persistenz |
 | `balance-ui-orchestration.test.mjs` | ~225 | Balance-UI-Bindings, Import-/Export-Control-Pfade, Schema-V1/V2-Migration, CSV-Provenienz und Profilverbund-Hooks |
 | `browser-smoke.test.mjs` | ~1070 | Playwright-Gate fuer HTML-Einstiege, MC-/Backtest-UI, A11y/Negativpfade sowie zentrale Balance-/Tranchenflows |
+| `suite-data-integration-contract.test.mjs` | ~220 | O-01 bis O-22, Browser-/Paritaetsinventar, fail-closed Parameterpfade, Gate-Zuordnung und unveraenderte Delta-Baselines |
 | `simulator-monte-carlo-browser.mjs` | ~360 | Vier isolierte MC-Browserfaelle fuer Worker, Fallback, Technikfehler, Cancel/Restart, Download und A11y |
 | `care-meta.test.mjs` | ~200 | Pflegefall-Logik |
 | `health-bucket.test.mjs` | ~160 | Pflegebucket-Trigger, Deckung, Verzinsung und Diagnose |

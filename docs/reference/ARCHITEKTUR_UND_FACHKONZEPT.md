@@ -2532,8 +2532,16 @@ Der **Parameter Sweep** ermöglicht die systematische Untersuchung, wie verschie
 | `targetEq` | `sweepTargetEq` | Ziel-Aktienquote % | 50:5:70 |
 | `rebalBand` | `sweepRebalBand` | Rebalancing-Band % | 3:1:7 |
 | `maxSkimPct` | `sweepMaxSkimPct` | Max. Abschöpfung im Peak % | 15:5:35 |
-| `maxBearRefillPct` | `sweepMaxBearRefillPct` | Max. Nachfüllung im Crash % | 30:10:60 |
+| `maxBearRefillPct` | `sweepMaxBearRefillPct` | Max. Nachfüllung im Crash % | 0,2,5 |
 | `goldTargetPct` | `sweepGoldTargetPct` | Gold-Zielallokation % | 0:2:10 |
+| `survivalQuantile` | `sweepSurvivalQuantile` | VPW-Survival-Quantil (nur bei passendem Dynamic-Flex-Modus) | 0.80,0.85,0.90 |
+| `goGoMultiplier` | `sweepGoGoMultiplier` | VPW-Go-Go-Multiplikator (nur bei aktivem Go-Go) | 1.0,1.1,1.2 |
+
+Der direkte `horizonYears`-/`sweepHorizonYears`-Parameter ist keine
+interaktive Browserdimension, weil die Oberfläche den Horizont aktuarisch
+bestimmt; der programmatische Requestvertrag bleibt bestehen. Die
+Traceability-Matrix belegt den kanonischen Datenpfad der sichtbaren Parameter,
+nicht eigenständig deren KPI-Wirkung.
 
 **Range-Syntax:**
 - `24` — Einzelwert

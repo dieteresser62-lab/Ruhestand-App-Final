@@ -180,6 +180,14 @@ Wichtige Simulator-Konzepte:
 - Worker-Paritaet durch deterministische Seeds und stabile Chunk-Merges,
 - Scenario-Logs mit 30 ausgewaehlten Szenarien.
 
+Der interaktive Sweep exponiert neun Parameter mit belegtem kanonischem
+Consumer und Provenienz-Witness, einschliesslich der maximalen
+Bear-Refill-Quote. Nur der direkte Horizont bleibt ein programmatisches
+Requestfeld und ist keine Browserdimension. Der Datenpfadnachweis ist kein
+eigenstaendiger KPI-Wirkungsnachweis. Das Slice-16-Abschlussinventar bildet
+O-01 bis O-22, Browserflows und Paritaetsachsen maschinenlesbar in
+`tests/fixtures/suite-data-integrity/oracle-traceability-v1.json` ab.
+
 ## Profilverbund
 
 Der Profilverbund verbindet mehrere Profile zu einer gemeinsamen Auswertung. Es gibt keinen separaten Verbund-Tab; die Profilauswahl steuert Balance und Simulator direkt.
@@ -278,8 +286,8 @@ Rahmen:
 - Testdateien: `*.test.mjs`
 - Browser-Smoke-Gate: `npm run test:browser`
 - Coverage-Gate: `npm run test:coverage`
-- Statistik laut Tranchenmanagement-Slice-09-Abschlussvalidierung: 107 Testdateien entdeckt, davon 106 im Node-Gate ausgefuehrt, 4410 Assertions, 0 Fehler und 0 offene Handles (`npm test`, 2026-07-14).
-- Coverage-Baseline laut Tranchenmanagement-Slice 09: 72,25% Zeilen-Coverage (26529/36717 in 195 Dateien) fuer `app/`, `engine/`, `workers/` und `types/`; keine harte Mindestschwelle.
+- Statistik nach der Suite-Datenintegritaet-Slice-16-Review-Nachbesserung: 137 Testdateien entdeckt, davon 136 im Node-Gate ausgefuehrt, 9.184 Assertions, 0 Fehler und 0 offene Handles (`npm test`, 2026-07-29); separates Browsergate 27/27.
+- Coverage-Baseline nach Slice 16: 77,89% approximative V8-Zeilenbereiche (38.479/49.403 in 207 Dateien) fuer `app/`, `engine/`, `workers/` und `types/`. Browserausfuehrung fliesst nicht ein; die Kennzahl ist Risikoindikator, kein Freigabebeweis.
 
 Wichtige Testgruppen:
 

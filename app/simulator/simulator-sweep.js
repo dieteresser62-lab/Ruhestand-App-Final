@@ -41,6 +41,10 @@ export const SWEEP_EXECUTION_VERSION = 'SweepExecutionV2';
  * "input"-Events gespeichert, um keine Benutzerinteraktion zu verlieren.
  */
 export function initSweepDefaultsWithLocalStorageFallback() {
+    // The direct horizon is no longer an interactive Sweep dimension. Remove
+    // its stale UI-only value so a future field cannot silently revive it.
+    persistenceStorage.removeItem('sim.sweep.horizonYears');
+
     const map = [
         ['sweepRunwayMin', 'sim.sweep.runwayMin'],
         ['sweepRunwayTarget', 'sim.sweep.runwayTarget'],
@@ -49,7 +53,6 @@ export function initSweepDefaultsWithLocalStorageFallback() {
         ['sweepMaxSkimPct', 'sim.sweep.maxSkimPct'],
         ['sweepMaxBearRefillPct', 'sim.sweep.maxBearRefillPct'],
         ['sweepGoldTargetPct', 'sim.sweep.goldTarget'],
-        ['sweepHorizonYears', 'sim.sweep.horizonYears'],
         ['sweepSurvivalQuantile', 'sim.sweep.survivalQuantile'],
         ['sweepGoGoMultiplier', 'sim.sweep.goGoMultiplier']
     ];
@@ -252,7 +255,6 @@ export async function runParameterSweep() {
             maxSkimPct: document.getElementById('sweepMaxSkimPct').value,
             maxBearRefillPct: document.getElementById('sweepMaxBearRefillPct').value,
             goldTargetPct: document.getElementById('sweepGoldTargetPct').value,
-            horizonYears: document.getElementById('sweepHorizonYears').value,
             survivalQuantile: document.getElementById('sweepSurvivalQuantile').value,
             goGoMultiplier: document.getElementById('sweepGoGoMultiplier').value
         };
@@ -265,7 +267,6 @@ export async function runParameterSweep() {
             maxSkimPct: 'Max Skim %',
             maxBearRefillPct: 'Max Bear Refill %',
             goldTargetPct: 'Gold Target %',
-            horizonYears: 'VPW Horizon Jahre',
             survivalQuantile: 'VPW Survival-Quantile',
             goGoMultiplier: 'VPW Go-Go Multiplikator'
         };

@@ -1061,10 +1061,6 @@
                                     type="text" id="sweepGoldTargetPct" value="5,7.5" placeholder="0,2.5,5,7.5"
                                     title="Format: start:step:end (z.B. 0:2.5:10) oder Liste 0,2.5,5,7.5 oder Einzelwert 7.5">
                             </div>
-                            <div class="form-group"><label for="sweepHorizonYears">VPW Horizon (Jahre)</label><input
-                                    type="text" id="sweepHorizonYears" value="30" placeholder="25,30,35"
-                                    title="Nur bei Dynamic Flex aktiv. Format: start:step:end, Liste oder Einzelwert.">
-                            </div>
                             <div class="form-group"><label for="sweepSurvivalQuantile">VPW Quantile</label><input
                                     type="text" id="sweepSurvivalQuantile" value="0.85" placeholder="0.80,0.85,0.90"
                                     title="Nur bei Dynamic Flex aktiv. Gueltig: 0.50 bis 0.99.">
@@ -1074,6 +1070,11 @@
                                     title="Nur bei Go-Go aktiv. Gueltig fuer Sweep: 1.0 bis 1.5.">
                             </div>
                         </div>
+                        <p class="hint">
+                            Der direkte VPW-Horizon bleibt fuer explizite, validierte Requests
+                            verfuegbar, ist aber keine interaktive Sweep-Dimension: Die UI
+                            verwendet aktuarische Horizonte.
+                        </p>
                     </fieldset>
                     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;"> <button
                             id="sweepButton" onclick="runParameterSweep()">Run Sweep</button> <button
@@ -1136,7 +1137,6 @@
                                         <option value="maxBearRefillPct">Max Bear Refill Pct
                                         </option>
                                         <option value="goldTargetPct">Gold Target Pct</option>
-                                        <option value="horizonYears">VPW Horizon</option>
                                         <option value="survivalQuantile">VPW Quantile</option>
                                         <option value="goGoMultiplier">VPW Go-Go Mult</option>
                                     </select> </div>
@@ -1150,7 +1150,6 @@
                                         <option value="maxBearRefillPct">Max Bear Refill Pct
                                         </option>
                                         <option value="goldTargetPct">Gold Target Pct</option>
-                                        <option value="horizonYears">VPW Horizon</option>
                                         <option value="survivalQuantile">VPW Quantile</option>
                                         <option value="goGoMultiplier">VPW Go-Go Mult</option>
                                     </select> </div>

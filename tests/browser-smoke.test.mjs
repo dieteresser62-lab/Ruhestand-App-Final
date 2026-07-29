@@ -82,9 +82,12 @@ function createBrowserProfileStorage(profiles, currentProfileId) {
                 belongsToHousehold: profile.belongsToHousehold !== false
             },
             data: {
-                depot_tranchen: profile.tranchesRaw ?? '[]',
+                ...(profile.omitTranches === true
+                    ? {}
+                    : { depot_tranchen: profile.tranchesRaw ?? '[]' }),
                 profile_tagesgeld: profile.tagesgeld ?? '10000',
                 profile_aktuelles_alter: profile.alter ?? '67',
+                ...(profile.extraData || {}),
                 ...(profile.healthBucketRaw !== undefined
                     ? { profile_health_bucket: profile.healthBucketRaw }
                     : {}),
@@ -567,6 +570,56 @@ async function runBalancePreviewLifecycle(browser, baseUrl) {
         afterRepeatedInputs.balanceStateLifecycle === undefined,
         'Input-only Persistenz darf keinen Periodencommit vortaeuschen'
     );
+    smoke.assertNoErrors();
+    await smoke.close();
+}
+
+async function runBalanceThreeBucketBear(browser, baseUrl) {
+    const storage = createBalanceStorage(2025);
+    const seededState = JSON.parse(storage[BALANCE_STATE_KEY]);
+    seededState.inputs = {
+        ...seededState.inputs,
+        inflation: 0,
+        endeVJ: 70,
+        endeVJ_1: 100,
+        endeVJ_2: 100,
+        endeVJ_3: 100,
+        ath: 100,
+        jahreSeitAth: 1,
+        decumulation: {
+            mode: '3_bucket_jilge',
+            bondTargetFactor: 5,
+            drawdownTrigger: 15,
+            bondRefillThreshold: 80
+        }
+    };
+    storage[BALANCE_STATE_KEY] = JSON.stringify(seededState);
+
+    const smoke = await openSmokePage(browser, baseUrl, 'Balance.html', { storage });
+    const { page } = smoke;
+    await page.locator('#profilverbund-profile-list input').waitFor({ state: 'visible' });
+    await page.waitForFunction(() => document.getElementById('entnahmeStrategie')?.value === '3_bucket_jilge');
+    const diagnosis = await page.evaluate(async lastState => {
+        const { UIReader } = await import('./app/balance/balance-reader.js');
+        const inputs = UIReader.readAllInputs();
+        const result = window.EngineAPI.simulateSingleYear({
+            ...inputs,
+            finalizeThreeBucketAction: true
+        }, lastState);
+        return {
+            strategy: inputs.decumulation?.mode,
+            realReturnEq: result.ui?.market?.realReturnEq,
+            threeBucket: result.ui?.threeBucket || null
+        };
+    }, seededState.lastState);
+    assert(
+        diagnosis.strategy === '3_bucket_jilge'
+        && diagnosis.realReturnEq < -0.15
+        && diagnosis.threeBucket?.isBadYear === true,
+        'Browser 3-Bucket bear diagnosis must use the real engine return'
+    );
+    assert(diagnosis.threeBucket?.is3Bucket === true,
+        'Browser 3-Bucket diagnosis must remain attached to the selected strategy');
     smoke.assertNoErrors();
     await smoke.close();
 }
@@ -1483,6 +1536,204 @@ async function runSimulatorGhostProfileContextSmoke(browser, baseUrl) {
     await smoke.close();
 }
 
+async function runSimulatorHybridProfileBlocker(browser, baseUrl) {
+    const detailedProfileId = 'browser-hybrid-detail';
+    const aggregateProfileId = 'browser-hybrid-aggregate';
+    const storage = createBrowserProfileStorage({
+        [detailedProfileId]: {
+            name: 'Browser Detailprofil',
+            tranchesRaw: JSON.stringify([createBrowserTranche({
+                trancheId: 'hybrid-detail-lot',
+                shares: 800,
+                purchasePrice: 100,
+                currentPrice: 100
+            })]),
+            tagesgeld: '10000'
+        },
+        [aggregateProfileId]: {
+            name: 'Browser Aggregatprofil',
+            omitTranches: true,
+            tagesgeld: '20000',
+            extraData: {
+                sim_depotwertAlt: '150000',
+                sim_geldmarktEtf: '30000',
+                sim_simStartVermoegen: '200000'
+            }
+        }
+    }, detailedProfileId);
+    const registryRaw = storage.rs_profiles_v1;
+    const smoke = await openSmokePage(browser, baseUrl, 'Simulator.html', { storage });
+    const { page } = smoke;
+    await page.locator('#simProfileStatus')
+        .filter({ hasText: 'Hybridhaushalt wurde blockiert' })
+        .waitFor({ state: 'visible', timeout: 10000 });
+    const statusText = await page.locator('#simProfileStatus').textContent();
+    assert(
+        statusText.includes('Browser Aggregatprofil') && statusText.includes('Cost Basis'),
+        'Browser hybrid household must fail closed'
+    );
+    assert(await page.locator('#mcButton').isDisabled(),
+        'Hybrid provenance blocker must disable Monte-Carlo execution');
+    assert(await page.locator('#sweepButton').isDisabled(),
+        'Hybrid provenance blocker must disable Sweep execution');
+    assert(await page.locator('#ao_run_btn').isDisabled(),
+        'Hybrid provenance blocker must disable Auto-Optimize execution');
+    assert((await readIndexedDb(page, 'kv', 'rs_profiles_v1')).value === registryRaw,
+        'Hybrid provenance blocker must not mutate the profile registry');
+    smoke.assertNoErrors();
+    await smoke.close();
+}
+
+async function runSimulatorSweepIntegration(browser, baseUrl) {
+    const smoke = await openSmokePage(browser, baseUrl, 'Simulator.html');
+    const { page } = smoke;
+    await page.locator('.tab-btn[data-tab="sweep"]').click();
+    await page.locator('#sweepButton').waitFor({ state: 'visible' });
+    await page.evaluate(() => {
+        const setValue = (id, value) => {
+            const element = document.getElementById(id);
+            element.value = String(value);
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+            element.dispatchEvent(new Event('change', { bubbles: true }));
+        };
+        setValue('mcAnzahl', 2);
+        setValue('mcDauer', 2);
+        setValue('mcBlockSize', 1);
+        setValue('mcWorkerCount', 1);
+        setValue('mcWorkerBudget', 50);
+        setValue('sweepRunwayMin', 24);
+        setValue('sweepRunwayTarget', 36);
+        setValue('sweepTargetEq', 60);
+        setValue('sweepRebalBand', 5);
+        setValue('sweepMaxSkimPct', 0);
+        setValue('sweepMaxBearRefillPct', 5);
+        setValue('sweepGoldTargetPct', 0);
+        setValue('sweepSurvivalQuantile', 0.85);
+        setValue('sweepGoGoMultiplier', 1.1);
+        document.getElementById('dynamicFlex').checked = true;
+        document.getElementById('dynamicFlex').dispatchEvent(new Event('change', { bubbles: true }));
+        document.getElementById('goGoActive').checked = true;
+        document.getElementById('goGoActive').dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await page.locator('#sweepButton').click();
+    await page.waitForFunction(
+        () => window.sweepExecution?.schemaVersion === 'SweepExecutionV2',
+        null,
+        { timeout: 30000 }
+    );
+    const execution = await page.evaluate(() => ({
+        schemaVersion: window.sweepExecution?.schemaVersion,
+        requestVersion: window.sweepExecution?.request?.schemaVersion,
+        resultCount: window.sweepExecution?.results?.length,
+        metricVersion: window.sweepExecution?.results?.[0]?.metrics?.schemaVersion,
+        invalidCombination: window.sweepExecution?.results?.[0]?.metrics?.invalidCombination,
+        parameterKeys: Object.keys(window.sweepExecution?.results?.[0]?.params || {}).sort(),
+        maxBearRefillPct: window.sweepExecution?.results?.[0]?.params?.maxBearRefillPct,
+        heatmapText: document.getElementById('sweepHeatmap')?.textContent || ''
+    }));
+    assert(
+        execution.schemaVersion === 'SweepExecutionV2'
+        && execution.requestVersion === 'SweepRequestV1'
+        && execution.metricVersion === 'SweepMetricsV3',
+        'Browser sweep must expose versioned execution provenance'
+    );
+    assert(execution.resultCount === 1,
+        'Browser Sweep single-value matrix must execute exactly one combination');
+    assert(execution.invalidCombination !== true,
+        `Browser Sweep integration combination must be valid: ${JSON.stringify(execution)}`);
+    assert(JSON.stringify(execution.parameterKeys) === JSON.stringify([
+        'goGoMultiplier',
+        'goldTargetPct',
+        'maxBearRefillPct',
+        'maxSkimPct',
+        'rebalBand',
+        'runwayMin',
+        'runwayTarget',
+        'survivalQuantile',
+        'targetEq'
+    ]), 'Browser Sweep result must expose every interactive parameter and no unsupported direct-horizon field');
+    assert(execution.maxBearRefillPct === 5,
+        'Browser Sweep must preserve the visible Bear-Refill assumption instead of forcing zero');
+    smoke.assertNoErrors();
+    await smoke.close();
+}
+
+async function runSimulatorOptimizerApplyIntegration(browser, baseUrl) {
+    const smoke = await openSmokePage(browser, baseUrl, 'Simulator.html');
+    const { page } = smoke;
+    await page.locator('.tab-btn[data-tab="sweep"]').click();
+    await page.locator('#ao_parameters_container .ao-parameter-block').first().waitFor({
+        state: 'visible',
+        timeout: 10000
+    });
+    const evaluation = await page.evaluate(async () => {
+        const [{ runAutoOptimize }, { renderAutoOptimizeResult }] = await Promise.all([
+            import('./app/simulator/auto_optimize.js'),
+            import('./app/simulator/auto-optimize-renderer.js')
+        ]);
+        const evaluateCandidateFn = async candidate => ({
+            metricContract: { schemaVersion: 'AutoOptimizeMetricResultV1' },
+            medianEndWealth: 1000000 - Math.pow(Number(candidate.targetEq) - 60, 2),
+            successProbFloor: 1,
+            depletionRate: 0,
+            worst5Drawdown: 0.2,
+            timeShareWRgt45: 0,
+            medianWithdrawalRate: 0.03
+        });
+        const objective = { metric: 'EndWealth_P50', direction: 'max', quantile: 50 };
+        const result = await runAutoOptimize({
+            objective,
+            params: { targetEq: { min: 60, max: 60, step: 1 } },
+            runsPerCandidate: 2,
+            seedsTrain: 1,
+            seedsTest: 1,
+            constraints: { sr99: false, noex: false, ts45: false, dd55: false },
+            maxDauer: 2,
+            safetyGuards: false,
+            evaluateCandidateFn
+        });
+        window.aoChampionResult = result;
+        const resultEl = document.getElementById('ao_result');
+        renderAutoOptimizeResult({ resultEl, result, objective });
+        const applyButton = document.getElementById('ao_apply_btn');
+        applyButton.style.display = 'inline-block';
+        return {
+            parameterFingerprint: result.parameterFidelity.parameterFingerprint,
+            requestFingerprint: result.parameterFidelity.requestFingerprint,
+            modelMode: result.modelStatus.evaluationMode,
+            targetEq: result.championCfg.targetEq
+        };
+    });
+    assert(evaluation.modelMode === 'custom_evaluator',
+        'Browser optimizer fixture must not claim built-in MC validation for its synthetic evaluator');
+    await page.locator('#ao_apply_btn').click();
+    const applied = await page.evaluate(async () => {
+        const {
+            createAutoOptimizeParameterFingerprint,
+            createAutoOptimizeRequestFingerprint
+        } = await import('./app/simulator/auto-optimize-param-meta.js');
+        const candidate = { targetEq: Number(document.getElementById('targetEq').value) };
+        return {
+            parameterFingerprint: createAutoOptimizeParameterFingerprint(candidate),
+            requestFingerprint: createAutoOptimizeRequestFingerprint(candidate),
+            targetEq: candidate.targetEq,
+            resultText: document.getElementById('ao_result')?.textContent || ''
+        };
+    });
+    assert(
+        applied.parameterFingerprint === evaluation.parameterFingerprint
+        && applied.requestFingerprint === evaluation.requestFingerprint,
+        'Browser optimizer apply must preserve the evaluated canonical fingerprint'
+    );
+    assert(applied.targetEq === evaluation.targetEq,
+        'Browser optimizer apply must write the evaluated target equity value');
+    assert(applied.resultText.includes('Experimenteller Szenariokandidat')
+        && applied.resultText.includes('keine Finanzempfehlung'),
+    'Browser optimizer result and apply confirmation must preserve the model-status boundary');
+    smoke.assertNoErrors();
+    await smoke.close();
+}
+
 async function runManualSmoke(browser, baseUrl) {
     const smoke = await openSmokePage(browser, baseUrl, 'Handbuch.html');
     const { page } = smoke;
@@ -1511,9 +1762,13 @@ async function main() {
             ['Balance engine gate', runBalanceEngineGate],
             ['Balance annual preflight', runBalanceAnnualPreflight],
             ['Balance preview lifecycle', runBalancePreviewLifecycle],
+            ['Balance 3-Bucket bear', runBalanceThreeBucketBear],
             ['Balance corrupt expenses', runBalanceCorruptExpenses],
             ['Simulator.html', runSimulatorSmoke],
             ['Simulator Monte-Carlo E2E', runMonteCarloBrowserRegression],
+            ['Simulator hybrid profile blocker', runSimulatorHybridProfileBlocker],
+            ['Simulator Sweep integration', runSimulatorSweepIntegration],
+            ['Simulator optimizer apply integration', runSimulatorOptimizerApplyIntegration],
             ['depot-tranchen-manager.html', runTranchesSmoke],
             ['tranche quote partial/offline', runTranchesQuoteFailureSmoke],
             ['tranche corrupt recovery', runTranchesRecoverySmoke],

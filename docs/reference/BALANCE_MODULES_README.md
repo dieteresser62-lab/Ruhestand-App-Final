@@ -345,6 +345,22 @@ DOM- und persistenzfreier Contract fuer das abgeschlossene Kalenderjahr. Er erze
 
 ---
 
+### 9.6 Integrationsnachweis des Jahres- und Recovery-Vertrags
+
+Der Abschlussgate fuer die Suite-Datenintegritaet fuehrt den echten
+Browserpfad von mutationsfreiem Preview zu genau einem bestaetigten
+Periodencommit mit Recovery-Snapshot aus. Ein separater Browserfall speist
+eine negative reale Aktienrendite aus `EngineAPI.simulateSingleYear()` in die
+3-Bucket-Diagnose und verhindert damit einen nur aus Testdoubles abgeleiteten
+Bear-Status. Import-Reject, Markt-CSV-Provenienz, korrupte Ausgaben und
+raw-preserving Recovery bleiben eigenstaendige fail-closed Browserpfade.
+
+Die Orakel O-01 bis O-22 und ihre konkreten Witnesses stehen im
+maschinenlesbaren Inventar
+`tests/fixtures/suite-data-integrity/oracle-traceability-v1.json`.
+
+---
+
 ## 10. `balance-guardrail-reset.js`
 Logik zur Erkennung signifikanter Eingabeänderungen, die den historischen Guardrail-State invalidieren.
 

@@ -1,0 +1,526 @@
+{
+  "schemaVersion": "SuiteDataIntegrityTraceabilityV1",
+  "oracles": [
+    {
+      "id": "O-01",
+      "title": "Preview-Idempotenz",
+      "witnesses": [
+        {
+          "gate": "browser",
+          "file": "tests/browser-smoke.test.mjs",
+          "marker": "Fuenf identische Eingaben duerfen Verlustvortrag, Flex, VPW und letzte Entnahme nicht fortschreiben"
+        }
+      ]
+    },
+    {
+      "id": "O-02",
+      "title": "Expliziter Commit",
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/balance-preview-commit-contract.test.mjs",
+          "marker": "Duplicate period commit performs no second write"
+        },
+        {
+          "gate": "browser",
+          "file": "tests/browser-smoke.test.mjs",
+          "marker": "Doppelklick darf nur einen Recovery-Snapshot erzeugen"
+        }
+      ]
+    },
+    {
+      "id": "O-03",
+      "title": "3-Bucket-Baer",
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/suite-data-three-bucket-final-action.test.mjs",
+          "marker": "A -30% nominal return at 2% inflation must trigger the -15% bad-year boundary"
+        },
+        {
+          "gate": "browser",
+          "file": "tests/browser-smoke.test.mjs",
+          "marker": "Browser 3-Bucket bear diagnosis must use the real engine return"
+        }
+      ]
+    },
+    {
+      "id": "O-04",
+      "title": "Finale Steuer",
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/suite-data-three-bucket-final-action.test.mjs",
+          "marker": "O-04 final tax must match the independent 1,314.14 EUR hand calculation"
+        }
+      ]
+    },
+    {
+      "id": "O-05",
+      "title": "Fractional Lot",
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/canonical-number-boundary.test.mjs",
+          "marker": "O-05 keeps 1.234 canonical shares"
+        },
+        {
+          "gate": "node",
+          "file": "tests/simulator-backtest.test.mjs",
+          "marker": "Backtest initializes O-05 with 1.234 shares at 100.50 EUR plus cash"
+        }
+      ]
+    },
+    {
+      "id": "O-06",
+      "title": "Mischprofile",
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/simulator-multiprofile-aggregation.test.mjs",
+          "marker": "O-06 must block a hybrid household instead of returning 110000 or 140000 EUR"
+        },
+        {
+          "gate": "browser",
+          "file": "tests/browser-smoke.test.mjs",
+          "marker": "Browser hybrid household must fail closed"
+        }
+      ]
+    },
+    {
+      "id": "O-07",
+      "title": "Profilgold",
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/simulator-multiprofile-aggregation.test.mjs",
+          "marker": "O-07 absolute household gold target should be 8000 EUR"
+        }
+      ]
+    },
+    {
+      "id": "O-08",
+      "title": "Nullgrenzen",
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/balance-reader.test.mjs",
+          "marker": "Production reader should preserve an explicit zero cash buffer"
+        },
+        {
+          "gate": "node",
+          "file": "tests/canonical-number-boundary.test.mjs",
+          "marker": "Decimal rebalancing band is not truncated"
+        },
+        {
+          "gate": "node",
+          "file": "tests/suite-data-three-bucket-final-action.test.mjs",
+          "marker": "maxSkimPctOfEq=0 must disable surplus overflow investment"
+        }
+      ]
+    },
+    {
+      "id": "O-09",
+      "title": "Gold-Floor",
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/suite-data-three-bucket-final-action.test.mjs",
+          "marker": "Multiple gold lots must share the single 30,000 EUR floor headroom"
+        }
+      ]
+    },
+    {
+      "id": "O-10",
+      "title": "Negativzins",
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/simulation.test.mjs",
+          "marker": "Accumulation signed cash flow should reconcile"
+        },
+        {
+          "gate": "node",
+          "file": "tests/health-bucket.test.mjs",
+          "marker": "Negative health-bucket cash return should reduce the bucket"
+        }
+      ]
+    },
+    {
+      "id": "O-11",
+      "title": "Sweep-Methodik",
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/simulator-sweep.test.mjs",
+          "marker": "O-11 expliziter Stationary-/Markov-Dispatch OK"
+        }
+      ]
+    },
+    {
+      "id": "O-12",
+      "title": "Sweep-Partner",
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/simulator-sweep.test.mjs",
+          "marker": "O-12 Sweep Partner-/Witwenpfad OK"
+        }
+      ]
+    },
+    {
+      "id": "O-13",
+      "title": "Sweep-Tail",
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/simulator-sweep.test.mjs",
+          "marker": "O-13 Sweep Tail-Risk-Overlay OK"
+        }
+      ]
+    },
+    {
+      "id": "O-14",
+      "title": "Drawdown",
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/simulator-sweep.test.mjs",
+          "marker": "O-14 Terminaler Ruin-Drawdown OK"
+        }
+      ]
+    },
+    {
+      "id": "O-15",
+      "title": "Optimizer-Paritaet",
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/auto-optimize-fidelity.test.mjs",
+          "marker": "apply roundtrip preserves the evaluated fingerprint"
+        },
+        {
+          "gate": "browser",
+          "file": "tests/browser-smoke.test.mjs",
+          "marker": "Browser optimizer apply must preserve the evaluated canonical fingerprint"
+        }
+      ]
+    },
+    {
+      "id": "O-16",
+      "title": "Boolean-Import",
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/balance-ui-orchestration.test.mjs",
+          "marker": "Aktuelles Schema blockiert den Nicht-Boolean"
+        },
+        {
+          "gate": "node",
+          "file": "tests/balance-ui-orchestration.test.mjs",
+          "marker": "Legacy-String false wird explizit migriert"
+        }
+      ]
+    },
+    {
+      "id": "O-17",
+      "title": "Stale CSV",
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/suite-data-integration-contract.test.mjs",
+          "marker": "O-17 rejects a 2010 market CSV for current period 2025"
+        }
+      ]
+    },
+    {
+      "id": "O-18",
+      "title": "Corrupt Recovery",
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/profile-storage.test.mjs",
+          "marker": "Korrupte Registry muss den Bootstrap in Recovery versetzen"
+        },
+        {
+          "gate": "browser",
+          "file": "tests/browser-smoke.test.mjs",
+          "marker": "Browser full-backup recovery must restore the previous registry byte-for-byte"
+        }
+      ]
+    },
+    {
+      "id": "O-19",
+      "title": "Engine-Grenzen",
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/spending-planner.test.mjs",
+          "marker": "Missing budget state should initialize at max and consume one bear year"
+        },
+        {
+          "gate": "node",
+          "file": "tests/spending-planner.test.mjs",
+          "marker": "First year should calculate 24% from 24,000 / 100,000"
+        },
+        {
+          "gate": "node",
+          "file": "tests/spending-quantization.test.mjs",
+          "marker": "Monthly quantization must not reduce a 25,000 annual floor to 24,000"
+        },
+        {
+          "gate": "node",
+          "file": "tests/suite-data-three-bucket-final-action.test.mjs",
+          "marker": "Explicit zero equity budget must prohibit equity sales"
+        }
+      ]
+    },
+    {
+      "id": "O-20",
+      "title": "Survival-Horizont",
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/simulator-sweep.test.mjs",
+          "marker": "Sweep and MC use the same VPW horizon"
+        },
+        {
+          "gate": "node",
+          "file": "tests/auto-optimize-fidelity.test.mjs",
+          "marker": "direct optimizer request contract should accept the O-20 upper fixture"
+        }
+      ]
+    },
+    {
+      "id": "O-21",
+      "title": "Optimizer-Metriken",
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/auto-optimize-metrics-contract.test.mjs",
+          "marker": "O-21 P25 should use its own final-outcome quantile"
+        }
+      ]
+    },
+    {
+      "id": "O-22",
+      "title": "Ergebnisnullen",
+      "witnesses": [
+        {
+          "gate": "node",
+          "file": "tests/simulation.test.mjs",
+          "marker": "Observed runway zero should remain zero"
+        },
+        {
+          "gate": "node",
+          "file": "tests/simulator-heatmap.test.mjs",
+          "marker": "One heatmap count in 100 runs should render as one percent"
+        },
+        {
+          "gate": "node",
+          "file": "tests/simulator-3bucket-ui-e2e.test.mjs",
+          "marker": "Portfolio chart should retain the terminal zero point on the original three-point time axis"
+        },
+        {
+          "gate": "node",
+          "file": "tests/simulator-monte-carlo.test.mjs",
+          "marker": "Successful median should include a successful terminal zero"
+        }
+      ]
+    }
+  ],
+  "browserContracts": [
+    {
+      "id": "preview_commit",
+      "gate": "browser",
+      "file": "tests/browser-smoke.test.mjs",
+      "marker": "Fachlicher State-Commit muss dieselbe stabile Perioden-ID speichern"
+    },
+    {
+      "id": "three_bucket",
+      "gate": "browser",
+      "file": "tests/browser-smoke.test.mjs",
+      "marker": "Browser 3-Bucket bear diagnosis must use the real engine return"
+    },
+    {
+      "id": "hybrid_profile",
+      "gate": "browser",
+      "file": "tests/browser-smoke.test.mjs",
+      "marker": "Browser hybrid household must fail closed"
+    },
+    {
+      "id": "import_recovery",
+      "gate": "browser",
+      "file": "tests/browser-smoke.test.mjs",
+      "marker": "Browser full-backup recovery must restore the previous registry byte-for-byte"
+    },
+    {
+      "id": "sweep",
+      "gate": "browser",
+      "file": "tests/browser-smoke.test.mjs",
+      "marker": "Browser sweep must expose versioned execution provenance"
+    },
+    {
+      "id": "optimizer",
+      "gate": "browser",
+      "file": "tests/browser-smoke.test.mjs",
+      "marker": "Browser optimizer apply must preserve the evaluated canonical fingerprint"
+    }
+  ],
+  "parityContracts": [
+    {
+      "id": "single_multi_profile",
+      "gate": "node",
+      "file": "tests/balance-preview-commit-contract.test.mjs",
+      "marker": "Multi-profile commit receives the same lifecycle period"
+    },
+    {
+      "id": "main_worker",
+      "gate": "node",
+      "file": "tests/worker-parity.test.mjs",
+      "marker": "Sweep split parity passed"
+    },
+    {
+      "id": "mc_single_sweep",
+      "gate": "node",
+      "file": "tests/simulator-sweep.test.mjs",
+      "marker": "Single-Profile Sweep/MC Ergebnisparitaet OK"
+    },
+    {
+      "id": "evaluate_apply",
+      "gate": "node",
+      "file": "tests/auto-optimize-fidelity.test.mjs",
+      "marker": "applied request fingerprint should match evaluation"
+    }
+  ],
+  "parameterCausality": {
+    "sweep": [
+      {
+        "uiId": "sweepRunwayMin",
+        "key": "runwayMin",
+        "canonicalKey": "runwayMinMonths",
+        "unit": "months",
+        "domain": { "min": 0, "max": 120 },
+        "consumer": "app/simulator/sweep-runner.js#buildSweepInputs",
+        "provenance": "SweepExecutionV2.results[].params.runwayMin",
+        "witnessValue": 18,
+        "apply": "not_applicable",
+        "status": "canonical_path_verified"
+      },
+      {
+        "uiId": "sweepRunwayTarget",
+        "key": "runwayTarget",
+        "canonicalKey": "runwayTargetMonths",
+        "unit": "months",
+        "domain": { "min": 0, "max": 120 },
+        "consumer": "app/simulator/sweep-runner.js#buildSweepInputs",
+        "provenance": "SweepExecutionV2.results[].params.runwayTarget",
+        "witnessValue": 42,
+        "apply": "not_applicable",
+        "status": "canonical_path_verified"
+      },
+      {
+        "uiId": "sweepTargetEq",
+        "key": "targetEq",
+        "canonicalKey": "targetEq",
+        "unit": "percent",
+        "domain": { "min": 0, "max": 100 },
+        "consumer": "app/simulator/sweep-runner.js#buildSweepInputs",
+        "provenance": "SweepExecutionV2.results[].params.targetEq",
+        "witnessValue": 70,
+        "apply": "not_applicable",
+        "status": "canonical_path_verified"
+      },
+      {
+        "uiId": "sweepRebalBand",
+        "key": "rebalBand",
+        "canonicalKey": "rebalBand",
+        "unit": "percent",
+        "domain": { "min": 0, "max": 50 },
+        "consumer": "app/simulator/sweep-runner.js#buildSweepInputs",
+        "provenance": "SweepExecutionV2.results[].params.rebalBand",
+        "witnessValue": 6.5,
+        "apply": "not_applicable",
+        "status": "canonical_path_verified"
+      },
+      {
+        "uiId": "sweepMaxSkimPct",
+        "key": "maxSkimPct",
+        "canonicalKey": "maxSkimPctOfEq",
+        "unit": "percent",
+        "domain": { "min": 0, "max": 100 },
+        "consumer": "app/simulator/sweep-runner.js#buildSweepInputs",
+        "provenance": "SweepExecutionV2.results[].params.maxSkimPct",
+        "witnessValue": 12,
+        "apply": "not_applicable",
+        "status": "canonical_path_verified"
+      },
+      {
+        "uiId": "sweepMaxBearRefillPct",
+        "key": "maxBearRefillPct",
+        "canonicalKey": "maxBearRefillPctOfEq",
+        "unit": "percent",
+        "domain": { "min": 0, "max": 100 },
+        "consumer": "app/simulator/sweep-runner.js#buildSweepInputs",
+        "provenance": "SweepExecutionV2.results[].params.maxBearRefillPct",
+        "witnessValue": 8,
+        "apply": "not_applicable",
+        "status": "canonical_path_verified"
+      },
+      {
+        "uiId": "sweepGoldTargetPct",
+        "key": "goldTargetPct",
+        "canonicalKey": "goldZielProzent",
+        "unit": "percent",
+        "domain": { "min": 0, "max": 30 },
+        "consumer": "app/simulator/sweep-runner.js#buildSweepInputs",
+        "provenance": "SweepExecutionV2.results[].params.goldTargetPct",
+        "witnessValue": 7.5,
+        "apply": "not_applicable",
+        "status": "canonical_path_verified"
+      },
+      {
+        "uiId": "sweepSurvivalQuantile",
+        "key": "survivalQuantile",
+        "canonicalKey": "survivalQuantile",
+        "unit": "ratio",
+        "domain": { "min": 0.5, "max": 0.99 },
+        "consumer": "app/simulator/sweep-runner.js#buildSweepInputs",
+        "provenance": "SweepExecutionV2.results[].params.survivalQuantile",
+        "witnessValue": 0.9,
+        "apply": "not_applicable",
+        "status": "canonical_path_verified_when_dynamic_flex_survival_quantile"
+      },
+      {
+        "uiId": "sweepGoGoMultiplier",
+        "key": "goGoMultiplier",
+        "canonicalKey": "goGoMultiplier",
+        "unit": "multiplier",
+        "domain": { "min": 1, "max": 1.5 },
+        "consumer": "app/simulator/sweep-runner.js#buildSweepInputs",
+        "provenance": "SweepExecutionV2.results[].params.goGoMultiplier",
+        "witnessValue": 1.2,
+        "apply": "not_applicable",
+        "status": "canonical_path_verified_when_go_go_active"
+      }
+    ],
+    "optimizer": [
+      { "uiId": "runwayMinMonths", "key": "runwayMinM", "canonicalKey": "runwayMinMonths", "unit": "Monate", "domain": { "min": 12, "max": 60, "step": 1 }, "consumer": "AUTO_OPTIMIZE_PARAMETER_REGISTRY", "provenance": "AutoOptimizeRequestFingerprintV1.runwayMinMonths", "apply": "runwayMinMonths", "status": "effective" },
+      { "uiId": "runwayTargetMonths", "key": "runwayTargetM", "canonicalKey": "runwayTargetMonths", "unit": "Monate", "domain": { "min": 18, "max": 72, "step": 1 }, "consumer": "AUTO_OPTIMIZE_PARAMETER_REGISTRY", "provenance": "AutoOptimizeRequestFingerprintV1.runwayTargetMonths", "apply": "runwayTargetMonths", "status": "effective" },
+      { "uiId": "goldAllokationProzent", "key": "goldTargetPct", "canonicalKey": "goldZielProzent", "unit": "%", "domain": { "min": 0, "max": 50, "step": 1 }, "consumer": "AUTO_OPTIMIZE_PARAMETER_REGISTRY", "provenance": "AutoOptimizeRequestFingerprintV1.goldZielProzent", "apply": "goldAllokationProzent+goldAllokationAktiv", "status": "effective" },
+      { "uiId": "targetEq", "key": "targetEq", "canonicalKey": "targetEq", "unit": "%", "domain": { "min": 20, "max": 90, "step": 1 }, "consumer": "AUTO_OPTIMIZE_PARAMETER_REGISTRY", "provenance": "AutoOptimizeRequestFingerprintV1.targetEq", "apply": "targetEq", "status": "effective" },
+      { "uiId": "rebalBand", "key": "rebalBand", "canonicalKey": "rebalBand", "unit": "%", "domain": { "min": 1, "max": 20, "step": 0.5 }, "consumer": "AUTO_OPTIMIZE_PARAMETER_REGISTRY", "provenance": "AutoOptimizeRequestFingerprintV1.rebalBand", "apply": "rebalBand", "status": "effective" },
+      { "uiId": "maxSkimPctOfEq", "key": "maxSkimPct", "canonicalKey": "maxSkimPctOfEq", "unit": "%", "domain": { "min": 0, "max": 50, "step": 1 }, "consumer": "AUTO_OPTIMIZE_PARAMETER_REGISTRY", "provenance": "AutoOptimizeRequestFingerprintV1.maxSkimPctOfEq", "apply": "maxSkimPctOfEq", "status": "effective" },
+      { "uiId": "survivalQuantile", "key": "survivalQuantile", "canonicalKey": "survivalQuantile", "unit": "", "domain": { "min": 0.5, "max": 0.99, "step": 0.01 }, "consumer": "AUTO_OPTIMIZE_PARAMETER_REGISTRY", "provenance": "AutoOptimizeRequestFingerprintV1.survivalQuantile", "apply": "survivalQuantile", "status": "effective_when_dynamic_flex_survival_quantile" },
+      { "uiId": "goGoMultiplier", "key": "goGoMultiplier", "canonicalKey": "goGoMultiplier", "unit": "x", "domain": { "min": 1, "max": 1.5, "step": 0.05 }, "consumer": "AUTO_OPTIMIZE_PARAMETER_REGISTRY", "provenance": "AutoOptimizeRequestFingerprintV1.goGoMultiplier", "apply": "goGoMultiplier+goGoActive", "status": "effective_when_dynamic_flex" }
+    ]
+  },
+  "deltaBaselines": [
+    { "id": "backtest-baseline", "file": "tests/fixtures/simulator-backtest-baseline-v1.json", "gitBlobSha1": "7b2cb702ad3c3c1501d5ddd4abb71a497b95ca3c", "expectedDelta": "none" },
+    { "id": "backtest-target", "file": "tests/fixtures/simulator-backtest-target-v1.json", "gitBlobSha1": "0933362ca52607f31be58585d6d63b3764d75c1e", "expectedDelta": "none" },
+    { "id": "mc-snapshot-policy", "file": "tests/fixtures/monte-carlo-measurement/snapshot-policy-v1.json", "gitBlobSha1": "c65fcfab8571e1bc77958e40854f5984280a3806", "expectedDelta": "none" },
+    { "id": "mc-final", "file": "tests/fixtures/monte-carlo-measurement/monte-carlo-v1-final.json", "gitBlobSha1": "f9dde37e5dff1e2d9459cb494a5780e7b85342d7", "expectedDelta": "none" },
+    { "id": "flow-delta-ledger", "file": "tests/fixtures/monte-carlo-measurement/delta-ledger-v1.json", "gitBlobSha1": "85f44b346bed831db64f4c3c8ec0690e41466cd7", "expectedDelta": "none" },
+    { "id": "generated-engine", "file": "engine.js", "gitBlobSha1": "ec49961ed58134928723be5ddb6185e11f7fbcb5", "expectedDelta": "none_after_build" }
+  ]
+}

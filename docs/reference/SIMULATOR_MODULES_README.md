@@ -209,6 +209,16 @@ Sweep-spezifische Logik mit Guardrails für Partner:innen-Felder und Heatmap-Aus
 
 **Dependencies:** `monte-carlo-runner.js` (Mini-Läufe), `simulator-heatmap.js`, `simulator-results.js`, `simulator-sweep-utils.js`, `simulator-utils.js`, `simulator-data.js`.
 
+**Interaktiver Parametervertrag:** Die Browseroberflaeche bietet genau die neun
+Dimensionen mit geprueftem kanonischem Datenpfad `sweepRunwayMin`,
+`sweepRunwayTarget`, `sweepTargetEq`, `sweepRebalBand`, `sweepMaxSkimPct`,
+`sweepMaxBearRefillPct`, `sweepGoldTargetPct`, `sweepSurvivalQuantile` und
+`sweepGoGoMultiplier`. Nur `horizonYears` bleibt fuer explizite
+programmatische `SweepRequestV1`-Aufrufe verfuegbar, ist aber keine
+interaktive Sweepdimension, weil die UI aktuarielle Horizonte verwendet.
+Die Matrix prueft Zuordnung, Consumer und Provenienz; sie ist kein
+eigenstaendiger Nachweis der KPI-Wirkung.
+
 ---
 
 ## 7. `simulator-sweep-utils.js` (~220 Zeilen)
@@ -893,6 +903,11 @@ app/simulator/simulator-main.js
 2. `simulator-sweep.js`: Iteriert über Whitelist-Parameter, nutzt Worker-Jobs (Fallback seriell).
 3. `simulator-heatmap.js`: `renderHeatmapSVG()` visualisiert Ergebnisse und
    kennzeichnet Quantilrankings als experimentelle Punktschaetzer.
+4. Der Abschlussvertrag ordnet alle neun sichtbaren Parameter ihrem
+   kanonischen Request-Key, Consumer, Wertebereich und Provenienz-Witness zu.
+   Dieser Datenpfadnachweis ist kein eigenstaendiger KPI-Wirkungsnachweis.
+   Der Browser-Smoke prueft `SweepRequestV1`, `SweepExecutionV2`,
+   `SweepMetricsV3` und die Parameterprovenienz eines echten Ein-Zellen-Laufs.
 
 ### Auto-Optimize
 
