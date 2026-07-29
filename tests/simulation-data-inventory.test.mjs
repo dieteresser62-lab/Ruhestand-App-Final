@@ -55,7 +55,7 @@ function captureError(callback) {
 }
 
 const historicalSeriesIds = [
-    'msci_eur',
+    'global_equity_research_index',
     'inflation_de',
     'zinssatz_de',
     'lohn_de',
@@ -71,7 +71,7 @@ assertEqual(
     'Inventory schema should be versioned'
 );
 assert(Object.isFrozen(SIMULATION_DATA_INVENTORY), 'Inventory root should be immutable');
-assert(Object.isFrozen(SIMULATION_DATA_INVENTORY.historicalSeries.msci_eur.qualitySegments), 'Quality segments should be immutable');
+assert(Object.isFrozen(SIMULATION_DATA_INVENTORY.historicalSeries.global_equity_research_index.qualitySegments), 'Quality segments should be immutable');
 assert(Object.isFrozen(SIMULATION_DATA_INVENTORY.staticData.mortality_table), 'Static entries should be immutable');
 console.log('✓ V1 shape and immutability OK');
 
@@ -88,8 +88,8 @@ for (const seriesId of historicalSeriesIds) {
         `${seriesId} quality should end in 2025`
     );
     assert(
-        entry.qualitySegments !== SIMULATION_DATA_INVENTORY.historicalSeries.msci_eur.qualitySegments
-            || seriesId === 'msci_eur',
+        entry.qualitySegments !== SIMULATION_DATA_INVENTORY.historicalSeries.global_equity_research_index.qualitySegments
+            || seriesId === 'global_equity_research_index',
         `${seriesId} should own a separate quality-segment contract`
     );
 }
@@ -99,9 +99,24 @@ assertEqual(
     'Gold should expose its zero-value ambiguity as series-specific segments'
 );
 assert(
-    SIMULATION_DATA_INVENTORY.historicalSeries.msci_eur.qualitySegments
-        .some(segment => segment.note.includes('D-15')),
-    'Equity quality should expose the D-15 placeholder risk'
+    SIMULATION_DATA_INVENTORY.historicalSeries.global_equity_research_index.qualitySegments
+        .some(segment => segment.startYear === 2021 && segment.evidenceClass === 'estimated'),
+    'Equity quality should expose the modelled 2021-2025 dividend segment'
+);
+assertEqual(
+    SIMULATION_DATA_INVENTORY.historicalSeries.global_equity_research_index.qualitySegments[0].endYear,
+    1950,
+    'Equity proxy quality should include the USD-based 1950 return'
+);
+assertEqual(
+    SIMULATION_DATA_INVENTORY.historicalSeries.global_equity_research_index.qualitySegments[1].startYear,
+    1951,
+    'Equity backtested quality should start with the German-investor return in 1951'
+);
+assertEqual(
+    SIMULATION_DATA_INVENTORY.historicalSeries.global_equity_research_index.source.status,
+    'known',
+    'Equity should resolve the open source chain that replaces the D-15 placeholder'
 );
 console.log('✓ series-specific quality segmentation OK');
 
@@ -264,15 +279,19 @@ for (const seriesId of historicalSeriesIds) {
     assertEqual(gate.technicallyReproducible, true, `${seriesId} should remain reproducible`);
     assertEqual(gate.externallyValidated, false, `${seriesId} must not claim external validation`);
     assertEqual(gate.replacementAllowed, false, `${seriesId} must not pass the replacement gate`);
-    assert(gate.unresolvedFields.includes('source'), `${seriesId} should expose its source blocker`);
-    assert(gate.unresolvedFields.includes('license'), `${seriesId} should expose its license blocker`);
+    if (seriesId === 'global_equity_research_index') {
+        assertEqual(gate.unresolvedFields.length, 0, 'Equity source and license fields should be resolved');
+    } else {
+        assert(gate.unresolvedFields.includes('source'), `${seriesId} should expose its source blocker`);
+        assert(gate.unresolvedFields.includes('license'), `${seriesId} should expose its license blocker`);
+    }
 }
 console.log('✓ unresolved source gate OK');
 
 console.log('Test 9: fabricated provenance and false validation claims fail closed');
 {
     const fabricated = clone(SIMULATION_DATA_INVENTORY);
-    fabricated.historicalSeries.msci_eur.source = {
+    fabricated.historicalSeries.global_equity_research_index.source = {
         status: 'unresolved',
         value: 'guessed-source'
     };
@@ -281,7 +300,11 @@ console.log('Test 9: fabricated provenance and false validation claims fail clos
     assertEqual(fabricatedError.code, 'SIMULATION_DATA_INVENTORY_INVALID', 'Fabricated provenance should fail the shape gate');
 
     const falseValidation = clone(SIMULATION_DATA_INVENTORY);
-    falseValidation.historicalSeries.msci_eur.externalValidationStatus = 'externally_validated';
+    falseValidation.historicalSeries.global_equity_research_index.source = {
+        status: 'unresolved',
+        value: null
+    };
+    falseValidation.historicalSeries.global_equity_research_index.externalValidationStatus = 'externally_validated';
     const validationError = captureError(() => validateSimulationDataInventory(falseValidation));
     assertEqual(
         validationError?.code,

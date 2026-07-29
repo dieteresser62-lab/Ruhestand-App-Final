@@ -1,0 +1,463 @@
+{
+  "schemaVersion": "GlobalEquityResearchBacktestDeltaV1",
+  "cause": "global_equity_research_chain",
+  "baseCommit": "16f5c830d83ce17f114294e555651fcb2d776d72",
+  "beforeTarget": {
+    "artifact": "global-equity-research-chain-before-target-v1.json",
+    "sha256": "5079d93fd1d5dedaf5e07ccb84979354b988e6a08079fa62a60f3ee804c7d6cf",
+    "generatedFrom": "base commit 16f5c83 plus the Slice-02 characterization metrics and seam scenario",
+    "baseCommitOriginalFixtureSha256": "c34e0aea16304308650d11b3a03d96ec3632f80e95df4bc771958da3d987febe",
+    "instrumentationDisclosure": [
+      "maxDrawdownPct and minRunwayCoveragePct were retrocomputed and are supplemental diagnostics, not base-fixture delta oracles",
+      "completed_numeraire_seam_1949_1952 was added to the base code solely to create a before/after seam comparison"
+    ]
+  },
+  "afterTarget": {
+    "artifact": "simulator-backtest-target-v1.json",
+    "sha256": "01a23a8484340fc2dac6dbcd48e3bf6929404c30356767b1d6a224cb7200aff2",
+    "equityAnnualReturnHash": "7982d0a0a9ec3f9dea0d547ec433abc7cb2aef0f61886fc7b3556c169a97e5bf"
+  },
+  "cases": [
+    {
+      "id": "completed_2000_2005",
+      "period": {
+        "endYear": 2005,
+        "requestedYears": 6,
+        "startYear": 2000
+      },
+      "inputHash": "ebdea5f8b4162f411a17802329bb68cc3a4e756f61e0c6a1f0131b611601ab7d",
+      "outcome": {
+        "before": "completed",
+        "after": "completed",
+        "cause": "global_equity_research_chain"
+      },
+      "metrics": {
+        "summaryEndWealth": {
+          "before": 1353347.36,
+          "after": 1692409.94,
+          "delta": 339062.58,
+          "cause": "global_equity_research_chain"
+        },
+        "totalWithdrawal": {
+          "before": 172800,
+          "after": 176400,
+          "delta": 3600,
+          "cause": "global_equity_research_chain"
+        },
+        "totalTax": {
+          "before": 0,
+          "after": 0,
+          "delta": 0,
+          "cause": "global_equity_research_chain"
+        },
+        "yearsWithReductionAtLeast10Pct": {
+          "before": 6,
+          "after": 4,
+          "delta": -2,
+          "cause": "global_equity_research_chain"
+        },
+        "maxReductionStreak": {
+          "before": 6,
+          "after": 4,
+          "delta": -2,
+          "cause": "global_equity_research_chain"
+        },
+        "maxAbsolutePortfolioFlowDelta": {
+          "before": 0,
+          "after": 0,
+          "delta": 0,
+          "cause": "global_equity_research_chain"
+        }
+      },
+      "supplementalDiagnostics": {
+        "evidence": "retrocomputed_from_base_commit_with_slice02_instrumentation_not_a_base_fixture_oracle",
+        "maxDrawdownPct": {
+          "before": 52.996658,
+          "after": 40.343729
+        },
+        "minRunwayCoveragePct": {
+          "before": 74.399823,
+          "after": 75.547603
+        }
+      }
+    },
+    {
+      "id": "completed_1960_2020",
+      "period": {
+        "endYear": 2020,
+        "requestedYears": 61,
+        "startYear": 1960
+      },
+      "inputHash": "cb5a70552297ce10277b714a2c5fcc6878a4569571368284257ece3550b8e379",
+      "outcome": {
+        "before": "completed",
+        "after": "completed",
+        "cause": "global_equity_research_chain"
+      },
+      "metrics": {
+        "summaryEndWealth": {
+          "before": 95436508.34,
+          "after": 178982113.78,
+          "delta": 83545605.44,
+          "cause": "global_equity_research_chain"
+        },
+        "totalWithdrawal": {
+          "before": 4122159.99,
+          "after": 4122159.99,
+          "delta": 0,
+          "cause": "global_equity_research_chain"
+        },
+        "totalTax": {
+          "before": 791315.78,
+          "after": 772770.76,
+          "delta": -18545.02,
+          "cause": "global_equity_research_chain"
+        },
+        "yearsWithReductionAtLeast10Pct": {
+          "before": 59,
+          "after": 59,
+          "delta": 0,
+          "cause": "global_equity_research_chain"
+        },
+        "maxReductionStreak": {
+          "before": 59,
+          "after": 59,
+          "delta": 0,
+          "cause": "global_equity_research_chain"
+        },
+        "maxAbsolutePortfolioFlowDelta": {
+          "before": 0,
+          "after": 0,
+          "delta": 0,
+          "cause": "global_equity_research_chain"
+        }
+      },
+      "supplementalDiagnostics": {
+        "evidence": "retrocomputed_from_base_commit_with_slice02_instrumentation_not_a_base_fixture_oracle",
+        "maxDrawdownPct": {
+          "before": 52.549962,
+          "after": 40.158872
+        },
+        "minRunwayCoveragePct": {
+          "before": 71.028948,
+          "after": 71.551312
+        }
+      }
+    },
+    {
+      "id": "completed_numeraire_seam_1949_1952",
+      "period": {
+        "endYear": 1952,
+        "requestedYears": 4,
+        "startYear": 1949
+      },
+      "inputHash": "cb5a70552297ce10277b714a2c5fcc6878a4569571368284257ece3550b8e379",
+      "outcome": {
+        "before": "completed",
+        "after": "completed",
+        "cause": "global_equity_research_chain"
+      },
+      "metrics": {
+        "summaryEndWealth": {
+          "before": 3697010.68,
+          "after": 5152751.56,
+          "delta": 1455740.88,
+          "cause": "global_equity_research_chain"
+        },
+        "totalWithdrawal": {
+          "before": 118800,
+          "after": 118800,
+          "delta": 0,
+          "cause": "global_equity_research_chain"
+        },
+        "totalTax": {
+          "before": 14784.35,
+          "after": 19510.49,
+          "delta": 4726.14,
+          "cause": "global_equity_research_chain"
+        },
+        "yearsWithReductionAtLeast10Pct": {
+          "before": 2,
+          "after": 2,
+          "delta": 0,
+          "cause": "global_equity_research_chain"
+        },
+        "maxReductionStreak": {
+          "before": 2,
+          "after": 2,
+          "delta": 0,
+          "cause": "global_equity_research_chain"
+        },
+        "maxAbsolutePortfolioFlowDelta": {
+          "before": 0,
+          "after": 0,
+          "delta": 0,
+          "cause": "global_equity_research_chain"
+        }
+      },
+      "supplementalDiagnostics": {
+        "evidence": "retrocomputed_from_base_commit_with_slice02_instrumentation_not_a_base_fixture_oracle",
+        "maxDrawdownPct": {
+          "before": 1.195063,
+          "after": 0
+        },
+        "minRunwayCoveragePct": {
+          "before": 72.73275,
+          "after": 70.419352
+        }
+      }
+    },
+    {
+      "id": "three_bucket_minimum_flex_2005_2014",
+      "period": {
+        "endYear": 2014,
+        "requestedYears": 10,
+        "startYear": 2005
+      },
+      "inputHash": "ee6f0f4f65ac743fec4e1b68f7424a486fa7b4c8f0f4a43bf374d743b4723c29",
+      "outcome": {
+        "before": "completed",
+        "after": "completed",
+        "cause": "global_equity_research_chain"
+      },
+      "metrics": {
+        "summaryEndWealth": {
+          "before": 383486.68,
+          "after": 385842.24,
+          "delta": 2355.56,
+          "cause": "global_equity_research_chain"
+        },
+        "totalWithdrawal": {
+          "before": 327600,
+          "after": 328800,
+          "delta": 1200,
+          "cause": "global_equity_research_chain"
+        },
+        "totalTax": {
+          "before": 20261.85,
+          "after": 29182.67,
+          "delta": 8920.82,
+          "cause": "global_equity_research_chain"
+        },
+        "yearsWithReductionAtLeast10Pct": {
+          "before": 10,
+          "after": 10,
+          "delta": 0,
+          "cause": "global_equity_research_chain"
+        },
+        "maxReductionStreak": {
+          "before": 10,
+          "after": 10,
+          "delta": 0,
+          "cause": "global_equity_research_chain"
+        },
+        "maxAbsolutePortfolioFlowDelta": {
+          "before": 0,
+          "after": 0,
+          "delta": 0,
+          "cause": "global_equity_research_chain"
+        }
+      },
+      "supplementalDiagnostics": {
+        "evidence": "retrocomputed_from_base_commit_with_slice02_instrumentation_not_a_base_fixture_oracle",
+        "maxDrawdownPct": {
+          "before": 42.251012,
+          "after": 34.421546
+        },
+        "minRunwayCoveragePct": {
+          "before": 40.095577,
+          "after": 95.532481
+        }
+      }
+    },
+    {
+      "id": "capital_poor_ruin_2000_2005",
+      "period": {
+        "endYear": 2005,
+        "requestedYears": 6,
+        "startYear": 2000
+      },
+      "inputHash": "e576bf078df99d1bc8b779e50fc8c0ffe381bb5599f8c9b1809da292295d31fc",
+      "outcome": {
+        "before": "ruin",
+        "after": "ruin",
+        "cause": "global_equity_research_chain"
+      },
+      "metrics": {
+        "summaryEndWealth": {
+          "before": 14695.21,
+          "after": 26802.8,
+          "delta": 12107.59,
+          "cause": "global_equity_research_chain"
+        },
+        "totalWithdrawal": {
+          "before": 90000,
+          "after": 90000,
+          "delta": 0,
+          "cause": "global_equity_research_chain"
+        },
+        "totalTax": {
+          "before": 0,
+          "after": 1290.26,
+          "delta": 1290.26,
+          "cause": "global_equity_research_chain"
+        },
+        "yearsWithReductionAtLeast10Pct": {
+          "before": 1,
+          "after": 1,
+          "delta": 0,
+          "cause": "global_equity_research_chain"
+        },
+        "maxReductionStreak": {
+          "before": 1,
+          "after": 1,
+          "delta": 0,
+          "cause": "global_equity_research_chain"
+        },
+        "maxAbsolutePortfolioFlowDelta": {
+          "before": 0,
+          "after": 0,
+          "delta": 0,
+          "cause": "global_equity_research_chain"
+        }
+      },
+      "supplementalDiagnostics": {
+        "evidence": "retrocomputed_from_base_commit_with_slice02_instrumentation_not_a_base_fixture_oracle",
+        "maxDrawdownPct": {
+          "before": 87.753993,
+          "after": 77.664331
+        },
+        "minRunwayCoveragePct": {
+          "before": 0,
+          "after": 0
+        }
+      }
+    },
+    {
+      "id": "health_bucket_nested_row_summary_positive",
+      "period": {
+        "endYear": 2011,
+        "requestedYears": 2,
+        "startYear": 2010
+      },
+      "inputHash": "a799ab677936d36be93752fa374902ad2c0421c7f199f3a8f84b01086d4bfff5",
+      "outcome": {
+        "before": "completed",
+        "after": "completed",
+        "cause": "global_equity_research_chain"
+      },
+      "metrics": {
+        "summaryEndWealth": {
+          "before": 2042036.36,
+          "after": 2272042.2,
+          "delta": 230005.84,
+          "cause": "global_equity_research_chain"
+        },
+        "totalWithdrawal": {
+          "before": 60000,
+          "after": 60000,
+          "delta": 0,
+          "cause": "global_equity_research_chain"
+        },
+        "totalTax": {
+          "before": 1568.12,
+          "after": 2657.61,
+          "delta": 1089.49,
+          "cause": "global_equity_research_chain"
+        },
+        "yearsWithReductionAtLeast10Pct": {
+          "before": 0,
+          "after": 0,
+          "delta": 0,
+          "cause": "global_equity_research_chain"
+        },
+        "maxReductionStreak": {
+          "before": 0,
+          "after": 0,
+          "delta": 0,
+          "cause": "global_equity_research_chain"
+        },
+        "maxAbsolutePortfolioFlowDelta": {
+          "before": 0,
+          "after": 0,
+          "delta": 0,
+          "cause": "global_equity_research_chain"
+        }
+      },
+      "supplementalDiagnostics": {
+        "evidence": "retrocomputed_from_base_commit_with_slice02_instrumentation_not_a_base_fixture_oracle",
+        "maxDrawdownPct": {
+          "before": 9.100847,
+          "after": 3.321382
+        },
+        "minRunwayCoveragePct": {
+          "before": 9.259259,
+          "after": 9.259259
+        }
+      }
+    },
+    {
+      "id": "dynamic_flex_cape_2010_2013",
+      "period": {
+        "endYear": 2013,
+        "requestedYears": 4,
+        "startYear": 2010
+      },
+      "inputHash": "1bc7852f16e88c723c6cc528290c37b04e209df4b1b353d55180d91a319ab65d",
+      "outcome": {
+        "before": "completed",
+        "after": "completed",
+        "cause": "global_equity_research_chain"
+      },
+      "metrics": {
+        "summaryEndWealth": {
+          "before": 2366522.53,
+          "after": 2412711.9,
+          "delta": 46189.37,
+          "cause": "global_equity_research_chain"
+        },
+        "totalWithdrawal": {
+          "before": 453000,
+          "after": 492000,
+          "delta": 39000,
+          "cause": "global_equity_research_chain"
+        },
+        "totalTax": {
+          "before": 36336,
+          "after": 91236.92,
+          "delta": 54900.92,
+          "cause": "global_equity_research_chain"
+        },
+        "yearsWithReductionAtLeast10Pct": {
+          "before": 4,
+          "after": 4,
+          "delta": 0,
+          "cause": "global_equity_research_chain"
+        },
+        "maxReductionStreak": {
+          "before": 4,
+          "after": 4,
+          "delta": 0,
+          "cause": "global_equity_research_chain"
+        },
+        "maxAbsolutePortfolioFlowDelta": {
+          "before": 0,
+          "after": 0,
+          "delta": 0,
+          "cause": "global_equity_research_chain"
+        }
+      },
+      "supplementalDiagnostics": {
+        "evidence": "retrocomputed_from_base_commit_with_slice02_instrumentation_not_a_base_fixture_oracle",
+        "maxDrawdownPct": {
+          "before": 12.9277,
+          "after": 7.712561
+        },
+        "minRunwayCoveragePct": {
+          "before": 22.404964,
+          "after": 47.531808
+        }
+      }
+    }
+  ]
+}

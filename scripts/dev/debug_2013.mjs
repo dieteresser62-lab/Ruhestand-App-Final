@@ -70,7 +70,7 @@ const yearData = {
     gold_eur_perf: -10,
     zinssatz: 1.0,
     inflation: 2.0,
-    msci_eur: 123.6
+    global_equity_research_index: 123.6
 };
 
 console.log('--- START SIMULATION ---');

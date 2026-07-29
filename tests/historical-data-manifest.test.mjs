@@ -33,7 +33,7 @@ function captureError(callback) {
 }
 
 const requiredSeries = [
-    'msci_eur',
+    'global_equity_research_index',
     'inflation_de',
     'zinssatz_de',
     'lohn_de',
@@ -45,12 +45,12 @@ console.log('Test 1: manifest contains all required reproducibility fields');
 validateHistoricalDataManifest(HISTORICAL_DATA_MANIFEST);
 assertEqual(HISTORICAL_DATA_MANIFEST.schemaVersion, 'HistoricalDataManifestV1', 'Manifest schema should be versioned');
 assertEqual(HISTORICAL_DATA_MANIFEST.datasetId, 'ruhestandsapp-historical-data-v1', 'Manifest ID should be stable');
-assertEqual(HISTORICAL_DATA_MANIFEST.revision, '2026-07-18.1', 'Manifest revision should be explicit');
+assertEqual(HISTORICAL_DATA_MANIFEST.revision, '2026-07-29.2', 'Manifest revision should be explicit');
 assertEqual(HISTORICAL_DATA_MANIFEST.period.startYear, 1925, 'Manifest start year should match embedded history');
 assertEqual(HISTORICAL_DATA_MANIFEST.period.endYear, 2025, 'Manifest end year should match embedded history');
 assertEqual(HISTORICAL_DATA_MANIFEST.lookback.backtestYears, 4, 'Backtest lookback should be explicit');
 assert(Object.isFrozen(HISTORICAL_DATA_MANIFEST), 'Manifest root should be immutable');
-assert(Object.isFrozen(HISTORICAL_DATA_MANIFEST.series.msci_eur), 'Manifest series should be deeply immutable');
+assert(Object.isFrozen(HISTORICAL_DATA_MANIFEST.series.global_equity_research_index), 'Manifest series should be deeply immutable');
 
 for (const seriesId of requiredSeries) {
     const series = HISTORICAL_DATA_MANIFEST.series[seriesId];
@@ -76,7 +76,7 @@ for (const seriesId of requiredSeries) {
 console.log('✓ required manifest fields OK');
 
 console.log('Test 2: unresolved source, license and variant claims stay explicit');
-for (const seriesId of requiredSeries) {
+for (const seriesId of requiredSeries.filter(seriesId => seriesId !== 'global_equity_research_index')) {
     const series = HISTORICAL_DATA_MANIFEST.series[seriesId];
     assertEqual(series.source.status, 'unresolved', `${seriesId} source must remain unresolved without evidence`);
     assertEqual(series.source.value, null, `${seriesId} unresolved source must not contain an invented value`);
@@ -85,6 +85,12 @@ for (const seriesId of requiredSeries) {
     assertEqual(series.variant.status, 'unresolved', `${seriesId} variant must remain unresolved without evidence`);
     assertEqual(series.variant.value, null, `${seriesId} unresolved variant must not contain an invented value`);
 }
+const equitySeries = HISTORICAL_DATA_MANIFEST.series.global_equity_research_index;
+assertEqual(equitySeries.source.status, 'known', 'Equity source should be resolved to the open source chain');
+assertEqual(equitySeries.license.status, 'known', 'Equity data license should be explicit');
+assertEqual(equitySeries.variant.status, 'known', 'Equity research-proxy variant should be explicit');
+assertEqual(equitySeries.estimatedSegments.length, 2, 'Equity should expose its early proxy and modelled modern segment');
+assertEqual(equitySeries.estimatedSegments[0].endYear, 1950, 'Equity USD-proxy segment should include the 1950 return');
 assertEqual(
     HISTORICAL_DATA_MANIFEST.series.gold_eur_perf.missingness.fallbackZeroSegments.length,
     0,
@@ -128,13 +134,13 @@ console.log('✓ contiguous immutable lookup OK');
 console.log('Test 5: empty or fabricated resolution fields are rejected');
 {
     const emptyKnown = clone(HISTORICAL_DATA_MANIFEST);
-    emptyKnown.series.msci_eur.source = { status: 'known', value: '' };
+    emptyKnown.series.global_equity_research_index.source = { status: 'known', value: '' };
     const emptyKnownError = captureError(() => validateHistoricalDataManifest(emptyKnown));
     assert(emptyKnownError instanceof HistoricalDataContractError, 'Empty known source should fail with contract error');
     assertEqual(emptyKnownError.code, 'HISTORICAL_MANIFEST_INVALID', 'Empty known source should have manifest error code');
 
     const fabricatedUnresolved = clone(HISTORICAL_DATA_MANIFEST);
-    fabricatedUnresolved.series.msci_eur.source = { status: 'unresolved', value: 'guessed-source' };
+    fabricatedUnresolved.series.global_equity_research_index.source = { status: 'unresolved', value: 'guessed-source' };
     const fabricatedError = captureError(() => validateHistoricalDataManifest(fabricatedUnresolved));
     assertEqual(fabricatedError?.code, 'HISTORICAL_MANIFEST_INVALID', 'Unresolved source with value should be rejected');
 
@@ -170,7 +176,11 @@ for (const seriesId of requiredSeries) {
     const inventorySeries = SIMULATION_DATA_INVENTORY.historicalSeries[seriesId];
     assert(inventorySeries, `${seriesId} should be linked into the wider data inventory`);
     assertEqual(inventorySeries.id, HISTORICAL_DATA_MANIFEST.series[seriesId].id, `${seriesId} inventory identity should match runtime manifest`);
-    assertEqual(inventorySeries.rawDataHash.status, 'unresolved', `${seriesId} should not invent an unavailable external raw-data hash`);
+    assertEqual(
+        inventorySeries.rawDataHash.status,
+        seriesId === 'global_equity_research_index' ? 'known' : 'unresolved',
+        `${seriesId} should reflect whether an external raw-data hash is available`
+    );
     assertEqual(inventorySeries.embeddedValueHash.status, 'known', `${seriesId} should have a series-specific embedded-value hash`);
     assert(Array.isArray(inventorySeries.qualitySegments), `${seriesId} should own quality segments`);
 }

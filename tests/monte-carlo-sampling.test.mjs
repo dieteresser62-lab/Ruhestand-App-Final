@@ -40,7 +40,7 @@ function createMockRng(sequence) {
 
     // Assertions: Result should be a data object from annualData
     assert(result, 'Should return a data object');
-    assert(typeof result.rendite === 'number', 'Should have rendite'); // NOT msci_eur
+    assert(typeof result.rendite === 'number', 'Should have rendite'); // sampled return, not an index level
     assert(result.regime, 'Should have regime');
 
     console.log('✅ Conditional Bootstrap logic execution works');

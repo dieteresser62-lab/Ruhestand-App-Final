@@ -338,10 +338,17 @@ for (const baseline of inventory.deltaBaselines) {
     assertEqual(
         gitBlobSha1(fs.readFileSync(absolutePath)),
         baseline.gitBlobSha1,
-        `${baseline.id} changed without a Slice-16 delta-ledger entry`
+        `${baseline.id} changed without declared delta evidence`
     );
-    assert(['none', 'none_after_build'].includes(baseline.expectedDelta),
-        `${baseline.id} must declare the expected Slice-16 delta`);
+    assert(['none', 'none_after_build', 'backtest_data_02'].includes(baseline.expectedDelta),
+        `${baseline.id} must declare its expected delta class`);
+    if (baseline.expectedDelta === 'backtest_data_02') {
+        assert(
+            typeof baseline.deltaEvidence === 'string'
+                && fs.existsSync(path.join(projectRoot, baseline.deltaEvidence)),
+            `${baseline.id} must link to Backtest-Data Slice 02 evidence`
+        );
+    }
 }
 
 console.log('Suite data integration contract tests passed');

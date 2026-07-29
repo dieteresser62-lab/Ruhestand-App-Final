@@ -116,11 +116,11 @@ commit-blocking.
 ## Historical market dataset (`app/simulator/simulator-data.js`)
 
 - Coverage: `1925-2025`
-- Estimated history segment: `1925-1949`
-- Baseline segment: `1950-2025`
+- Equity estimated/proxy segments: `1925-1950` and `2021-2025`
+- Equity provider-backtested segment: `1951-2020`
 - Machine-readable manifest: `HISTORICAL_DATA_MANIFEST`, schema `HistoricalDataManifestV1`
-- Dataset ID/revision: `ruhestandsapp-historical-data-v1` / `2026-07-18.1`
-- Canonical content hash: `8246422d98657c2a76b750ce9fd1253e01aa7a9a4dfa0f0f01dcb96b5507ef29`
+- Dataset ID/revision: `ruhestandsapp-historical-data-v1` / `2026-07-29.2`
+- Canonical content hash: `6e7facc781d4168e511881f9a0c7ab21d2a7f945078913fe2cd51138932c4494`
 - Hash algorithm: SHA-256 over canonical JSON (`sha256-canonical-json-v1`); year keys are numeric ascending, object fields lexical, and numbers are locale-independent JSON tokens.
 - Backtest lookback contract: four complete years before `startYear`; the contract-derived technical bounds are therefore `1929-2025`. The Backtest UI reads these bounds from the active provider, sets both year inputs dynamically, and validates against the same contract.
 
@@ -131,6 +131,13 @@ once per manifest revision/content hash, creates an immutable lookup of
 request or cohort batch. The productive historical backtest and its rolling
 cohorts consume this provider. Monte Carlo, sweep, optimizer and worker data
 paths remain separate and must not be described as manifest-backed holdouts.
+
+The canonical equity field is `global_equity_research_index`. Its generated
+source module is `app/simulator/global-equity-research-chain.js`; the filtered
+original and filtered inputs, hashes, attribution and separate data license live under
+`data/historical/global-equity-research-chain/`. Rebuild it with
+`npm run build:global-equity-data`. The chain is a 16-country research proxy,
+not an MSCI or other provider index.
 
 ### Manifest status terms
 
@@ -152,25 +159,25 @@ paths remain separate and must not be described as manifest-backed holdouts.
 
 | Series ID | Variant | Currency | Region | Frequency | Source | License | Transformation | Estimated segment | Missingness |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `msci_eur` | `unresolved` | EUR | global | annual | `unresolved` | `unresolved` | embedded levels; 1925-1949 rescaled to the 1950 bridge | 1925-1949 | required; reject missing/non-finite and non-positive levels |
+| `global_equity_research_index` | economically weighted research total-return proxy | USD proxy 1925-1950; German investor currency 1951-2020; EUR 2021-2025 | 16 advanced economies | annual | JST R6; OECD `DSD_STES@DF_FINMARK` 4.0; ECB `EXR` | derived data `CC BY-NC-SA 4.0`; OECD/ESCB terms also apply | generated prior-year economic weights; USD through 1950; German investor currency from 1951; documented price/dividend transformations | 1925-1950 and 2021-2025 | required; reject missing/non-finite and non-positive levels |
 | `inflation_de` | `unresolved` | not applicable | DE | annual | `unresolved` | `unresolved` | identity from embedded annual percentage | 1925-1949 | required; reject missing/non-finite |
 | `zinssatz_de` | `unresolved` | not applicable | DE | annual | `unresolved` | `unresolved` | identity from embedded annual percentage | 1925-1949 | required; reject missing/non-finite |
 | `lohn_de` | `unresolved` | not applicable | DE | annual | `unresolved` | `unresolved` | identity from embedded annual percentage | 1925-1949 | required; reject missing/non-finite |
 | `gold_eur_perf` | `unresolved` | EUR | global | annual | `unresolved` | `unresolved` | identity from embedded annual percentage | 1925-1949 | required; reject missing/non-finite; zero quality unresolved |
 | `cape` | `unresolved` | not applicable | `unresolved` | annual | `unresolved` | `unresolved` | identity from embedded annual ratio | 1925-1949 | required; reject missing/non-finite and non-positive ratios |
 
-All source and license statuses above are intentionally unresolved. The
-manifest improves traceability but is not evidence that external provenance,
-index variant, or usage rights have been established.
+The equity source, proxy identity, transformation and data license are
+resolved. The other five source and license statuses remain intentionally
+unresolved. A resolved source chain does not turn the derived equity proxy
+into an externally validated provider index.
 
 ### Simulation-wide data inventory
 
 `app/simulator/simulation-data-inventory.js` adds the wider, immutable
-`SimulationDataInventoryV1`, revision `2026-07-29.1`. The existing
+`SimulationDataInventoryV1`, revision `2026-07-29.3`. The existing
 `HistoricalDataManifestV1` remains the active runtime/backtest record contract;
 the wider inventory is an evidence and change gate around that runtime
-contract and the productively used static model-data classes. Slice 01 changes
-no embedded historical value and no financial formula.
+contract and the productively used static model-data classes.
 
 Each inventory entry carries:
 
@@ -194,7 +201,7 @@ The six historical entries own separate, contiguous `qualitySegments` for
 
 | Series | Current segment contract | Important gate |
 | --- | --- | --- |
-| `msci_eur` | 1925-1949 `estimated`; 1950-2023 `unresolved`; 2024-2025 separately `unresolved` | D-15 placeholder/inherited-level risk; source, return variant and license unresolved |
+| `global_equity_research_index` | 1925-1950 `proxy`; 1951-2020 `backtested`; 2021-2025 `estimated` | source chain is reproducible; 1950 stays in USD so the reconstructed German 1949/1950 factor is not a global return; the modern frozen-dividend model remains an explicit limitation |
 | `inflation_de` | 1925-1949 `estimated`; 1950-2023 `unresolved`; 2024-2025 separately `unresolved` | single German VPI identity, territory/method bridges and retrieval chain unresolved |
 | `zinssatz_de` | 1925-1949 `estimated`; 1950-1998 DM-era `unresolved`; 1999-2025 EUR-era `unresolved` | investable instrument, accrual and annualization conventions unresolved |
 | `lohn_de` | 1925-1949 `estimated`; 1950-2023 `unresolved`; 2024-2025 separately `unresolved` | nominal wage/pension-adjustment identity and D-20 reconciliation unresolved |
@@ -226,12 +233,13 @@ The source gate deliberately separates three questions:
    class.
 3. `replacementAllowed` is false until the external-validation gate passes.
 
-Therefore all six currently embedded historical series can continue to replay
-deterministically, but none may be described as externally validated or used
-as a licensed replacement source by this inventory. The later data-replacement
+Therefore all six historical series can replay deterministically. The equity
+entry now also has resolved source, license, retrieval and raw-data hashes, but
+its external-validation status remains `not_validated` because it is a
+research proxy with a modelled 2021-2025 dividend component. The other five
+series retain their unresolved replacement gates. Later data-replacement
 slices must update their exact series entry, raw-data and embedded-value
-hashes,
-segments, transformation and source/license evidence together.
+hashes, segments, transformation and source/license evidence together.
 
 ### Cross-domain model source snapshots
 
@@ -263,10 +271,10 @@ does not replace this runtime manifest and does not upgrade any field to
 
 | Open item | Current state | Required owner and next evidence | Blocking effect |
 | --- | --- | --- | --- |
-| exact `msci_eur` Price/Net/Gross-TR variant | `unresolved` | named data/capital-markets methodology owner; primary-source index identity, currency treatment, data vintage and license | blocks FQ-01 baseline and international comparison |
-| variants and primary sources for all six series | `unresolved` | exact series identifiers, definitions, retrieval/data dates and permitted source chain | blocks research-grade FV-G02 |
-| licenses/usage rights for all six series | `unresolved` | license text, use/redistribution scope and review date; legal review where needed | blocks replacement, integration or redistribution |
-| pre-1950 source and transformation chain | internal bridge/rescaling documented; external origin `unresolved` | raw-data hashes plus reproducible transformation and bridge evidence | 1925-1949 remain `estimated` and cannot be treated like baseline observations |
+| exact equity provider-index identity | intentionally not applicable: `global_equity_research_index` is a named research proxy | external methodology review may compare it with licensed provider indices without renaming the proxy | blocks claims of provider-index equivalence, not deterministic use |
+| variants and primary sources for the other five series | `unresolved` | exact series identifiers, definitions, retrieval/data dates and permitted source chain | blocks research-grade FV-G02 for those series |
+| licenses/usage rights for the other five series | `unresolved` | license text, use/redistribution scope and review date; legal review where needed | blocks their replacement, integration or redistribution |
+| equity proxy segments | original and filtered JST/OECD/ECB inputs, hashes and transformation resolved; 1925-1950 USD proxy and 2021-2025 frozen-dividend model | independent methodology validation and future dividend-source replacement | prevents provider-index and externally-validated claims |
 | zero-valued `gold_eur_perf` observations | 42 records with unresolved quality: 1925-1932, 1934-1960 and 1962-1968 | evidence whether each segment is genuine zero return, missing data or an assumption, followed by a new manifest revision | blocks gold-effect and holdout claims; values must not be silently reinterpreted |
 | CAPE region | `unresolved` | exact market/region and transformation contract | blocks international CAPE/policy comparison |
 
@@ -300,14 +308,16 @@ rejects non-finite required returns before portfolio mutation.
 
 ## Important notes
 
-- The `msci_eur` series is currently treated as an MSCI-World-EUR-like proxy.
-- The exact variant (`Price` vs `Net TR` vs `Gross TR`) is not yet fully documented in code history.
-- Years `1925-1949` are normalized to connect to the 1950 base level.
-- Monte Carlo now supports excluding estimated years via `mcExcludeEstimatedHistory`.
+- `global_equity_research_index` is a neutral research proxy and must not be
+  displayed or exported as an MSCI series.
+- The 2021-2025 OECD component is a price index; the dividend component is the
+  country-specific JST 2020 dividend return held constant by construction.
+- Monte Carlo supports excluding observations marked estimated via
+  `mcExcludeEstimatedHistory`.
 
 ## Series overview
 
-- `msci_eur`: equity index level proxy (undocumented exact index variant)
+- `global_equity_research_index`: open, segmented global equity research index level
 - `inflation_de`: annual German inflation proxy
 - `zinssatz_de`: annual German rate proxy
 - `lohn_de`: annual wage growth proxy
@@ -316,6 +326,8 @@ rejects non-finite required returns before portfolio mutation.
 
 ## Follow-up actions
 
-- Document the exact MSCI variant with a primary source.
-- Add explicit source references for pre-1950 extension methodology.
+- Independently validate the weighting and currency methodology of the equity
+  research proxy.
+- Replace the frozen 2020 dividend component when an open observed
+  total-return source for 2021-2025 becomes available.
 - Clarify zero values in early `gold_eur_perf` years (`no data` vs `assumed 0`).

@@ -4,9 +4,14 @@
  *          Includes historical market data (1925-2025), mortality tables,
  *          care grades/probabilities, and stress test presets.
  * Usage: Imported by various simulator modules (historical, stress, etc.).
- * Dependencies: None (pure data)
+ * Dependencies: generated global equity research-chain data
  */
 "use strict";
+
+import {
+  GLOBAL_EQUITY_RESEARCH_ANNUAL_RETURNS,
+  GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS
+} from './global-equity-research-chain.js';
 
 // --- DATA & CONFIG ---
 
@@ -30,6 +35,20 @@ const ESTIMATED_HISTORY_SEGMENTS = Object.freeze([
     note: 'Embedded pre-1950 extension; exact external source chain remains unresolved.'
   })
 ]);
+const GLOBAL_EQUITY_ESTIMATED_SEGMENTS = Object.freeze([
+  Object.freeze({
+    startYear: 1925,
+    endYear: 1950,
+    qualityStatus: 'estimated',
+    note: 'Open JST total-return research proxy in USD through the 1950 return; not a provider index or German-investor-currency series.'
+  }),
+  Object.freeze({
+    startYear: 2021,
+    endYear: 2025,
+    qualityStatus: 'estimated',
+    note: 'Open OECD price return plus frozen country-level JST 2020 dividend return, converted with ECB reference rates.'
+  })
+]);
 
 function historicalSeriesManifest({
   id,
@@ -39,6 +58,9 @@ function historicalSeriesManifest({
   currency,
   region,
   transformation,
+  source = { status: 'unresolved', value: null },
+  license = { status: 'unresolved', value: null },
+  estimatedSegments = ESTIMATED_HISTORY_SEGMENTS,
   zeroValuePolicy = 'literal_value'
 }) {
   return {
@@ -50,17 +72,17 @@ function historicalSeriesManifest({
     region,
     frequency: { status: 'known', value: 'annual' },
     period: HISTORICAL_PERIOD,
-    source: { status: 'unresolved', value: null },
-    license: { status: 'unresolved', value: null },
+    source,
+    license,
     transformation,
-    estimatedSegments: ESTIMATED_HISTORY_SEGMENTS,
+    estimatedSegments,
     missingness: {
       required: true,
       rule: 'reject_missing_or_non_finite',
       fallbackZeroSegments: [],
       zeroValuePolicy
     },
-    revision: '2026-07-18.1'
+    revision: '2026-07-29.2'
   };
 }
 
@@ -73,7 +95,7 @@ function historicalSeriesManifest({
 export const HISTORICAL_DATA_MANIFEST = deepFreezeDataMetadata({
   schemaVersion: 'HistoricalDataManifestV1',
   datasetId: 'ruhestandsapp-historical-data-v1',
-  revision: '2026-07-18.1',
+  revision: '2026-07-29.2',
   period: HISTORICAL_PERIOD,
   lookback: {
     backtestYears: 4,
@@ -81,21 +103,33 @@ export const HISTORICAL_DATA_MANIFEST = deepFreezeDataMetadata({
   },
   contentHash: {
     algorithm: 'sha256-canonical-json-v1',
-    value: '8246422d98657c2a76b750ce9fd1253e01aa7a9a4dfa0f0f01dcb96b5507ef29'
+    value: '6e7facc781d4168e511881f9a0c7ab21d2a7f945078913fe2cd51138932c4494'
   },
   documentation: 'docs/reference/DATA_SOURCES.md',
   series: {
-    msci_eur: historicalSeriesManifest({
-      id: 'msci_eur',
-      label: 'MSCI World EUR-like index level',
+    global_equity_research_index: historicalSeriesManifest({
+      id: 'global_equity_research_index',
+      label: 'Open global equity research total-return index level',
       unit: 'index_level',
-      variant: { status: 'unresolved', value: null },
-      currency: { status: 'known', value: 'EUR' },
-      region: { status: 'known', value: 'global' },
+      variant: { status: 'known', value: 'economically_weighted_research_total_return_proxy' },
+      currency: {
+        status: 'known',
+        value: 'USD proxy 1925-1950; German investor currency 1951-2020; EUR 2021-2025'
+      },
+      region: { status: 'known', value: '16 advanced economies' },
+      source: {
+        status: 'known',
+        value: 'JST Macrohistory Database R6; OECD DSD_STES@DF_FINMARK 4.0; ECB EXR'
+      },
+      license: {
+        status: 'known',
+        value: 'Derived data: CC BY-NC-SA 4.0; OECD and ESCB source terms also apply'
+      },
       transformation: {
         status: 'known',
-        value: 'Embedded levels; 1925-1949 are rescaled at module initialization to connect to the 1950 level.'
-      }
+        value: 'Prior-year economic weights; JST total returns in USD through 1950 and German investor currency from 1951 through 2020; OECD December price return plus frozen JST 2020 dividend return and ECB conversion for 2021-2025.'
+      },
+      estimatedSegments: GLOBAL_EQUITY_ESTIMATED_SEGMENTS
     }),
     inflation_de: historicalSeriesManifest({
       id: 'inflation_de',
@@ -159,14 +193,15 @@ export const DATASET_META = Object.freeze({
     estimatedYears: [ESTIMATED_HISTORY_MIN_YEAR, ESTIMATED_HISTORY_MAX_YEAR],
     estimatedHistoryCutoffYear: ESTIMATED_HISTORY_CUTOFF_YEAR,
     notes: [
-      'Years 1925-1949 are normalized to connect to the 1950 level.',
-      'Use the Monte Carlo setting "exclude estimated history" to drop years < 1950 from sampling.'
+      'Equity years 1925-1950 are an explicit USD research proxy; the German investor-currency conversion starts with the 1951 return.',
+      'Equity years 2021-2025 use observed OECD price components and a modelled dividend component.',
+      'Use the Monte Carlo setting "exclude estimated history" to omit observations marked estimated.'
     ],
     series: {
-      msci_eur: {
-        label: 'MSCI World EUR-like index level',
-        variantStatus: 'undocumented',
-        sourceStatus: 'partially_estimated_pre_1950'
+      global_equity_research_index: {
+        label: 'Open global equity research total-return index level',
+        variantStatus: 'documented_research_proxy',
+        sourceStatus: 'open_segmented_source_chain'
       },
       inflation_de: {
         label: 'German CPI inflation (annual)',
@@ -252,139 +287,117 @@ export const REGIME_CLASSIFICATION_THRESHOLDS = Object.freeze({
 /**
  * Historische Marktdaten (1925-2025)
  *
- * Hinweis zu `msci_eur`:
- * - Die Index-Variante (Price vs. Net vs. Gross Total Return) ist aktuell
- *   nicht dokumentiert.
- * - Die CAGR der Reihe (1978-2025) liegt bei ~7.8%, was eher zu einem
- *   Price Index passt (Total Return waere typischerweise ~10%+ in EUR).
- * - Im Zweifel ist das konservativ; bitte Quelle/Variante dokumentieren,
- *   sobald bekannt (z.B. MSCI World Index EUR Price/Net/Gross).
- *
- * Erweiterung 1925-1949:
- * - Diese Jahre dienen als "Schwarze-Schwan"-Phase (Depression/Kriegsjahre).
- * - Empfehlung: per Startjahr-Filter oder Recency-Gewichtung seltener ziehen.
- * - Die MSCI-Levels werden auf die 1950-Basis skaliert, um Spruenge zu vermeiden.
- * - Stress-Presets nutzen die Phase fuer Great Depression und Zweiter Weltkrieg.
+ * Hinweis zu `global_equity_research_index`:
+ * - Offene, wirtschaftsgewichtete Forschungsproxyreihe; kein Anbieterindex.
+ * - 1925-1950: JST-Total-Returns als USD-Waehrungsproxy.
+ * - 1951-2020: JST-Total-Returns in deutscher Anlegerwaehrung.
+ * - 2021-2025: OECD-Price-Komponente plus modellierter JST-2020-
+ *   Dividendenbaustein, mit EZB-Kursen in EUR umgerechnet.
+ * - Quelle der Levelwerte ist ausschliesslich das generierte Datenmodul.
  */
 export const HISTORICAL_DATA = {
-  1925: { msci_eur: 9.49, inflation_de: 2.5, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 10 },
-  1926: { msci_eur: 8.5, inflation_de: 1.1, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 11.7 },
-  1927: { msci_eur: 12.21, inflation_de: -1.7, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 17.5 },
-  1928: { msci_eur: 17.54, inflation_de: -1.2, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 24.8 },
-  1929: { msci_eur: 16.06, inflation_de: 0, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 32.6 },
-  1930: { msci_eur: 12.06, inflation_de: -2.3, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 21 },
-  1931: { msci_eur: 6.83, inflation_de: -9, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 12.3 },
-  1932: { msci_eur: 6.27, inflation_de: -9.9, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 5.6 },
-  1933: { msci_eur: 9.66, inflation_de: -5.1, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 69, cape: 10.3 },
-  1934: { msci_eur: 9.52, inflation_de: 3.1, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 11.3 },
-  1935: { msci_eur: 14.06, inflation_de: 2.2, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 14 },
-  1936: { msci_eur: 18.83, inflation_de: 1.5, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 18.2 },
-  1937: { msci_eur: 12.23, inflation_de: 3.6, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 14.2 },
-  1938: { msci_eur: 16.04, inflation_de: -2.1, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 11 },
-  1939: { msci_eur: 15.97, inflation_de: -1.4, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 12 },
-  1940: { msci_eur: 14.41, inflation_de: 0.7, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 10.2 },
-  1941: { msci_eur: 12.74, inflation_de: 5, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 10.2 },
-  1942: { msci_eur: 15.33, inflation_de: 10.9, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 8.4 },
-  1943: { msci_eur: 19.3, inflation_de: 6.1, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 10.3 },
-  1944: { msci_eur: 23.11, inflation_de: 1.7, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 11.2 },
-  1945: { msci_eur: 31.53, inflation_de: 2.3, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 11.9 },
-  1946: { msci_eur: 28.99, inflation_de: 8.3, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 15.2 },
-  1947: { msci_eur: 30.65, inflation_de: 14.4, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 10.8 },
-  1948: { msci_eur: 32.34, inflation_de: 8.1, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 9.3 },
-  1949: { msci_eur: 38.42, inflation_de: -1.2, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 9.1 },
-  1950: { msci_eur: 4.68, inflation_de: -0.6, zinssatz_de: 4.0, lohn_de: 12.0, gold_eur_perf: 0.0, cape: 10.8 },
-  1951: { msci_eur: 6.16, inflation_de: 7.6, zinssatz_de: 6.0, lohn_de: 14.0, gold_eur_perf: 0.0, cape: 11.8 },
-  1952: { msci_eur: 7.64, inflation_de: 2.1, zinssatz_de: 5.0, lohn_de: 8.0, gold_eur_perf: 0.0, cape: 12.3 },
-  1953: { msci_eur: 9.05, inflation_de: -1.7, zinssatz_de: 3.5, lohn_de: 6.0, gold_eur_perf: 0.0, cape: 11.5 },
-  1954: { msci_eur: 8.96, inflation_de: 0.2, zinssatz_de: 3.0, lohn_de: 5.0, gold_eur_perf: 0.0, cape: 14.5 },
-  1955: { msci_eur: 13.68, inflation_de: 1.2, zinssatz_de: 3.5, lohn_de: 7.0, gold_eur_perf: 0.0, cape: 18.6 },
-  1956: { msci_eur: 17.99, inflation_de: 2.9, zinssatz_de: 5.0, lohn_de: 8.5, gold_eur_perf: 0.0, cape: 18.3 },
-  1957: { msci_eur: 19.18, inflation_de: 4.5, zinssatz_de: 4.0, lohn_de: 8.0, gold_eur_perf: 0.0, cape: 15.4 },
-  1958: { msci_eur: 17.11, inflation_de: 2.3, zinssatz_de: 3.0, lohn_de: 6.5, gold_eur_perf: 0.0, cape: 18.9 },
-  1959: { msci_eur: 24.54, inflation_de: 0.9, zinssatz_de: 4.0, lohn_de: 5.5, gold_eur_perf: 0.0, cape: 19.6 },
-  1960: { msci_eur: 27.49, inflation_de: 1.5, zinssatz_de: 4.0, lohn_de: 9.0, gold_eur_perf: 0.0, cape: 18.2 },
-  1961: { msci_eur: 27.63, inflation_de: 2.3, zinssatz_de: 3.0, lohn_de: 10.0, gold_eur_perf: -4.8, cape: 21.3 },
-  1962: { msci_eur: 33.40, inflation_de: 3.0, zinssatz_de: 3.0, lohn_de: 8.5, gold_eur_perf: 0.0, cape: 17.5 },
-  1963: { msci_eur: 30.50, inflation_de: 3.0, zinssatz_de: 3.0, lohn_de: 7.0, gold_eur_perf: 0.0, cape: 20.8 },
-  1964: { msci_eur: 37.45, inflation_de: 2.3, zinssatz_de: 3.0, lohn_de: 8.0, gold_eur_perf: 0.0, cape: 22.2 },
-  1965: { msci_eur: 43.63, inflation_de: 3.4, zinssatz_de: 4.0, lohn_de: 9.0, gold_eur_perf: 0.0, cape: 23.8 },
-  1966: { msci_eur: 49.09, inflation_de: 3.7, zinssatz_de: 5.0, lohn_de: 7.0, gold_eur_perf: 0.0, cape: 19.9 },
-  1967: { msci_eur: 44.13, inflation_de: 1.5, zinssatz_de: 3.0, lohn_de: 3.5, gold_eur_perf: 0.0, cape: 21.5 },
-  1968: { msci_eur: 54.72, inflation_de: 1.5, zinssatz_de: 3.0, lohn_de: 6.0, gold_eur_perf: 0.0, cape: 22.4 },
-  1969: { msci_eur: 60.8, inflation_de: 1.9, zinssatz_de: 6, lohn_de: 9.8, gold_eur_perf: -8.5, cape: 16.9 },
-  1970: { msci_eur: 60.9, inflation_de: 3.4, zinssatz_de: 7.5, lohn_de: 12.6, gold_eur_perf: 4.3, cape: 15.6 },
-  1971: { msci_eur: 72.4, inflation_de: 5.3, zinssatz_de: 5, lohn_de: 10.5, gold_eur_perf: 19.8, cape: 17.2 },
-  1972: { msci_eur: 88.4, inflation_de: 5.5, zinssatz_de: 4, lohn_de: 9.1, gold_eur_perf: 47.2, cape: 18.8 },
-  1973: { msci_eur: 74.4, inflation_de: 7.1, zinssatz_de: 7, lohn_de: 10.2, gold_eur_perf: 68.5, cape: 18.7 },
-  1974: { msci_eur: 53.6, inflation_de: 7, zinssatz_de: 6, lohn_de: 10.8, gold_eur_perf: 70.1, cape: 14.3 },
-  1975: { msci_eur: 71, inflation_de: 6, zinssatz_de: 4.5, lohn_de: 7.2, gold_eur_perf: -25.8, cape: 9.3 },
-  1976: { msci_eur: 72.6, inflation_de: 4.3, zinssatz_de: 3.5, lohn_de: 7.3, gold_eur_perf: -1.5, cape: 10.6 },
-  1977: { msci_eur: 67.1, inflation_de: 3.7, zinssatz_de: 3, lohn_de: 7.1, gold_eur_perf: 22.4, cape: 10.6 },
-  1978: { msci_eur: 77.7, inflation_de: 2.7, zinssatz_de: 3, lohn_de: 5.4, gold_eur_perf: 35.7, cape: 9.2 },
-  1979: { msci_eur: 79.2, inflation_de: 4.1, zinssatz_de: 5, lohn_de: 6.2, gold_eur_perf: 126.3, cape: 8.8 },
-  1980: { msci_eur: 97.8, inflation_de: 5.5, zinssatz_de: 8.5, lohn_de: 6.6, gold_eur_perf: -6.2, cape: 7.3 },
-  1981: { msci_eur: 91.2, inflation_de: 6.3, zinssatz_de: 10.5, lohn_de: 4.8, gold_eur_perf: -20.8, cape: 8.5 },
-  1982: { msci_eur: 90.7, inflation_de: 5.3, zinssatz_de: 7.5, lohn_de: 4.2, gold_eur_perf: 18.9, cape: 7.4 },
-  1983: { msci_eur: 110.8, inflation_de: 3.3, zinssatz_de: 5.5, lohn_de: 3.7, gold_eur_perf: -18.9, cape: 8.8 },
-  1984: { msci_eur: 114.5, inflation_de: 2.4, zinssatz_de: 5.5, lohn_de: 3.4, gold_eur_perf: -15.4, cape: 10.5 },
-  1985: { msci_eur: 164.3, inflation_de: 2.2, zinssatz_de: 5.5, lohn_de: 3.7, gold_eur_perf: 12.7, cape: 10.1 },
-  1986: { msci_eur: 206.5, inflation_de: -0.1, zinssatz_de: 4.5, lohn_de: 4.1, gold_eur_perf: 24.1, cape: 12.8 },
-  1987: { msci_eur: 227.1, inflation_de: 0.2, zinssatz_de: 3.5, lohn_de: 3.2, gold_eur_perf: 1.8, cape: 16.8 },
-  1988: { msci_eur: 274.6, inflation_de: 1.3, zinssatz_de: 4, lohn_de: 3.8, gold_eur_perf: -12.4, cape: 15.3 },
-  1989: { msci_eur: 326.8, inflation_de: 2.8, zinssatz_de: 7, lohn_de: 3.9, gold_eur_perf: -2.4, cape: 15.2 },
-  1990: { msci_eur: 274, inflation_de: 2.7, zinssatz_de: 8, lohn_de: 5.8, gold_eur_perf: -7.8, cape: 17.5 },
-  1991: { msci_eur: 317.9, inflation_de: 3.5, zinssatz_de: 8.5, lohn_de: 6.7, gold_eur_perf: -6.1, cape: 15.9 },
-  1992: { msci_eur: 300, inflation_de: 5.1, zinssatz_de: 9.5, lohn_de: 5.7, gold_eur_perf: -5.8, cape: 19.6 },
-  1993: { msci_eur: 376.1, inflation_de: 4.5, zinssatz_de: 7.25, lohn_de: 3.3, gold_eur_perf: 20.1, cape: 20.8 },
-  1994: { msci_eur: 382.7, inflation_de: 2.7, zinssatz_de: 5, lohn_de: 2.4, gold_eur_perf: -2.3, cape: 21.3 },
-  1995: { msci_eur: 450.4, inflation_de: 1.7, zinssatz_de: 4, lohn_de: 3.5, gold_eur_perf: 0.6, cape: 21.1 },
-  1996: { msci_eur: 505.7, inflation_de: 1.4, zinssatz_de: 3, lohn_de: 2.2, gold_eur_perf: -6.9, cape: 25.4 },
-  1997: { msci_eur: 590, inflation_de: 1.9, zinssatz_de: 3, lohn_de: 1.9, gold_eur_perf: -20.7, cape: 28.3 },
-  1998: { msci_eur: 758.3, inflation_de: 0.9, zinssatz_de: 3, lohn_de: 2.8, gold_eur_perf: 0.9, cape: 32.6 },
-  1999: { msci_eur: 958.4, inflation_de: 0.6, zinssatz_de: 2.5, lohn_de: 2.7, gold_eur_perf: -0.6, cape: 40.6 },
-  2000: { msci_eur: 823.1, inflation_de: 1.4, zinssatz_de: 4.25, lohn_de: 2.5, gold_eur_perf: -2.7, cape: 43.8 },
-  2001: { msci_eur: 675.2, inflation_de: 2.1, zinssatz_de: 3.75, lohn_de: 1.9, gold_eur_perf: 4.3, cape: 36.8 },
-  2002: { msci_eur: 462.8, inflation_de: 1.3, zinssatz_de: 2.75, lohn_de: 2.1, gold_eur_perf: 19.4, cape: 29.9 },
-  2003: { msci_eur: 511, inflation_de: 1, zinssatz_de: 2, lohn_de: 1.2, gold_eur_perf: 11.7, cape: 22.9 },
-  2004: { msci_eur: 565.6, inflation_de: 1.7, zinssatz_de: 2, lohn_de: 1.1, gold_eur_perf: 2.2, cape: 27.1 },
-  2005: { msci_eur: 724, inflation_de: 1.5, zinssatz_de: 2.1, lohn_de: 0.8, gold_eur_perf: 22.3, cape: 26.5 },
-  2006: { msci_eur: 825, inflation_de: 1.8, zinssatz_de: 3, lohn_de: 1.6, gold_eur_perf: 17.3, cape: 26.0 },
-  2007: { msci_eur: 842.2, inflation_de: 2.3, zinssatz_de: 4, lohn_de: 2.8, gold_eur_perf: 2.1, cape: 27.2 },
-  2008: { msci_eur: 462.6, inflation_de: 2.8, zinssatz_de: 3.25, lohn_de: 3.4, gold_eur_perf: 2.7, cape: 24.0 },
-  2009: { msci_eur: 609.4, inflation_de: 0.2, zinssatz_de: 1, lohn_de: 0.8, gold_eur_perf: 17.2, cape: 15.2 },
-  2010: { msci_eur: 687.9, inflation_de: 1.1, zinssatz_de: 1, lohn_de: 2.3, gold_eur_perf: 34.9, cape: 20.3 },
-  2011: { msci_eur: 634.3, inflation_de: 2.5, zinssatz_de: 1.25, lohn_de: 3.9, gold_eur_perf: 7.6, cape: 23.0 },
-  2012: { msci_eur: 726.6, inflation_de: 2.1, zinssatz_de: 0.75, lohn_de: 2.9, gold_eur_perf: 4, cape: 21.1 },
-  2013: { msci_eur: 898, inflation_de: 1.6, zinssatz_de: 0.25, lohn_de: 2.4, gold_eur_perf: -22.8, cape: 21.3 },
-  2014: { msci_eur: 1062.5, inflation_de: 0.9, zinssatz_de: 0.05, lohn_de: 2.8, gold_eur_perf: -0.6, cape: 25.0 },
-  2015: { msci_eur: 1159.2, inflation_de: 0.7, zinssatz_de: 0.05, lohn_de: 2.9, gold_eur_perf: -10, cape: 27.2 },
-  2016: { msci_eur: 1248, inflation_de: 0.4, zinssatz_de: 0, lohn_de: 2.5, gold_eur_perf: 11.7, cape: 25.6 },
-  2017: { msci_eur: 1329.8, inflation_de: 1.7, zinssatz_de: 0, lohn_de: 2.6, gold_eur_perf: -0.4, cape: 28.1 },
-  2018: { msci_eur: 1268.4, inflation_de: 1.9, zinssatz_de: 0, lohn_de: 3.1, gold_eur_perf: -4.3, cape: 32.3 },
-  2019: { msci_eur: 1619.5, inflation_de: 1.4, zinssatz_de: 0, lohn_de: 2.8, gold_eur_perf: 19.4, cape: 29.3 },
-  2020: { msci_eur: 1706.7, inflation_de: 0.5, zinssatz_de: -0.5, lohn_de: 1.2, gold_eur_perf: 13.9, cape: 31.0 },
-  2021: { msci_eur: 2260.4, inflation_de: 3.1, zinssatz_de: -0.5, lohn_de: 3, gold_eur_perf: -5.2, cape: 34.5 },
-  2022: { msci_eur: 1960.9, inflation_de: 6.9, zinssatz_de: 1.25, lohn_de: 4, gold_eur_perf: 5.7, cape: 37.0 },
-  2023: { msci_eur: 2318.9, inflation_de: 5.9, zinssatz_de: 3.5, lohn_de: 6, gold_eur_perf: 12.1, cape: 28.3 },
-  2024: { msci_eur: 2500, inflation_de: 2.5, zinssatz_de: 3.75, lohn_de: 3, gold_eur_perf: 15, cape: 31.0 },
-  2025: { msci_eur: 2633.8, inflation_de: 2.2, zinssatz_de: 2.0, lohn_de: 4.2, gold_eur_perf: 47.6, cape: 37.1 }
+  1925: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1925], inflation_de: 2.5, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 10 },
+  1926: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1926], inflation_de: 1.1, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 11.7 },
+  1927: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1927], inflation_de: -1.7, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 17.5 },
+  1928: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1928], inflation_de: -1.2, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 24.8 },
+  1929: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1929], inflation_de: 0, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 32.6 },
+  1930: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1930], inflation_de: -2.3, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 21 },
+  1931: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1931], inflation_de: -9, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 12.3 },
+  1932: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1932], inflation_de: -9.9, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 5.6 },
+  1933: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1933], inflation_de: -5.1, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 69, cape: 10.3 },
+  1934: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1934], inflation_de: 3.1, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 11.3 },
+  1935: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1935], inflation_de: 2.2, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 14 },
+  1936: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1936], inflation_de: 1.5, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 18.2 },
+  1937: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1937], inflation_de: 3.6, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 14.2 },
+  1938: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1938], inflation_de: -2.1, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 11 },
+  1939: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1939], inflation_de: -1.4, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 12 },
+  1940: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1940], inflation_de: 0.7, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 10.2 },
+  1941: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1941], inflation_de: 5, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 10.2 },
+  1942: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1942], inflation_de: 10.9, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 8.4 },
+  1943: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1943], inflation_de: 6.1, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 10.3 },
+  1944: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1944], inflation_de: 1.7, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 11.2 },
+  1945: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1945], inflation_de: 2.3, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 11.9 },
+  1946: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1946], inflation_de: 8.3, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 15.2 },
+  1947: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1947], inflation_de: 14.4, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 10.8 },
+  1948: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1948], inflation_de: 8.1, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 9.3 },
+  1949: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1949], inflation_de: -1.2, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 9.1 },
+  1950: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1950], inflation_de: -0.6, zinssatz_de: 4.0, lohn_de: 12.0, gold_eur_perf: 0.0, cape: 10.8 },
+  1951: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1951], inflation_de: 7.6, zinssatz_de: 6.0, lohn_de: 14.0, gold_eur_perf: 0.0, cape: 11.8 },
+  1952: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1952], inflation_de: 2.1, zinssatz_de: 5.0, lohn_de: 8.0, gold_eur_perf: 0.0, cape: 12.3 },
+  1953: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1953], inflation_de: -1.7, zinssatz_de: 3.5, lohn_de: 6.0, gold_eur_perf: 0.0, cape: 11.5 },
+  1954: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1954], inflation_de: 0.2, zinssatz_de: 3.0, lohn_de: 5.0, gold_eur_perf: 0.0, cape: 14.5 },
+  1955: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1955], inflation_de: 1.2, zinssatz_de: 3.5, lohn_de: 7.0, gold_eur_perf: 0.0, cape: 18.6 },
+  1956: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1956], inflation_de: 2.9, zinssatz_de: 5.0, lohn_de: 8.5, gold_eur_perf: 0.0, cape: 18.3 },
+  1957: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1957], inflation_de: 4.5, zinssatz_de: 4.0, lohn_de: 8.0, gold_eur_perf: 0.0, cape: 15.4 },
+  1958: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1958], inflation_de: 2.3, zinssatz_de: 3.0, lohn_de: 6.5, gold_eur_perf: 0.0, cape: 18.9 },
+  1959: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1959], inflation_de: 0.9, zinssatz_de: 4.0, lohn_de: 5.5, gold_eur_perf: 0.0, cape: 19.6 },
+  1960: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1960], inflation_de: 1.5, zinssatz_de: 4.0, lohn_de: 9.0, gold_eur_perf: 0.0, cape: 18.2 },
+  1961: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1961], inflation_de: 2.3, zinssatz_de: 3.0, lohn_de: 10.0, gold_eur_perf: -4.8, cape: 21.3 },
+  1962: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1962], inflation_de: 3.0, zinssatz_de: 3.0, lohn_de: 8.5, gold_eur_perf: 0.0, cape: 17.5 },
+  1963: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1963], inflation_de: 3.0, zinssatz_de: 3.0, lohn_de: 7.0, gold_eur_perf: 0.0, cape: 20.8 },
+  1964: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1964], inflation_de: 2.3, zinssatz_de: 3.0, lohn_de: 8.0, gold_eur_perf: 0.0, cape: 22.2 },
+  1965: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1965], inflation_de: 3.4, zinssatz_de: 4.0, lohn_de: 9.0, gold_eur_perf: 0.0, cape: 23.8 },
+  1966: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1966], inflation_de: 3.7, zinssatz_de: 5.0, lohn_de: 7.0, gold_eur_perf: 0.0, cape: 19.9 },
+  1967: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1967], inflation_de: 1.5, zinssatz_de: 3.0, lohn_de: 3.5, gold_eur_perf: 0.0, cape: 21.5 },
+  1968: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1968], inflation_de: 1.5, zinssatz_de: 3.0, lohn_de: 6.0, gold_eur_perf: 0.0, cape: 22.4 },
+  1969: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1969], inflation_de: 1.9, zinssatz_de: 6, lohn_de: 9.8, gold_eur_perf: -8.5, cape: 16.9 },
+  1970: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1970], inflation_de: 3.4, zinssatz_de: 7.5, lohn_de: 12.6, gold_eur_perf: 4.3, cape: 15.6 },
+  1971: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1971], inflation_de: 5.3, zinssatz_de: 5, lohn_de: 10.5, gold_eur_perf: 19.8, cape: 17.2 },
+  1972: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1972], inflation_de: 5.5, zinssatz_de: 4, lohn_de: 9.1, gold_eur_perf: 47.2, cape: 18.8 },
+  1973: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1973], inflation_de: 7.1, zinssatz_de: 7, lohn_de: 10.2, gold_eur_perf: 68.5, cape: 18.7 },
+  1974: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1974], inflation_de: 7, zinssatz_de: 6, lohn_de: 10.8, gold_eur_perf: 70.1, cape: 14.3 },
+  1975: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1975], inflation_de: 6, zinssatz_de: 4.5, lohn_de: 7.2, gold_eur_perf: -25.8, cape: 9.3 },
+  1976: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1976], inflation_de: 4.3, zinssatz_de: 3.5, lohn_de: 7.3, gold_eur_perf: -1.5, cape: 10.6 },
+  1977: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1977], inflation_de: 3.7, zinssatz_de: 3, lohn_de: 7.1, gold_eur_perf: 22.4, cape: 10.6 },
+  1978: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1978], inflation_de: 2.7, zinssatz_de: 3, lohn_de: 5.4, gold_eur_perf: 35.7, cape: 9.2 },
+  1979: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1979], inflation_de: 4.1, zinssatz_de: 5, lohn_de: 6.2, gold_eur_perf: 126.3, cape: 8.8 },
+  1980: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1980], inflation_de: 5.5, zinssatz_de: 8.5, lohn_de: 6.6, gold_eur_perf: -6.2, cape: 7.3 },
+  1981: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1981], inflation_de: 6.3, zinssatz_de: 10.5, lohn_de: 4.8, gold_eur_perf: -20.8, cape: 8.5 },
+  1982: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1982], inflation_de: 5.3, zinssatz_de: 7.5, lohn_de: 4.2, gold_eur_perf: 18.9, cape: 7.4 },
+  1983: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1983], inflation_de: 3.3, zinssatz_de: 5.5, lohn_de: 3.7, gold_eur_perf: -18.9, cape: 8.8 },
+  1984: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1984], inflation_de: 2.4, zinssatz_de: 5.5, lohn_de: 3.4, gold_eur_perf: -15.4, cape: 10.5 },
+  1985: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1985], inflation_de: 2.2, zinssatz_de: 5.5, lohn_de: 3.7, gold_eur_perf: 12.7, cape: 10.1 },
+  1986: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1986], inflation_de: -0.1, zinssatz_de: 4.5, lohn_de: 4.1, gold_eur_perf: 24.1, cape: 12.8 },
+  1987: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1987], inflation_de: 0.2, zinssatz_de: 3.5, lohn_de: 3.2, gold_eur_perf: 1.8, cape: 16.8 },
+  1988: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1988], inflation_de: 1.3, zinssatz_de: 4, lohn_de: 3.8, gold_eur_perf: -12.4, cape: 15.3 },
+  1989: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1989], inflation_de: 2.8, zinssatz_de: 7, lohn_de: 3.9, gold_eur_perf: -2.4, cape: 15.2 },
+  1990: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1990], inflation_de: 2.7, zinssatz_de: 8, lohn_de: 5.8, gold_eur_perf: -7.8, cape: 17.5 },
+  1991: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1991], inflation_de: 3.5, zinssatz_de: 8.5, lohn_de: 6.7, gold_eur_perf: -6.1, cape: 15.9 },
+  1992: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1992], inflation_de: 5.1, zinssatz_de: 9.5, lohn_de: 5.7, gold_eur_perf: -5.8, cape: 19.6 },
+  1993: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1993], inflation_de: 4.5, zinssatz_de: 7.25, lohn_de: 3.3, gold_eur_perf: 20.1, cape: 20.8 },
+  1994: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1994], inflation_de: 2.7, zinssatz_de: 5, lohn_de: 2.4, gold_eur_perf: -2.3, cape: 21.3 },
+  1995: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1995], inflation_de: 1.7, zinssatz_de: 4, lohn_de: 3.5, gold_eur_perf: 0.6, cape: 21.1 },
+  1996: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1996], inflation_de: 1.4, zinssatz_de: 3, lohn_de: 2.2, gold_eur_perf: -6.9, cape: 25.4 },
+  1997: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1997], inflation_de: 1.9, zinssatz_de: 3, lohn_de: 1.9, gold_eur_perf: -20.7, cape: 28.3 },
+  1998: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1998], inflation_de: 0.9, zinssatz_de: 3, lohn_de: 2.8, gold_eur_perf: 0.9, cape: 32.6 },
+  1999: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[1999], inflation_de: 0.6, zinssatz_de: 2.5, lohn_de: 2.7, gold_eur_perf: -0.6, cape: 40.6 },
+  2000: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[2000], inflation_de: 1.4, zinssatz_de: 4.25, lohn_de: 2.5, gold_eur_perf: -2.7, cape: 43.8 },
+  2001: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[2001], inflation_de: 2.1, zinssatz_de: 3.75, lohn_de: 1.9, gold_eur_perf: 4.3, cape: 36.8 },
+  2002: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[2002], inflation_de: 1.3, zinssatz_de: 2.75, lohn_de: 2.1, gold_eur_perf: 19.4, cape: 29.9 },
+  2003: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[2003], inflation_de: 1, zinssatz_de: 2, lohn_de: 1.2, gold_eur_perf: 11.7, cape: 22.9 },
+  2004: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[2004], inflation_de: 1.7, zinssatz_de: 2, lohn_de: 1.1, gold_eur_perf: 2.2, cape: 27.1 },
+  2005: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[2005], inflation_de: 1.5, zinssatz_de: 2.1, lohn_de: 0.8, gold_eur_perf: 22.3, cape: 26.5 },
+  2006: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[2006], inflation_de: 1.8, zinssatz_de: 3, lohn_de: 1.6, gold_eur_perf: 17.3, cape: 26.0 },
+  2007: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[2007], inflation_de: 2.3, zinssatz_de: 4, lohn_de: 2.8, gold_eur_perf: 2.1, cape: 27.2 },
+  2008: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[2008], inflation_de: 2.8, zinssatz_de: 3.25, lohn_de: 3.4, gold_eur_perf: 2.7, cape: 24.0 },
+  2009: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[2009], inflation_de: 0.2, zinssatz_de: 1, lohn_de: 0.8, gold_eur_perf: 17.2, cape: 15.2 },
+  2010: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[2010], inflation_de: 1.1, zinssatz_de: 1, lohn_de: 2.3, gold_eur_perf: 34.9, cape: 20.3 },
+  2011: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[2011], inflation_de: 2.5, zinssatz_de: 1.25, lohn_de: 3.9, gold_eur_perf: 7.6, cape: 23.0 },
+  2012: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[2012], inflation_de: 2.1, zinssatz_de: 0.75, lohn_de: 2.9, gold_eur_perf: 4, cape: 21.1 },
+  2013: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[2013], inflation_de: 1.6, zinssatz_de: 0.25, lohn_de: 2.4, gold_eur_perf: -22.8, cape: 21.3 },
+  2014: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[2014], inflation_de: 0.9, zinssatz_de: 0.05, lohn_de: 2.8, gold_eur_perf: -0.6, cape: 25.0 },
+  2015: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[2015], inflation_de: 0.7, zinssatz_de: 0.05, lohn_de: 2.9, gold_eur_perf: -10, cape: 27.2 },
+  2016: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[2016], inflation_de: 0.4, zinssatz_de: 0, lohn_de: 2.5, gold_eur_perf: 11.7, cape: 25.6 },
+  2017: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[2017], inflation_de: 1.7, zinssatz_de: 0, lohn_de: 2.6, gold_eur_perf: -0.4, cape: 28.1 },
+  2018: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[2018], inflation_de: 1.9, zinssatz_de: 0, lohn_de: 3.1, gold_eur_perf: -4.3, cape: 32.3 },
+  2019: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[2019], inflation_de: 1.4, zinssatz_de: 0, lohn_de: 2.8, gold_eur_perf: 19.4, cape: 29.3 },
+  2020: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[2020], inflation_de: 0.5, zinssatz_de: -0.5, lohn_de: 1.2, gold_eur_perf: 13.9, cape: 31.0 },
+  2021: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[2021], inflation_de: 3.1, zinssatz_de: -0.5, lohn_de: 3, gold_eur_perf: -5.2, cape: 34.5 },
+  2022: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[2022], inflation_de: 6.9, zinssatz_de: 1.25, lohn_de: 4, gold_eur_perf: 5.7, cape: 37.0 },
+  2023: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[2023], inflation_de: 5.9, zinssatz_de: 3.5, lohn_de: 6, gold_eur_perf: 12.1, cape: 28.3 },
+  2024: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[2024], inflation_de: 2.5, zinssatz_de: 3.75, lohn_de: 3, gold_eur_perf: 15, cape: 31.0 },
+  2025: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[2025], inflation_de: 2.2, zinssatz_de: 2.0, lohn_de: 4.2, gold_eur_perf: 47.6, cape: 37.1 }
 };
-
-// Normalize 1925-1949 MSCI levels to connect smoothly to the 1950 base.
-(() => {
-  const anchorYear = 1950;
-  const bridgeYear = 1949;
-  const anchor = HISTORICAL_DATA[anchorYear]?.msci_eur;
-  const bridge = HISTORICAL_DATA[bridgeYear]?.msci_eur;
-  if (!Number.isFinite(anchor) || !Number.isFinite(bridge) || bridge <= 0) return;
-  const factor = anchor / bridge;
-  for (let year = 1925; year <= bridgeYear; year++) {
-    const entry = HISTORICAL_DATA[year];
-    if (entry && Number.isFinite(entry.msci_eur)) {
-      entry.msci_eur = entry.msci_eur * factor;
-    }
-  }
-})();
 
 /**
  * Sterbetafeln für Männer und Frauen
@@ -508,16 +521,17 @@ export const BREAK_ON_RUIN = true;
 
 (function initializeData() {
   const years = Object.keys(HISTORICAL_DATA).map(Number).sort((a, b) => a - b);
-  let prevMsci = null;
 
   years.forEach((year, index) => {
     const raw = HISTORICAL_DATA[year];
 
-    let rendite = 0;
-    if (prevMsci !== null && raw.msci_eur > 0) {
-      rendite = (raw.msci_eur / prevMsci) - 1;
+    // 1925 is intentionally a real sampling observation. The retired level-
+    // differencing path emitted a structural zero because no 1924 runtime
+    // level existed; the generated chain owns an explicit 1924 base level.
+    const rendite = GLOBAL_EQUITY_RESEARCH_ANNUAL_RETURNS[year];
+    if (!Number.isFinite(rendite)) {
+      throw new Error(`Missing global equity research return for ${year}.`);
     }
-    prevMsci = raw.msci_eur;
 
     const inflation = raw.inflation_de;
     const zinssatz = raw.zinssatz_de;

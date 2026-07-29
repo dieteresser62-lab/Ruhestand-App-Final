@@ -22,6 +22,27 @@ SOFTWARE.
 
 ---
 
+## Separat lizenzierte Datenbeilage
+
+Die MIT-Lizenz gilt fuer den Programmcode und nicht pauschal fuer die
+historischen Forschungsdaten unter
+`data/historical/global-equity-research-chain/` oder die daraus erzeugten
+Datenwerte in `app/simulator/global-equity-research-chain.js`.
+
+Soweit diese Daten auf der Jordà-Schularick-Taylor Macrohistory Database R6
+beruhen, gelten `CC BY-NC-SA 4.0`, insbesondere Namensnennung,
+Nichtkommerzialitaet und Weitergabe unter gleichen Bedingungen. OECD- und
+EZB-Eingaben behalten daneben ihre jeweiligen Nutzungsbedingungen. Die
+vollstaendige Zuordnung und Namensnennung steht in
+`data/historical/global-equity-research-chain/LICENSE.md`.
+
+Die Datenbeilage erteilt keine Erlaubnis fuer kommerzielle Nutzung. Vor einer
+kommerziellen Weitergabe des Repositories, eines `dist/`-Standes oder einer
+daraus gebauten Anwendung ist deshalb eine gesonderte Lizenz- beziehungsweise
+Rechtspruefung erforderlich.
+
+---
+
 ## About This Project
 
 This retirement planning application was built with AI assistance (ChatGPT, 

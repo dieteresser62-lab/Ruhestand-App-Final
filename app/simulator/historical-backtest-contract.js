@@ -7,7 +7,7 @@ export const HISTORICAL_DATA_MANIFEST_SCHEMA_VERSION = 'HistoricalDataManifestV1
 export const HISTORICAL_TEMPORAL_CONVENTION_ID = 'realized_t_decision_t_minus_1_v1';
 
 const REQUIRED_SERIES_IDS = Object.freeze([
-    'msci_eur',
+    'global_equity_research_index',
     'inflation_de',
     'zinssatz_de',
     'lohn_de',
@@ -326,11 +326,11 @@ function validateRawHistoricalRecord(record, year) {
             });
         }
     }
-    if (record.msci_eur <= 0) {
-        contractError('HISTORICAL_INDEX_LEVEL_INVALID', `Historical record ${year}.msci_eur must be greater than zero`, {
+    if (record.global_equity_research_index <= 0) {
+        contractError('HISTORICAL_INDEX_LEVEL_INVALID', `Historical record ${year}.global_equity_research_index must be greater than zero`, {
             year,
-            seriesId: 'msci_eur',
-            value: record.msci_eur
+            seriesId: 'global_equity_research_index',
+            value: record.global_equity_research_index
         });
     }
     if (record.cape <= 0) {
@@ -381,13 +381,13 @@ export function buildHistoricalYearRecord({ year, current, previous, manifest = 
     validateRawHistoricalRecord(current, year);
     validateRawHistoricalRecord(previous, year - 1);
     const series = manifest.series;
-    const previousEquityQuality = resolveQualityStatus(series.msci_eur, year - 1, previous.msci_eur);
-    const currentEquityQuality = resolveQualityStatus(series.msci_eur, year, current.msci_eur);
-    const equityReturn = (current.msci_eur / previous.msci_eur) - 1;
+    const previousEquityQuality = resolveQualityStatus(series.global_equity_research_index, year - 1, previous.global_equity_research_index);
+    const currentEquityQuality = resolveQualityStatus(series.global_equity_research_index, year, current.global_equity_research_index);
+    const equityReturn = (current.global_equity_research_index / previous.global_equity_research_index) - 1;
     if (!Number.isFinite(equityReturn)) {
         contractError('HISTORICAL_DATA_FIELD_NON_FINITE', `Historical equity return for ${year} must be finite`, {
             year,
-            seriesId: 'msci_eur'
+            seriesId: 'global_equity_research_index'
         });
     }
 
@@ -404,7 +404,7 @@ export function buildHistoricalYearRecord({ year, current, previous, manifest = 
         },
         realized: {
             equityReturn: createObservation({
-                seriesId: 'msci_eur',
+                seriesId: 'global_equity_research_index',
                 value: equityReturn,
                 unit: 'ratio',
                 sourceYear: year,
@@ -413,9 +413,9 @@ export function buildHistoricalYearRecord({ year, current, previous, manifest = 
                 derivation: 'index_level_t_div_index_level_t_minus_1_minus_1',
                 inputs: {
                     previousSourceYear: year - 1,
-                    previousIndexLevel: previous.msci_eur,
+                    previousIndexLevel: previous.global_equity_research_index,
                     currentSourceYear: year,
-                    currentIndexLevel: current.msci_eur
+                    currentIndexLevel: current.global_equity_research_index
                 }
             }),
             goldReturn: createObservation({
@@ -472,7 +472,7 @@ export function buildHistoricalYearRecord({ year, current, previous, manifest = 
 }
 
 const REQUIRED_OBSERVATIONS = Object.freeze([
-    Object.freeze({ section: 'realized', field: 'equityReturn', expectedSeriesId: 'msci_eur' }),
+    Object.freeze({ section: 'realized', field: 'equityReturn', expectedSeriesId: 'global_equity_research_index' }),
     Object.freeze({ section: 'realized', field: 'goldReturn', expectedSeriesId: 'gold_eur_perf' }),
     Object.freeze({ section: 'realized', field: 'cashBondReturn', expectedSeriesId: 'zinssatz_de' }),
     Object.freeze({ section: 'realized', field: 'inflation', expectedSeriesId: 'inflation_de' }),
@@ -671,11 +671,11 @@ function buildInitialMarketHistory(startYear, context) {
         ['endeVJ_2', startYear - 3],
         ['endeVJ_3', startYear - 4]
     ];
-    const equitySeries = context.manifest.series.msci_eur;
+    const equitySeries = context.manifest.series.global_equity_research_index;
     const levels = Object.fromEntries(levelDefinitions.map(([field, sourceYear]) => {
-        const value = context.rawLookup.get(sourceYear)?.msci_eur;
+        const value = context.rawLookup.get(sourceYear)?.global_equity_research_index;
         return [field, createObservation({
-            seriesId: 'msci_eur',
+            seriesId: 'global_equity_research_index',
             value,
             unit: equitySeries.unit,
             sourceYear,
@@ -686,7 +686,7 @@ function buildInitialMarketHistory(startYear, context) {
     }));
     const priorLevels = context.datasetYears
         .filter(year => year < startYear)
-        .map(year => ({ year, value: context.rawLookup.get(year).msci_eur }));
+        .map(year => ({ year, value: context.rawLookup.get(year).global_equity_research_index }));
     const allTimeHigh = priorLevels.reduce((selected, candidate) => (
         candidate.value >= selected.value ? candidate : selected
     ), priorLevels[0]);
@@ -696,7 +696,7 @@ function buildInitialMarketHistory(startYear, context) {
         asOfYear: startYear - 1,
         levels,
         allTimeHigh: createObservation({
-            seriesId: 'msci_eur',
+            seriesId: 'global_equity_research_index',
             value: allTimeHigh.value,
             unit: equitySeries.unit,
             sourceYear: allTimeHigh.year,

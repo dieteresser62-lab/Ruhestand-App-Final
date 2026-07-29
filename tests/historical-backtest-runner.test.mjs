@@ -65,11 +65,11 @@ callerInputs.self = callerInputs;
 freezeDeep(callerInputs);
 
 const historicalRecords = {
-    1996: { msci_eur: 70, gold_eur_perf: 1, zinssatz_de: 1, inflation_de: 0.4, lohn_de: 1.1, cape: 15 },
-    1997: { msci_eur: 80, gold_eur_perf: 2, zinssatz_de: 1.2, inflation_de: 0.6, lohn_de: 1.2, cape: 16 },
-    1998: { msci_eur: 90, gold_eur_perf: 3, zinssatz_de: 1.5, inflation_de: 0.8, lohn_de: 1.3, cape: 17 },
+    1996: { global_equity_research_index: 70, gold_eur_perf: 1, zinssatz_de: 1, inflation_de: 0.4, lohn_de: 1.1, cape: 15 },
+    1997: { global_equity_research_index: 80, gold_eur_perf: 2, zinssatz_de: 1.2, inflation_de: 0.6, lohn_de: 1.2, cape: 16 },
+    1998: { global_equity_research_index: 90, gold_eur_perf: 3, zinssatz_de: 1.5, inflation_de: 0.8, lohn_de: 1.3, cape: 17 },
     1999: {
-        msci_eur: 100,
+        global_equity_research_index: 100,
         gold_eur_perf: 4,
         zinssatz_de: 2,
         inflation_de: 1,
@@ -78,7 +78,7 @@ const historicalRecords = {
         nested: { source: 'caller-1999' }
     },
     2000: {
-        msci_eur: 110,
+        global_equity_research_index: 110,
         gold_eur_perf: 5,
         zinssatz_de: 2.5,
         inflation_de: 1.2,
@@ -87,7 +87,7 @@ const historicalRecords = {
         nested: { source: 'caller-2000' }
     },
     2001: {
-        msci_eur: 121,
+        global_equity_research_index: 121,
         gold_eur_perf: 6,
         zinssatz_de: 3,
         inflation_de: 1.4,
@@ -119,12 +119,12 @@ function makeHistoricalYearRecord(year) {
         temporalConventionId: HISTORICAL_TEMPORAL_CONVENTION_ID,
         alignmentStatus: 'approved_d01',
         realized: {
-            equityReturn: observation('msci_eur', (current.msci_eur / previous.msci_eur) - 1, year, {
+            equityReturn: observation('global_equity_research_index', (current.global_equity_research_index / previous.global_equity_research_index) - 1, year, {
                 inputs: {
                     previousSourceYear: year - 1,
-                    previousIndexLevel: previous.msci_eur,
+                    previousIndexLevel: previous.global_equity_research_index,
                     currentSourceYear: year,
-                    currentIndexLevel: current.msci_eur
+                    currentIndexLevel: current.global_equity_research_index
                 }
             }),
             goldReturn: observation('gold_eur_perf', current.gold_eur_perf, year),
@@ -171,12 +171,12 @@ function createContractProvider({ incompleteYear = null } = {}) {
                 temporalConventionId: HISTORICAL_TEMPORAL_CONVENTION_ID,
                 initialMarketHistory: {
                     levels: {
-                        endeVJ: observation('msci_eur', historicalRecords[period.startYear - 1].msci_eur, period.startYear - 1),
-                        endeVJ_1: observation('msci_eur', historicalRecords[period.startYear - 2].msci_eur, period.startYear - 2),
-                        endeVJ_2: observation('msci_eur', historicalRecords[period.startYear - 3].msci_eur, period.startYear - 3),
-                        endeVJ_3: observation('msci_eur', historicalRecords[period.startYear - 4].msci_eur, period.startYear - 4)
+                        endeVJ: observation('global_equity_research_index', historicalRecords[period.startYear - 1].global_equity_research_index, period.startYear - 1),
+                        endeVJ_1: observation('global_equity_research_index', historicalRecords[period.startYear - 2].global_equity_research_index, period.startYear - 2),
+                        endeVJ_2: observation('global_equity_research_index', historicalRecords[period.startYear - 3].global_equity_research_index, period.startYear - 3),
+                        endeVJ_3: observation('global_equity_research_index', historicalRecords[period.startYear - 4].global_equity_research_index, period.startYear - 4)
                     },
-                    allTimeHigh: observation('msci_eur', historicalRecords[period.startYear - 1].msci_eur, period.startYear - 1),
+                    allTimeHigh: observation('global_equity_research_index', historicalRecords[period.startYear - 1].global_equity_research_index, period.startYear - 1),
                     yearsSinceAllTimeHigh: 0
                 },
                 records

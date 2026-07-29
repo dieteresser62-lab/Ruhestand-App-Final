@@ -4,7 +4,7 @@
 
 This directory contains the comprehensive testing infrastructure for the Ruhestand-App-Final project. The tests are designed to be zero-dependency, using native Node.js ESM and a custom test runner, avoiding the need for heavy frameworks like Jest or Mocha.
 
-**Test-Statistik:** 137 entdeckte Testdateien, davon 136 im Node-Gate ausgefuehrt, mit 9.184 von 9.184 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (in der Slice-16-Review-Nachbesserung mit `npm test` am 2026-07-29 verifiziert). `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen und bestand mit 27/27 Einstiegspunkt-/Zusatzflows, darunter Preview/Commit, realer 3-Bucket-Bear-Pfad, Hybridprofil-Blocker, Import/Recovery, Sweep, Optimizer-Apply sowie vier isolierte Monte-Carlo-Browserfaelle.
+**Test-Statistik:** 140 entdeckte Testdateien mit 11.375 von 11.375 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (nach der technischen Review-Nachbesserung von Backtest-Datenpruefung Slice 02 mit `npm test` am 2026-07-29 verifiziert). `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen und bestand mit 27/27 Einstiegspunkt-/Zusatzflows, darunter Preview/Commit, realer 3-Bucket-Bear-Pfad, Hybridprofil-Blocker, Import/Recovery, Sweep, Optimizer-Apply sowie vier isolierte Monte-Carlo-Browserfaelle.
 
 Die Zahl beschreibt nur die Node-Standardsuite. `npm run test:browser`, `npm run test:coverage` und ein echter Tauri-Build sind getrennte Gates und in den Assertions nicht enthalten.
 
@@ -299,6 +299,13 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
   `pending`, dokumentiert D-14-Runwerte, Rohverteilungen und das erwartete
   Bufferdelta 93 auf 106 Byte pro Run, ohne fruehere Referenzen zu
   ueberschreiben.
+- **Backtest-Data-Slice-02-Kandidat:** `post-backtest-data-02-v3` friert die
+  neue Aktien-Datenversion sowie Risiko-, CaR-, Sampling- und
+  Auto-Optimize-Projektionen fuer denselben Seed und dasselbe Workerlayout
+  ein. V1 und V2 bleiben als ueberholte, unreviewte Kandidaten unveraendert;
+  der Erzeugungsmodus darf V3 nicht ueberschreiben und endet absichtlich
+  nicht gruen. V3 bleibt bis zum externen Review `pending`; die aktuelle extern
+  reviewte Referenz bleibt `post-suite-data-02-v1`.
 - **Ressourcenmessung:** Das feste Standardprofil mit 100.000 Runs ergab
   977,62585 gesamte Worker-Result-Byte pro Run; der Laufzeitvertrag verwendet
   gerundete 978 Byte pro Run.
@@ -644,11 +651,34 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 #### `historical-data-manifest.test.mjs`
 **Zweck:** Testet `HistoricalDataManifestV1` und den eingebetteten Datenfingerprint.
 - **Manifestfelder:** IDs, Variante, Waehrung, Region, Frequenz, Zeitraum, Source-/Lizenzstatus, Transformation, Schaetzsegmente, Missingness und Revision.
-- **Unresolved-Gate:** Keine leeren `known`-Werte und keine erfundenen Werte unter `unresolved`.
-- **Hash:** Browser-kompatibles SHA-256 gegen Node-`crypto` und den manifestierten Post-Normalisierungs-Datenbestand.
+- **Resolution-Gate:** Belegte Aktien-Source-/Lizenzfelder bleiben `known`; fuer die anderen Reihen gibt es keine leeren `known`-Werte und keine erfundenen Werte unter `unresolved`.
+- **Hash:** Browser-kompatibles SHA-256 gegen Node-`crypto` und den manifestierten Laufzeit-Datenbestand.
 - **Lookup:** Lueckenlose 1925-2025-Baseline, abgeleitete technische Bounds 1929-2025, Provenienz und Non-Mutation.
+
+#### `global-equity-research-chain.test.mjs`
+**Zweck:** Testet die generierte offene 1925-2025-Aktien-Forschungsproxykette.
+- **Quellenhashes:** Originale und gefilterte JST-/OECD-/EZB-Eingaben stimmen mit den gepinnten SHA-256-Werten ueberein; der Build rekonstruiert die Filterung bytegenau.
+- **Verkettung:** 101 Jahresreturns und Levels sind lueckenlos, positiv und genau einmal verkettet; `HISTORICAL_DATA` verwendet ausschliesslich diese Levels.
+- **Vollnachrechnung:** Ein unabhaengiger Testpfad rekonstruiert alle 101
+  Returns direkt aus den Filtereingaben; 1950 bleibt USD-basiert, der
+  deutsche Anleger-Numeraire beginnt 1951.
+- **Lueckenvertrag:** Deutsche Wechselkursluecke 1945-1946 und japanische Aktienluecke 1946-1947 bleiben maschinenlesbar.
+- **Evidenz:** `proxy`, `backtested` und `estimated` bleiben getrennt; moderne Referenzjahre und Datenhashes sind stabil.
+- **Identitaet/Lizenz:** Kein MSCI-Anspruch; das generierte Artefakt traegt den separaten JST-Datenlizenzhinweis.
 - **Inventarbruecke:** Alle sechs Runtime-Reihen sind mit eigenem Wert-Hash und
   Qualitaetssegmenten in `SimulationDataInventoryV1` verknuepft.
+
+#### `global-equity-backtest-delta.test.mjs`
+**Zweck:** Validiert den maschinenlesbaren Vorher-/Nachher-Vertrag aller sechs
+bestehenden Zielreferenzen sowie eines zusaetzlichen Laufs ueber die
+1949/1950/1951-Naht.
+- **Konstanz:** Eingabe-Hashes und Outcome-Klassen bleiben unveraendert.
+- **Deltas:** Endvermoegen, Entnahmen, Steuern, Kuerzungsjahre/-serie und
+  FlowDelta besitzen jeweils die Ursache `global_equity_research_chain`.
+  Neu instrumentierte Drawdown-/Runway-Werte sind getrennt als
+  retroberechnete Zusatzdiagnostik markiert und keine Basisfixture-Oracles.
+- **Bilanzgate:** Vorher und nachher bleibt der maximale absolute
+  `portfolio_flow_delta` unter 1 EUR.
 
 #### `simulation-data-inventory.test.mjs`
 **Zweck:** Testet das simulationsweite Evidenzinventar und seine Quell-Gates.
@@ -984,6 +1014,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `historical-backtest-cohorts.test.mjs` | ~210 | Feste Rolling-Cohort-Fenster, Batch-Preflight, Outcome-/Ausschlussinventar und Aussagegrenze |
 | `historical-backtest-export.test.mjs` | ~310 | Raw-JSON/CSV, Fingerprints, Provenienz, Roundtrip, HTML-/Formelinjektionsschutz |
 | `historical-data-manifest.test.mjs` | ~165 | Manifestvollstaendigkeit, unresolved-Gates, kanonischer SHA-256 und immutable Lookup |
+| `global-equity-research-chain.test.mjs` | ~100 | Gepinnte offene Eingaben, 1925-2025-Verkettung, Laenderluecken, Evidenzsegmente und neutrale Identitaet |
 | `historical-data-robustness.test.mjs` | ~60 | Fehlende Marktdaten |
 | `simulation-data-inventory.test.mjs` | ~330 | Historien-/Statik-Inventar, Evidenzklassen, Wertfingerprints und fail-closed Quell-/Lizenz-Gates |
 | `liquidity-guardrail.test.mjs` | ~100 | Liquiditäts-Guardrails |

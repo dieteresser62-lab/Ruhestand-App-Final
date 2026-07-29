@@ -25,6 +25,14 @@
       "purpose": "Record Suite-Datenintegritaet semantic transitions without overwriting the completed Monte Carlo hardening references."
     },
     {
+      "idPattern": "post-backtest-data-{sliceNumber}-v{revision}",
+      "filePattern": "post-backtest-data-{sliceNumber}-v{revision}.json",
+      "immutableAfterReview": true,
+      "overwriteAllowed": false,
+      "requiresDeltaLedger": true,
+      "purpose": "Record Backtest-Datenpruefung data transitions without overwriting reviewed Monte Carlo references."
+    },
+    {
       "id": "monte-carlo-v1-final",
       "file": "monte-carlo-v1-final.json",
       "candidateOnlyUntilExternalApproval": true,

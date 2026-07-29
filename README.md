@@ -358,5 +358,17 @@ IP-/Transportmetadaten fallen bei externen Providern dennoch an.
 
 ## Lizenz
 
-Veröffentlicht unter der MIT-Lizenz. Die vollständigen Lizenzbedingungen stehen in `LICENSE.md`.
+Der Programmcode ist unter der MIT-Lizenz veröffentlicht. Die vollständigen
+Bedingungen und die Abgrenzung zur Datenbeilage stehen in `LICENSE.md`.
 Lizenztext, npm-Paketmetadaten und Tauri-/Cargo-Metadaten weisen das Projekt einheitlich als `MIT` aus.
+Diese Metadaten beschreiben den Programmcode; für die mitgelieferten Forschungsdaten
+gelten die nachfolgend dokumentierten abweichenden Bedingungen.
+
+Die Forschungsdaten unter
+`data/historical/global-equity-research-chain/` und die daraus erzeugten Werte
+unterliegen teilweise `CC BY-NC-SA 4.0`, einschließlich
+Nichtkommerzialitäts- und Share-Alike-Bedingungen. OECD- und EZB-Bedingungen
+gelten zusätzlich. Vor einer kommerziellen Verteilung des Repositories,
+eines `dist/`-Standes oder einer ausführbaren Anwendung ist eine gesonderte
+Lizenzprüfung erforderlich. Details und Namensnennung:
+`data/historical/global-equity-research-chain/LICENSE.md`.

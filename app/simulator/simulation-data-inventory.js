@@ -6,7 +6,7 @@ import {
 } from './historical-backtest-contract.js';
 
 export const SIMULATION_DATA_INVENTORY_SCHEMA_VERSION = 'SimulationDataInventoryV1';
-export const SIMULATION_DATA_INVENTORY_REVISION = '2026-07-29.1';
+export const SIMULATION_DATA_INVENTORY_REVISION = '2026-07-29.3';
 
 export const SIMULATION_DATA_EVIDENCE_CLASSES = Object.freeze([
     'official',
@@ -32,7 +32,7 @@ const RESOLUTION_STATUSES = new Set(['known', 'unresolved', 'not_applicable']);
 const EVIDENCE_CLASSES = new Set(SIMULATION_DATA_EVIDENCE_CLASSES);
 const EXTERNAL_VALIDATION_STATUSES = new Set(SIMULATION_DATA_EXTERNAL_VALIDATION_STATUSES);
 const REQUIRED_HISTORICAL_SERIES = Object.freeze([
-    'msci_eur',
+    'global_equity_research_index',
     'inflation_de',
     'zinssatz_de',
     'lohn_de',
@@ -93,25 +93,33 @@ function historicalSeries({
     transformation,
     embeddedValueHash,
     qualitySegments,
-    yearConvention = unresolved()
+    evidenceClass = 'unresolved',
+    implementationLocations = [`app/simulator/simulator-data.js:HISTORICAL_DATA.*.${id}`],
+    source = unresolved(),
+    seriesIdentifier = unresolved(),
+    yearConvention = unresolved(),
+    license = unresolved(),
+    retrievedAt = unresolved(),
+    rawDataHash = unresolved(),
+    externalValidationStatus = 'unresolved'
 }) {
     return {
         id,
         category: 'historical_series',
         label,
-        evidenceClass: 'unresolved',
-        implementationLocations: [`app/simulator/simulator-data.js:HISTORICAL_DATA.*.${id}`],
-        source: unresolved(),
-        seriesIdentifier: unresolved(),
+        evidenceClass,
+        implementationLocations,
+        source,
+        seriesIdentifier,
         unit,
         currency,
         yearConvention,
         transformation: resolved(transformation),
-        license: unresolved(),
-        retrievedAt: unresolved(),
-        rawDataHash: unresolved(),
+        license,
+        retrievedAt,
+        rawDataHash,
         embeddedValueHash: resolved(embeddedValueHash),
-        externalValidationStatus: 'unresolved',
+        externalValidationStatus,
         qualitySegments
     };
 }
@@ -157,31 +165,43 @@ function staticEntry({
 }
 
 const HISTORICAL_SERIES = {
-    msci_eur: historicalSeries({
-        id: 'msci_eur',
-        label: 'Embedded global equity index-level proxy',
+    global_equity_research_index: historicalSeries({
+        id: 'global_equity_research_index',
+        label: 'Open global equity research total-return index level',
         unit: 'index_level',
-        currency: resolved('EUR'),
-        transformation: '1925-1949 levels are rescaled at module initialization; annual return uses level_t / level_t_minus_1 - 1.',
-        embeddedValueHash: '20a0496a3e8f96f3885cd0b6832ab1f2c5e9107df9d6dc15245e555d8894b53a',
+        evidenceClass: 'proxy',
+        implementationLocations: [
+            'app/simulator/global-equity-research-chain.js:GLOBAL_EQUITY_RESEARCH_CHAIN',
+            'app/simulator/simulator-data.js:HISTORICAL_DATA.*.global_equity_research_index'
+        ],
+        source: resolved('JST Macrohistory Database R6; OECD DSD_STES@DF_FINMARK 4.0; ECB EXR'),
+        seriesIdentifier: resolved('global_equity_research_index / GlobalEquityResearchChainV1'),
+        currency: resolved('USD proxy 1925-1950; German investor currency 1951-2020; EUR 2021-2025'),
+        yearConvention: resolved('Annual return t; JST calendar year through 2020, December-average-index ratio for OECD 2021-2025'),
+        transformation: 'Prior-year JST population-times-real-GDP-per-capita weights; local-to-USD conversion through 1950 and German investor-currency conversion from 1951 through 2020; OECD December price return plus frozen JST 2020 dividend return and ECB December conversion thereafter.',
+        license: resolved('Derived data CC BY-NC-SA 4.0; OECD and ESCB source terms also apply'),
+        retrievedAt: resolved('2026-07-29'),
+        rawDataHash: resolved('a234f57c21c3184077ce00743bbd6bc149363518939eeebb016e9fb25ab1f893'),
+        embeddedValueHash: '38118b9f982ee3ff5d64a920b397451c302c34f3e46722462bac6e0732878c89',
+        externalValidationStatus: 'not_validated',
         qualitySegments: [
             {
                 startYear: 1925,
-                endYear: 1949,
-                evidenceClass: 'estimated',
-                note: 'Embedded extension and bridge are reproducible; the external source chain remains unresolved.'
+                endYear: 1950,
+                evidenceClass: 'proxy',
+                note: 'JST nominal local equity total returns converted to a USD research proxy through the 1950 return; Germany is absent in 1945-1946 and Japan in 1946-1947 where required inputs are missing.'
             },
             {
-                startYear: 1950,
-                endYear: 2023,
-                evidenceClass: 'unresolved',
-                note: 'Values are reproducible, but external series identity, return variant and license are unresolved.'
+                startYear: 1951,
+                endYear: 2020,
+                evidenceClass: 'backtested',
+                note: 'JST provider-built national total returns are economically weighted and converted into German investor currency.'
             },
             {
-                startYear: 2024,
+                startYear: 2021,
                 endYear: 2025,
-                evidenceClass: 'unresolved',
-                note: 'D-15 identifies a placeholder/inherited-level risk; both observations require source reconciliation.'
+                evidenceClass: 'estimated',
+                note: 'Observed OECD price and ECB currency components plus a frozen country-level JST 2020 dividend-return model component.'
             }
         ]
     }),
@@ -530,7 +550,7 @@ const STATIC_DATA = {
         evidenceClass: 'derived',
         implementationLocations: ['app/simulator/simulator-data.js:REGIME_TRANSITIONS'],
         unit: 'transition_count',
-        embeddedValueHash: resolved('052bb8f523e33cfdfae81026b4ed64c22ca262d9a934a9cb5ec2bf1c685c1d98'),
+        embeddedValueHash: resolved('ab1a37acbf4a1f141983ad194108f028fac85eb3f3c5522efe1d70c42601f398'),
         source: resolved('ruhestandsapp-historical-data-v1 plus REGIME_CLASSIFICATION_THRESHOLDS'),
         seriesIdentifier: resolved('REGIME_TRANSITIONS'),
         transformation: resolved('Count consecutive annual regime labels; empty source regimes fall back to one SIDEWAYS transition.'),

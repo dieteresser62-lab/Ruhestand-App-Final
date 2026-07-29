@@ -322,16 +322,26 @@ Diese Grenze ist fachlich gewollt: Balance kennt derzeit keinen belastbaren aktu
 * `app/shared/persistence-key-policy.js` – Allowlist fuer Erstmigration, Restore und Import aus Legacy-/Fremdquellen.
 * `app/shared/persistence-backup.js` – Zentrales Modul fuer Komplett-Export und Komplett-Import der Persistenzdaten mit Prototype-Pollution-Haertung.
 * `app/shared/runtime-env.js` – Laufzeiterkennung fuer Browser/Tauri-Featureauswahl.
-* `app/simulator/simulator-data.js` – Historische Daten (inkl. 1925-1949 Schwarze-Schwan-Erweiterung), tief eingefrorenes `HistoricalDataManifestV1`, Mortalitäts- und Stress-Presets.
+* `app/simulator/global-equity-research-chain.js` – deterministisch erzeugte,
+  tief eingefrorene 1925-2025-Aktien-Forschungsproxykette aus den separat
+  lizenzierten JST-/OECD-/EZB-Eingaben; kein Anbieterindex. Das Buildskript
+  rekonstruiert die gefilterten Inputs aus den paketierten Originaldateien,
+  fuehrt 1950 noch vollstaendig im USD-Proxy und beginnt die deutsche
+  Anlegerwaehrung mit dem Return 1951.
+* `app/simulator/simulator-data.js` – Historische Datenprojektion mit
+  `global_equity_research_index`, tief eingefrorenes
+  `HistoricalDataManifestV1`, Mortalitäts- und Stress-Presets.
 * `app/simulator/historical-backtest-contract.js` – DOM-freier, im Produktbacktest aktivierter Manifest-/SHA-256-/`HistoricalYearRecordV1`-Contract. Validiert das Dataset einmal je Revision/Hash, liefert immutable Records und prueft Einzelpfad- bzw. Cohort-Batch-Perioden vor der Rechenschleife. Die aktive Zeitachse `realized_t_decision_t_minus_1_v1` verwendet realisierte Markt-/Makrowerte aus `t` und CAPE decision-as-of aus `t-1`.
 * `app/simulator/simulation-data-inventory.js` – DOM-freier
   `SimulationDataInventoryV1`-Evidenzvertrag fuer alle sechs historischen
   Reihen sowie Demografie-, Pflege-, Hinterbliebenen-, Steuer-/Tranchen-,
   Renten-/Sozial-, Stress-/Regime- und Default-/Fallbackklassen. Eigene
   Reihen-Segmente und kanonische SHA-256-Wertfingerprints sichern
-  Reproduzierbarkeit; `unresolved` blockiert externe Validierungs- und
-  Datenersatzbehauptungen, ohne den bestehenden Runtime-Backtest zu
-  veraendern.
+  Reproduzierbarkeit; die Aktienproxy besitzt eine aufgeloeste offene
+  Quell-/Lizenzkette, bleibt als Ganzes aber `not_validated`; `unresolved`
+  blockiert fuer die anderen Reihen externe Validierungs- und
+  Datenersatzbehauptungen, ohne deren technisch reproduzierbaren
+  Runtime-Backtest zu blockieren.
 
 Browser-Persistenz seit Phase 2:
 
@@ -380,7 +390,7 @@ Dynamic-Flex ist entlang der Simulator-Pipeline konsistent aktiviert:
 * Backtest-Metriken/Cohorts: `app/simulator/historical-backtest-metrics.js` definiert 24 versionierte Metriken mit Einheiten, Nennern, Missingness-, Outcome- und Rohquellenregeln und leitet sie ohne Displayrundung aus dem kanonischen Resultat ab. `app/simulator/historical-backtest-cohorts.js` erzeugt feste inklusive Fenster ueber einen einzigen Batch-Preflight, inventarisiert Outcomes und Ausschluesse getrennt und kennzeichnet die ueberlappenden Fenster als historische In-sample-Diagnose ohne Erfolgswahrscheinlichkeitsaussage.
 * Backtest-Export: `app/simulator/historical-backtest-export.js` ist DOM-frei und serialisiert ausschliesslich `BacktestRunResultV1`. `HistoricalBacktestExportV1` (`schemaId=de.ruhestandsapp.historical-backtest.raw`) fuehrt Request-/Run-ID, Dataset-Content-/Manifest-Hash, Temporal-Konvention, Engine-Build und Config-Fingerprint, Outcome, sichere Fehlerdaten, Portfolio-Snapshots, Historical-Year-Records, Rohjahreszeilen, Metriken und optional ein Cohort-Inventar. Der SHA-256-Result-Fingerprint verwendet kanonisches JSON; `exportedAt`, IDs, Exportmetadaten und interne `diagnostics` sind ausgeschlossen. UI, Summary, Tabelle und Export teilen dieselbe tief eingefrorene Result-/Row-Instanz.
 * Monte-Carlo-Export: `MonteCarloRunRequestV1` friert normalisierte Szenarioeingaben, Seed, Sampling-/Stressvertrag, Datenfingerprint sowie die tatsaechlich verwendete Worker-/Chunkkonfiguration ein. `MonteCarloRunResultV1` projiziert das disjunkte Outcome-Inventar, explizit benannte Nominal-/Real-EUR-KPIs, Stichprobengroessen, Missingness, Unsicherheit, Sampling-/Ausfuehrungsdiagnostik und sanitizierte technische Fehler. `MonteCarloExportV1` (`schemaId=de.ruhestandsapp.monte-carlo.run`) ergaenzt App-, Engine- und Snapshotprovenienz; sein SHA-256-Run-Fingerprint schliesst nur Exportzeit, IDs und reine Export-/Privacy-Metadaten aus. Unbekannte Zusatzfelder werden nach erfolgreicher V1-Pflichtfeldpruefung inventarisiert, unbekannte Schemaversionen und Fingerprintabweichungen fail-closed abgewiesen. Seit Slice 11 schreiben und lesen produktive V1-Consumer ausschliesslich kanonische KPI-Felder; das Legacy-Read-Aliasregister ist leer.
-* Die aktuelle extern reviewte Same-Runtime-Referenz ist `post-suite-data-02-v1`. Sie baut unveraenderlich auf `post-suite-data-05-v1` auf und dokumentiert das freigegebene Delta der harten `maxSkimPctOfEq=0`-/Equity-Budget-Semantik: nur Run 6 veraendert Volatilitaet und maximalen Drawdown geringfuegig, daraus folgt ein kleiner Median-Volatilitaets-Delta. Der getrennte Slice-11-Kandidat `post-suite-data-11-v1` ist bis zum externen Review `pending` und erfasst D-14, Rohverteilungen sowie den Ressourcen-/Buffervertrag; keine fruehere Referenz wird ueberschrieben.
+* Die aktuelle extern reviewte Same-Runtime-Referenz bleibt `post-suite-data-02-v1`. Sie baut unveraenderlich auf `post-suite-data-05-v1` auf und dokumentiert das freigegebene Delta der harten `maxSkimPctOfEq=0`-/Equity-Budget-Semantik. Die neue globale Aktienkette besitzt getrennt den noch nicht extern freigegebenen Kandidaten `post-backtest-data-02-v1`: fester Seed, Inputs, Runtime und Workerlayout bleiben gleich; Datenfingerprint, Regimeinventar und davon abhaengige Finanzpfade werden als eigenes Delta gegen `post-suite-data-02-v1` eingefroren. Auch `post-suite-data-11-v1` bleibt `pending`; keine fruehere Referenz wird ueberschrieben.
 * Backtest-CSV: `HistoricalBacktestCsvV1` verwendet feste technische Header mit Einheiten, Semikolon, Punkt als Dezimaltrenner, LF und leere Missingness-Zellen. Textfelder erhalten Formel-Injektionsschutz und RFC-artiges Quote-/Delimiter-/Newline-Escaping. Displayformatter und der Detailtoggle werden nicht konsumiert. Der Download bleibt eine explizite Nutzeraktion ohne automatische Persistenz oder Uebertragung.
 * Backtest-UI/A11y: `app/simulator/historical-backtest-ui.js` kapselt manifestabgeleitete Periodengrenzen, feldnahe Integer-/Bounds-Validierung, sanitizierte Statusprojektion, Datenqualitaets-/In-sample-Hinweise, das immutable Cohort-Inventar sowie Caption-/Header-Semantik der scrollbaren Tabelle. `simulator-backtest.js` injiziert im Browser-Gate Provider und Jahresadapter, ohne den produktiven Runnervertrag zu umgehen. Der Status unterscheidet `running`, `completed`, `ruin`, `incomplete`, `technical_error` sowie reine `validation_error` und verschiebt den Fokus nur nach explizitem Lauf oder auf das erste fehlerhafte Feld. Der Startbutton wird ausschliesslich per Modulhandler gebunden; Inline-`onclick` existiert nicht mehr.
 * Worker-Parität: `workers/mc-worker.js` erhält dieselben Dynamic-Flex Inputs; Seed/Chunking bleiben deterministisch.
@@ -699,6 +709,10 @@ definiert werden. Ergebnisse werden gegen diese Limits geprüft und als OK/Verle
 * Engine anpassen → `npm run build:engine` ausführen, anschließend `engine.js` prüfen; für CI/Release `npm run build:engine:strict` nutzen.
 * Desktop-Release auf Windows → `npm run build-tauri-exe` oder `build-tauri.bat`; der Workflow führt `npm run sync-dist`, `npm run tauri:build`, die zeitgestempelte Sicherung einer vorhandenen EXE unter `release-archive/` und den geprüften Kopierschritt nach `RuhestandSuite.exe` aus.
 * Reine Tauri-Bundles → vor `npm run tauri:build` immer `npm run sync-dist` ausführen, damit `src-tauri/tauri.conf.json` den aktuellen `dist/`-Stand lädt.
+* Nach einer Revision der historischen Forschungsdatenkette ist ein
+  vorhandenes `dist/` ausdruecklich veraltet, bis `npm run sync-dist`
+  ausgefuehrt wurde. Ein Release oder Desktop-Smoke gegen den alten Stand ist
+  unzulaessig.
 * Dateiimporte/-exporte benötigen Browser-Datei-/Download-Unterstuetzung. Jahresabschluss-Snapshots liegen intern im aktiven Persistenzadapter: Browser `IndexedDB` Store `snapshots`, Tauri `ruhestand_suite_snapshots.json`, localStorage-Fallback `rs_snapshot_archive_v1`.
 * Tests/Smoketests:
   * `npm test` fuehrt die schnelle Node-Standardsuite aus.

@@ -2,8 +2,9 @@
 
 **Pruefdatum:** 2026-07-29
 **Pruefer:** Claude (Primary reviewer & Analyst)
-**Status:** Korrekturprogramm beauftragt; Slice 01 technisch abgeschlossen,
-Review ausstehend
+**Status:** Korrekturprogramm beauftragt; Slice 01 lokal committed; Slice 02
+nach Nutzerentscheidung Variante 1 durch Codex technisch nachgebessert;
+erneutes externes Review, Freigabe und Commit ausstehend
 **Pruefgegenstand:** Exportdatei
 `backtest-2000-2025-89fc3e368d64-2026-07-29T10-00-22.287Z.json`
 **Anlass:** Nutzerseitige Verifikation nach Abschluss der Suite-Datenintegritaet-
@@ -651,7 +652,7 @@ Umsetzung eine erneute Nutzerentscheidung.
 
 | Thema | Festgelegte Semantik |
 | --- | --- |
-| Aktienrendite | Net Total Return in deutscher Anlegerwaehrung |
+| Aktienrendite | Offene globale Total-Return-Forschungsreihe; 1925-1950 expliziter USD-Waehrungsproxy, ab Returnjahr 1951 deutsche Anlegerwaehrung |
 | Aktienpositionen | Alle Aktienpositionen erhalten weiterhin dieselbe globale Aktienrendite; keine positionsspezifischen Einzelreihen |
 | Historische Aktienabdeckung | Die Abdeckung 1925-2025 bleibt erhalten, wird aber als segmentierte globale Total-Return-Kette statt durchgehend als MSCI World bezeichnet |
 | Liquiditaet | Liquiditaet soll nur die gesondert konfigurierte Runway-Zeitspanne abdecken; eine dadurch steigende Aktienquote ist beabsichtigt |
@@ -672,18 +673,23 @@ Umsetzung eine erneute Nutzerentscheidung.
 
 ### Praezisierung der globalen Aktienreihe
 
-Eine durchgehende offizielle Reihe `MSCI World Net Total Return EUR` existiert
-nicht fuer den gesamten eingebetteten Zeitraum 1925-2025. Die kuenftige
-kanonische Reihe erhaelt deshalb einen neutralen Namen, zum Beispiel
-`global_equity_net_total_return_eur_chain`, und weist ihre Segmente
-maschinenlesbar aus.
+Der Nutzer hat am 2026-07-29 den wegen der MSCI-Nutzungsbedingungen
+gestoppten Vertrag mit „Stelle sie um“ auf den angebotenen offenen,
+neutral benannten Fortsetzungsweg umgestellt. Der kanonische Name ist
+`global_equity_research_index`; die Reihe bildet keinen Anbieterindex nach.
+
+Das feste Laenderuniversum umfasst die 16 JST-Laender mit vorhandener
+Aktien-Total-Return-Historie:
+`AUS, BEL, CHE, DEU, DNK, ESP, FIN, FRA, GBR, ITA, JPN, NLD, NOR, PRT, SWE,
+USA`. Die Gewichtung erfolgt ohne Look-ahead anhand des Vorjahresprodukts aus
+JST-Bevoelkerung und realem BIP je Einwohner. Fuer 2021 bis 2025 bleiben die
+Gewichte auf dem Stand 2020 eingefroren.
 
 | Zeitraum | Zielkonstruktion | Qualitaetsstatus |
 | --- | --- | --- |
-| 1999-2025 | MSCI World Net Return in EUR, sofern die vollstaendige Reihe mit zulaessiger Nutzung bezogen werden kann | `official` |
-| 1986-1998 | MSCI World Net Return, ueber historische DM/USD-Kurse in deutsche Anlegerwaehrung ueberfuehrt und am EUR-Uebergang verkettet | `official_market_currency_derived` |
-| 1970-1985 | Von MSCI rueckgerechnete World-Net-Return-Historie plus dokumentierte DM/USD-Umrechnung | `backtested_by_provider_currency_derived` |
-| 1925-1969 | Gesonderte, quellenbelegte globale Aktien-Total-Return-Proxyreihe; keine MSCI-Bezeichnung | `proxy` beziehungsweise `estimated` |
+| 1925-1950 | JST nominaler lokaler Aktien-Total-Return, ueber lokale Waehrung je USD in einen wirtschaftsgewichteten USD-Proxy ueberfuehrt; der deutsche Rekonstruktionsfaktor 1949/1950 geht nicht als globale Rendite ein | `proxy` |
+| 1951-2020 | JST nominaler lokaler Aktien-Total-Return, wirtschaftsgewichtet und ueber lokale sowie deutsche USD-Kurse in deutsche Anlegerwaehrung umgerechnet | `backtested` und `derived` |
+| 2021-2025 | OECD-Dezember-Kursreturn plus je Land fortgeschriebener JST-Dividendenreturn 2020, ueber EZB-Dezemberkurse in EUR umgerechnet | `estimated` und `derived` |
 
 Die Indexstaende werden aus den Jahresrenditen stetig verkettet:
 
@@ -699,15 +705,13 @@ nicht zulaessig.
 
 Primaerquellen fuer den Aufbau:
 
-- [MSCI World Index EUR Net Factsheet](https://www.msci.com/resources/factsheets/index_fact_sheet/msci-world-index-eur-net.pdf)
-- [MSCI Index Calculation Methodology](https://app2.msci.com/eqb/methodology/meth_docs/MSCI_Index_Calculation_Methodology_Aug2025.pdf)
-- [MSCI Index Data Search](https://app2.msci.com/products/index-data-search/?chart=regional)
-- [Deutsche Bundesbank, historische Devisenkurse](https://www.bundesbank.de/de/statistiken/wechselkurse/devisenkurse-euro-referenzkurse-sonstige-wechselkurse)
+- [Jordà-Schularick-Taylor Macrohistory Database R6](https://www.macrohistory.net/database/)
+- [OECD Share Prices](https://www.oecd.org/en/data/indicators/share-prices.html)
+- [EZB EXR-Daten-API](https://data.ecb.europa.eu/help/api/data)
 
-Der MSCI-Lizenzstatus ist ein Umsetzungs-Gate. Eine technisch abrufbare Reihe
-darf nicht allein deshalb in Repository, `dist/` oder Desktop-Paket
-uebernommen werden. Vor dem Einbau muessen lokale Speicherung, Paketierung und
-gegebenenfalls Weitergabe durch die konkrete Bezugsquelle abgedeckt sein.
+JST steht unter `CC BY-NC-SA 4.0`. Die gefilterten JST-Eingaben und die daraus
+abgeleitete Forschungsreihe werden deshalb separat vom MIT-Code unter dieser
+Datenlizenz ausgewiesen. MSCI-Werte werden weder kopiert noch abgeleitet.
 
 ## Erweiterter Pruefumfang des Datenbestands
 
@@ -749,12 +753,25 @@ reine Stressparameter duerfen im Manifest nicht dieselbe Evidenzklasse tragen.
 
 ### Arbeitsstatus und Branch-Regel
 
-- Status: Slice 01 am 2026-07-29 technisch abgeschlossen; Review und Freigabe
-  ausstehend.
+- Status: Slice 01 am 2026-07-29 technisch abgeschlossen und als lokaler
+  Commit `16f5c83` vorhanden; Slice 02 ist nach Nutzerentscheidung auf die
+  offene Forschungsdatenkette umgestellt. Die im anschliessenden
+  Claude-Review dokumentierten Blocker CR02-1/CR02-3 und Freigabeauflagen
+  CR02-2/CR02-6 sind durch Codex technisch nachgebessert. Der Reviewerstatus
+  bleibt bis zum erneuten unabhaengigen Review blockiert. Externes Review,
+  Freigabe und Commit stehen aus; Slice 03 darf erst nach erfolgreicher
+  Freigabe begonnen werden.
 - Dokumentierter Ausgangsstand der Nachrechnung: `ca982cf`.
 - Nutzerentscheidung vom 2026-07-29: Die Umsetzung bleibt ausdruecklich auf
   dem vorhandenen Branch `codex/suite-datenintegritaet-hardening`; es wird
   kein neuer Branch angelegt.
+- **Dauerhafte Branch-Ausnahme fuer dieses Korrekturprogramm:** Diese
+  Nutzerentscheidung gilt fuer Slice 02 bis einschliesslich Slice 13 und ist
+  bei jedem Folgeslice aus diesem Abschnitt als bereits erteilt zu behandeln.
+  Codex und Folgeagenten fragen nicht erneut nach einem eigenen Feature-Branch,
+  solange der Nutzer diese Entscheidung nicht ausdruecklich widerruft oder
+  einen anderen Branch vorgibt. Der tatsaechlich aktive Branch und
+  Arbeitsbaumstatus werden weiterhin vor jedem Slice dokumentiert.
 - Fuer jeden Slice wird vor Coding der Branch- und Arbeitsbaumstatus sowie das
   erwartete Diff-Risiko dokumentiert.
 - Die nachstehenden Abschnitte sind das Master-Geruest. Vor Beginn eines
@@ -843,36 +860,52 @@ und statischen Daten, bevor Werte ersetzt werden.
 - Keine erfundene Provenienz.
 - Manifest-, Contract- und Dokumentationstests bestehen.
 
-### Slice 2 - Globale Aktien-Net-Total-Return-Kette
+### Slice 2 - Offene globale Aktien-Forschungsreihe
+
+**Slice-Dokument:**
+[`SLICE_BACKTEST_DATENPRUEFUNG_02_GLOBALE_AKTIENREIHE.md`](SLICE_BACKTEST_DATENPRUEFUNG_02_GLOBALE_AKTIENREIHE.md)
 
 **Abhaengigkeit:** Slice 1.
 
+**Umsetzungsstatus:** am 2026-07-29 durch Codex technisch umgesetzt und nach
+dem Claude-Review gemaess Nutzerentscheidung mit Variante 1 nachgebessert:
+USD-Numeraire bis einschliesslich 1950, deutsche Anlegerwaehrung ab
+Returnjahr 1951. Der Numerairebruch, der fehlende Nahtreferenzlauf, der
+fehlende Health-Fall-Deltabeleg und der selbst ersetzbare
+Monte-Carlo-Vergleichsanker sind technisch bearbeitet. `npm test` ist mit
+11.375/11.375 Assertions gruen; erneutes externes Review, Freigabe und Commit
+stehen aus. Codex erteilt keine eigene Freigabe.
+
 **Ziel**
 
-Ersetzen der ungeklaerten `msci_eur`-Price-Proxyreihe durch die beschlossene,
-segmentierte globale Net-Total-Return-Kette 1925-2025.
+Ersetzen der ungeklaerten `msci_eur`-Price-Proxyreihe durch die offene,
+segmentierte `global_equity_research_index`-Kette 1925-2025.
 
 **Scope**
 
 - Neutraler kanonischer Reihenname und kontrollierte Migration bestehender
   Consumer.
-- MSCI-basierte Segmente ab 1970.
-- Dokumentierte DM-/EUR-Waehrungsableitung.
-- Quellenbelegte Proxysegmente 1925-1969.
+- JST-basierte Total-Return-Segmente 1925-2020.
+- Offene OECD-Kurs- und EZB-Waehrungskomponenten 2021-2025 mit explizitem
+  JST-2020-Dividendenmodell.
+- Dokumentierte USD-Proxy- und deutsche Anlegerwaehrungssegmente.
 - Stetige Verkettung ohne kuenstlichen Brueckensprung.
 - Weiterhin ein gemeinsamer Jahresreturn fuer alle Aktienpositionen.
 
 **Stop-Gates**
 
-- MSCI-Nutzungsrecht fuer lokale Speicherung/Paketierung ungeklaert.
-- Keine belastbare Total-Return-Proxyquelle fuer 1925-1969.
+- Die gefilterten Eingaben stimmen nicht mit den dokumentierten
+  Originaldatei-Hashes ueberein.
+- Ein Land-/Jahreswert fehlt ausserhalb der explizit dokumentierten
+  deutschen Wechselkursluecke 1945-1946 oder japanischen
+  Aktienreturn-Luecke 1946-1947.
 - UI und Engine wuerden unterschiedliche Reihen- oder Parameternamen erhalten.
 
 **Abnahmekriterien**
 
 - Abdeckung 1925-2025 bleibt vorhanden.
-- 2024 und alle anderen Jahre stimmen innerhalb definierter Toleranz mit der
-  jeweiligen Segmentquelle ueberein.
+- Alle Jahre stimmen innerhalb `1e-12` mit dem Transformationsskript ueberein;
+  2024 ist als OECD-Price-plus-Modell-Dividende gekennzeichnet.
 - Segmentgrenzen und Waehrungsuebergaenge erzeugen keinen unbelegten Return.
 - Rohdaten, Transformationsskript, Manifestrevision und Hash sind vorhanden.
 - Vorher-/Nachher-Backtests quantifizieren die Ergebniswirkung.

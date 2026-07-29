@@ -944,10 +944,10 @@
   },
   "deltaBaselines": [
     { "id": "backtest-baseline", "file": "tests/fixtures/simulator-backtest-baseline-v1.json", "gitBlobSha1": "7b2cb702ad3c3c1501d5ddd4abb71a497b95ca3c", "expectedDelta": "none" },
-    { "id": "backtest-target", "file": "tests/fixtures/simulator-backtest-target-v1.json", "gitBlobSha1": "0933362ca52607f31be58585d6d63b3764d75c1e", "expectedDelta": "none" },
-    { "id": "mc-snapshot-policy", "file": "tests/fixtures/monte-carlo-measurement/snapshot-policy-v1.json", "gitBlobSha1": "c65fcfab8571e1bc77958e40854f5984280a3806", "expectedDelta": "none" },
+    { "id": "backtest-target", "file": "tests/fixtures/simulator-backtest-target-v1.json", "gitBlobSha1": "6194002af8dbfdbc2719fc28019ab02d8452eeb7", "expectedDelta": "backtest_data_02", "deltaEvidence": "tests/fixtures/global-equity-research-chain-backtest-delta-v1.json" },
+    { "id": "mc-snapshot-policy", "file": "tests/fixtures/monte-carlo-measurement/snapshot-policy-v1.json", "gitBlobSha1": "677eb702dc5d40c905e9d9be010b3dcae04379eb", "expectedDelta": "backtest_data_02", "deltaEvidence": "tests/fixtures/monte-carlo-measurement/post-backtest-data-02-v3.json" },
     { "id": "mc-final", "file": "tests/fixtures/monte-carlo-measurement/monte-carlo-v1-final.json", "gitBlobSha1": "f9dde37e5dff1e2d9459cb494a5780e7b85342d7", "expectedDelta": "none" },
-    { "id": "flow-delta-ledger", "file": "tests/fixtures/monte-carlo-measurement/delta-ledger-v1.json", "gitBlobSha1": "85f44b346bed831db64f4c3c8ec0690e41466cd7", "expectedDelta": "none" },
+    { "id": "flow-delta-ledger", "file": "tests/fixtures/monte-carlo-measurement/delta-ledger-v1.json", "gitBlobSha1": "8a4663627c7c9f418f8e961c39d88596cf842e71", "expectedDelta": "backtest_data_02", "deltaEvidence": "tests/fixtures/monte-carlo-measurement/post-backtest-data-02-v3.json" },
     { "id": "generated-engine", "file": "engine.js", "gitBlobSha1": "ec49961ed58134928723be5ddb6185e11f7fbcb5", "expectedDelta": "none_after_build" }
   ]
 }

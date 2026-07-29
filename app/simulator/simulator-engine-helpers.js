@@ -176,10 +176,10 @@ export function initMcRunState(inputs, startYearIndex) {
     const startJahr = annualData[effectiveIndex].jahr;
 
     const marketDataHist = {
-        endeVJ: HISTORICAL_DATA[startJahr - 1]?.msci_eur || 1000,
-        endeVJ_1: HISTORICAL_DATA[startJahr - 2]?.msci_eur || 1000,
-        endeVJ_2: HISTORICAL_DATA[startJahr - 3]?.msci_eur || 1000,
-        endeVJ_3: HISTORICAL_DATA[startJahr - 4]?.msci_eur || 1000,
+        endeVJ: HISTORICAL_DATA[startJahr - 1]?.global_equity_research_index || 1000,
+        endeVJ_1: HISTORICAL_DATA[startJahr - 2]?.global_equity_research_index || 1000,
+        endeVJ_2: HISTORICAL_DATA[startJahr - 3]?.global_equity_research_index || 1000,
+        endeVJ_3: HISTORICAL_DATA[startJahr - 4]?.global_equity_research_index || 1000,
         ath: 0,
         jahreSeitAth: 0,
         inflation: HISTORICAL_DATA[startJahr - 1]?.inflation_de || 2.0,
@@ -187,10 +187,10 @@ export function initMcRunState(inputs, startYearIndex) {
     };
 
     // ATH-Bestimmung über alle Jahre vor Startjahr.
-    const pastValues = histYears.filter(y => y < startJahr).map(y => HISTORICAL_DATA[y].msci_eur);
+    const pastValues = histYears.filter(y => y < startJahr).map(y => HISTORICAL_DATA[y].global_equity_research_index);
     marketDataHist.ath = pastValues.length > 0 ? Math.max(...pastValues, marketDataHist.endeVJ) : marketDataHist.endeVJ;
     if (marketDataHist.endeVJ < marketDataHist.ath) {
-        let lastAthYear = Math.max(...histYears.filter(y => y < startJahr && HISTORICAL_DATA[y].msci_eur >= marketDataHist.ath));
+        let lastAthYear = Math.max(...histYears.filter(y => y < startJahr && HISTORICAL_DATA[y].global_equity_research_index >= marketDataHist.ath));
         marketDataHist.jahreSeitAth = (startJahr - 1) - lastAthYear;
     }
 

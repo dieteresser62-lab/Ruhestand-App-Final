@@ -28,7 +28,7 @@ function makeFixtureRecords() {
     const records = {};
     for (let year = 1996; year <= 2002; year++) {
         records[year] = {
-            msci_eur: 100 + (year - 1996) * 10,
+            global_equity_research_index: 100 + (year - 1996) * 10,
             inflation_de: year - 1990,
             zinssatz_de: year - 1995,
             lohn_de: year - 1900,
@@ -79,9 +79,14 @@ const isolationRecords = makeFixtureRecords();
 const isolationManifest = makeFixtureManifest(isolationRecords, 'caller-isolation');
 const isolationProvider = createHistoricalBacktestContractProvider({ records: isolationRecords, manifest: isolationManifest });
 assert(!Object.isFrozen(isolationManifest), 'Provider creation should not freeze the caller manifest');
-isolationManifest.series.msci_eur.source = { status: 'known', value: 'mutated-after-validation' };
+const isolatedSourceBeforeMutation = clone(isolationProvider.manifest.series.global_equity_research_index.source);
+isolationManifest.series.global_equity_research_index.source = { status: 'known', value: 'mutated-after-validation' };
 isolationRecords[2000].lohn_de = 999;
-assertEqual(isolationProvider.manifest.series.msci_eur.source.status, 'unresolved', 'Caller manifest mutation must not reach provider snapshot');
+assertEqual(
+    JSON.stringify(isolationProvider.manifest.series.global_equity_research_index.source),
+    JSON.stringify(isolatedSourceBeforeMutation),
+    'Caller manifest mutation must not reach provider snapshot'
+);
 assertEqual(isolationProvider.getRecord(2000).realized.wagePensionAdjustment.value, 100, 'Caller data mutation must not reach validated lookup');
 console.log('✓ immutable provider and derived bounds OK');
 
@@ -194,7 +199,7 @@ console.log('Test 5: missing, non-finite and invalid index values fail with stru
     assertEqual(nonFiniteError?.details.seriesId, 'gold_eur_perf', 'Non-finite error should identify the series');
 
     const invalidIndexRecords = makeFixtureRecords();
-    invalidIndexRecords[2000].msci_eur = 0;
+    invalidIndexRecords[2000].global_equity_research_index = 0;
     const invalidIndexError = captureError(() => createHistoricalBacktestContractProvider({
         records: invalidIndexRecords,
         manifest: makeFixtureManifest(invalidIndexRecords, 'invalid-index')

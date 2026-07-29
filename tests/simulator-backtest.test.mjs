@@ -302,7 +302,7 @@ try {
             einstandAlt: 400000,
             tagesgeld: 20000,
             startFlexBedarf: 12000,
-            minimumFlexAnnual: 9000,
+            minimumFlexAnnual: 12000,
             flexBudgetAnnual: 0,
             marketCapeRatio: 35,
             dynamicFlex: 'true',

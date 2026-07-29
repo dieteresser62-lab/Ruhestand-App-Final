@@ -993,7 +993,7 @@ const emptyLists = {
         engine: EngineAPI
     });
 
-    const withMinimumFlex = await runChunk(9000);
+    const withMinimumFlex = await runChunk(12000);
     const withoutMinimumFlex = await runChunk(0);
     const withRows = withMinimumFlex.runMeta?.[0]?.logDataRows || [];
     const withoutRows = withoutMinimumFlex.runMeta?.[0]?.logDataRows || [];

@@ -1869,34 +1869,34 @@ von der Fertigstellungsreihenfolge. Die Startjahr- und Folgejahrlogik liegt in
 
 | Feld | Dokumentierter Status | Zeitraum |
 |------|-----------------------|----------|
-| `msci_eur` | MSCI-World-EUR-ähnlicher Indexlevel; exakte Variante (`Price`, `Net TR`, `Gross TR`) ist noch nicht vollständig dokumentiert | 1925-2025 |
+| `global_equity_research_index` | wirtschaftsgewichtete, offene Total-Return-Forschungsproxykette; kein Anbieterindex | 1925-2025 |
 | `inflation_de` | deutsche Inflationsreihe bzw. Proxy | 1925-2025 |
 | `zinssatz_de` | deutscher Kurz-/Zinsproxy | 1925-2025 |
 | `lohn_de` | deutsche Lohnentwicklungsreihe bzw. Proxy | 1925-2025 |
 | `gold_eur_perf` | Gold-EUR-Performance; frühe Jahre enthalten Null-Fallbacks und müssen quellenfachlich weiter geklärt werden | 1925-2025, belastbarer ab späterer Historie |
 | `cape` | CAPE-/Shiller-Bewertungsproxy | 1925-2025 |
 
-**Provenienz-Hinweis `msci_eur`:**
-*   Die Reihe wird im Code als MSCI-World-EUR-ähnlicher Proxy behandelt; die genaue Indexvariante ist ausdrücklich noch nicht vollständig belegt.
-*   Die Jahre 1925-1949 sind eine geschätzte Erweiterung und auf den 1950er-Basiswert normalisiert. Sie dienen vor allem der Abbildung extremer Sequenzrisiken.
-*   Deshalb macht dieses Dokument keine harte Aussage mehr, dass Teilperioden exakt einem bestimmten MSCI-Net-Total-Return-Index entsprechen. Der Klärpunkt steht in `DATA_SOURCES.md`.
-*   Für konservative Läufe kann die geschätzte Frühhistorie per Monte-Carlo-Option ausgeschlossen oder über Filter/Recency-Gewichtung schwächer gewichtet werden.
+**Provenienz-Hinweis `global_equity_research_index`:**
+*   Die Reihe erhebt ausdrücklich keinen Anspruch auf Gleichheit mit einem MSCI- oder anderen Anbieterindex.
+*   1925-1950 ist ein wirtschaftsgewichteter JST-USD-Proxy. Erst der Return 1951 beginnt die Umrechnung in deutsche Anlegerwährung; der rekonstruierte deutsche Faktor 1949/1950 ist keine globale Marktrendite.
+*   1951-2020 verwendet JST-Total-Returns, 2021-2025 OECD-Kursreturns plus einen offengelegten, auf 2020 eingefrorenen JST-Dividendenbaustein und EZB-Wechselkurse.
+*   Originale, Filterprojektionen, Hashes, Formeln und die separate Datenlizenz stehen unter `data/historical/global-equity-research-chain/` und in `DATA_SOURCES.md`.
 
 **Hinweis Balance-App:** In der Balance-App werden reale Depotstände und
 ETF-Kurse verwendet; eine im veröffentlichten NAV bereits enthaltene TER darf
-dort nicht nochmals pauschal abgezogen werden. Diese Aussage lässt sich nicht
-auf die Simulatorreihe übertragen: Für `msci_eur` ist die genaue
-Price-/Net-/Gross-Return-Variante ungeklärt. Engine und Simulator modellieren
-TER, Spread, Slippage und Transaktionsgebühren nicht als eigene Cashflows.
+dort nicht nochmals pauschal abgezogen werden. Die Simulatorreihe ist dagegen
+eine eigene Forschungsproxykette und kein konkretes investierbares Produkt.
+Engine und Simulator modellieren TER, Spread, Slippage und
+Transaktionsgebühren nicht als eigene Cashflows.
 
 **Erweiterte Datenbasis (1925-2025):**
 *   **Erweiterung:** Die Daten wurden ab Januar 2026 von 1950 auf **1925** erweitert.
-*   **Rekonstruktion 1925-1949:** MSCI-Levels wurden aus US-Marktdaten rekonstruiert und auf den 1950er-Basiswert normalisiert.
+*   **Forschungsproxy 1925-1950:** JST-Total-Returns von 16 Volkswirtschaften werden mit Vorjahres-Bevölkerung mal realem BIP je Einwohner gewichtet und in USD geführt.
 *   **Zweck:** Ermöglicht Stress-Tests mit historisch extremen Perioden (Große Depression, Zweiter Weltkrieg).
 
 **Daten-Anomalie 1950-1960 ("Wirtschaftswunder"):**
-*   **Beobachtung:** Die Jahre 1950-1960 weisen eine nominale CAGR von **~19.4%** (Real: ~17.4%) auf.
-*   **Bewertung:** Dies ist ein historischer Sonderfall (Nachkriegs-Wiederaufbau), der sich so kaum wiederholen lässt.
+*   **Beobachtung:** Die Forschungsproxykette weist fuer 1950-1960 eine nominale CAGR von rund **20,2 %** auf.
+*   **Bewertung:** Dies ist eine aussergewoehnliche Modellbeobachtung des wirtschaftsgewichteten Nachkriegszeitraums und keine Prognose.
 *   **Risiko:** Da die Monte-Carlo-Simulation zufällige Blöcke aus der Historie zieht, besteht das Risiko, dass "Wirtschaftswunder"-Phasen eine zu optimistische Erwartungshaltung erzeugen.
 *   **Empfehlung:** Für eine konservative Planung ("Stress-Test") kann die Datenbasis erst ab **1970** (Beginn Stagflation) oder **1978** (Präzisere Daten) genutzt werden. Die neuen Stress-Presets "Great Depression" und "WWII" bieten zusätzliche Extremszenarien.
 
@@ -1904,12 +1904,14 @@ TER, Spread, Slippage und Transaktionsgebühren nicht als eigene Cashflows.
 
 | Regime | Jahre | Anteil |
 |--------|-------|--------|
-| BULL | 28 | 28% |
-| BEAR | 22 | 22% |
-| SIDEWAYS | 38 | 38% |
-| STAGFLATION | 12 | 12% |
+| BULL | 40 | 39,6% |
+| BEAR | 6 | 5,9% |
+| SIDEWAYS | 49 | 48,5% |
+| STAGFLATION | 6 | 5,9% |
 
-*Hinweis: Die erweiterte Historie (1925-1949) enthält mehr Bärenmarkt- und Stagflationsjahre durch Große Depression und Weltkriege.*
+*Hinweis: Die Regimeklassifikation verwendet unveraenderte Schwellen auf der
+neuen Total-Return-Proxykette. Eine fachliche Rekalibrierung ist fuer Slice 12
+vorgemerkt.*
 
 ### C.3.4 Determinismus
 
@@ -2423,9 +2425,10 @@ Die eingebettete Datenbasis deckt 1925-2025 ab. Der Backtest-Provider leitet aus
 dem vollstaendigen vierjaehrigen Marktkontext die technischen Grenzen
 1929-2025 ab und projiziert sie in die UI. Die Periode ist inklusiv; auch
 `startYear === endYear` ist bei vollstaendigem Record/Lookback gueltig. Die
-Jahre 1925-1949 bleiben als `estimated`, zahlreiche Gold-Nullwerte als
-`unresolved` gekennzeichnet. Diese Qualitaetsmarker werden angezeigt und im
-Raw-Export erhalten.
+Aktienreihe markiert 1925-1950 als `proxy`, 1951-2020 als `backtested` und
+2021-2025 als `estimated`; andere Reihen besitzen eigene Qualitaetssegmente.
+Zahlreiche Gold-Nullwerte bleiben `unresolved`. Diese Qualitaetsmarker werden
+angezeigt und im Raw-Export erhalten.
 
 ### C.8.2 Daten-, Zeit- und Outcome-Vertrag
 
@@ -3196,8 +3199,8 @@ beliebige zusätzliche Asset-Klassen.
 
 | ID | Risiko oder offener Befund | Mögliche Wirkung | Behandlung / Status |
 |----|----------------------------|-----------------|---------------------|
-| MR-01 | Die Jahre 1925–1949 sind geschätzt und auf den 1950er-Level normalisiert. | Extrem- und Sequenzrisiken können durch Rekonstruktion statt beobachteter homogener Reihe geprägt sein. | In `DATA_SOURCES.md` gekennzeichnet; per `mcExcludeEstimatedHistory` oder Startjahrfilter ausschließbar. Bekannte Datenmodellgrenze. |
-| MR-02 | Die genaue Price-/Net-/Gross-Return-Variante von `msci_eur` ist ungeklärt. | Dividenden- und Kostenwirkung der Aktienhistorie ist nicht eindeutig interpretierbar. | Keine Behauptung, TER oder Ausschüttungen seien im Simulator konsistent enthalten. Offener Provenienzpunkt. |
+| MR-01 | Die Aktienreihe verwendet 1925–1950 einen wirtschaftsgewichteten USD-Forschungsproxy und 2021–2025 einen eingefrorenen Dividendenbaustein. | Extrem-, Sequenz- und moderne Jahresrenditen können von einem investierbaren kapitalgewichteten Produkt abweichen. | In `DATA_SOURCES.md` segmentiert; Startjahrfilter und Sensitivitäten verwenden. `mcExcludeEstimatedHistory` entfernt den allgemeinen Vor-1950-Bereich, nicht automatisch den USD-Return 1950. Bekannte Datenmodellgrenze. |
+| MR-02 | `global_equity_research_index` ist kein Anbieterindex und wurde nicht jahresgenau gegen einen kapitalgewichteten Weltindex extern validiert. | Ländergewichte, Dividenden- und Währungswirkung können von dem Instrument abweichen, das ein Nutzer tatsächlich hält. | Keine MSCI- oder Produktäquivalenz behaupten; Originale, Transformationen und Hashes sind reproduzierbar, externe Benchmarkvalidierung bleibt offen. |
 | MR-03 | TER, Spread, Slippage und Transaktionsgebühren fehlen als Simulator-Cashflows. | Endvermögen und Entnahmefähigkeit können gegenüber realer Umsetzung zu hoch ausfallen. | Sensitivität über konservativere Renditeannahmen möglich, aber kein gleichwertiges Kostenmodell. Bekannte Modellgrenze. |
 | MR-04 | Einwährungsmodell EUR ohne FX. | Fremdwährungsrendite, Hedgingkosten und Wechselkursschwankungen fehlen. | Nur EUR-Planungsfall; Nicht-EUR-Quotes werden abgelehnt. Bekannte Modellgrenze. |
 | MR-05 | Steuer- und Rentensteuerlogik sind bewusst vereinfacht. | Nettoerlös und bedarfsmindernder Rentenzufluss können von realer Veranlagung abweichen. | Nutzerparameter und externe Prüfung erforderlich; keine Rechtsberatung. Bekannte Modellgrenze. |
@@ -3236,7 +3239,7 @@ einem technischen Status abgeleitet.
 
 | ID / Domaene | Owner | Implementierte Quelle, Datenstand und Einheit | Geltungsbereich / wesentliche Grenze | Technisch getestet | Intern plausibilisiert | Extern validiert | Naechster Review |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| MS-01 Markt-/Inflationshistorie | Daten-Owner: Nutzer; externe Datenpruefung unbesetzt | `HistoricalDataManifestV1`, Revision `2026-07-18.1`, Jahre 1925-2025; Indexstaende, Prozent p.a., CAPE-Verhaeltnis | 1925-1949 geschaetzt; `msci_eur`-Price-/Net-/Gross-Return-Variante ungeklärt; keine Verteilungsgarantie | ja, Manifest-/Hash-/Samplingvertraege | teilweise, interne Konsistenz und Ausschlussfilter | nein | 2027-01-15 oder vor jeder Datenrevision |
+| MS-01 Markt-/Inflationshistorie | Daten-Owner: Nutzer; externe Datenpruefung unbesetzt | `HistoricalDataManifestV1`, Revision `2026-07-29.2`, Jahre 1925-2025; `global_equity_research_index`, Prozent p.a., CAPE-Verhaeltnis | offene Forschungsproxykette statt Anbieterindex; Aktiensegmente 1925-1950 USD-Proxy, 1951-2020 deutsche Anlegerwaehrung, 2021-2025 modellierter Dividendenbaustein; keine Verteilungsgarantie | ja, Manifest-/Hash-/Sampling-/Vollnachrechnungsvertraege | teilweise, interne Konsistenz und Ausschlussfilter | nein | 2027-01-15 oder vor jeder Datenrevision |
 | MS-02 Steuer | Fach-Owner: Nutzer; Steuerreview unbesetzt | vereinfachte Kapitalertragsteuer in `tax-settlement.mjs` und `sale-engine.mjs`; Vergleich: [Paragraph 32d EStG](https://www.gesetze-im-internet.de/estg/__32d.html), [BMF/LStH 2026 Paragraph 43a](https://lsth.bundesfinanzministerium.de/lsth/2026/A-Einkommensteuergesetz/VI-Steuererhebung-36-47/3-Steuerabzug-vom-Kapitalertrag-KapSt-43-45e/Paragraf-43a/inhalt.html), Abruf 2026-07-28; EUR und Steuersaetze als Verhaeltnis | Planungsnaeherung, keine Veranlagung; Kirchensteuerformel D-10 weicht ab | ja, heutiger Contract | teilweise, nur implementierte Formel | nein | 2026-10-31 oder vor Steuerjahr-/Formelaenderung |
 | MS-03 Ausgaben | Produkt-Owner: Nutzer | importierte Kategorien als vorzeichenbehaftete EUR-Betraege; Monats-/Jahresaggregation; Contractstand 2026-07-28 | aktueller Wert ist Betrag der saldierten Kategorien und damit Netto-Cash-Abfluss, keine Bruttoausgabe; D-12 offen | ja, Metrik-/Importvertraege | teilweise | nein | 2026-10-31 |
 | MS-04 Verkauf/Reconciliation | Produkt-Owner: Nutzer; Accounting-Review unbesetzt | bestaetigte Stuecke, Nettoerloes und Gebuehr in EUR; Contractstand 2026-07-28 | bestaetigte Lots werden entfernt; Verkaufserloes wird nicht automatisch in freie Liquiditaet gebucht; D-15 offen | ja, Reconciliation-Vertraege | teilweise, operativer Ablauf dokumentiert | nein | 2026-10-31 |

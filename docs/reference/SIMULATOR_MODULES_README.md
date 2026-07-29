@@ -2,7 +2,11 @@
 
 Die Simulator-App ist inzwischen in mehrere spezialisierte ES6-Module zerlegt. Die zentralen Abläufe (Monte-Carlo, Sweep, Backtests, Pflege-UI) leben nicht mehr als Monolith in `simulator-main.js`, sondern wurden in klar abgegrenzte Dateien ausgelagert. Dieses Dokument beschreibt Zweck, Haupt-Exports, Einbindungspunkte und die gewünschte Aufteilung neuer Features.
 
-**Stand:** 2026-07-29 (einschliesslich Langlebigkeit, Stationary Bootstrap, Tail-Risk-Overlay, Realentnahmevertrag, getrennter Pflege-KPI-Semantik, vollstaendigem historischen Backtest-Contract, SimulationDataInventoryV1 sowie verlustfreier Profilasset-/Goldzielaggregation)
+**Stand:** 2026-07-29 (einschliesslich offener globaler
+Aktien-Forschungsproxykette, Langlebigkeit, Stationary Bootstrap,
+Tail-Risk-Overlay, Realentnahmevertrag, getrennter Pflege-KPI-Semantik,
+vollstaendigem historischen Backtest-Contract, SimulationDataInventoryV1
+sowie verlustfreier Profilasset-/Goldzielaggregation)
 
 **Pfadkonvention:** Simulator-Module liegen unter `app/simulator/`, Profilmodule unter `app/profile/`, Shared-Utilities unter `app/shared/`, Tranchen-Status unter `app/tranches/`. Im Dokument werden Dateinamen aus Lesbarkeit meist ohne Präfix genannt.
 
@@ -156,7 +160,7 @@ DOM-freier, versionierter Raw-Vertrag fuer einen vollstaendigen Monte-Carlo-Lauf
 - `extractMonteCarloReplayArgsV1()` – rekonstruiert die DOM-freien Runnerargumente fuer einen deterministischen Re-Run.
 - `buildMonteCarloExportV1()` / `readMonteCarloExportV1()` / `createMonteCarloExportDownload()` – erzeugen und lesen `MonteCarloExportV1` mit SHA-256-Runfingerprint, App-/Engineprovenienz, Forward-Policy und eindeutigem sicheren Dateinamen. Das befristete Legacy-Read-Aliasregister ist seit Slice 11 leer; nur kanonische KPI-Felder werden erkannt.
 
-**Snapshotlinie:** `MonteCarloSnapshotPolicyV1` trennt die unveraenderliche Referenz `pre-hardening-v1`, versionierte semantische Post-Slice-Referenzen und den extern noch nicht freigegebenen Integrationskandidaten `monte-carlo-v1-final`. Unerklaerte Deltas blockieren die Fortschreibung.
+**Snapshotlinie:** `MonteCarloSnapshotPolicyV1` trennt die unveraenderliche Referenz `pre-hardening-v1`, versionierte semantische Post-Slice-Referenzen und den extern noch nicht freigegebenen Integrationskandidaten `monte-carlo-v1-final`. `post-backtest-data-02-v1` friert die Monte-Carlo-Wirkung der neuen Aktienkette getrennt und mit Status `pending` ein, ohne die aktuelle extern reviewte Referenz `post-suite-data-02-v1` zu ueberschreiben. Unerklaerte Deltas blockieren die Fortschreibung.
 
 **Einbindung:** `simulator-monte-carlo.js` erzeugt Request und Resultat direkt aus den tatsaechlich verwendeten Laufdaten. `monte-carlo-ui.js` stellt den Download erst danach bereit; es gibt keine automatische Persistenz oder Uebertragung.
 
@@ -578,20 +582,46 @@ Zufallszahlen und Statistik (Formatierung wird aus `app/shared/shared-formatting
 
 ---
 
-## 23. `simulator-data.js` (~190 Zeilen)
-Historische Daten (inkl. 1925-1949 Schwarze-Schwan-Erweiterung), Mortalitätstafeln, Stress-Presets.
+## 23. `simulator-data.js`
+Historische Datenprojektion 1925-2025, Mortalitätstafeln und Stress-Presets.
+Die Aktienlevels werden nicht mehr als zweite Zahlenreihe gepflegt, sondern
+aus `global-equity-research-chain.js` importiert.
 
 **Exporte:**
-- `HISTORICAL_DATA` – historische Marktdaten (MSCI, Gold, Inflation)
+- `HISTORICAL_DATA` – historische Marktdaten mit dem neutralen Feld
+  `global_equity_research_index` sowie Gold, Inflation, Zins, Lohn und CAPE
 - `MORTALITY_TABLE` – Sterbetafeln nach Geschlecht und Alter
 - `CARE_ENTRY_PROB` – Pflegeeintrittswahrscheinlichkeiten (BARMER)
 - `STRESS_PRESETS` – Stresstest-Szenarien (GFC, Stagflation, Lost Decade, System-Krise etc.)
 
-**Dependencies:** keine
+**Dependencies:** `global-equity-research-chain.js`
 
 ---
 
-## 23a. `simulation-data-inventory.js`
+## 23a. `global-equity-research-chain.js`
+
+Generiertes, tief eingefrorenes Datenartefakt fuer die offene
+16-Laender-Aktien-Forschungsproxykette. Das Buildskript prueft die Original-
+und gefilterten JST-/OECD-/EZB-Eingabehashes, rekonstruiert die Filterung
+bytegenau, berechnet Vorjahres-Wirtschaftsgewichte, Waehrungsumrechnungen,
+Jahresreturns und die stetige Levelkette. Der USD-Proxy reicht einschliesslich
+1950; die deutsche Anlegerwaehrung beginnt erst mit dem Return 1951.
+
+**Exporte:**
+
+- `GLOBAL_EQUITY_RESEARCH_CHAIN` – Version, Quellenhashes,
+  Numeraireuebergang, Qualitaetssegmente, Gewichte, Country-Counts, Returns
+  und Levels;
+- `GLOBAL_EQUITY_RESEARCH_ANNUAL_RETURNS` – 1925-2025-Returnprojektion;
+- `GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS` – kanonische Laufzeitlevels.
+
+**Erzeugung:** `npm run build:global-equity-data`. Die JST-abgeleiteten
+Datenwerte stehen separat unter `CC BY-NC-SA 4.0`; Details liegen in
+`data/historical/global-equity-research-chain/`.
+
+---
+
+## 23b. `simulation-data-inventory.js`
 
 DOM-freier, unveraenderlicher Evidenz- und Quell-Gate-Contract fuer
 historische Reihen und statische Simulationsdaten. Das Modul ersetzt weder
@@ -601,7 +631,7 @@ Backtestcontract.
 **Exporte:**
 
 - `SIMULATION_DATA_INVENTORY` – `SimulationDataInventoryV1`, Revision
-  `2026-07-29.1`, mit sechs reihenspezifischen Historieneintraegen und sieben
+  `2026-07-29.3`, mit sechs reihenspezifischen Historieneintraegen und sieben
   statischen Kategorien;
 - `validateSimulationDataInventory()` – prueft Pflichtfelder,
   Evidenzvokabular, lueckenlose 1925-2025-Qualitaetssegmente,
@@ -614,7 +644,9 @@ Backtestcontract.
   Reproduzierbarkeit, externe Validierung und Erlaubnis zum Datenersatz.
 
 `unresolved` bleibt technisch reproduzierbar, darf aber weder eine externe
-Validierung noch einen lizenzierten Datenersatz behaupten. Modellannahmen,
+Validierung noch einen lizenzierten Datenersatz behaupten. Die Aktienproxy
+besitzt bekannte Quellen-/Lizenzfelder, bleibt wegen ihrer Proxy- und
+Modellsegmente jedoch `not_validated`. Modellannahmen,
 Nutzereingaben, Stressparameter, abgeleitete Werte und fehlende Modelle tragen
 getrennte Evidenzklassen.
 

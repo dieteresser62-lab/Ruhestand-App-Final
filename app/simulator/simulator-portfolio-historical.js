@@ -20,9 +20,9 @@ export function prepareHistoricalData() {
         const cur = HISTORICAL_DATA[y], vj = HISTORICAL_DATA[prev];
         if (!cur || !vj) continue;
 
-        // Equity returns are based on MSCI EUR year-over-year changes.
-        const m1 = Number(cur.msci_eur);
-        const m0 = Number(vj.msci_eur);
+        // Equity returns use the canonical open research index year-over-year change.
+        const m1 = Number(cur.global_equity_research_index);
+        const m0 = Number(vj.global_equity_research_index);
         if (!isFinite(m0) || !isFinite(m1)) {
             continue;
         }

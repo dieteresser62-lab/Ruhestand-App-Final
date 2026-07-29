@@ -67,6 +67,20 @@ const METRIC_DICTIONARY_V1 = Object.freeze({
         denominator: 'consecutive emitted rows with kuerzungProzent >= 10',
         legacySource: 'legacy loop counter'
     },
+    maxDrawdownPct: {
+        unit: 'percent',
+        sign: 'non_negative',
+        rounding: 'six_decimals_in_fixture',
+        denominator: 'start wealth and emitted end-of-year wrapper portfolio totals',
+        legacySource: 'maximum peak-to-trough loss of wertAktien + wertGold + liquiditaet'
+    },
+    minRunwayCoveragePct: {
+        unit: 'percent',
+        sign: 'non_negative_or_null',
+        rounding: 'six_decimals_in_fixture',
+        denominator: 'rows containing a finite RunwayCoveragePct',
+        legacySource: 'min(rows[].row.RunwayCoveragePct)'
+    },
     maxAbsolutePortfolioFlowDelta: {
         unit: 'EUR',
         sign: 'absolute_non_negative',
@@ -328,6 +342,20 @@ function projectScenario({ id, oracleClass = 'target_expected', inputs, data, al
         .map(entry => Number(entry?.row?.portfolio_flow_delta))
         .filter(Number.isFinite)
         .map(Math.abs);
+    const wrapperTotals = rows
+        .map(entry => (Number(entry?.wertAktien) || 0) + (Number(entry?.wertGold) || 0) + (Number(entry?.liquiditaet) || 0))
+        .filter(Number.isFinite);
+    const finiteRunwayCoverage = rows
+        .map(entry => Number(entry?.row?.RunwayCoveragePct))
+        .filter(Number.isFinite);
+    let runningPeak = Number(normalizedInputs.startVermoegen) || 0;
+    let maxDrawdownPct = 0;
+    for (const wrapperTotal of wrapperTotals) {
+        runningPeak = Math.max(runningPeak, wrapperTotal);
+        if (runningPeak > 0) {
+            maxDrawdownPct = Math.max(maxDrawdownPct, ((runningPeak - wrapperTotal) / runningPeak) * 100);
+        }
+    }
     const last = rows.at(-1);
     const wrapperEnd = last
         ? (Number(last.wertAktien) || 0) + (Number(last.wertGold) || 0) + (Number(last.liquiditaet) || 0)
@@ -358,6 +386,10 @@ function projectScenario({ id, oracleClass = 'target_expected', inputs, data, al
             totalTax: round(rows.reduce((sum, entry) => sum + (Number(entry?.row?.steuern_gesamt) || 0), 0)),
             yearsWithReductionAtLeast10Pct: reductions.count,
             maxReductionStreak: reductions.maxStreak,
+            maxDrawdownPct: round(maxDrawdownPct, 6),
+            minRunwayCoveragePct: finiteRunwayCoverage.length > 0
+                ? round(Math.min(...finiteRunwayCoverage), 6)
+                : null,
             maxAbsolutePortfolioFlowDelta: round(Math.max(0, ...finiteFlowDeltas), 6)
         },
         summaryText: summaryText(summaryHtml),
@@ -536,7 +568,7 @@ function buildAlignmentOracle() {
             legacyBacktest: {
                 equity: {
                     sourceYears: [year - 1, year],
-                    valueRatio: round((current.msci_eur - previous.msci_eur) / previous.msci_eur, 12)
+                    valueRatio: round((current.global_equity_research_index - previous.global_equity_research_index) / previous.global_equity_research_index, 12)
                 },
                 gold: { sourceYear: year - 1, valuePct: previous.gold_eur_perf },
                 inflation: { sourceYear: year - 1, valuePct: previous.inflation_de },
@@ -557,7 +589,7 @@ function buildAlignmentOracle() {
                 temporalConventionId: 'realized_t_decision_t_minus_1_v1',
                 equity: {
                     sourceYears: [year - 1, year],
-                    valueRatio: round((current.msci_eur - previous.msci_eur) / previous.msci_eur, 12)
+                    valueRatio: round((current.global_equity_research_index - previous.global_equity_research_index) / previous.global_equity_research_index, 12)
                 },
                 gold: { sourceYear: year, valuePct: current.gold_eur_perf },
                 inflation: { sourceYear: year, valuePct: current.inflation_de },
@@ -778,6 +810,14 @@ try {
         expectedRowCount: 61,
         notes: ['Long-horizon regression sentinel.']
     });
+    const completedNumeraireSeam = runScenario({
+        id: 'completed_numeraire_seam_1949_1952',
+        values: { simStartJahr: 1949, simEndJahr: 1952, p1StartAlter: 18 },
+        expectedRowCount: 4,
+        notes: [
+            'Regression sentinel across the USD-through-1950 to German-investor-currency-from-1951 seam.'
+        ]
+    });
     let pensionWealthOracle = null;
     const pensionWealthProbe = runScenario({
         id: 'active_pension_wealth_reduction_2000_2001',
@@ -978,6 +1018,7 @@ try {
         cases: [
             completedShort,
             completedLong,
+            completedNumeraireSeam,
             threeBucketMinimumFlex,
             ruin,
             healthBucketProjection,
@@ -992,7 +1033,7 @@ try {
         ].map(entry => ({ ...entry, oracleClass: 'target_expected' }))
     };
 
-    assertEqual(actual.cases.length, 6, 'six runtime characterization cases should be present');
+    assertEqual(actual.cases.length, 7, 'seven runtime characterization cases should be present');
     assertEqual(pensionWealthProbe.observedRowCount, 2, 'active-pension integration probe should complete two backtest years');
     assert(pensionWealthOracle !== null, 'active-pension integration probe should publish its explicit oracle');
     assert(actual.reductionBoundaryOracle.countedByLegacyOperator, 'exact 10% must be counted by the legacy operator');
