@@ -4,7 +4,7 @@
   "baseCommit": "16f5c830d83ce17f114294e555651fcb2d776d72",
   "beforeTarget": {
     "artifact": "global-equity-research-chain-before-target-v1.json",
-    "sha256": "5079d93fd1d5dedaf5e07ccb84979354b988e6a08079fa62a60f3ee804c7d6cf",
+    "sha256": "4332716192a1224ac5730ea307584b8221af5635d61880bf98e047d9db52d4ac",
     "generatedFrom": "base commit 16f5c83 plus the Slice-02 characterization metrics and seam scenario",
     "baseCommitOriginalFixtureSha256": "c34e0aea16304308650d11b3a03d96ec3632f80e95df4bc771958da3d987febe",
     "instrumentationDisclosure": [
@@ -13,8 +13,8 @@
     ]
   },
   "afterTarget": {
-    "artifact": "simulator-backtest-target-v1.json",
-    "sha256": "01a23a8484340fc2dac6dbcd48e3bf6929404c30356767b1d6a224cb7200aff2",
+    "artifact": "post-backtest-data-02-target-v1.json",
+    "sha256": "de9dc9500c4634416bb8239a10208e853f3fb18691088c3c3770f13df1cb6c07",
     "equityAnnualReturnHash": "7982d0a0a9ec3f9dea0d547ec433abc7cb2aef0f61886fc7b3556c169a97e5bf"
   },
   "cases": [
@@ -25,7 +25,7 @@
         "requestedYears": 6,
         "startYear": 2000
       },
-      "inputHash": "ebdea5f8b4162f411a17802329bb68cc3a4e756f61e0c6a1f0131b611601ab7d",
+      "inputHash": "4fb90382bc7af1fad54fb11014e5e23862d5b561cfd992428c74e5f78397df0a",
       "outcome": {
         "before": "completed",
         "after": "completed",
@@ -88,7 +88,7 @@
         "requestedYears": 61,
         "startYear": 1960
       },
-      "inputHash": "cb5a70552297ce10277b714a2c5fcc6878a4569571368284257ece3550b8e379",
+      "inputHash": "3a08ea0c492d3ef517e7cc239506b067c8151227a61332568f4381885514c032",
       "outcome": {
         "before": "completed",
         "after": "completed",
@@ -151,7 +151,7 @@
         "requestedYears": 4,
         "startYear": 1949
       },
-      "inputHash": "cb5a70552297ce10277b714a2c5fcc6878a4569571368284257ece3550b8e379",
+      "inputHash": "d2b24432c05cbafbabbe4ca835a7ee923fbeb7ac0d2c342e45a7acdf18732e60",
       "outcome": {
         "before": "completed",
         "after": "completed",
@@ -214,7 +214,7 @@
         "requestedYears": 10,
         "startYear": 2005
       },
-      "inputHash": "ee6f0f4f65ac743fec4e1b68f7424a486fa7b4c8f0f4a43bf374d743b4723c29",
+      "inputHash": "653e5e3d4233319611c26d3a195523ecdf8e3aa5d5f7e8e7e45915edb4bf7261",
       "outcome": {
         "before": "completed",
         "after": "completed",
@@ -277,7 +277,7 @@
         "requestedYears": 6,
         "startYear": 2000
       },
-      "inputHash": "e576bf078df99d1bc8b779e50fc8c0ffe381bb5599f8c9b1809da292295d31fc",
+      "inputHash": "20093d9f6c8285d9d912581c900ef84d14b3f51bdf2e55f9dea8140fd89ab3e5",
       "outcome": {
         "before": "ruin",
         "after": "ruin",
@@ -340,7 +340,7 @@
         "requestedYears": 2,
         "startYear": 2010
       },
-      "inputHash": "a799ab677936d36be93752fa374902ad2c0421c7f199f3a8f84b01086d4bfff5",
+      "inputHash": "a5c01c72490858910f6690147879d5fd07a6a51f2790cdeb39678d911440075c",
       "outcome": {
         "before": "completed",
         "after": "completed",
@@ -403,7 +403,7 @@
         "requestedYears": 4,
         "startYear": 2010
       },
-      "inputHash": "1bc7852f16e88c723c6cc528290c37b04e209df4b1b353d55180d91a319ab65d",
+      "inputHash": "2b1a7afe9d7d3589451d6fc4f4dd35fffd1d832864db70c8cd95f38bb1b34c17",
       "outcome": {
         "before": "completed",
         "after": "completed",

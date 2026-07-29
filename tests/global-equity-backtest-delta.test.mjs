@@ -11,14 +11,12 @@ console.log('--- Global Equity Backtest Delta Tests ---');
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixturePath = path.join(__dirname, 'fixtures', 'global-equity-research-chain-backtest-delta-v1.json');
 const beforeTargetPath = path.join(__dirname, 'fixtures', 'global-equity-research-chain-before-target-v1.json');
-const targetPath = path.join(__dirname, 'fixtures', 'simulator-backtest-target-v1.json');
+const targetPath = path.join(__dirname, 'fixtures', 'post-backtest-data-02-target-v1.json');
 const fixture = JSON.parse(fs.readFileSync(fixturePath, 'utf8'));
 const beforeTargetBytes = fs.readFileSync(beforeTargetPath);
 const beforeTarget = JSON.parse(beforeTargetBytes);
-const beforeTargetCases = new Map(beforeTarget.cases.map(testCase => [testCase.id, testCase]));
 const targetBytes = fs.readFileSync(targetPath);
 const target = JSON.parse(targetBytes);
-const targetCases = new Map(target.cases.map(testCase => [testCase.id, testCase]));
 const expectedMetricKeys = [
     'summaryEndWealth',
     'totalWithdrawal',
@@ -35,6 +33,33 @@ function sha256(value) {
 function roundDelta(value) {
     return Math.round(value * 1e6) / 1e6;
 }
+
+function referenceCaseIdentity(testCase) {
+    const startYear = Number(testCase?.period?.startYear);
+    const endYear = Number(testCase?.period?.endYear);
+    assert(Number.isInteger(startYear), `${testCase?.id || 'unknown'} should identify an integer start year`);
+    assert(Number.isInteger(endYear), `${testCase?.id || 'unknown'} should identify an integer end year`);
+    return `${testCase.id}:${startYear}-${endYear}`;
+}
+
+function indexReferenceCases(cases, label) {
+    const indexed = new Map();
+    for (const testCase of cases) {
+        const identity = referenceCaseIdentity(testCase);
+        assert(!indexed.has(identity), `${label} should not duplicate reference identity ${identity}`);
+        indexed.set(identity, testCase);
+    }
+    return indexed;
+}
+
+function assertSamePeriod(actual, expected, label) {
+    assertEqual(actual?.startYear, expected?.startYear, `${label} start year should match`);
+    assertEqual(actual?.endYear, expected?.endYear, `${label} end year should match`);
+    assertEqual(actual?.requestedYears, expected?.requestedYears, `${label} requested years should match`);
+}
+
+const beforeTargetCases = indexReferenceCases(beforeTarget.cases, 'Before-target evidence');
+const targetCases = indexReferenceCases(target.cases, 'Active target fixture');
 
 assertEqual(fixture.schemaVersion, 'GlobalEquityResearchBacktestDeltaV1', 'Delta fixture should be versioned');
 assertEqual(fixture.cause, 'global_equity_research_chain', 'Delta fixture should name the sole intended cause');
@@ -53,10 +78,13 @@ assertEqual(
 assertEqual(sha256(targetBytes), fixture.afterTarget.sha256, 'After-target hash should match the frozen target fixture');
 
 for (const testCase of fixture.cases) {
-    const beforeCase = beforeTargetCases.get(testCase.id);
-    const activeCase = targetCases.get(testCase.id);
-    assert(beforeCase, `${testCase.id} should exist in the tracked before-target evidence`);
-    assert(activeCase, `${testCase.id} should exist in the active target fixture`);
+    const identity = referenceCaseIdentity(testCase);
+    const beforeCase = beforeTargetCases.get(identity);
+    const activeCase = targetCases.get(identity);
+    assert(beforeCase, `${identity} should exist in the tracked before-target evidence`);
+    assert(activeCase, `${identity} should exist in the active target fixture`);
+    assertSamePeriod(beforeCase.period, testCase.period, `${identity} before period`);
+    assertSamePeriod(activeCase.period, testCase.period, `${identity} active period`);
     assertEqual(beforeCase.inputHash, testCase.inputHash, `${testCase.id} before input hash should match`);
     assertEqual(activeCase.inputHash, testCase.inputHash, `${testCase.id} input hash should remain unchanged`);
     assertEqual(beforeCase.outcomeObservation, testCase.outcome.before, `${testCase.id} before outcome should match`);

@@ -328,8 +328,23 @@ Diese Grenze ist fachlich gewollt: Balance kennt derzeit keinen belastbaren aktu
   rekonstruiert die gefilterten Inputs aus den paketierten Originaldateien,
   fuehrt 1950 noch vollstaendig im USD-Proxy und beginnt die deutsche
   Anlegerwaehrung mit dem Return 1951.
+* `app/simulator/german-cpi-chain.js` – deterministisch erzeugte, tief
+  eingefrorene 1925-2025-Kette der deutschen
+  Jahresdurchschnitts-Verbraucherpreisinflation. JST-R6-Levelaenderungen
+  bilden den Proxy 1925-1949; gepinnte Destatis-Langreihen und die aktuelle
+  Jahrestabelle bilden die amtlichen Segmente ab 1950. Gebiets- und
+  Haushaltskonzeptwechsel 1950/1963/1992 sowie der 2025-Quellwechsel sind
+  maschinenlesbar; HICP/HVPI ist ausgeschlossen. Die Integer-Quantisierung
+  1925-1948, Preisstopp-/Kriegsphase 1936-1948 und der 1949er
+  Waehrungsreform-Splice samt 8,0878-pp-Abstand zur amtlichen Alternative sind
+  als Proxyqualifikation im Artefakt hinterlegt. Zusaetzlich trennt die
+  Metadatenqualifikation den CPI-basierten Kaufkraftverlust von rund 36,9 %
+  vom nominalen 100:6,5-Schnitt grosser Reichsmark-Bar- und Bank-/Sparguthaben
+  (93,5 %); die Reihe ist kein durchgehender Geldvermoegensdeflator ueber
+  1948. Ein zweiter Testreader
+  rekonstruiert alle 101 Raten unabhaengig vom Generator.
 * `app/simulator/simulator-data.js` – Historische Datenprojektion mit
-  `global_equity_research_index`, tief eingefrorenes
+  generiertem `global_equity_research_index` und `inflation_de`, tief eingefrorenes
   `HistoricalDataManifestV1`, Mortalitäts- und Stress-Presets.
 * `app/simulator/historical-backtest-contract.js` – DOM-freier, im Produktbacktest aktivierter Manifest-/SHA-256-/`HistoricalYearRecordV1`-Contract. Validiert das Dataset einmal je Revision/Hash, liefert immutable Records und prueft Einzelpfad- bzw. Cohort-Batch-Perioden vor der Rechenschleife. Die aktive Zeitachse `realized_t_decision_t_minus_1_v1` verwendet realisierte Markt-/Makrowerte aus `t` und CAPE decision-as-of aus `t-1`.
 * `app/simulator/simulation-data-inventory.js` – DOM-freier
@@ -337,8 +352,8 @@ Diese Grenze ist fachlich gewollt: Balance kennt derzeit keinen belastbaren aktu
   Reihen sowie Demografie-, Pflege-, Hinterbliebenen-, Steuer-/Tranchen-,
   Renten-/Sozial-, Stress-/Regime- und Default-/Fallbackklassen. Eigene
   Reihen-Segmente und kanonische SHA-256-Wertfingerprints sichern
-  Reproduzierbarkeit; die Aktienproxy besitzt eine aufgeloeste offene
-  Quell-/Lizenzkette, bleibt als Ganzes aber `not_validated`; `unresolved`
+  Reproduzierbarkeit; Aktienproxy und deutsche VPI-Kette besitzen aufgeloeste
+  offene Quell-/Lizenzketten, bleiben als Ganzes aber `not_validated`; `unresolved`
   blockiert fuer die anderen Reihen externe Validierungs- und
   Datenersatzbehauptungen, ohne deren technisch reproduzierbaren
   Runtime-Backtest zu blockieren.
@@ -390,7 +405,7 @@ Dynamic-Flex ist entlang der Simulator-Pipeline konsistent aktiviert:
 * Backtest-Metriken/Cohorts: `app/simulator/historical-backtest-metrics.js` definiert 24 versionierte Metriken mit Einheiten, Nennern, Missingness-, Outcome- und Rohquellenregeln und leitet sie ohne Displayrundung aus dem kanonischen Resultat ab. `app/simulator/historical-backtest-cohorts.js` erzeugt feste inklusive Fenster ueber einen einzigen Batch-Preflight, inventarisiert Outcomes und Ausschluesse getrennt und kennzeichnet die ueberlappenden Fenster als historische In-sample-Diagnose ohne Erfolgswahrscheinlichkeitsaussage.
 * Backtest-Export: `app/simulator/historical-backtest-export.js` ist DOM-frei und serialisiert ausschliesslich `BacktestRunResultV1`. `HistoricalBacktestExportV1` (`schemaId=de.ruhestandsapp.historical-backtest.raw`) fuehrt Request-/Run-ID, Dataset-Content-/Manifest-Hash, Temporal-Konvention, Engine-Build und Config-Fingerprint, Outcome, sichere Fehlerdaten, Portfolio-Snapshots, Historical-Year-Records, Rohjahreszeilen, Metriken und optional ein Cohort-Inventar. Der SHA-256-Result-Fingerprint verwendet kanonisches JSON; `exportedAt`, IDs, Exportmetadaten und interne `diagnostics` sind ausgeschlossen. UI, Summary, Tabelle und Export teilen dieselbe tief eingefrorene Result-/Row-Instanz.
 * Monte-Carlo-Export: `MonteCarloRunRequestV1` friert normalisierte Szenarioeingaben, Seed, Sampling-/Stressvertrag, Datenfingerprint sowie die tatsaechlich verwendete Worker-/Chunkkonfiguration ein. `MonteCarloRunResultV1` projiziert das disjunkte Outcome-Inventar, explizit benannte Nominal-/Real-EUR-KPIs, Stichprobengroessen, Missingness, Unsicherheit, Sampling-/Ausfuehrungsdiagnostik und sanitizierte technische Fehler. `MonteCarloExportV1` (`schemaId=de.ruhestandsapp.monte-carlo.run`) ergaenzt App-, Engine- und Snapshotprovenienz; sein SHA-256-Run-Fingerprint schliesst nur Exportzeit, IDs und reine Export-/Privacy-Metadaten aus. Unbekannte Zusatzfelder werden nach erfolgreicher V1-Pflichtfeldpruefung inventarisiert, unbekannte Schemaversionen und Fingerprintabweichungen fail-closed abgewiesen. Seit Slice 11 schreiben und lesen produktive V1-Consumer ausschliesslich kanonische KPI-Felder; das Legacy-Read-Aliasregister ist leer.
-* Die aktuelle extern reviewte Same-Runtime-Referenz bleibt `post-suite-data-02-v1`. Sie baut unveraenderlich auf `post-suite-data-05-v1` auf und dokumentiert das freigegebene Delta der harten `maxSkimPctOfEq=0`-/Equity-Budget-Semantik. Die neue globale Aktienkette besitzt getrennt den noch nicht extern freigegebenen Kandidaten `post-backtest-data-02-v1`: fester Seed, Inputs, Runtime und Workerlayout bleiben gleich; Datenfingerprint, Regimeinventar und davon abhaengige Finanzpfade werden als eigenes Delta gegen `post-suite-data-02-v1` eingefroren. Auch `post-suite-data-11-v1` bleibt `pending`; keine fruehere Referenz wird ueberschrieben.
+* Die oeffentliche `currentReference` ist `null`, solange kein extern freigegebener Nachfolger vorliegt. Der getrennte CPI-Messkandidat `post-backtest-data-03-v1` bleibt `pending` und steht ausschliesslich im Delta-Ledger. Der veraenderliche Referenzzeiger ist kein Bestandteil der eingefrorenen Ergebnisprojektion; dadurch wird der Kandidat weder selbstreferenziell noch wegen einer reinen Zeigeraenderung dupliziert. Fruehere Backtest-Datenkandidaten und `post-suite-data-11-v1` bleiben unveraenderliche historische Referenzen. Fester Seed, Inputs, Runtime und Workerlayout bleiben gleich; Datenfingerprint, Regimeinventar und davon abhaengige Finanzpfade werden je Daten-Slice als getrenntes Delta eingefroren.
 * Backtest-CSV: `HistoricalBacktestCsvV1` verwendet feste technische Header mit Einheiten, Semikolon, Punkt als Dezimaltrenner, LF und leere Missingness-Zellen. Textfelder erhalten Formel-Injektionsschutz und RFC-artiges Quote-/Delimiter-/Newline-Escaping. Displayformatter und der Detailtoggle werden nicht konsumiert. Der Download bleibt eine explizite Nutzeraktion ohne automatische Persistenz oder Uebertragung.
 * Backtest-UI/A11y: `app/simulator/historical-backtest-ui.js` kapselt manifestabgeleitete Periodengrenzen, feldnahe Integer-/Bounds-Validierung, sanitizierte Statusprojektion, Datenqualitaets-/In-sample-Hinweise, das immutable Cohort-Inventar sowie Caption-/Header-Semantik der scrollbaren Tabelle. `simulator-backtest.js` injiziert im Browser-Gate Provider und Jahresadapter, ohne den produktiven Runnervertrag zu umgehen. Der Status unterscheidet `running`, `completed`, `ruin`, `incomplete`, `technical_error` sowie reine `validation_error` und verschiebt den Fokus nur nach explizitem Lauf oder auf das erste fehlerhafte Feld. Der Startbutton wird ausschliesslich per Modulhandler gebunden; Inline-`onclick` existiert nicht mehr.
 * Worker-Parität: `workers/mc-worker.js` erhält dieselben Dynamic-Flex Inputs; Seed/Chunking bleiben deterministisch.

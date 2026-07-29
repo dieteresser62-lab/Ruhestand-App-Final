@@ -48,7 +48,10 @@ fixtures through the same local proxy contract.
 
 The Balance annual workflow queries the completed calendar year from the annual-period contract. All accepted source responses are normalized to the metric `consumer_prices_all_items_annual_average_growth_pct` and return:
 
-- `rate`: finite percentage in the existing engine range `-10` through `50`;
+- `rate`: finite percentage in the Balance live-provider range `-10` through
+  `50`; the separate historical Engine input and Balance import contracts
+  accept `-15` through `50` so the 1932 research-proxy observation remains
+  representable without weakening the live-data plausibility gate;
 - `year`: exact completed target year;
 - `source`: selected provider and index family;
 - `dataAsOf`: source response preparation/update timestamp, with retrieval time only as a last-resort fallback;
@@ -118,9 +121,12 @@ commit-blocking.
 - Coverage: `1925-2025`
 - Equity estimated/proxy segments: `1925-1950` and `2021-2025`
 - Equity provider-backtested segment: `1951-2020`
+- Inflation proxy segment: `1925-1949`
+- Inflation official Destatis segments: `1950-1962`, `1963-1991`,
+  `1992-2024` and `2025`
 - Machine-readable manifest: `HISTORICAL_DATA_MANIFEST`, schema `HistoricalDataManifestV1`
-- Dataset ID/revision: `ruhestandsapp-historical-data-v1` / `2026-07-29.2`
-- Canonical content hash: `6e7facc781d4168e511881f9a0c7ab21d2a7f945078913fe2cd51138932c4494`
+- Dataset ID/revision: `ruhestandsapp-historical-data-v1` / `2026-07-29.4`
+- Canonical content hash: `26e7334f7123c5f22d40746a9c9f7b840e44beebb10df148c3c11f528128d6e2`
 - Hash algorithm: SHA-256 over canonical JSON (`sha256-canonical-json-v1`); year keys are numeric ascending, object fields lexical, and numbers are locale-independent JSON tokens.
 - Backtest lookback contract: four complete years before `startYear`; the contract-derived technical bounds are therefore `1929-2025`. The Backtest UI reads these bounds from the active provider, sets both year inputs dynamically, and validates against the same contract.
 
@@ -138,6 +144,44 @@ original and filtered inputs, hashes, attribution and separate data license live
 `data/historical/global-equity-research-chain/`. Rebuild it with
 `npm run build:global-equity-data`. The chain is a 16-country research proxy,
 not an MSCI or other provider index.
+
+The canonical inflation field is `inflation_de`. Its generated source module
+is `app/simulator/german-cpi-chain.js`; pinned originals, hashes, attribution
+and separate data licences live under
+`data/historical/german-cpi-chain/`. Rebuild it with
+`npm run build:german-cpi-data` and verify the read-only reconstruction with
+`npm run verify:german-cpi-data`. The selected identity is annual-average
+German national consumer-price inflation, not HICP/HVPI. The JST R6 segment
+through 1949 is a historical cost-of-living research proxy, not the modern
+German VPI. Normalized to 1938=126, its 1925-1948 levels are exact integers
+(about 0.48-0.85
+percentage-point implied rate resolution); price controls and the wartime
+freeze affect 1936-1948. The 1949 non-integer JST endpoint is an explicit
+post-currency-reform splice: `+7.0352%` selected versus `-1.0526%` from the
+Destatis levels `28.5 -> 28.2`, a difference of `8.0878` percentage points.
+This price proxy does not capture the separate write-down of major Reichsmark
+cash and bank/savings balances. Under the October 1948 settlement, 100 RM
+became 6.50 DM, a 93.5% nominal balance loss; by contrast the chain's
+1936-1948 price change of about 58.5% implies about 36.9% purchasing-power
+loss. The series must therefore not be used as a continuous-currency deflator
+for monetary wealth across the reform. Source:
+[Deutsche Bundesbank, Währungsreform 1948](https://www.bundesbank.de/de/aufgaben/themen/waehrungsreform-1948-614040).
+JST R6 German CPI level changes provide the 1925-1949 proxy. Destatis provides the official
+former-West-German medium-income four-person-household series for 1950-1962,
+the all-private-household series for 1963-1991 and the German VPI for
+1992-2025. Each seam-year rate is calculated inside one source series. The
+Destatis 1948 observation is a second-half average and is therefore not used
+to calculate the 1949 rate. Published rates are checked against the rounded
+annual levels with a maximum deviation of `0.05` percentage points. This
+threshold passes the measured maximum genuine rounding drift (`0.049688` pp)
+but rejects every plus/minus `0.1`-pp published-rate mutation across all 76
+official 1950-2025 cross-checks. The
+long-series source vintage is `2025-06`; the latest source snapshot is
+`2026-07-10`. The selected national VPI annual rates are
+2.2 percent in both 2024 and 2025. The combined raw-data hash is
+`83841d2c11df3a5e193aa07db3bdfe815cbbeea7f9f81c3526b197702a46bdb4`;
+the generated 101-rate hash is
+`9ec87b5052d5e086517142c34213a4063e2be6ccdd8a5babf6d5722ffb76ae3a`.
 
 ### Manifest status terms
 
@@ -160,21 +204,21 @@ not an MSCI or other provider index.
 | Series ID | Variant | Currency | Region | Frequency | Source | License | Transformation | Estimated segment | Missingness |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `global_equity_research_index` | economically weighted research total-return proxy | USD proxy 1925-1950; German investor currency 1951-2020; EUR 2021-2025 | 16 advanced economies | annual | JST R6; OECD `DSD_STES@DF_FINMARK` 4.0; ECB `EXR` | derived data `CC BY-NC-SA 4.0`; OECD/ESCB terms also apply | generated prior-year economic weights; USD through 1950; German investor currency from 1951; documented price/dividend transformations | 1925-1950 and 2021-2025 | required; reject missing/non-finite and non-positive levels |
-| `inflation_de` | `unresolved` | not applicable | DE | annual | `unresolved` | `unresolved` | identity from embedded annual percentage | 1925-1949 | required; reject missing/non-finite |
+| `inflation_de` | segmented German national consumer-price chain; excludes HICP/HVPI | not applicable | DE | annual | JST R6 1925-1949; Destatis long series 1950-2024; Destatis current annual table 2025 | JST-derived segment `CC BY-NC-SA 4.0`; Destatis segments Data Licence Germany - attribution - 2.0 | JST consecutive-level changes through 1949; published Destatis annual-average changes from 1950 with source-local seams; excludes the separate 100:6.5 nominal monetary-balance write-down across the 1948 reform | 1925-1949 | required; reject missing/non-finite |
 | `zinssatz_de` | `unresolved` | not applicable | DE | annual | `unresolved` | `unresolved` | identity from embedded annual percentage | 1925-1949 | required; reject missing/non-finite |
 | `lohn_de` | `unresolved` | not applicable | DE | annual | `unresolved` | `unresolved` | identity from embedded annual percentage | 1925-1949 | required; reject missing/non-finite |
 | `gold_eur_perf` | `unresolved` | EUR | global | annual | `unresolved` | `unresolved` | identity from embedded annual percentage | 1925-1949 | required; reject missing/non-finite; zero quality unresolved |
 | `cape` | `unresolved` | not applicable | `unresolved` | annual | `unresolved` | `unresolved` | identity from embedded annual ratio | 1925-1949 | required; reject missing/non-finite and non-positive ratios |
 
-The equity source, proxy identity, transformation and data license are
-resolved. The other five source and license statuses remain intentionally
-unresolved. A resolved source chain does not turn the derived equity proxy
-into an externally validated provider index.
+The equity and German CPI sources, identities, transformations and data
+licences are resolved. The remaining four historical source and licence
+statuses remain intentionally unresolved. A resolved source chain does not
+turn either research chain into an externally validated provider series.
 
 ### Simulation-wide data inventory
 
 `app/simulator/simulation-data-inventory.js` adds the wider, immutable
-`SimulationDataInventoryV1`, revision `2026-07-29.3`. The existing
+`SimulationDataInventoryV1`, revision `2026-07-29.4`. The existing
 `HistoricalDataManifestV1` remains the active runtime/backtest record contract;
 the wider inventory is an evidence and change gate around that runtime
 contract and the productively used static model-data classes.
@@ -201,8 +245,8 @@ The six historical entries own separate, contiguous `qualitySegments` for
 
 | Series | Current segment contract | Important gate |
 | --- | --- | --- |
-| `global_equity_research_index` | 1925-1950 `proxy`; 1951-2020 `backtested`; 2021-2025 `estimated` | source chain is reproducible; 1950 stays in USD so the reconstructed German 1949/1950 factor is not a global return; the modern frozen-dividend model remains an explicit limitation |
-| `inflation_de` | 1925-1949 `estimated`; 1950-2023 `unresolved`; 2024-2025 separately `unresolved` | single German VPI identity, territory/method bridges and retrieval chain unresolved |
+| `global_equity_research_index` | 1925-1950 `proxy`; 1951-2020 `backtested`; 2021-2025 `estimated` | source chain is reproducible; 1950 stays in USD so the reconstructed German 1949/1950 factor is not a global return; the modern frozen-dividend model remains an explicit limitation. The local German component still contains a documented currency-reform reconstruction in 1948/1949: Germany contributes about -4.17 percentage points in 1948 and +37.38 percentage points in 1949 despite an economic weight near five percent. This low-evidence proxy artifact is retained, not presented as a market event, and is removed when estimated history is excluded. |
+| `inflation_de` | 1925-1949 `proxy`; 1950-1962 `official` with `proxy_population`; 1963-1991 `official`; 1992-2024 `official`; 2025 `official` | pinned JST/Destatis originals and generated hashes resolve the national VPI chain; territory/population seams remain explicit and HICP/HVPI is excluded |
 | `zinssatz_de` | 1925-1949 `estimated`; 1950-1998 DM-era `unresolved`; 1999-2025 EUR-era `unresolved` | investable instrument, accrual and annualization conventions unresolved |
 | `lohn_de` | 1925-1949 `estimated`; 1950-2023 `unresolved`; 2024-2025 separately `unresolved` | nominal wage/pension-adjustment identity and D-20 reconciliation unresolved |
 | `gold_eur_perf` | zero ranges 1925-1932, 1934-1960 and 1962-1968 separately `unresolved`; remaining ranges separately inventoried | 42 zeros, gold-price source, market regime and USD/DM/EUR conversion unresolved |
@@ -234,10 +278,12 @@ The source gate deliberately separates three questions:
 3. `replacementAllowed` is false until the external-validation gate passes.
 
 Therefore all six historical series can replay deterministically. The equity
-entry now also has resolved source, license, retrieval and raw-data hashes, but
-its external-validation status remains `not_validated` because it is a
-research proxy with a modelled 2021-2025 dividend component. The other five
-series retain their unresolved replacement gates. Later data-replacement
+and inflation entries now have resolved source, licence, retrieval and
+raw-data hashes, but their external-validation statuses remain
+`not_validated`. Equity is a research proxy with a modelled 2021-2025 dividend
+component; inflation includes a JST proxy through 1949 and explicit official
+territory/population seams. The remaining four series retain their unresolved
+replacement gates. Later data-replacement
 slices must update their exact series entry, raw-data and embedded-value
 hashes, segments, transformation and source/license evidence together.
 
@@ -272,8 +318,8 @@ does not replace this runtime manifest and does not upgrade any field to
 | Open item | Current state | Required owner and next evidence | Blocking effect |
 | --- | --- | --- | --- |
 | exact equity provider-index identity | intentionally not applicable: `global_equity_research_index` is a named research proxy | external methodology review may compare it with licensed provider indices without renaming the proxy | blocks claims of provider-index equivalence, not deterministic use |
-| variants and primary sources for the other five series | `unresolved` | exact series identifiers, definitions, retrieval/data dates and permitted source chain | blocks research-grade FV-G02 for those series |
-| licenses/usage rights for the other five series | `unresolved` | license text, use/redistribution scope and review date; legal review where needed | blocks their replacement, integration or redistribution |
+| variants and primary sources for the remaining four series | `unresolved` | exact series identifiers, definitions, retrieval/data dates and permitted source chain | blocks research-grade FV-G02 for those series |
+| licenses/usage rights for the remaining four series | `unresolved` | license text, use/redistribution scope and review date; legal review where needed | blocks their replacement, integration or redistribution |
 | equity proxy segments | original and filtered JST/OECD/ECB inputs, hashes and transformation resolved; 1925-1950 USD proxy and 2021-2025 frozen-dividend model | independent methodology validation and future dividend-source replacement | prevents provider-index and externally-validated claims |
 | zero-valued `gold_eur_perf` observations | 42 records with unresolved quality: 1925-1932, 1934-1960 and 1962-1968 | evidence whether each segment is genuine zero return, missing data or an assumption, followed by a new manifest revision | blocks gold-effect and holdout claims; values must not be silently reinterpreted |
 | CAPE region | `unresolved` | exact market/region and transformation contract | blocks international CAPE/policy comparison |
@@ -318,7 +364,7 @@ rejects non-finite required returns before portfolio mutation.
 ## Series overview
 
 - `global_equity_research_index`: open, segmented global equity research index level
-- `inflation_de`: annual German inflation proxy
+- `inflation_de`: open, segmented German annual-average national CPI chain
 - `zinssatz_de`: annual German rate proxy
 - `lohn_de`: annual wage growth proxy
 - `gold_eur_perf`: annual gold return proxy

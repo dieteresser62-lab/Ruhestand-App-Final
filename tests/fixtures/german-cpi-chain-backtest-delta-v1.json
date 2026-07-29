@@ -1,0 +1,519 @@
+{
+  "schemaVersion": "GermanCpiBacktestDeltaV1",
+  "cause": "german_cpi_chain",
+  "beforeTarget": {
+    "artifact": "post-backtest-data-02-target-v1.json",
+    "sha256": "de9dc9500c4634416bb8239a10208e853f3fb18691088c3c3770f13df1cb6c07",
+    "inflationAnnualRateHash": "048bfca64b8bf6033f1c43fadb673fe48c9f4d7790127824fb65015c34e1af2f"
+  },
+  "afterTarget": {
+    "artifact": "simulator-backtest-target-v1.json",
+    "sha256": "c73f82d60efde37652229439c7cb783f91c1abd1d4b2b319a18346a3d77709fb",
+    "inflationAnnualRateHash": "9ec87b5052d5e086517142c34213a4063e2be6ccdd8a5babf6d5722ffb76ae3a"
+  },
+  "finalYearDeflatorIsolation": {
+    "findingId": "D-20",
+    "year": 2024,
+    "beforeInflationPct": 2.5,
+    "afterInflationPct": 2.2,
+    "nominalBasisAfterPriorYearInflation": 2709296.0241668024,
+    "nominalEndWealthDelta": 0,
+    "realEndWealthBefore": 2643215.633333466,
+    "realEndWealthAfter": 2650974.583333466,
+    "realEndWealthDelta": 7758.95,
+    "formula": "real_end = nominal_basis_after_prior_year_inflation / (1 + final_year_inflation_pct / 100)",
+    "evidence": "Reconstruction of the recorded D-20 isolated 2024 sensitivity; full-chain cases below are separate runtime evidence."
+  },
+  "cases": [
+    {
+      "id": "completed_2000_2005",
+      "period": {
+        "endYear": 2005,
+        "requestedYears": 6,
+        "startYear": 2000
+      },
+      "inputHash": "4fb90382bc7af1fad54fb11014e5e23862d5b561cfd992428c74e5f78397df0a",
+      "outcome": {
+        "before": "completed",
+        "after": "completed",
+        "cause": "german_cpi_chain"
+      },
+      "canonicalRowsHash": {
+        "before": "0b5640651e9816750ed36962f3249ff53ca4070d38478b3af5a26e98bb8d2b38",
+        "after": "1d5e87fbdfa29bdc370b4d720b4ccc15c513704ada0f0ec129d286dcc9b95ee7",
+        "changed": true,
+        "cause": "german_cpi_chain"
+      },
+      "metrics": {
+        "summaryEndWealth": {
+          "before": 1692409.94,
+          "after": 1692425.95,
+          "delta": 16.01,
+          "cause": "german_cpi_chain"
+        },
+        "totalWithdrawal": {
+          "before": 176400,
+          "after": 176400,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "totalTax": {
+          "before": 0,
+          "after": 0,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "yearsWithReductionAtLeast10Pct": {
+          "before": 4,
+          "after": 4,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "maxReductionStreak": {
+          "before": 4,
+          "after": 4,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "maxDrawdownPct": {
+          "before": 40.343729,
+          "after": 40.343729,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "minRunwayCoveragePct": {
+          "before": 75.547603,
+          "after": 75.585921,
+          "delta": 0.038318,
+          "cause": "german_cpi_chain"
+        },
+        "maxAbsolutePortfolioFlowDelta": {
+          "before": 0,
+          "after": 0,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        }
+      }
+    },
+    {
+      "id": "completed_1960_2020",
+      "period": {
+        "endYear": 2020,
+        "requestedYears": 61,
+        "startYear": 1960
+      },
+      "inputHash": "3a08ea0c492d3ef517e7cc239506b067c8151227a61332568f4381885514c032",
+      "outcome": {
+        "before": "completed",
+        "after": "completed",
+        "cause": "german_cpi_chain"
+      },
+      "canonicalRowsHash": {
+        "before": "61b8d631b36b1c75a50e095de5ff2f83dd6441c22a8b93840a3da1b913d81581",
+        "after": "3731cac5e44a9bb4c6809230864675bc58e1656a8a8d3f9f7b5a7ef711b78f80",
+        "changed": true,
+        "cause": "german_cpi_chain"
+      },
+      "metrics": {
+        "summaryEndWealth": {
+          "before": 178982113.78,
+          "after": 179135437.66,
+          "delta": 153323.88,
+          "cause": "german_cpi_chain"
+        },
+        "totalWithdrawal": {
+          "before": 4122159.99,
+          "after": 4093414.61,
+          "delta": -28745.38,
+          "cause": "german_cpi_chain"
+        },
+        "totalTax": {
+          "before": 772770.76,
+          "after": 766632.65,
+          "delta": -6138.11,
+          "cause": "german_cpi_chain"
+        },
+        "yearsWithReductionAtLeast10Pct": {
+          "before": 59,
+          "after": 59,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "maxReductionStreak": {
+          "before": 59,
+          "after": 59,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "maxDrawdownPct": {
+          "before": 40.158872,
+          "after": 40.158872,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "minRunwayCoveragePct": {
+          "before": 71.551312,
+          "after": 71.554003,
+          "delta": 0.002691,
+          "cause": "german_cpi_chain"
+        },
+        "maxAbsolutePortfolioFlowDelta": {
+          "before": 0,
+          "after": 0,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        }
+      }
+    },
+    {
+      "id": "completed_numeraire_seam_1949_1952",
+      "period": {
+        "endYear": 1952,
+        "requestedYears": 4,
+        "startYear": 1949
+      },
+      "inputHash": "d2b24432c05cbafbabbe4ca835a7ee923fbeb7ac0d2c342e45a7acdf18732e60",
+      "outcome": {
+        "before": "completed",
+        "after": "completed",
+        "cause": "german_cpi_chain"
+      },
+      "canonicalRowsHash": {
+        "before": "261191396762ae8481a7f6f6db175d59e689ec67f69ed68f1f31bc919984d66f",
+        "after": "f1ffb7529cea0b5213a47ceaedacb14e230c1998a818ed619c539df49394d4bb",
+        "changed": true,
+        "cause": "german_cpi_chain"
+      },
+      "metrics": {
+        "summaryEndWealth": {
+          "before": 5152751.56,
+          "after": 5145999.78,
+          "delta": -6751.78,
+          "cause": "german_cpi_chain"
+        },
+        "totalWithdrawal": {
+          "before": 118800,
+          "after": 121200,
+          "delta": 2400,
+          "cause": "german_cpi_chain"
+        },
+        "totalTax": {
+          "before": 19510.49,
+          "after": 19910.66,
+          "delta": 400.17,
+          "cause": "german_cpi_chain"
+        },
+        "yearsWithReductionAtLeast10Pct": {
+          "before": 2,
+          "after": 3,
+          "delta": 1,
+          "cause": "german_cpi_chain"
+        },
+        "maxReductionStreak": {
+          "before": 2,
+          "after": 3,
+          "delta": 1,
+          "cause": "german_cpi_chain"
+        },
+        "maxDrawdownPct": {
+          "before": 0,
+          "after": 0,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "minRunwayCoveragePct": {
+          "before": 70.419352,
+          "after": 70.419352,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "maxAbsolutePortfolioFlowDelta": {
+          "before": 0,
+          "after": 0,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        }
+      }
+    },
+    {
+      "id": "three_bucket_minimum_flex_2005_2014",
+      "period": {
+        "endYear": 2014,
+        "requestedYears": 10,
+        "startYear": 2005
+      },
+      "inputHash": "653e5e3d4233319611c26d3a195523ecdf8e3aa5d5f7e8e7e45915edb4bf7261",
+      "outcome": {
+        "before": "completed",
+        "after": "completed",
+        "cause": "german_cpi_chain"
+      },
+      "canonicalRowsHash": {
+        "before": "6192b923a4397f50decd360bfb1045970f50300d26970d467eda0bf548a125f9",
+        "after": "acbdad297eea65851081f1163905e669f80445609869e9ca18421e2c575c7478",
+        "changed": true,
+        "cause": "german_cpi_chain"
+      },
+      "metrics": {
+        "summaryEndWealth": {
+          "before": 385842.24,
+          "after": 385842.24,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "totalWithdrawal": {
+          "before": 328800,
+          "after": 328800,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "totalTax": {
+          "before": 29182.67,
+          "after": 29182.67,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "yearsWithReductionAtLeast10Pct": {
+          "before": 10,
+          "after": 10,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "maxReductionStreak": {
+          "before": 10,
+          "after": 10,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "maxDrawdownPct": {
+          "before": 34.421546,
+          "after": 34.421546,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "minRunwayCoveragePct": {
+          "before": 95.532481,
+          "after": 96.40839,
+          "delta": 0.875909,
+          "cause": "german_cpi_chain"
+        },
+        "maxAbsolutePortfolioFlowDelta": {
+          "before": 0,
+          "after": 0,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        }
+      }
+    },
+    {
+      "id": "capital_poor_ruin_2000_2005",
+      "period": {
+        "endYear": 2005,
+        "requestedYears": 6,
+        "startYear": 2000
+      },
+      "inputHash": "20093d9f6c8285d9d912581c900ef84d14b3f51bdf2e55f9dea8140fd89ab3e5",
+      "outcome": {
+        "before": "ruin",
+        "after": "ruin",
+        "cause": "german_cpi_chain"
+      },
+      "canonicalRowsHash": {
+        "before": "30bf451ba9c335b886105b4fdcd9e108f62839967579294dc9f7e7167af642f4",
+        "after": "0e3cd5f7ca6100ae7e8fb9eaf447f61020f046917eb77f8f087ea7c47d9eee9f",
+        "changed": true,
+        "cause": "german_cpi_chain"
+      },
+      "metrics": {
+        "summaryEndWealth": {
+          "before": 26802.8,
+          "after": 26802.8,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "totalWithdrawal": {
+          "before": 90000,
+          "after": 90000,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "totalTax": {
+          "before": 1290.26,
+          "after": 1290.26,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "yearsWithReductionAtLeast10Pct": {
+          "before": 1,
+          "after": 1,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "maxReductionStreak": {
+          "before": 1,
+          "after": 1,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "maxDrawdownPct": {
+          "before": 77.664331,
+          "after": 77.664331,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "minRunwayCoveragePct": {
+          "before": 0,
+          "after": 0,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "maxAbsolutePortfolioFlowDelta": {
+          "before": 0,
+          "after": 0,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        }
+      }
+    },
+    {
+      "id": "health_bucket_nested_row_summary_positive",
+      "period": {
+        "endYear": 2011,
+        "requestedYears": 2,
+        "startYear": 2010
+      },
+      "inputHash": "a5c01c72490858910f6690147879d5fd07a6a51f2790cdeb39678d911440075c",
+      "outcome": {
+        "before": "completed",
+        "after": "completed",
+        "cause": "german_cpi_chain"
+      },
+      "canonicalRowsHash": {
+        "before": "1c61710562ceb423db86647b16e7096302563ee27a7dc537d53413ca193187d1",
+        "after": "673670958d79899add2ae7876c7a8913e74f9a4cb4d99345006406caebad7041",
+        "changed": true,
+        "cause": "german_cpi_chain"
+      },
+      "metrics": {
+        "summaryEndWealth": {
+          "before": 2272042.2,
+          "after": 2272042.2,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "totalWithdrawal": {
+          "before": 60000,
+          "after": 60000,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "totalTax": {
+          "before": 2657.61,
+          "after": 2657.61,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "yearsWithReductionAtLeast10Pct": {
+          "before": 0,
+          "after": 0,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "maxReductionStreak": {
+          "before": 0,
+          "after": 0,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "maxDrawdownPct": {
+          "before": 3.321382,
+          "after": 3.321382,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "minRunwayCoveragePct": {
+          "before": 9.259259,
+          "after": 9.259259,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "maxAbsolutePortfolioFlowDelta": {
+          "before": 0,
+          "after": 0,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        }
+      }
+    },
+    {
+      "id": "dynamic_flex_cape_2010_2013",
+      "period": {
+        "endYear": 2013,
+        "requestedYears": 4,
+        "startYear": 2010
+      },
+      "inputHash": "2b1a7afe9d7d3589451d6fc4f4dd35fffd1d832864db70c8cd95f38bb1b34c17",
+      "outcome": {
+        "before": "completed",
+        "after": "completed",
+        "cause": "german_cpi_chain"
+      },
+      "canonicalRowsHash": {
+        "before": "19ed56f2c5257882e31ed091ca63c7cc46667fc1142a85ed8a5ddb6caf033e0a",
+        "after": "426caa35dd6c3bd855752d5fbdca85548040dd355cb9b2840b8e3ce3020b09ba",
+        "changed": true,
+        "cause": "german_cpi_chain"
+      },
+      "metrics": {
+        "summaryEndWealth": {
+          "before": 2412711.9,
+          "after": 2412711.9,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "totalWithdrawal": {
+          "before": 492000,
+          "after": 492000,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "totalTax": {
+          "before": 91236.92,
+          "after": 91236.92,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "yearsWithReductionAtLeast10Pct": {
+          "before": 4,
+          "after": 4,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "maxReductionStreak": {
+          "before": 4,
+          "after": 4,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "maxDrawdownPct": {
+          "before": 7.712561,
+          "after": 7.712561,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        },
+        "minRunwayCoveragePct": {
+          "before": 47.531808,
+          "after": 47.279805,
+          "delta": -0.252003,
+          "cause": "german_cpi_chain"
+        },
+        "maxAbsolutePortfolioFlowDelta": {
+          "before": 0,
+          "after": 0,
+          "delta": 0,
+          "cause": "german_cpi_chain"
+        }
+      }
+    }
+  ]
+}

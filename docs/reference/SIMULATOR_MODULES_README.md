@@ -160,7 +160,7 @@ DOM-freier, versionierter Raw-Vertrag fuer einen vollstaendigen Monte-Carlo-Lauf
 - `extractMonteCarloReplayArgsV1()` – rekonstruiert die DOM-freien Runnerargumente fuer einen deterministischen Re-Run.
 - `buildMonteCarloExportV1()` / `readMonteCarloExportV1()` / `createMonteCarloExportDownload()` – erzeugen und lesen `MonteCarloExportV1` mit SHA-256-Runfingerprint, App-/Engineprovenienz, Forward-Policy und eindeutigem sicheren Dateinamen. Das befristete Legacy-Read-Aliasregister ist seit Slice 11 leer; nur kanonische KPI-Felder werden erkannt.
 
-**Snapshotlinie:** `MonteCarloSnapshotPolicyV1` trennt die unveraenderliche Referenz `pre-hardening-v1`, versionierte semantische Post-Slice-Referenzen und den extern noch nicht freigegebenen Integrationskandidaten `monte-carlo-v1-final`. `post-backtest-data-02-v1` friert die Monte-Carlo-Wirkung der neuen Aktienkette getrennt und mit Status `pending` ein, ohne die aktuelle extern reviewte Referenz `post-suite-data-02-v1` zu ueberschreiben. Unerklaerte Deltas blockieren die Fortschreibung.
+**Snapshotlinie:** `MonteCarloSnapshotPolicyV1` trennt die unveraenderliche Referenz `pre-hardening-v1`, versionierte semantische Post-Slice-Referenzen und den extern noch nicht freigegebenen Integrationskandidaten `monte-carlo-v1-final`. Solange kein extern freigegebener Nachfolger vorliegt, ist die oeffentliche `currentReference` `null`; `post-backtest-data-03-v1` ist ein davon getrennter, bis zum externen Re-Review `pending` markierter CPI-Messkandidat im Delta-Ledger. Der veraenderliche Zeiger wird aus der eingefrorenen Ergebnisprojektion ausgeschlossen. Pending Kandidaten werden daher weder zur aktuellen Referenz erklaert noch wegen einer reinen Zeigeraenderung dupliziert. Fruehere Suite- und Backtest-Datenreferenzen werden nicht ueberschrieben. Unerklaerte Deltas blockieren die Fortschreibung.
 
 **Einbindung:** `simulator-monte-carlo.js` erzeugt Request und Resultat direkt aus den tatsaechlich verwendeten Laufdaten. `monte-carlo-ui.js` stellt den Download erst danach bereit; es gibt keine automatische Persistenz oder Uebertragung.
 
@@ -585,7 +585,9 @@ Zufallszahlen und Statistik (Formatierung wird aus `app/shared/shared-formatting
 ## 23. `simulator-data.js`
 Historische Datenprojektion 1925-2025, Mortalitätstafeln und Stress-Presets.
 Die Aktienlevels werden nicht mehr als zweite Zahlenreihe gepflegt, sondern
-aus `global-equity-research-chain.js` importiert.
+aus `global-equity-research-chain.js` importiert. Die deutschen
+Inflationswerte werden ebenso ausschliesslich aus
+`german-cpi-chain.js` projiziert.
 
 **Exporte:**
 - `HISTORICAL_DATA` – historische Marktdaten mit dem neutralen Feld
@@ -594,7 +596,7 @@ aus `global-equity-research-chain.js` importiert.
 - `CARE_ENTRY_PROB` – Pflegeeintrittswahrscheinlichkeiten (BARMER)
 - `STRESS_PRESETS` – Stresstest-Szenarien (GFC, Stagflation, Lost Decade, System-Krise etc.)
 
-**Dependencies:** `global-equity-research-chain.js`
+**Dependencies:** `global-equity-research-chain.js`, `german-cpi-chain.js`
 
 ---
 
@@ -621,7 +623,44 @@ Datenwerte stehen separat unter `CC BY-NC-SA 4.0`; Details liegen in
 
 ---
 
-## 23b. `simulation-data-inventory.js`
+## 23b. `german-cpi-chain.js`
+
+Generiertes, tief eingefrorenes Datenartefakt fuer die deutsche
+Jahresdurchschnitts-Verbraucherpreisinflation 1925-2025. Das Buildskript
+prueft die Hashes des wiederverwendeten JST-R6-Originals, der gepinnten
+Destatis-Langreihen-XLSX und des aktuellen Destatis-HTML-Snapshots. Es
+berechnet die JST-Levelaenderungen bis 1949, liest die veroeffentlichten
+Destatis-Jahresraten ab 1950 und prueft diese gegen aufeinanderfolgende
+Jahresdurchschnittslevel mit hoechstens 0,05 Prozentpunkten Abweichung; damit
+wird jede Abweichung um einen publizierten Tick von 0,1 Prozentpunkten
+abgewiesen. Ein
+getrennter Testreader rekonstruiert alle 101 Raten direkt aus den gepinnten
+Originalen. Die Integer-Quantisierung 1925-1948, Preisstopp-/Kriegsphase
+1936-1948 und der 1949er Waehrungsreform-Splice (`+7,0352` % statt
+`-1,0526` % amtlicher Levelalternative) sind maschinenlesbar qualifiziert.
+Die separate 100:6,5-Umstellung grosser Reichsmark-Bar- und
+Bank-/Sparguthaben (93,5 % nominaler Verlust) wird dem CPI-basierten
+Kaufkraftverlust von rund 36,9 % gegenuebergestellt; die Kette ist kein
+durchgehender Geldvermoegensdeflator ueber die Reform.
+Die Naehte 1950, 1963, 1992 und 2025 bleiben
+explizit; HICP/HVPI ist ausgeschlossen.
+
+**Exporte:**
+
+- `GERMAN_CPI_RESEARCH_CHAIN` – Version, Quellenhashes, Auswahl- und
+  Nahtregeln, Qualitaetssegmente, Jahresraten und synthetische Indexlevels;
+- `GERMAN_CPI_INFLATION_RATES` – kanonische 1925-2025-Laufzeitprojektion;
+- `GERMAN_CPI_SYNTHETIC_INDEX_LEVELS` – stetige Diagnoselevel ab Basis 1924.
+
+**Erzeugung:** `npm run build:german-cpi-data`; read-only Gate:
+`npm run verify:german-cpi-data`. Die JST-Anteile stehen unter
+`CC BY-NC-SA 4.0`, die Destatis-Anteile unter der Datenlizenz Deutschland –
+Namensnennung – 2.0. Details liegen in
+`data/historical/german-cpi-chain/`.
+
+---
+
+## 23c. `simulation-data-inventory.js`
 
 DOM-freier, unveraenderlicher Evidenz- und Quell-Gate-Contract fuer
 historische Reihen und statische Simulationsdaten. Das Modul ersetzt weder
@@ -631,7 +670,7 @@ Backtestcontract.
 **Exporte:**
 
 - `SIMULATION_DATA_INVENTORY` – `SimulationDataInventoryV1`, Revision
-  `2026-07-29.3`, mit sechs reihenspezifischen Historieneintraegen und sieben
+  `2026-07-29.4`, mit sechs reihenspezifischen Historieneintraegen und sieben
   statischen Kategorien;
 - `validateSimulationDataInventory()` – prueft Pflichtfelder,
   Evidenzvokabular, lueckenlose 1925-2025-Qualitaetssegmente,

@@ -163,7 +163,8 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 
 #### `engine-robustness.test.mjs`
 **Zweck:** Robustheitstests gegen Edge Cases und fehlerhafte Eingaben.
-- **Inflation:** Zero inflation, hohe Inflation (50%), out-of-range (>50%)
+- **Inflation:** Nullinflation, historische Deflation bis -15%, hohe Inflation
+  bis 50% sowie out-of-range unter -15% und über 50%
 - **Marktextreme:** 100% Jahresperformance, 0% Return
 
 #### `tauri-csp.test.mjs`
@@ -292,7 +293,7 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 
 #### `monte-carlo-measurement-contract.test.mjs`
 **Zweck:** Validiert Golden Cases, unveraenderliche Snapshot-Linie, Delta-Ledger, Same-Runtime-Exaktheit sowie Direct-/Worker-/Chunk-Paritaet.
-- **Aktuelle Referenz:** `post-suite-data-02-v1` baut auf `post-suite-data-05-v1` auf; keine fruehere Fixture wird ueberschrieben.
+- **Aktuelle Referenz:** Die oeffentliche `currentReference` ist `null`, solange kein extern freigegebener Nachfolger vorliegt; `post-backtest-data-03-v1` ist der getrennte, noch extern zu reviewende CPI-Datenkandidat. Der veraenderliche Zeiger ist aus der eingefrorenen Ergebnisprojektion ausgeschlossen. Keine fruehere Fixture wird ueberschrieben und eine reine Zeigeraenderung erzeugt keinen Folgesnapshot.
 - **Slice-02-Delta:** Die harte Nullsemantik fuer `maxSkimPctOfEq` und das Equity-Gesamtbudget veraendert im festen Acht-Run-Fall nur Volatilitaet und maximalen Drawdown von Run 6 sowie die davon abgeleitete Median-Volatilitaet.
 - **Invarianten:** Direct-Runner-CaR, alle anderen Pfad-/Aggregatwerte, Outcome-Inventar, Missingness und Datenprovenienz bleiben exakt.
 - **Slice-11-Kandidat:** `post-suite-data-11-v1` bleibt bis zum externen Review
@@ -304,8 +305,12 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
   Auto-Optimize-Projektionen fuer denselben Seed und dasselbe Workerlayout
   ein. V1 und V2 bleiben als ueberholte, unreviewte Kandidaten unveraendert;
   der Erzeugungsmodus darf V3 nicht ueberschreiben und endet absichtlich
-  nicht gruen. V3 bleibt bis zum externen Review `pending`; die aktuelle extern
-  reviewte Referenz bleibt `post-suite-data-02-v1`.
+  nicht gruen. V3 bleibt bis zum externen Review `pending`.
+- **Backtest-Data-Slice-03-Kandidat:** `post-backtest-data-03-v1` baut
+  unveraenderlich auf V3 auf und friert die CPI-Datenversion samt Risiko-,
+  CaR-, Sampling- und Auto-Optimize-Projektionen ein. Der Erzeugungsmodus
+  verweigert ein Ueberschreiben; der Kandidat bleibt bis zum externen Review
+  `pending`. Die oeffentliche `currentReference` bleibt deshalb `null`.
 - **Ressourcenmessung:** Das feste Standardprofil mit 100.000 Runs ergab
   977,62585 gesamte Worker-Result-Byte pro Run; der Laufzeitvertrag verwendet
   gerundete 978 Byte pro Run.
@@ -651,7 +656,7 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 #### `historical-data-manifest.test.mjs`
 **Zweck:** Testet `HistoricalDataManifestV1` und den eingebetteten Datenfingerprint.
 - **Manifestfelder:** IDs, Variante, Waehrung, Region, Frequenz, Zeitraum, Source-/Lizenzstatus, Transformation, Schaetzsegmente, Missingness und Revision.
-- **Resolution-Gate:** Belegte Aktien-Source-/Lizenzfelder bleiben `known`; fuer die anderen Reihen gibt es keine leeren `known`-Werte und keine erfundenen Werte unter `unresolved`.
+- **Resolution-Gate:** Belegte Aktien- und VPI-Source-/Lizenzfelder bleiben `known`; fuer die verbleibenden Reihen gibt es keine leeren `known`-Werte und keine erfundenen Werte unter `unresolved`.
 - **Hash:** Browser-kompatibles SHA-256 gegen Node-`crypto` und den manifestierten Laufzeit-Datenbestand.
 - **Lookup:** Lueckenlose 1925-2025-Baseline, abgeleitete technische Bounds 1929-2025, Provenienz und Non-Mutation.
 
@@ -680,10 +685,42 @@ bestehenden Zielreferenzen sowie eines zusaetzlichen Laufs ueber die
 - **Bilanzgate:** Vorher und nachher bleibt der maximale absolute
   `portfolio_flow_delta` unter 1 EUR.
 
+#### `german-cpi-chain.test.mjs`
+**Zweck:** Testet die generierte deutsche 1925-2025-VPI-Kette.
+- **Quellenhashes:** JST-R6-Original, Destatis-Langreihen-XLSX und aktueller
+  Destatis-HTML-Snapshot stimmen mit ihren gepinnten SHA-256-Werten ueberein.
+- **Verkettung:** 101 Jahresraten und synthetische Levels sind lueckenlos;
+  `HISTORICAL_DATA` und `annualData` verwenden ausschliesslich die generierten
+  Raten.
+- **Naehte:** 1949/1950, 1962/1963, 1991/1992 und 2024/2025 besitzen feste
+  Quellen-/Gebietsvertraege; 2024 und 2025 betragen jeweils 2,2 Prozent.
+- **Evidenz/Lizenz:** JST-Proxy, amtliche Destatis-Segmente,
+  `proxy_population`, HICP/HVPI-Ausschluss und beide Datenlizenzen bleiben
+  maschinenlesbar.
+
+#### `german-cpi-source-reconstruction.test.mjs`
+**Zweck:** Fuehrt den read-only Original-zu-Modul-Rekonstruktionscheck aus und
+beweist, dass das Verifikationsgate das generierte Modul nicht umschreibt.
+
+#### `german-cpi-backtest-delta.test.mjs`
+**Zweck:** Validiert die Slice-03-Vorher-/Nachher-Evidenz gegen den eingefrorenen
+Post-Slice-02-Zielstand und das aktive Backtest-Ziel.
+- **Identitaet:** Referenzen werden mit ID und Periode identifiziert;
+  Input-Hashes und Outcome-Klassen bleiben stabil.
+- **Deltas:** Endvermoegen, Entnahmen, Steuern, Kuerzungsmetriken,
+  Drawdown, Runway und FlowDelta tragen die alleinige Ursache
+  `german_cpi_chain`.
+- **D-20:** Die isolierte Endjahreskorrektur 2024 haelt nominales
+  Endvermoegen konstant und erklaert die dokumentierten +7.758,95 EUR
+  Realwert rein aus dem Deflator.
+- **Bilanzgate:** Vorher und nachher bleibt der maximale absolute
+  `portfolio_flow_delta` unter 1 EUR.
+
 #### `simulation-data-inventory.test.mjs`
 **Zweck:** Testet das simulationsweite Evidenzinventar und seine Quell-Gates.
 - **Historieninventar:** Sechs eigene, lueckenlose 1925-2025-Segmentvertraege
-  einschliesslich D-15- und Gold-Nullwert-Risiken.
+  einschliesslich der aufgeloesten D-15-/D-20-Quellketten und der
+  verbleibenden Gold-Nullwert-Risiken.
 - **Statische Klassen:** Demografie, Pflege, Hinterbliebene, Steuern/Tranchen,
   Rente/Sozialversicherung, Stress/Regime und Default-/Fallbackwerte besitzen
   Implementierungsabdeckung und getrennte Evidenzklassen.

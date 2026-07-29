@@ -62,6 +62,22 @@ function assertFiniteNumber(value, label) {
     assertFiniteNumber(result.ui.spending.monatlicheEntnahme, 'monatlicheEntnahme');
 }
 
+// --- TEST 2b: Historical deflation within the widened lower bound ---
+{
+    const input = { ...baseInput, inflation: -11.02941175231129 };
+    const result = EngineAPI.simulateSingleYear(input, null);
+    assert(!result.error, 'Documented 1932 German historical deflation should be accepted');
+    assertFiniteNumber(result.ui.spending.monatlicheEntnahme, 'monatlicheEntnahme');
+}
+
+// --- TEST 2c: Lower inflation boundary is inclusive ---
+{
+    const input = { ...baseInput, inflation: -15 };
+    const result = EngineAPI.simulateSingleYear(input, null);
+    assert(!result.error, 'Inflation at the -15% lower bound should be accepted');
+    assertFiniteNumber(result.ui.spending.monatlicheEntnahme, 'monatlicheEntnahme');
+}
+
 // --- TEST 3: Extreme Market Jump (100% yearly performance) ---
 {
     const input = { ...baseInput, endeVJ: 200, endeVJ_1: 100, ath: 220, jahreSeitAth: 0 };
@@ -111,9 +127,22 @@ function assertFiniteNumber(value, label) {
     const originalError = console.error;
     console.error = () => {};
     try {
-        const input = { ...baseInput, inflation: 100 };
-        const result = EngineAPI.simulateSingleYear(input, null);
-        assert(result.error instanceof ValidationError, 'Out-of-range inflation should return ValidationError');
+        const excessiveInflation = EngineAPI.simulateSingleYear(
+            { ...baseInput, inflation: 100 },
+            null
+        );
+        const excessiveDeflation = EngineAPI.simulateSingleYear(
+            { ...baseInput, inflation: -15.0001 },
+            null
+        );
+        assert(
+            excessiveInflation.error instanceof ValidationError,
+            'Inflation above 50% should return ValidationError'
+        );
+        assert(
+            excessiveDeflation.error instanceof ValidationError,
+            'Inflation below -15% should return ValidationError'
+        );
     } finally {
         console.error = originalError;
     }

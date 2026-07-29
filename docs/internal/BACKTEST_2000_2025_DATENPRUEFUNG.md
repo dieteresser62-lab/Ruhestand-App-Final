@@ -753,14 +753,14 @@ reine Stressparameter duerfen im Manifest nicht dieselbe Evidenzklasse tragen.
 
 ### Arbeitsstatus und Branch-Regel
 
-- Status: Slice 01 am 2026-07-29 technisch abgeschlossen und als lokaler
-  Commit `16f5c83` vorhanden; Slice 02 ist nach Nutzerentscheidung auf die
-  offene Forschungsdatenkette umgestellt. Die im anschliessenden
-  Claude-Review dokumentierten Blocker CR02-1/CR02-3 und Freigabeauflagen
-  CR02-2/CR02-6 sind durch Codex technisch nachgebessert. Der Reviewerstatus
-  bleibt bis zum erneuten unabhaengigen Review blockiert. Externes Review,
-  Freigabe und Commit stehen aus; Slice 03 darf erst nach erfolgreicher
-  Freigabe begonnen werden.
+- Status: Slice 01 ist als lokaler Commit `16f5c83` vorhanden. Slice 02 ist
+  nach Claude-Zweitreview Runde 2 freigegeben und als Commit `289471b`
+  vorhanden. Die Auflagen CR02-13 bis CR02-16 sind als vorgeschaltetes
+  Slice-03-Gate technisch nachgezogen. Slice 03 ist auf demselben Branch
+  umgesetzt und technisch validiert. S03-STOP-01 wurde nach ausdruecklicher
+  Nutzerfreigabe durch die gezielte Erweiterung der Engine-Untergrenze von
+  `-10` auf `-15` Prozent aufgeloest; die Vollsuite ist mit
+  12.440/12.440 Assertions gruen. Externes Review und Freigabe stehen aus.
 - Dokumentierter Ausgangsstand der Nachrechnung: `ca982cf`.
 - Nutzerentscheidung vom 2026-07-29: Die Umsetzung bleibt ausdruecklich auf
   dem vorhandenen Branch `codex/suite-datenintegritaet-hardening`; es wird
@@ -911,6 +911,17 @@ segmentierte `global_equity_research_index`-Kette 1925-2025.
 - Vorher-/Nachher-Backtests quantifizieren die Ergebniswirkung.
 
 ### Slice 3 - Deutscher Verbraucherpreisindex
+
+**Slice-Dokument:**
+[`SLICE_BACKTEST_DATENPRUEFUNG_03_DEUTSCHER_VPI.md`](SLICE_BACKTEST_DATENPRUEFUNG_03_DEUTSCHER_VPI.md)
+
+**Umsetzungsstatus:** am 2026-07-29 auf
+`codex/suite-datenintegritaet-hardening` umgesetzt und technisch validiert.
+Die gezielten Quellen-, Runtime-, Manifest-, Inventar-, Backtestdelta-,
+Monte-Carlo- und Integrationsgates sowie `npm test` mit 12.440/12.440
+Assertions sind gruen. S03-STOP-01 wurde durch die vom Nutzer freigegebene
+Engine-Untergrenze von `-15` Prozent aufgeloest. Technisches Review und
+Freigabe stehen aus; Codex nimmt keine Selbstfreigabe vor.
 
 **Abhaengigkeit:** Slice 1.
 

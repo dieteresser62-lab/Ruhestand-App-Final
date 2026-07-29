@@ -157,7 +157,7 @@
       "canonicalRowsHash": "ca5828ee5050aa1b8a80b4226757191f694bc2972ead3712178db97723c9d275",
       "expectedRowCount": 6,
       "id": "completed_2000_2005",
-      "inputHash": "ebdea5f8b4162f411a17802329bb68cc3a4e756f61e0c6a1f0131b611601ab7d",
+      "inputHash": "4fb90382bc7af1fad54fb11014e5e23862d5b561cfd992428c74e5f78397df0a",
       "inputs": {
         "accumulationPhase": {
           "durationYears": 0,
@@ -456,7 +456,7 @@
       "canonicalRowsHash": "410a0a116f1ed51de27cdf58453aa007bb1d78bf1e14acc2bb305e9f7d60998b",
       "expectedRowCount": 61,
       "id": "completed_1960_2020",
-      "inputHash": "cb5a70552297ce10277b714a2c5fcc6878a4569571368284257ece3550b8e379",
+      "inputHash": "3a08ea0c492d3ef517e7cc239506b067c8151227a61332568f4381885514c032",
       "inputs": {
         "accumulationPhase": {
           "durationYears": 0,
@@ -728,7 +728,7 @@
       "canonicalRowsHash": "9274de0836e0da9966e09eceffb92f558b1309680d07edb1c1afe7134df75982",
       "expectedRowCount": 4,
       "id": "completed_numeraire_seam_1949_1952",
-      "inputHash": "cb5a70552297ce10277b714a2c5fcc6878a4569571368284257ece3550b8e379",
+      "inputHash": "d2b24432c05cbafbabbe4ca835a7ee923fbeb7ac0d2c342e45a7acdf18732e60",
       "inputs": {
         "accumulationPhase": {
           "durationYears": 0,
@@ -1000,7 +1000,7 @@
       "canonicalRowsHash": "1d3c42f3c097e003e99f725df7c78441452eba668d9c3aa7c54fe045aa0db035",
       "expectedRowCount": 10,
       "id": "three_bucket_minimum_flex_2005_2014",
-      "inputHash": "ee6f0f4f65ac743fec4e1b68f7424a486fa7b4c8f0f4a43bf374d743b4723c29",
+      "inputHash": "653e5e3d4233319611c26d3a195523ecdf8e3aa5d5f7e8e7e45915edb4bf7261",
       "inputs": {
         "accumulationPhase": {
           "durationYears": 0,
@@ -1272,7 +1272,7 @@
       "canonicalRowsHash": "c78bb2b1d1f71ac3e552e9ff086b41ed050e9682b34b99de0e264f6488c659a9",
       "expectedRowCount": 2,
       "id": "capital_poor_ruin_2000_2005",
-      "inputHash": "e576bf078df99d1bc8b779e50fc8c0ffe381bb5599f8c9b1809da292295d31fc",
+      "inputHash": "20093d9f6c8285d9d912581c900ef84d14b3f51bdf2e55f9dea8140fd89ab3e5",
       "inputs": {
         "accumulationPhase": {
           "durationYears": 0,
@@ -1492,7 +1492,7 @@
       "canonicalRowsHash": "a561830e2f5713ae0916aa278deb71dc4a7f4279417505bf05324e4c5af61403",
       "expectedRowCount": 2,
       "id": "health_bucket_nested_row_summary_positive",
-      "inputHash": "a799ab677936d36be93752fa374902ad2c0421c7f199f3a8f84b01086d4bfff5",
+      "inputHash": "a5c01c72490858910f6690147879d5fd07a6a51f2790cdeb39678d911440075c",
       "inputs": {
         "accumulationPhase": {
           "durationYears": 0,
@@ -1713,7 +1713,7 @@
       "canonicalRowsHash": "0048585e7909c89c4f45da8db53b7029d175bcfb718a1a69e1232342613dfd1d",
       "expectedRowCount": 4,
       "id": "dynamic_flex_cape_2010_2013",
-      "inputHash": "1bc7852f16e88c723c6cc528290c37b04e209df4b1b353d55180d91a319ab65d",
+      "inputHash": "2b1a7afe9d7d3589451d6fc4f4dd35fffd1d832864db70c8cd95f38bb1b34c17",
       "inputs": {
         "accumulationPhase": {
           "durationYears": 0,
@@ -2678,7 +2678,7 @@
       "canonicalRowsHash": "b0ba109fde0ea3c49676ae3ce0ace5841181521e07ca5e7c90bfc32fb2b6d8ff",
       "expectedRowCount": 0,
       "id": "negative_single_year_2010",
-      "inputHash": "a799ab677936d36be93752fa374902ad2c0421c7f199f3a8f84b01086d4bfff5",
+      "inputHash": "9d17d3ae44a88df7077a195b728527f5f6bff6a603d7ebaf8acb3f167b69967c",
       "inputs": {
         "accumulationPhase": {
           "durationYears": 0,
@@ -2872,7 +2872,7 @@
       "canonicalRowsHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "expectedRowCount": 0,
       "id": "negative_nan_period",
-      "inputHash": "a799ab677936d36be93752fa374902ad2c0421c7f199f3a8f84b01086d4bfff5",
+      "inputHash": "a57d4c526f28cf948b9bd563397ae4ede7f3a1f75201ad9ed8fdd248d85eff0c",
       "inputs": {
         "accumulationPhase": {
           "durationYears": 0,
@@ -3039,7 +3039,7 @@
       "canonicalRowsHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "expectedRowCount": 0,
       "id": "negative_reverse_period_2012_2010",
-      "inputHash": "a799ab677936d36be93752fa374902ad2c0421c7f199f3a8f84b01086d4bfff5",
+      "inputHash": "2aa6696ea91226be9e984cecb11d81d8449ada0999a15a4120e3912a7b7df085",
       "inputs": {
         "accumulationPhase": {
           "durationYears": 0,
@@ -3206,7 +3206,7 @@
       "canonicalRowsHash": "b49dcf23ff8126a3951a2766efdcf207570a03f29d35260ada00bdf3f5ecc5e2",
       "expectedRowCount": 1,
       "id": "negative_missing_middle_year_2000_2002",
-      "inputHash": "a799ab677936d36be93752fa374902ad2c0421c7f199f3a8f84b01086d4bfff5",
+      "inputHash": "1998565282ce1f330bf96cafbd136eaaffbda15d97567f80d72d5f4d9a75a91d",
       "inputs": {
         "accumulationPhase": {
           "durationYears": 0,
@@ -3452,7 +3452,7 @@
       "canonicalRowsHash": "5babb878fecded49ab08d6b295f7951a5ad069df815f905f2c7e232f15745cb8",
       "expectedRowCount": 2,
       "id": "negative_non_finite_gold_return_2001_2002",
-      "inputHash": "a799ab677936d36be93752fa374902ad2c0421c7f199f3a8f84b01086d4bfff5",
+      "inputHash": "77c77f5e878e586e13f58170b9da0f92e849e294bd4cf7527fa28adda7c0ecd1",
       "inputs": {
         "accumulationPhase": {
           "durationYears": 0,

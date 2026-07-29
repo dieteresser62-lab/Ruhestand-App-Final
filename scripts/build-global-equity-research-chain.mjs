@@ -20,6 +20,11 @@ const OUTPUT_PATH = path.join(
 );
 const ORIGINAL_DATA_DIRECTORY = path.join(DATA_DIRECTORY, 'originals');
 const REFRESH_FILTERED_INPUTS = process.argv.includes('--refresh-filtered-inputs');
+const VERIFY_ONLY = process.argv.includes('--verify-only');
+
+if (REFRESH_FILTERED_INPUTS && VERIFY_ONLY) {
+    throw new Error('--refresh-filtered-inputs and --verify-only are mutually exclusive');
+}
 
 const COUNTRY_CURRENCIES = Object.freeze({
     AUS: 'AUD',
@@ -705,8 +710,12 @@ export const GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS =
     GLOBAL_EQUITY_RESEARCH_CHAIN.indexLevels;
 `;
 
-fs.writeFileSync(OUTPUT_PATH, output, 'utf8');
-console.log(`Generated ${path.relative(PROJECT_ROOT, OUTPUT_PATH)}`);
+if (VERIFY_ONLY) {
+    console.log('Verified original-to-filtered reconstruction and generated-chain inputs without writing files.');
+} else {
+    fs.writeFileSync(OUTPUT_PATH, output, 'utf8');
+    console.log(`Generated ${path.relative(PROJECT_ROOT, OUTPUT_PATH)}`);
+}
 console.log(`rawDataHash=${rawDataHash}`);
 console.log(`annualReturnHash=${chain.annualReturnHash}`);
 console.log(`indexLevelHash=${chain.indexLevelHash}`);

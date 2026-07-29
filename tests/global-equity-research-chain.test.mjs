@@ -6,6 +6,9 @@ import {
 } from '../app/simulator/global-equity-research-chain.js';
 import {
     annualData,
+    DATASET_META,
+    ESTIMATED_HISTORY_CUTOFF_YEAR,
+    ESTIMATED_HISTORY_MAX_YEAR,
     HISTORICAL_DATA,
     HISTORICAL_DATA_MANIFEST
 } from '../app/simulator/simulator-data.js';
@@ -201,6 +204,14 @@ assertEqual(
 assertEqual(GLOBAL_EQUITY_RESEARCH_CHAIN.segments[0].endYear, 1950, 'Proxy segment should include the USD-based 1950 return');
 assertEqual(GLOBAL_EQUITY_RESEARCH_CHAIN.segments[1].startYear, 1951, 'Backtested German-investor segment should start in 1951');
 assertEqual(HISTORICAL_DATA_MANIFEST.series.global_equity_research_index.estimatedSegments.length, 2, 'Runtime manifest should mark both estimated equity segments');
+assertEqual(ESTIMATED_HISTORY_MAX_YEAR, 1950, 'Global estimated-history maximum should match the equity proxy segment');
+assertEqual(ESTIMATED_HISTORY_CUTOFF_YEAR, 1951, 'Estimated-history exclusion should start after the equity proxy segment');
+assertEqual(DATASET_META.historicalData.estimatedYears[1], 1950, 'Dataset metadata should expose the complete equity proxy range');
+assertEqual(
+    HISTORICAL_DATA_MANIFEST.series.global_equity_research_index.estimatedSegments[0].endYear,
+    ESTIMATED_HISTORY_MAX_YEAR,
+    'Sampling boundary and manifested equity proxy segment should remain aligned'
+);
 console.log('✓ gaps and evidence segmentation OK');
 
 console.log('Test 4: generated value hashes and modern reference years are stable');

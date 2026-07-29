@@ -6,16 +6,16 @@ bestehender Branch fuer Slice 02 bis 13, kein eigener Feature-Branch und keine
 erneute Branch-Rueckfrage ohne ausdruecklichen Widerruf  
 **GitHub-Status:** kein Upstream fuer den aktiven Branch eingetragen  
 **Basiscommit:** `16f5c830d83ce17f114294e555651fcb2d776d72`  
-**Status:** Review-Nachbesserung durch Codex technisch umgesetzt; wegen
-ausstehendem erneutem Claude-Review weiterhin nicht freigegeben; Commit
-ausstehend  
-**Freigabe:** ausstehend; Codex nimmt keine Selbstfreigabe vor
+**Status:** in Commit `289471b` umgesetzt; Claude-Zweitreview Runde 2 hat den
+Slice mit Auflagen freigegeben; die dort vor Commit beziehungsweise vor
+Slice 03 verlangten Punkte CR02-13 bis CR02-16 wurden am 2026-07-29 als
+vorgeschaltetes Slice-03-Gate technisch nachgezogen
+**Freigabe:** durch Claude-Zweitreview Runde 2 erteilt; Codex nimmt keine
+Selbstfreigabe vor
 
-**Blockierung:** Die von Claude dokumentierten technischen Blocker CR02-1 und
-CR02-3 sowie die Freigabeauflagen CR02-2 und CR02-6 sind durch Variante 1 und
-die nachstehenden Nachweise technisch bearbeitet. Der Reviewstatus bleibt bis
-zur unabhaengigen erneuten Pruefung blockiert. Bis zur externen Freigabe wird
-weder Slice 02 committed noch Slice 03 begonnen.
+**Uebergabe an Slice 03:** Die Auflagen CR02-13 bis CR02-16 sind im
+Arbeitsbaum ueber Commit `289471b` technisch geschlossen und werden zusammen
+mit Slice 03 erneut der unabhaengigen Pruefung vorgelegt.
 
 ## Ziel
 
@@ -1162,3 +1162,37 @@ auf, wenn jemand ein konservatives Ergebnis nicht reproduzieren kann.
   die `ESTIMATED_HISTORY_*`-Konstanten nicht mit, und die Option zum
   Ausschluss geschaetzter Historie zieht still eine falsche Grenze, ohne
   dass ein Test anschlaegt.
+
+## Technische Erledigung der Freigabeauflagen vor Slice 03
+
+**Stand:** 2026-07-29
+**Aktiver Branch:** `codex/suite-datenintegritaet-hardening`
+**Ausgangscommit:** `289471b`
+
+- CR02-13: `global-equity-backtest-delta.test.mjs` indiziert Vorher- und
+  Nachherfaelle jetzt ueber `id:startYear-endYear`, prueft Eindeutigkeit und
+  vergleicht `startYear`, `endYear` sowie `requestedYears` explizit.
+- CR02-14: `--verify-only` rekonstruiert die drei Filtereingaben aus den
+  paketierten Originalen, prueft die bytegenaue Gleichheit und schreibt
+  keine Datei. Das Gate laeuft als eigener Test
+  `global-equity-source-reconstruction.test.mjs` in `npm test`; zusaetzlich
+  ist `npm run verify:global-equity-data` direkt aufrufbar.
+- CR02-15: `ESTIMATED_HISTORY_MAX_YEAR = 1950`,
+  `ESTIMATED_HISTORY_CUTOFF_YEAR = 1951` und
+  `DATASET_META.historicalData.estimatedYears` sind wieder mit dem
+  Equity-Proxysegment 1925-1950 konsistent. Der Kettentest bindet diese
+  Uebereinstimmung an den Manifestvertrag.
+- CR02-16: Das lokale deutsche Waehrungsreformartefakt 1948/1949 ist sowohl
+  in diesem Slice als auch in `docs/reference/DATA_SOURCES.md` ausdruecklich
+  als beibehaltenes Low-Evidence-Proxyartefakt und nicht als Marktereignis
+  dokumentiert.
+
+Gezielte Gates:
+
+- `global-equity-backtest-delta.test.mjs`: gruen;
+- `global-equity-research-chain.test.mjs`: 749/749 Assertions;
+- `global-equity-source-reconstruction.test.mjs`: 3/3 Assertions;
+- `npm run verify:global-equity-data`: gruen und schreibfrei.
+
+Diese technische Rueckdokumentation ist keine neue Selbstfreigabe durch
+Codex. Die Aenderungen werden mit Slice 03 erneut extern geprueft.

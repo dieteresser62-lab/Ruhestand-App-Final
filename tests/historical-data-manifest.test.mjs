@@ -45,7 +45,7 @@ console.log('Test 1: manifest contains all required reproducibility fields');
 validateHistoricalDataManifest(HISTORICAL_DATA_MANIFEST);
 assertEqual(HISTORICAL_DATA_MANIFEST.schemaVersion, 'HistoricalDataManifestV1', 'Manifest schema should be versioned');
 assertEqual(HISTORICAL_DATA_MANIFEST.datasetId, 'ruhestandsapp-historical-data-v1', 'Manifest ID should be stable');
-assertEqual(HISTORICAL_DATA_MANIFEST.revision, '2026-07-29.2', 'Manifest revision should be explicit');
+assertEqual(HISTORICAL_DATA_MANIFEST.revision, '2026-07-29.4', 'Manifest revision should be explicit');
 assertEqual(HISTORICAL_DATA_MANIFEST.period.startYear, 1925, 'Manifest start year should match embedded history');
 assertEqual(HISTORICAL_DATA_MANIFEST.period.endYear, 2025, 'Manifest end year should match embedded history');
 assertEqual(HISTORICAL_DATA_MANIFEST.lookback.backtestYears, 4, 'Backtest lookback should be explicit');
@@ -75,8 +75,10 @@ for (const seriesId of requiredSeries) {
 }
 console.log('✓ required manifest fields OK');
 
-console.log('Test 2: unresolved source, license and variant claims stay explicit');
-for (const seriesId of requiredSeries.filter(seriesId => seriesId !== 'global_equity_research_index')) {
+console.log('Test 2: resolved research chains and remaining unresolved claims stay explicit');
+for (const seriesId of requiredSeries.filter(seriesId => (
+    seriesId !== 'global_equity_research_index' && seriesId !== 'inflation_de'
+))) {
     const series = HISTORICAL_DATA_MANIFEST.series[seriesId];
     assertEqual(series.source.status, 'unresolved', `${seriesId} source must remain unresolved without evidence`);
     assertEqual(series.source.value, null, `${seriesId} unresolved source must not contain an invented value`);
@@ -91,6 +93,17 @@ assertEqual(equitySeries.license.status, 'known', 'Equity data license should be
 assertEqual(equitySeries.variant.status, 'known', 'Equity research-proxy variant should be explicit');
 assertEqual(equitySeries.estimatedSegments.length, 2, 'Equity should expose its early proxy and modelled modern segment');
 assertEqual(equitySeries.estimatedSegments[0].endYear, 1950, 'Equity USD-proxy segment should include the 1950 return');
+const inflationSeries = HISTORICAL_DATA_MANIFEST.series.inflation_de;
+assertEqual(inflationSeries.source.status, 'known', 'German CPI source chain should be resolved');
+assertEqual(inflationSeries.license.status, 'known', 'German CPI source licences should be explicit');
+assertEqual(inflationSeries.variant.status, 'known', 'German CPI segmented national variant should be explicit');
+assertEqual(inflationSeries.estimatedSegments.length, 1, 'German CPI should expose only its JST proxy segment as estimated');
+assertEqual(inflationSeries.estimatedSegments[0].endYear, 1949, 'German CPI proxy should end before the official 1950 segment');
+assert(
+    inflationSeries.transformation.value.includes('100:6.5')
+        && inflationSeries.transformation.value.includes('continuous-currency'),
+    'German CPI manifest should distinguish the 1948 monetary-balance write-down from price inflation'
+);
 assertEqual(
     HISTORICAL_DATA_MANIFEST.series.gold_eur_perf.missingness.fallbackZeroSegments.length,
     0,
@@ -101,7 +114,7 @@ assertEqual(
     'unresolved_if_zero',
     'Ambiguous gold zeros should carry unresolved quality'
 );
-console.log('✓ unresolved claims and zero policy OK');
+console.log('✓ resolved chains, unresolved claims and zero policy OK');
 
 console.log('Test 3: canonical browser-compatible SHA-256 matches Node SHA-256');
 {
@@ -178,7 +191,9 @@ for (const seriesId of requiredSeries) {
     assertEqual(inventorySeries.id, HISTORICAL_DATA_MANIFEST.series[seriesId].id, `${seriesId} inventory identity should match runtime manifest`);
     assertEqual(
         inventorySeries.rawDataHash.status,
-        seriesId === 'global_equity_research_index' ? 'known' : 'unresolved',
+        ['global_equity_research_index', 'inflation_de'].includes(seriesId)
+            ? 'known'
+            : 'unresolved',
         `${seriesId} should reflect whether an external raw-data hash is available`
     );
     assertEqual(inventorySeries.embeddedValueHash.status, 'known', `${seriesId} should have a series-specific embedded-value hash`);

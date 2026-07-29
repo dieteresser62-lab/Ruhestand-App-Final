@@ -6,7 +6,7 @@ import {
 } from './historical-backtest-contract.js';
 
 export const SIMULATION_DATA_INVENTORY_SCHEMA_VERSION = 'SimulationDataInventoryV1';
-export const SIMULATION_DATA_INVENTORY_REVISION = '2026-07-29.3';
+export const SIMULATION_DATA_INVENTORY_REVISION = '2026-07-29.4';
 
 export const SIMULATION_DATA_EVIDENCE_CLASSES = Object.freeze([
     'official',
@@ -207,29 +207,53 @@ const HISTORICAL_SERIES = {
     }),
     inflation_de: historicalSeries({
         id: 'inflation_de',
-        label: 'Embedded German inflation proxy',
+        label: 'German annual consumer-price inflation',
         unit: 'percent_per_year',
+        evidenceClass: 'proxy',
+        implementationLocations: [
+            'app/simulator/german-cpi-chain.js:GERMAN_CPI_RESEARCH_CHAIN',
+            'app/simulator/simulator-data.js:HISTORICAL_DATA.*.inflation_de'
+        ],
+        source: resolved('JST Macrohistory Database R6 (1925-1949); Destatis consumer-price long series (1950-2024); Destatis current annual table (2025)'),
+        seriesIdentifier: resolved('german_consumer_price_inflation / GermanCpiResearchChainV1'),
         currency: notApplicable(),
-        transformation: 'Identity projection from the embedded annual percentage assigned to simulation year t.',
-        embeddedValueHash: '048bfca64b8bf6033f1c43fadb673fe48c9f4d7790127824fb65015c34e1af2f',
+        yearConvention: resolved('Annual-average consumer-price change in simulation year t versus annual average t-1'),
+        transformation: 'JST consecutive German CPI level changes through 1949; normalized 1925-1948 source levels are integer-quantized and 1949 is an explicit post-currency-reform splice. The price proxy excludes the separate 100:6.5 nominal write-down of major Reichsmark cash and bank/savings balances and is not a continuous-currency monetary-asset deflator across 1948. Published Destatis national consumer-price annual changes start in 1950; every seam rate stays inside one source series and HICP/HVPI is excluded.',
+        license: resolved('JST-derived segment CC BY-NC-SA 4.0; Destatis segments Data Licence Germany - attribution - 2.0'),
+        retrievedAt: resolved('2026-07-10'),
+        rawDataHash: resolved('83841d2c11df3a5e193aa07db3bdfe815cbbeea7f9f81c3526b197702a46bdb4'),
+        embeddedValueHash: '9ec87b5052d5e086517142c34213a4063e2be6ccdd8a5babf6d5722ffb76ae3a',
+        externalValidationStatus: 'not_validated',
         qualitySegments: [
             {
                 startYear: 1925,
                 endYear: 1949,
-                evidenceClass: 'estimated',
-                note: 'The early extension is marked estimated; exact VPI segments and territory conventions are unresolved.'
+                evidenceClass: 'proxy',
+                note: 'Annual changes from JST R6 German CPI levels. Levels normalized to 1938=126 are exact integers for 1925-1948; 1936-1948 reflects price controls/wartime freeze, and 1949 is a non-integer post-currency-reform splice whose +7.0352% differs by 8.0878 pp from the -1.0526% Destatis level-derived alternative. The roughly 36.9% CPI-implied purchasing-power loss is not the separate 93.5% nominal write-down of major monetary balances under the 100:6.5 conversion.'
             },
             {
                 startYear: 1950,
-                endYear: 2023,
-                evidenceClass: 'unresolved',
-                note: 'The embedded values lack a proven single VPI series identity and source chain.'
+                endYear: 1962,
+                evidenceClass: 'official',
+                note: 'Destatis former West Germany four-person worker/employee household with medium income; official series with proxy_population qualifier.'
             },
             {
-                startYear: 2024,
+                startYear: 1963,
+                endYear: 1991,
+                evidenceClass: 'official',
+                note: 'Destatis former West Germany price index for all private households.'
+            },
+            {
+                startYear: 1992,
+                endYear: 2024,
+                evidenceClass: 'official',
+                note: 'Destatis Verbraucherpreisindex for Germany from the pinned long-series workbook.'
+            },
+            {
+                startYear: 2025,
                 endYear: 2025,
-                evidenceClass: 'unresolved',
-                note: 'D-20 requires reconciliation against the selected German VPI annual-average series.'
+                evidenceClass: 'official',
+                note: 'Destatis Verbraucherpreisindex for Germany from the pinned current annual table.'
             }
         ]
     }),

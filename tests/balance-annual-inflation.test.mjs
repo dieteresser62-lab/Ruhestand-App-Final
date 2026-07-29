@@ -207,6 +207,36 @@ try {
         );
     }
 
+    console.log('Test 3b: live inflation boundaries are inclusive and reject values outside them');
+    {
+        localStorage.clear();
+        const lowerDom = createDom();
+        const lowerHandlers = createHandlers(lowerDom);
+        lowerHandlers.applyInflationToBedarfe(-10);
+        assertClose(readNeeds(lowerDom).floor, 900, 0.01, 'The -10% live-provider lower boundary should be accepted');
+
+        let lowerRejected = false;
+        try {
+            lowerHandlers.applyInflationToBedarfe(-10.1);
+        } catch {
+            lowerRejected = true;
+        }
+        assert(lowerRejected, 'A rate below the -10% live-provider boundary should be rejected');
+
+        const upperDom = createDom();
+        const upperHandlers = createHandlers(upperDom);
+        upperHandlers.applyInflationToBedarfe(50);
+        assertClose(readNeeds(upperDom).floor, 1500, 0.01, 'The +50% upper boundary should be accepted');
+
+        let upperRejected = false;
+        try {
+            upperHandlers.applyInflationToBedarfe(50.1);
+        } catch {
+            upperRejected = true;
+        }
+        assert(upperRejected, 'A rate above the +50% live-provider boundary should be rejected');
+    }
+
     console.log('Test 4: ECB returns the exact annual-average contract before financial mutation');
     {
         localStorage.clear();

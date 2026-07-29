@@ -12,7 +12,7 @@ const InputValidator = {
      *
      * Prüft folgende Kategorien:
      * - Alter (18-120 Jahre)
-     * - Inflation (-10% bis +50%)
+     * - Inflation (-15% bis +50%)
      * - Vermögenswerte (>= 0)
      * - Gold-Parameter (bei Aktivierung)
      * - Runway-Werte (min/target)
@@ -51,11 +51,11 @@ const InputValidator = {
     );
 
     // 2. Inflationsvalidierung
-    // Erlaubt Deflation (-10%) bis extreme Inflation (50%)
+    // Erlaubt historische Deflation (-15%) bis extreme Inflation (50%)
     checkFiniteRange(
-        input.inflation, -10, 50,
+        input.inflation, -15, 50,
         'inflation',
-        'Inflation außerhalb plausibler Grenzen (-10% bis 50%).'
+        'Inflation außerhalb plausibler Grenzen (-15% bis 50%).'
     );
 
     // 3. Pflicht-Bedarfe und Vermögenswerte dürfen nicht negativ sein

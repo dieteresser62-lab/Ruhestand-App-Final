@@ -340,13 +340,13 @@ for (const baseline of inventory.deltaBaselines) {
         baseline.gitBlobSha1,
         `${baseline.id} changed without declared delta evidence`
     );
-    assert(['none', 'none_after_build', 'backtest_data_02'].includes(baseline.expectedDelta),
+    assert(['none', 'none_after_build', 'backtest_data_02', 'backtest_data_03'].includes(baseline.expectedDelta),
         `${baseline.id} must declare its expected delta class`);
-    if (baseline.expectedDelta === 'backtest_data_02') {
+    if (baseline.expectedDelta === 'backtest_data_02' || baseline.expectedDelta === 'backtest_data_03') {
         assert(
             typeof baseline.deltaEvidence === 'string'
                 && fs.existsSync(path.join(projectRoot, baseline.deltaEvidence)),
-            `${baseline.id} must link to Backtest-Data Slice 02 evidence`
+            `${baseline.id} must link to its declared Backtest-Data evidence`
         );
     }
 }

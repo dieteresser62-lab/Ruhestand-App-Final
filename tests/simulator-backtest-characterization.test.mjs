@@ -337,6 +337,11 @@ function projectScenario({ id, oracleClass = 'target_expected', inputs, data, al
     const normalizedInputs = { ...inputs };
     delete normalizedInputs.__periodStart;
     delete normalizedInputs.__periodEnd;
+    const periodIdentity = {
+        startYear: inputs.__periodStart,
+        endYear: inputs.__periodEnd,
+        requestedYears
+    };
     const reductions = computeReductionMetrics(rows);
     const finiteFlowDeltas = rows
         .map(entry => Number(entry?.row?.portfolio_flow_delta))
@@ -364,13 +369,12 @@ function projectScenario({ id, oracleClass = 'target_expected', inputs, data, al
         id,
         oracleClass,
         notes,
-        inputHash: stableHash(normalizedInputs),
+        inputHash: stableHash({
+            inputs: normalizedInputs,
+            period: periodIdentity
+        }),
         inputs: normalizedInputs,
-        period: {
-            startYear: inputs.__periodStart,
-            endYear: inputs.__periodEnd,
-            requestedYears
-        },
+        period: periodIdentity,
         expectedRowCount,
         observedRowCount: rows.length,
         canonicalRowsHash: stableHash(rows),
@@ -1045,6 +1049,11 @@ try {
         'every case in the target fixture must be labeled target_expected'
     );
     assert(actual.cases.every(testCase => testCase.inputHash.length === 64), 'every runtime case should contain a canonical SHA-256 input hash');
+    assertEqual(
+        new Set(actual.cases.map(testCase => testCase.inputHash)).size,
+        actual.cases.length,
+        'period-aware input identities should distinguish every positive reference case'
+    );
     assert(actual.cases.every(testCase => testCase.observedRowCount === testCase.expectedRowCount), 'positive runtime row counts should match the frozen contract');
     assert(actual.cases.every(testCase => testCase.values.maxAbsolutePortfolioFlowDelta < 1), 'positive baselines must keep FlowDelta below one euro');
     assert(actual.detailToggleOracle.payloadStable, 'normal and detailed rendering must retain the same canonical row payload');

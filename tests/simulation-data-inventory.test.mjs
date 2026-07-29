@@ -118,6 +118,35 @@ assertEqual(
     'known',
     'Equity should resolve the open source chain that replaces the D-15 placeholder'
 );
+assertEqual(
+    JSON.stringify(
+        SIMULATION_DATA_INVENTORY.historicalSeries.inflation_de.qualitySegments
+            .map(({ startYear, endYear, evidenceClass }) => ({
+                startYear,
+                endYear,
+                evidenceClass
+            }))
+    ),
+    JSON.stringify([
+        { startYear: 1925, endYear: 1949, evidenceClass: 'proxy' },
+        { startYear: 1950, endYear: 1962, evidenceClass: 'official' },
+        { startYear: 1963, endYear: 1991, evidenceClass: 'official' },
+        { startYear: 1992, endYear: 2024, evidenceClass: 'official' },
+        { startYear: 2025, endYear: 2025, evidenceClass: 'official' }
+    ]),
+    'German CPI should expose the source and territory seams without gaps'
+);
+assertEqual(
+    SIMULATION_DATA_INVENTORY.historicalSeries.inflation_de.source.status,
+    'known',
+    'German CPI should resolve the pinned JST and Destatis source chain'
+);
+assert(
+    SIMULATION_DATA_INVENTORY.historicalSeries.inflation_de.transformation.value.includes('100:6.5')
+        && SIMULATION_DATA_INVENTORY.historicalSeries.inflation_de.transformation.value
+            .includes('continuous-currency'),
+    'German CPI inventory should separate the monetary reform loss from the price proxy'
+);
 console.log('✓ series-specific quality segmentation OK');
 
 console.log('Test 3: mandatory provenance fields and evidence vocabulary are explicit');
@@ -273,20 +302,20 @@ console.log('Test 7: source-local user/tax defaults match their inventoried cont
 }
 console.log('✓ source-local default contracts OK');
 
-console.log('Test 8: unresolved gates allow reproduction but block external claims/replacement');
+console.log('Test 8: source gates resolve evidence without claiming external validation');
 for (const seriesId of historicalSeriesIds) {
     const gate = evaluateSimulationDataSourceGate(seriesId);
     assertEqual(gate.technicallyReproducible, true, `${seriesId} should remain reproducible`);
     assertEqual(gate.externallyValidated, false, `${seriesId} must not claim external validation`);
     assertEqual(gate.replacementAllowed, false, `${seriesId} must not pass the replacement gate`);
-    if (seriesId === 'global_equity_research_index') {
-        assertEqual(gate.unresolvedFields.length, 0, 'Equity source and license fields should be resolved');
+    if (['global_equity_research_index', 'inflation_de'].includes(seriesId)) {
+        assertEqual(gate.unresolvedFields.length, 0, `${seriesId} source and license fields should be resolved`);
     } else {
         assert(gate.unresolvedFields.includes('source'), `${seriesId} should expose its source blocker`);
         assert(gate.unresolvedFields.includes('license'), `${seriesId} should expose its license blocker`);
     }
 }
-console.log('✓ unresolved source gate OK');
+console.log('✓ source gates OK');
 
 console.log('Test 9: fabricated provenance and false validation claims fail closed');
 {

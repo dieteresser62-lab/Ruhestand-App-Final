@@ -6,6 +6,9 @@
   "scripts": {
     "docs:evidence": "node scripts/check-architecture-evidence.mjs",
     "build:global-equity-data": "node scripts/build-global-equity-research-chain.mjs",
+    "verify:global-equity-data": "node scripts/build-global-equity-research-chain.mjs --verify-only",
+    "build:german-cpi-data": "node scripts/build-german-cpi-chain.mjs",
+    "verify:german-cpi-data": "node scripts/build-german-cpi-chain.mjs --verify-only",
     "build:engine": "node build-engine.mjs",
     "build:engine:strict": "node -e \"process.env.ENGINE_BUILD_STRICT='1'; import('./build-engine.mjs')\"",
     "test": "node tests/run-tests.mjs",

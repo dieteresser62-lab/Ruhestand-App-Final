@@ -753,6 +753,17 @@ async function runBalanceUiOrchestrationTests() {
             'Aktueller Export-/Import-Roundtrip erhält targetEq=0 ohne Legacy-Fallback');
         assertEqual(normalizedZeroBoundary.payload.inputs.rebalBand, 0,
             'Aktueller Export-/Import-Roundtrip erhält rebalBand=0 ohne Legacy-Fallback');
+        for (const inflationBoundary of [-15, 50]) {
+            const boundaryDocument = createBalanceExportDocument({
+                ...validState,
+                inputs: { ...validState.inputs, inflation: inflationBoundary }
+            });
+            assertEqual(boundaryDocument.validationWarnings?.length || 0, 0,
+                `Inflationsgrenze ${inflationBoundary} bleibt im Export-/Importvertrag inklusive`);
+            const normalizedBoundary = normalizeBalanceImportDocument(boundaryDocument);
+            assertEqual(normalizedBoundary.payload.inputs.inflation, inflationBoundary,
+                `Inflationsgrenze ${inflationBoundary} bleibt im Roundtrip erhalten`);
+        }
         const goldDiagnosticInputs = {
             ...validState.inputs,
             goldBasisVermoegen: 100000,

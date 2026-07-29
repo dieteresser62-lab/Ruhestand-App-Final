@@ -365,10 +365,13 @@ Diese Metadaten beschreiben den Programmcode; für die mitgelieferten Forschungs
 gelten die nachfolgend dokumentierten abweichenden Bedingungen.
 
 Die Forschungsdaten unter
-`data/historical/global-equity-research-chain/` und die daraus erzeugten Werte
+`data/historical/global-equity-research-chain/` und
+`data/historical/german-cpi-chain/` sowie die daraus erzeugten Werte
 unterliegen teilweise `CC BY-NC-SA 4.0`, einschließlich
 Nichtkommerzialitäts- und Share-Alike-Bedingungen. OECD- und EZB-Bedingungen
-gelten zusätzlich. Vor einer kommerziellen Verteilung des Repositories,
+gelten zusätzlich; für die Destatis-Anteile gilt die Datenlizenz Deutschland
+– Namensnennung – Version 2.0. Vor einer kommerziellen Verteilung des Repositories,
 eines `dist/`-Standes oder einer ausführbaren Anwendung ist eine gesonderte
 Lizenzprüfung erforderlich. Details und Namensnennung:
-`data/historical/global-equity-research-chain/LICENSE.md`.
+`data/historical/global-equity-research-chain/LICENSE.md` und
+`data/historical/german-cpi-chain/LICENSE.md`.

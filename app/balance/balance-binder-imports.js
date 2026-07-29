@@ -63,7 +63,7 @@ export const BALANCE_IMPORT_INPUT_SCHEMA_V2 = Object.freeze({
     flexBudgetAnnual: numberField({ min: 0 }),
     flexBudgetYears: numberField({ min: 0, max: 10 }),
     flexBudgetRecharge: numberField({ min: 0 }),
-    inflation: numberField({ min: -10, max: 50 }),
+    inflation: numberField({ min: -15, max: 50 }),
     tagesgeld: numberField({ min: 0 }),
     geldmarktEtf: numberField({ min: 0 }),
     depotwertAlt: numberField({ min: 0 }),
