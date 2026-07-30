@@ -45,7 +45,7 @@ console.log('Test 1: manifest contains all required reproducibility fields');
 validateHistoricalDataManifest(HISTORICAL_DATA_MANIFEST);
 assertEqual(HISTORICAL_DATA_MANIFEST.schemaVersion, 'HistoricalDataManifestV1', 'Manifest schema should be versioned');
 assertEqual(HISTORICAL_DATA_MANIFEST.datasetId, 'ruhestandsapp-historical-data-v1', 'Manifest ID should be stable');
-assertEqual(HISTORICAL_DATA_MANIFEST.revision, '2026-07-29.4', 'Manifest revision should be explicit');
+assertEqual(HISTORICAL_DATA_MANIFEST.revision, '2026-07-29.5', 'Manifest revision should be explicit');
 assertEqual(HISTORICAL_DATA_MANIFEST.period.startYear, 1925, 'Manifest start year should match embedded history');
 assertEqual(HISTORICAL_DATA_MANIFEST.period.endYear, 2025, 'Manifest end year should match embedded history');
 assertEqual(HISTORICAL_DATA_MANIFEST.lookback.backtestYears, 4, 'Backtest lookback should be explicit');
@@ -77,7 +77,9 @@ console.log('✓ required manifest fields OK');
 
 console.log('Test 2: resolved research chains and remaining unresolved claims stay explicit');
 for (const seriesId of requiredSeries.filter(seriesId => (
-    seriesId !== 'global_equity_research_index' && seriesId !== 'inflation_de'
+    seriesId !== 'global_equity_research_index'
+        && seriesId !== 'inflation_de'
+        && seriesId !== 'zinssatz_de'
 ))) {
     const series = HISTORICAL_DATA_MANIFEST.series[seriesId];
     assertEqual(series.source.status, 'unresolved', `${seriesId} source must remain unresolved without evidence`);
@@ -103,6 +105,17 @@ assert(
     inflationSeries.transformation.value.includes('100:6.5')
         && inflationSeries.transformation.value.includes('continuous-currency'),
     'German CPI manifest should distinguish the 1948 monetary-balance write-down from price inflation'
+);
+const interestSeries = HISTORICAL_DATA_MANIFEST.series.zinssatz_de;
+assertEqual(interestSeries.source.status, 'known', 'Cash/money-market source chain should be resolved');
+assertEqual(interestSeries.license.status, 'known', 'Cash/money-market source licences should be explicit');
+assertEqual(interestSeries.variant.status, 'known', 'Cash/money-market return convention should be resolved');
+assertEqual(interestSeries.estimatedSegments.length, 1, 'Cash should expose one estimated exclusion segment');
+assertEqual(interestSeries.estimatedSegments[0].endYear, 1948, 'Cash proxy and explicit post-war bridge should remain estimated');
+assert(
+    interestSeries.transformation.value.includes('No additional compounding')
+        && interestSeries.transformation.value.includes('tax'),
+    'Cash transform should rule out double accrual and embedded tax'
 );
 assertEqual(
     HISTORICAL_DATA_MANIFEST.series.gold_eur_perf.missingness.fallbackZeroSegments.length,
@@ -191,7 +204,7 @@ for (const seriesId of requiredSeries) {
     assertEqual(inventorySeries.id, HISTORICAL_DATA_MANIFEST.series[seriesId].id, `${seriesId} inventory identity should match runtime manifest`);
     assertEqual(
         inventorySeries.rawDataHash.status,
-        ['global_equity_research_index', 'inflation_de'].includes(seriesId)
+        ['global_equity_research_index', 'inflation_de', 'zinssatz_de'].includes(seriesId)
             ? 'known'
             : 'unresolved',
         `${seriesId} should reflect whether an external raw-data hash is available`

@@ -46,5 +46,16 @@
     "discreteFields": "exact-always",
     "widenToleranceAfterFailure": false,
     "unexplainedDelta": "block"
+  },
+  "historicalFixtureCompatibility": {
+    "appliesToSnapshotIds": [
+      "post-backtest-data-03-v1",
+      "post-backtest-data-04-v1"
+    ],
+    "ignoredResultPaths": [
+      "contracts.snapshotPolicy.currentReference",
+      "contracts.snapshotPolicy.ignoredHistoricalFixtureFields"
+    ],
+    "reason": "Immutable pending fixtures retain snapshot-policy metadata written by their historical runtime. Comparison removes only these non-financial fixture fields; the public product contract does not carry fixture-specific ignore paths."
   }
 }

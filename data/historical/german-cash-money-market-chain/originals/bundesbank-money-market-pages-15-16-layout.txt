@@ -1,0 +1,127 @@
+                                                                                                                                                                                          Deutsche Bundesbank
+                                                                                                                                                                                               Long time series
+                                                                                                                                                                                                    05-03-2026
+                                                                                                                                                                                                             15
+
+         III. Money and capital market
+
+         2. Money market rates until 1998
+
+         Annual averages in %
+         Frankfurt banks' money market rates1, FIBOR                                                     Memo item: Frankfurt banks' money market rates 1
+         Overnight           One-month           Three-month      Six-month           Twelve-month       Overnight           One-month           Three-month      Six-month           Twelve-month
+Period   funds2              funds3              funds3           funds3              funds3             funds               funds               funds            funds               funds
+
+ 1949                 3.24                4.48             4.77                   .                  .                3.24                4.48             4.77                   .                  .
+ 1950                 4.31                5.25             4.92                   .                  .                4.31                5.25             4.92                   .                  .
+ 1951                 6.01                6.97             7.08                   .                  .                6.01                6.97             7.08                   .                  .
+ 1952                 5.11                5.81             6.39                   .                  .                5.11                5.81             6.39                   .                  .
+ 1953                 3.57                4.07             4.34                   .                  .                3.57                4.07             4.34                   .                  .
+ 1954                 2.89                3.47             3.75                   .                  .                2.89                3.47             3.75                   .                  .
+ 1955                 3.16                3.85             4.20                   .                  .                3.16                3.85             4.20                   .                  .
+ 1956                 4.71                5.63             6.15                   .                  .                4.71                5.63             6.15                   .                  .
+ 1957                 3.96                4.45             4.95                   .                  .                3.96                4.45             4.95                   .                  .
+ 1958                 3.08                3.29             3.60                   .                  .                3.08                3.29             3.60                   .                  .
+ 1959                 2.70                2.92             3.22                   .                  .                2.70                2.92             3.22                   .                  .
+ 1960                 4.56                4.89             5.10                   .                  .                4.56                4.89             5.10                   .                  .
+ 1961                 2.93                3.31             3.59                   .                  .                2.93                3.31             3.59                   .                  .
+ 1962                 2.66                3.04             3.42                   .                  .                2.66                3.04             3.42                   .                  .
+ 1963                 3.00                3.48             3.98                   .                  .                3.00                3.48             3.98                   .                  .
+ 1964                 3.29                3.64             4.09                   .                  .                3.29                3.64             4.09                   .                  .
+ 1965                 4.10                4.63             5.14                   .                  .                4.10                4.63             5.14                   .                  .
+ 1966                 5.34                5.99             6.63                   .                  .                5.34                5.99             6.63                   .                  .
+ 1967                 3.35                3.61             4.27                   .                  .                3.35                3.61             4.27                   .                  .
+ 1968                 2.59                3.27             3.81                   .                  .                2.59                3.27             3.81                   .                  .
+ 1969                 4.81                5.42             5.79                   .                  .                4.81                5.42             5.79                   .                  .
+ 1970                 8.65                9.22             9.41                   .                  .                8.65                9.22             9.41                   .                  .
+ 1971                 6.16                6.81             7.15                   .                  .                6.16                6.81             7.15                   .                  .
+ 1972                 4.30                5.11             5.61                   .                  .                4.30                5.11             5.61                   .                  .
+ 1973                10.18               11.26            12.14                   .                  .               10.18               11.26            12.14                   .                  .
+ 1974                 8.87                9.46             9.90                   .                  .                8.87                9.46             9.90                   .                  .
+ 1975                 4.40                4.68             4.96                   .                  .                4.40                4.68             4.96                   .                  .
+ 1976                 3.89                4.05             4.25                   .                  .                3.89                4.05             4.25                   .                  .
+ 1977                 4.14                4.25             4.37                   .                  .                4.14                4.25             4.37                   .                  .
+ 1978                 3.36                3.55             3.70                   .                  .                3.36                3.55             3.70                   .                  .
+ 1979                 5.87                6.31             6.69                   .                  .                5.87                6.31             6.69                   .                  .
+ 1980                 9.06                9.38             9.54                   .                 .                 9.06                9.38             9.54                   .                  .
+ 1981                11.26               11.88            12.11                   .                 .                11.26               11.88            12.11                   .                  .
+ 1982                 8.67                8.81             8.88               8.83              8.86                  8.67                8.81             8.88               8.83               8.86
+ 1983                 5.36                5.60             5.78               5.91              6.27                  5.36                5.60             5.78               5.91               6.27
+ 1984                 5.55                5.77             5.99               6.13              6.43                  5.55                5.77             5.99               6.13               6.43
+ 1985                 5.19                5.32             5.44               5.52              5.64                  5.19                5.32             5.44               5.52               5.64
+ 1986                 4.57                4.60             4.60               4.61              4.67                  4.57                4.60             4.60               4.61               4.67
+ 1987                 3.72                3.87             3.99               4.10              4.21                  3.72                3.87             3.99               4.10               4.21
+ 1988                 4.01                4.16             4.28               4.42              4.58                  4.01                4.16             4.28               4.42               4.58
+ 1989                 6.59                6.84             7.07               7.19              7.26                  6.59                6.84             7.07               7.19               7.26
+ 1990                 7.92                8.16             8.43               8.69              8.93                  7.92                8.16             8.43               8.69               8.93
+ 1991                 8.84                9.08             9.25               9.33              9.38                  8.84                9.02             9.18               9.27               9.31
+ 1992                 9.42                9.52             9.52               9.42              9.26                  9.42                9.47             9.46               9.36               9.20
+ 1993                 7.49                7.49             7.30               6.98              6.52                  7.49                7.43             7.24               6.92               6.46
+ 1994                 5.35                5.39             5.36               5.35              5.43                  5.35                5.34             5.31               5.30               5.38
+ 1995                 4.50                4.52             4.53               4.57              4.73                  4.50                4.47             4.48               4.52               4.68
+ 1996                 3.27                3.32             3.31               3.31              3.42                  3.27                3.28             3.27               3.27               3.38
+ 1997                 3.22                3.27             3.33               3.40              3.56                  3.18                3.24             3.30               3.37               3.53
+ 1998                 3.45                3.49             3.54               3.60              3.71                  3.41                3.48             3.52               3.58               3.68
+
+         Source: Deutsches Geld- und Bankwesen in Zahlen 1876 − 1975 (1976), Verlag Fritz Knapp GmbH, Frankfurt am Main, pp. 274 ff. and Bundesbank calculations. 1 Not officially
+         set or quoted. The rates shown here are unweighted monthly averages based on data reported by Frankfurt banks. Up to February 1967, the rates for monthly funds and three-
+         month funds are based on weekly data. After February 1967, the rates are based on daily data, as was already the case for overnight rates at that time. From March 1970, the
+         series are based on a new, broader survey group. Up until June 1990, the rates are calculated using the German 360/360 days method. From July 1990, the rates are calculated
+         using the actual/360 method. 2 Up to December 1996, the rates are annual averages of the daily money market rates reported by Frankfurt banks. For 1997 and 1998, the rates
+         are annual averages of the daily FIBOR rates for overnight money (O/N). 3 Up to December 1990, the rates are money market rates reported by Frankfurt banks. From
+         January 1991, the rates are FIBOR rates.
+                                                                                                                                                                                              Deutsche Bundesbank
+                                                                                                                                                                                                   Long time series
+                                                                                                                                                                                                        05-03-2026
+                                                                                                                                                                                                                 16
+
+         III. Money and capital market
+
+         3. Money market rates from 1999
+
+         Annual averages in %
+         EONIA/€STR/Euribor®                                                                                Memo item: Frankfurt banks’ money market rates1
+         Overnight            One-month            Three-month       Six-month            Twelve-month      Overnight           One-month           Three-month       Six-month           Twelve-month
+Period   funds2               funds3               funds3            funds3               funds3            funds               funds               funds             funds               funds
+
+ 1999                 2.74                 2.86              2.97                 3.05              3.18                2.73                2.84              2.94                3.03               3.16
+ 2000                 4.12                 4.24              4.39                 4.55              4.78                4.11                4.21              4.37                4.52               4.76
+ 2001                 4.38                 4.33              4.26                 4.16              4.08                4.37                4.31              4.24                4.13               4.06
+ 2002                 3.28                 3.31              3.32                 3.35              3.49                3.28                3.28              3.30                3.33               3.48
+ 2003                 2.32                 2.35              2.33                 2.31              2.34                2.32                2.33              2.32                2.29               2.32
+ 2004                 2.05                 2.08              2.11                 2.15              2.27                2.05                2.06              2.09                2.13               2.25
+ 2005                 2.09                 2.14              2.19                 2.23              2.33                2.09                2.12              2.17                2.22               2.32
+ 2006                 2.84                 2.94              3.08                 3.23              3.44                2.84                2.92              3.06                3.22               3.42
+ 2007                 3.86                 4.08              4.28                 4.35              4.45                3.86                4.06              4.26                4.33               4.43
+ 2008                 3.86                 4.27              4.63                 4.72              4.81                3.82                4.26              4.62                4.70               4.80
+ 2009                 0.72                 0.90              1.23                 1.44              1.62                0.63                0.87              1.20                1.41               1.59
+ 2010                 0.44                 0.57              0.81                 1.08              1.35                0.38                0.53              0.75                1.02               1.28
+ 2011                 0.87                 1.18              1.39                 1.64              2.01                0.81                1.14              1.35                1.59               1.96
+ 2012                 0.23                 0.33              0.57                 0.83              1.11                    .                   .                 .                   .                  .
+ 2013                 0.09                 0.13              0.22                 0.34              0.54                    .                   .                 .                   .                  .
+ 2014                 0.10                 0.13              0.21                 0.31              0.48                    .                   .                 .                   .                  .
+ 2015                - 0.11               - 0.07            - 0.02                 0.05              0.17                   .                   .                 .                   .                  .
+ 2016                - 0.32               - 0.34            - 0.26               - 0.16            - 0.04                   .                   .                 .                   .                  .
+ 2017                - 0.36               - 0.37            - 0.33               - 0.26            - 0.15                   .                   .                 .                   .                  .
+ 2018                - 0.36               - 0.37            - 0.32               - 0.27            - 0.17                   .                   .                 .                   .                  .
+ 2019                - 0.39               - 0.40            - 0.36               - 0.30            - 0.22                   .                   .                 .                   .                  .
+ 2020                - 0.55               - 0.50            - 0.43               - 0.36            - 0.30                   .                   .                 .                   .                  .
+ 2021                - 0.57                 0.09              0.34                 0.67              1.09                   .                   .                 .                   .                  .
+ 2022                - 0.01                 0.09              0.34                 0.67              1.09                   .                   .                 .                   .                  .
+ 2023                  3.21                 3.24              3.43                 3.69              3.87                   .                   .                 .                   .                  .
+ 2024                  3.64                 3.56              3.57                 3.48              3.27                   .                   .                 .                   .                  .
+ 2025                 2.18                 2.12              2.18                 2.20              2.22                    .                   .                 .                   .                  .
+
+         Source: Bundesbank calculations. 1 Not officially set or quoted. The rates shown here are unweighted monthly averages based on data reported by Frankfurt banks. The rates
+         are calculated using the actual/360 method. The data are no longer collected as of 1 June 2012. 2 From 4 January 1999 to 30 September 2019, the rates are weighted EONIA
+         averages for overnight money in the interbank market calculated by the European Central Bank on the basis of effective transactions. From 1 October 2019, the rates are
+         calculated as the Euro Short-Term Rate (€STR). Please note the disclaimer issued by the European Central Bank in its capacity as administrator of the Euro Short-Term Rate:
+         https://www.ecb.europa.eu/stats/financial_markets_and_interest_rates/euro_short-term_rate/html/index.en.html . This disclaimer also applies to publications by the Deutsche
+         Bundesbank. 3 Euribor® rates. Euribor® average rates are Bundesbank calculations based on Euribor® daily rates calculated by the European Money Markets Institute (EMMI).
+         These are unweighted averages. All data are correct to the best of our knowledge. Publication in this document does not establish an entitlement to provision of the rates by the
+         Deutsche Bundesbank. The Deutsche Bundesbank reserves the right to cease publishing the information on its website in future. No explicit or implicit assurances or guarantees
+         are made as to the up-to-dateness, accuracy, timeliness, completeness, marketability or suitability of the data as interest rates or reference interest rates. The European Money
+         Markets Institute (EMMI), Euribor EBF, Euribor ACI, the Euribor Panel Banks, the Euribor Steering Committee, the European Central Bank, Reuters and the Deutsche
+         Bundesbank shall not be liable in the event of discrepancies, incompleteness or late provision of the money market rates in question. Information on Euribor® daily rates
+         administered by the EMMI is available here: https://www.emmi-benchmarks.eu/benchmarks/euribor/.
+

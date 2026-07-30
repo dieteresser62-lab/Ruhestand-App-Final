@@ -189,6 +189,17 @@
       "expectedDirection": "real financial paths and inflation-derived regimes may change in either direction; nominal return inputs, fixed seed, runtime, worker layout, outcome semantics and calculation formulas stay unchanged, and every captured value is frozen in a separate pending snapshot",
       "goldenCaseIds": ["GC-RISK-01", "GC-CUT-01", "GC-CARE-01", "GC-OUTCOME-01", "GC-SAMPLING-01", "GC-CAR-01"],
       "reviewStatus": "pending"
+    },
+    {
+      "sliceId": "BACKTEST-DATA-04",
+      "sourceReference": "post-backtest-data-03-v1",
+      "targetReference": "post-backtest-data-04-v1",
+      "fieldPath": "metadata.dataVersion/result.{pathSummaries,riskKpis,realWithdrawalP10,samplingDiagnostics}/carResult/autoOptimizeResult",
+      "formulaBefore": "Monte Carlo sampled the prior unidentified embedded zinssatz_de annual-rate literals while retaining the Backtest-Data Slice 03 equity and inflation chains",
+      "formulaAfter": "Monte Carlo samples the reproducible German cash and overnight money-market gross return proxy: JST DEU.stir through 1944, an explicit 1944 carry-forward bridge for 1945-1948, Bundesbank Frankfurt overnight/FIBOR through 1998 and EONIA/EURSTR from 1999; negative official rates remain valid, and no cost, tax or extra compounding is embedded",
+      "expectedDirection": "cash-like financial paths, derived regimes and aggregate deltas may change in either direction; fixed seed, equity and inflation inputs, runtime, worker layout, outcome semantics and calculation formulas stay unchanged, and every captured value is frozen in a separate pending snapshot",
+      "goldenCaseIds": ["GC-RISK-01", "GC-CUT-01", "GC-CARE-01", "GC-OUTCOME-01", "GC-SAMPLING-01", "GC-CAR-01"],
+      "reviewStatus": "pending"
     }
   ],
   "requiredEntryFields": [

@@ -66,6 +66,10 @@ const postBacktestData02 = readFixtureUnlessWriting(
     'post-backtest-data-02-v3'
 );
 const postBacktestData03 = readFixture('post-backtest-data-03-v1.json');
+const postBacktestData04 = readFixtureUnlessWriting(
+    'post-backtest-data-04-v1.json',
+    'post-backtest-data-04-v1'
+);
 const finalCandidate = readFixture('monte-carlo-v1-final.json');
 const benchmarkContract = readFixture('benchmark-contract-v1.json');
 const benchmarkResults = readFixture('benchmark-results-2026-07-22.json');
@@ -583,10 +587,16 @@ function finalCandidateSnapshotProjection(result) {
     });
 }
 
-function omitSnapshotCurrentReference(snapshotResult) {
+function omitHistoricalFixtureCompatibilityFields(snapshotResult) {
     const evidence = canonicalize(snapshotResult);
-    if (evidence?.contracts?.snapshotPolicy) {
-        delete evidence.contracts.snapshotPolicy.currentReference;
+    for (const pathName of snapshotPolicy.historicalFixtureCompatibility.ignoredResultPaths) {
+        const parts = pathName.split('.');
+        let parent = evidence;
+        for (const part of parts.slice(0, -1)) {
+            parent = parent?.[part];
+            if (!parent) break;
+        }
+        if (parent) delete parent[parts.at(-1)];
     }
     return evidence;
 }
@@ -935,6 +945,14 @@ function computeKpiDelta(low, high) {
     assert(baselineClass?.immutable === true && baselineClass?.overwriteAllowed === false, 'Pre-hardening reference must be immutable');
     assertEqual(snapshotPolicy.comparisonRules.sameRuntime, 'exact', 'Same-runtime snapshots must be exact');
     assertEqual(snapshotPolicy.comparisonRules.widenToleranceAfterFailure, false, 'Tolerance widening after failure must be forbidden');
+    assertEqual(
+        JSON.stringify(snapshotPolicy.historicalFixtureCompatibility.ignoredResultPaths),
+        JSON.stringify([
+            'contracts.snapshotPolicy.currentReference',
+            'contracts.snapshotPolicy.ignoredHistoricalFixtureFields'
+        ]),
+        'Fixture-specific historical compatibility paths must live in the measurement policy'
+    );
     assertEqual(deltaLedger.baselineOverwriteAllowed, false, 'Delta ledger must not permit baseline overwrite');
     assert(deltaLedger.requiredEntryFields.includes('goldenCaseIds'), 'Delta entries must link to golden cases');
     assertEqual(deltaLedger.policy.unexplainedDelta, 'block', 'Unexplained deltas must block');
@@ -1063,6 +1081,19 @@ function computeKpiDelta(low, high) {
         assertEqual(postBacktestData03.snapshotId, 'post-backtest-data-03-v1', 'The Backtest-Data Slice 03 candidate must retain its original immutable revision');
         assertEqual(postBacktestData03.reviewStatus, 'pending', 'The Backtest-Data Slice 03 candidate must remain pending until external review');
         assertEqual(postBacktestData03.goldenCaseIds.length, goldenFixture.cases.length, 'Backtest-Data Slice 03 snapshot must cover every golden-case family');
+    }
+    const backtestData04Entries = deltaLedger.entries.filter(entry => entry.sliceId === 'BACKTEST-DATA-04');
+    assertEqual(backtestData04Entries.length, 1, 'Backtest-Data Slice 04 must ledger its cash/money-market snapshot delta separately');
+    for (const field of deltaLedger.requiredEntryFields) {
+        assert(Object.prototype.hasOwnProperty.call(backtestData04Entries[0], field), `Backtest-Data Slice 04 delta entry must contain ${field}`);
+    }
+    assertEqual(backtestData04Entries[0].sourceReference, 'post-backtest-data-03-v1', 'Backtest-Data Slice 04 must retain the Slice 03 source reference');
+    assertEqual(backtestData04Entries[0].targetReference, 'post-backtest-data-04-v1', 'Backtest-Data Slice 04 must target its immutable pending candidate');
+    if (postBacktestData04) {
+        assertEqual(postBacktestData04.sourceReference, 'post-backtest-data-03-v1', 'Backtest-Data Slice 04 snapshot must reference the prior data snapshot');
+        assertEqual(postBacktestData04.snapshotId, 'post-backtest-data-04-v1', 'The Backtest-Data Slice 04 candidate must retain its original immutable revision');
+        assertEqual(postBacktestData04.reviewStatus, 'pending', 'The Backtest-Data Slice 04 candidate must remain pending until external review');
+        assertEqual(postBacktestData04.goldenCaseIds.length, goldenFixture.cases.length, 'Backtest-Data Slice 04 snapshot must cover every golden-case family');
     }
     const slice12Entries = deltaLedger.entries.filter(entry => entry.sliceId === '12');
     assertEqual(slice12Entries.length, 1, 'Slice 12 must ledger the integrated final candidate separately');
@@ -1222,10 +1253,34 @@ const actualBacktestData03Snapshot = {
     autoOptimizeResult: actualAutoOptimizeProjection,
     result: actualFinalProjection
 };
+const actualBacktestData04Snapshot = {
+    schemaVersion: 'monte-carlo-post-slice-snapshot-v1',
+    snapshotId: 'post-backtest-data-04-v1',
+    sourceReference: 'post-backtest-data-03-v1',
+    sliceId: 'BACKTEST-DATA-04',
+    reviewStatus: 'pending',
+    capturedAtUtc: '2026-07-29T00:00:00.000Z',
+    goldenCaseIds: ['GC-RISK-01', 'GC-CUT-01', 'GC-CARE-01', 'GC-OUTCOME-01', 'GC-SAMPLING-01', 'GC-CAR-01'],
+    metadata: {
+        seed: preHardening.metadata.seed,
+        dataVersion: actualDataVersion,
+        runtime: {
+            kind: 'node',
+            version: process.version,
+            platform: process.platform,
+            architecture: process.arch
+        },
+        numericTolerance: postBacktestData03.metadata.numericTolerance
+    },
+    carResult: actualSlice07Result,
+    autoOptimizeResult: actualAutoOptimizeProjection,
+    result: actualFinalProjection
+};
 if (UPDATE_REFERENCE_ID) {
     const candidates = new Map([
         [actualBacktestData02Snapshot.snapshotId, actualBacktestData02Snapshot],
-        [actualBacktestData03Snapshot.snapshotId, actualBacktestData03Snapshot]
+        [actualBacktestData03Snapshot.snapshotId, actualBacktestData03Snapshot],
+        [actualBacktestData04Snapshot.snapshotId, actualBacktestData04Snapshot]
     ]);
     const candidate = candidates.get(UPDATE_REFERENCE_ID);
     if (!candidate) {
@@ -1246,7 +1301,7 @@ assertJsonEqual(postSlice03.metadata.dataVersion, finalCandidate.metadata.dataVe
 assert(preHardening.result !== null, 'Immutable pre-hardening result must remain captured');
 assertEqual(preHardening.result.bufferBytesPerRun, 63, 'Immutable pre-hardening buffer evidence must remain unchanged');
 assertJsonEqual(preHardening.result.buffers.volatilities, preHardening.result.buffers.maxDrawdowns, 'Immutable baseline must retain the documented pre-fix volatility defect');
-const activeSnapshot = postBacktestData03;
+const activeSnapshot = postBacktestData04;
 const sameRuntime = process.version === activeSnapshot.metadata.runtime.version
     && process.platform === activeSnapshot.metadata.runtime.platform
     && process.arch === activeSnapshot.metadata.runtime.architecture;
@@ -1257,11 +1312,11 @@ assertEqual(postSlice05.result.bufferBytesPerRun, 75, 'Immutable Post-Slice-05 r
 assertJsonEqual(postSlice03.metadata.dataVersion, postSlice06.metadata.dataVersion, 'Post-Slice-06 should retain the immutable prior data version');
 assertEqual(postSlice06.result.bufferBytesPerRun, 75, 'Immutable Post-Slice-06 reference retains its buffer evidence');
 assertJsonEqual(postSlice03.metadata.dataVersion, postSlice07.metadata.dataVersion, 'Post-Slice-07 should retain the immutable prior data version');
-assertJsonEqual(actualDataVersion, activeSnapshot.metadata.dataVersion, 'Backtest-Data Slice 03 data version must match');
+assertJsonEqual(actualDataVersion, activeSnapshot.metadata.dataVersion, 'Backtest-Data Slice 04 data version must match');
 compareSnapshotNode(
     actualSlice07Result,
     activeSnapshot.carResult,
-    'postBacktestData03.carResult',
+    'postBacktestData04.carResult',
     sameRuntime,
     activeSnapshot.metadata.numericTolerance
 );
@@ -1271,18 +1326,33 @@ assertEqual(
     null,
     'Public snapshot policy must expose no current reference while every available successor remains pending'
 );
+assertEqual(
+    MONTE_CARLO_SNAPSHOT_POLICY.policy,
+    'immutable-baseline-with-versioned-pending-candidates',
+    'Public snapshot policy must describe pending candidates rather than promoted post-slice references'
+);
+assertEqual(
+    MONTE_CARLO_SNAPSHOT_POLICY.promotionRule,
+    'current-reference-remains-null-until-external-approval',
+    'Public snapshot policy must require external approval before reference promotion'
+);
+assertEqual(
+    Object.hasOwn(MONTE_CARLO_SNAPSHOT_POLICY, 'ignoredHistoricalFixtureFields'),
+    false,
+    'Public snapshot policy must not expose fixture-specific ignore paths'
+);
 assertEqual(activeSnapshot.reviewStatus, 'pending', 'The active measurement target should remain a pending candidate');
 compareSnapshotNode(
     actualFinalProjection,
-    omitSnapshotCurrentReference(activeSnapshot.result),
-    'postBacktestData03.result',
+    omitHistoricalFixtureCompatibilityFields(activeSnapshot.result),
+    'postBacktestData04.result',
     sameRuntime,
     activeSnapshot.metadata.numericTolerance
 );
 compareSnapshotNode(
     actualAutoOptimizeProjection,
     activeSnapshot.autoOptimizeResult,
-    'postBacktestData03.autoOptimizeResult',
+    'postBacktestData04.autoOptimizeResult',
     sameRuntime,
     activeSnapshot.metadata.numericTolerance
 );

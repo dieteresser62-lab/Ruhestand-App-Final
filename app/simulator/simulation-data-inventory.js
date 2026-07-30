@@ -6,7 +6,7 @@ import {
 } from './historical-backtest-contract.js';
 
 export const SIMULATION_DATA_INVENTORY_SCHEMA_VERSION = 'SimulationDataInventoryV1';
-export const SIMULATION_DATA_INVENTORY_REVISION = '2026-07-29.4';
+export const SIMULATION_DATA_INVENTORY_REVISION = '2026-07-29.5';
 
 export const SIMULATION_DATA_EVIDENCE_CLASSES = Object.freeze([
     'official',
@@ -259,29 +259,65 @@ const HISTORICAL_SERIES = {
     }),
     zinssatz_de: historicalSeries({
         id: 'zinssatz_de',
-        label: 'Embedded German short-rate proxy',
+        label: 'German cash and overnight money-market gross return proxy',
         unit: 'percent_per_year',
-        currency: notApplicable(),
-        transformation: 'Identity projection from the embedded annual percentage assigned to simulation year t.',
-        embeddedValueHash: 'e4dafb4d556cb342e7060d65933bbbdcaeb5a7e8adfbf89aefca04f4bfb45ad6',
+        evidenceClass: 'proxy',
+        implementationLocations: [
+            'app/simulator/german-cash-money-market-chain.js:GERMAN_CASH_MONEY_MARKET_CHAIN',
+            'app/simulator/simulator-data.js:HISTORICAL_DATA.*.zinssatz_de'
+        ],
+        source: resolved('JST Macrohistory Database R6 DEU.stir (1925-1944); explicit 1944 carry-forward bridge (1945-1948); Deutsche Bundesbank overnight-money-market long series (1949-2025), with Fritz Knapp/Bundesbank source chain through 1975'),
+        seriesIdentifier: resolved('german_cash_money_market_proxy / GermanCashMoneyMarketChainV1'),
+        currency: resolved('Historical German regimes/DEM through 1998; EUR from 1999; return percentages do not perform currency conversion, and the 1948 monetary-balance write-down is not implemented'),
+        yearConvention: resolved('Published annual-average nominal rate in simulation year t, applied once through the existing shared cashBondReturn path to cash-like holdings and bond tranches'),
+        transformation: 'JST DEU.stir is used directly through 1944; 1945-1948 carries the 1944 value forward as an explicit estimated bridge; Bundesbank annual-average reported Frankfurt overnight, FIBOR O/N, EONIA and EURSTR values are used directly from 1949. The shared bond application is a maturity-mismatched model proxy. No extra compounding, product cost, bank margin or tax is embedded.',
+        license: resolved('JST-derived segment CC BY-NC-SA 4.0; Bundesbank/ESCB statistics reuse terms with attribution; ECB EURSTR administrator disclaimer applies'),
+        retrievedAt: resolved('2026-07-29'),
+        rawDataHash: resolved('ea1608b5dee7e00ae7bf24bb651cb01cd3f0d5423b54cdf21b9f975cced30722'),
+        embeddedValueHash: 'cf5471a345234984ac3ff8de57bffdb3128c1046e01ec998198721325ede9b69',
+        externalValidationStatus: 'not_validated',
         qualitySegments: [
             {
                 startYear: 1925,
-                endYear: 1949,
-                evidenceClass: 'estimated',
-                note: 'The early extension is estimated and has no proven investable cash-return source chain.'
+                endYear: 1944,
+                evidenceClass: 'proxy',
+                note: 'JST nominal German short-term interest-rate proxy; the instrument is not homogeneous enough to claim a continuous investable overnight return.'
             },
             {
-                startYear: 1950,
+                startYear: 1945,
+                endYear: 1948,
+                evidenceClass: 'estimated',
+                note: 'Explicit last-observation carry-forward at 2.13 percent for unobserved market-closure and post-war years; not an observed investable return.'
+            },
+            {
+                startYear: 1949,
+                endYear: 1996,
+                evidenceClass: 'proxy',
+                note: 'Bundesbank-published unweighted monthly averages of rates reported by Frankfurt banks; the source states they were not officially set or quoted. Survey-group and day-count breaks occur in 1970 and 1990.'
+            },
+            {
+                startYear: 1997,
                 endYear: 1998,
-                evidenceClass: 'unresolved',
-                note: 'DM-era instrument, accrual and annualization conventions are unresolved.'
+                evidenceClass: 'official',
+                note: 'Bundesbank annual averages of daily FIBOR overnight rates.'
             },
             {
                 startYear: 1999,
+                endYear: 2018,
+                evidenceClass: 'official',
+                note: 'EONIA annual averages as published by Deutsche Bundesbank.'
+            },
+            {
+                startYear: 2019,
+                endYear: 2019,
+                evidenceClass: 'official',
+                note: 'Published transition-year average: EONIA through September and EURSTR from October.'
+            },
+            {
+                startYear: 2020,
                 endYear: 2025,
-                evidenceClass: 'unresolved',
-                note: 'EUR-era values remain reproducible but are not tied to a proven investable series identifier.'
+                evidenceClass: 'official',
+                note: 'EURSTR annual averages as published by Deutsche Bundesbank.'
             }
         ]
     }),

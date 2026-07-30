@@ -753,7 +753,7 @@ async function runBalanceUiOrchestrationTests() {
             'Aktueller Export-/Import-Roundtrip erhält targetEq=0 ohne Legacy-Fallback');
         assertEqual(normalizedZeroBoundary.payload.inputs.rebalBand, 0,
             'Aktueller Export-/Import-Roundtrip erhält rebalBand=0 ohne Legacy-Fallback');
-        for (const inflationBoundary of [-15, 50]) {
+        for (const inflationBoundary of [-10, 50]) {
             const boundaryDocument = createBalanceExportDocument({
                 ...validState,
                 inputs: { ...validState.inputs, inflation: inflationBoundary }
@@ -764,6 +764,22 @@ async function runBalanceUiOrchestrationTests() {
             assertEqual(normalizedBoundary.payload.inputs.inflation, inflationBoundary,
                 `Inflationsgrenze ${inflationBoundary} bleibt im Roundtrip erhalten`);
         }
+        const rejectedHistoricalInflationDocument = createBalanceExportDocument({
+            ...validState,
+            inputs: { ...validState.inputs, inflation: -10.1 }
+        });
+        assertEqual(rejectedHistoricalInflationDocument.validationWarnings?.[0]?.code, 'invalid_input_bounds',
+            'Balance export marks an inflation value below the live application boundary');
+        let rejectedHistoricalInflation = null;
+        try {
+            normalizeBalanceImportDocument(rejectedHistoricalInflationDocument);
+        } catch (error) {
+            rejectedHistoricalInflation = error;
+        }
+        assertEqual(rejectedHistoricalInflation?.code, 'invalid_input_bounds',
+            'Balance import rejects values that the annual live application path cannot consume');
+        assert(rejectedHistoricalInflation?.message?.includes('Untergrenze -10'),
+            'Balance import names the same lower boundary as the annual live application path');
         const goldDiagnosticInputs = {
             ...validState.inputs,
             goldBasisVermoegen: 100000,

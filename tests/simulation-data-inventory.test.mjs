@@ -147,6 +147,31 @@ assert(
             .includes('continuous-currency'),
     'German CPI inventory should separate the monetary reform loss from the price proxy'
 );
+assertEqual(
+    JSON.stringify(
+        SIMULATION_DATA_INVENTORY.historicalSeries.zinssatz_de.qualitySegments
+            .map(({ startYear, endYear, evidenceClass }) => ({
+                startYear,
+                endYear,
+                evidenceClass
+            }))
+    ),
+    JSON.stringify([
+        { startYear: 1925, endYear: 1944, evidenceClass: 'proxy' },
+        { startYear: 1945, endYear: 1948, evidenceClass: 'estimated' },
+        { startYear: 1949, endYear: 1996, evidenceClass: 'proxy' },
+        { startYear: 1997, endYear: 1998, evidenceClass: 'official' },
+        { startYear: 1999, endYear: 2018, evidenceClass: 'official' },
+        { startYear: 2019, endYear: 2019, evidenceClass: 'official' },
+        { startYear: 2020, endYear: 2025, evidenceClass: 'official' }
+    ]),
+    'German cash should expose source and benchmark seams without gaps'
+);
+assertEqual(
+    SIMULATION_DATA_INVENTORY.historicalSeries.zinssatz_de.source.status,
+    'known',
+    'German cash should resolve its pinned JST and Bundesbank source chain'
+);
 console.log('✓ series-specific quality segmentation OK');
 
 console.log('Test 3: mandatory provenance fields and evidence vocabulary are explicit');
@@ -308,7 +333,7 @@ for (const seriesId of historicalSeriesIds) {
     assertEqual(gate.technicallyReproducible, true, `${seriesId} should remain reproducible`);
     assertEqual(gate.externallyValidated, false, `${seriesId} must not claim external validation`);
     assertEqual(gate.replacementAllowed, false, `${seriesId} must not pass the replacement gate`);
-    if (['global_equity_research_index', 'inflation_de'].includes(seriesId)) {
+    if (['global_equity_research_index', 'inflation_de', 'zinssatz_de'].includes(seriesId)) {
         assertEqual(gate.unresolvedFields.length, 0, `${seriesId} source and license fields should be resolved`);
     } else {
         assert(gate.unresolvedFields.includes('source'), `${seriesId} should expose its source blocker`);

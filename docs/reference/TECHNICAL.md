@@ -343,8 +343,29 @@ Diese Grenze ist fachlich gewollt: Balance kennt derzeit keinen belastbaren aktu
   (93,5 %); die Reihe ist kein durchgehender Geldvermoegensdeflator ueber
   1948. Ein zweiter Testreader
   rekonstruiert alle 101 Raten unabhaengig vom Generator.
+* `app/simulator/german-cash-money-market-chain.js` – deterministisch
+  erzeugte, tief eingefrorene 1925-2025-Kette fuer den deutschen
+  Cash-/Overnight-Geldmarkt-Bruttoertragsproxy. JST `DEU.stir` bildet
+  1925-1944 ab; 1945-1948 ist ein expliziter 1944-Carry-forward; die
+  Bundesbank-Langreihe liefert Frankfurt-Tagesgeld/FIBOR, EONIA und EURSTR ab
+  1949. Das Build-Gate liest die gepinnte PDF selbst mit Poppler
+  `pdftohtml` 25.07.0 und verlangt fuer alle 77 PDF-Jahre exakte
+  Uebereinstimmung mit dem getrennten Layout-Extrakt; nur JST und PDF gehen
+  in den Primaerquellenhash ein. Die Jahre 1949-1996 sind wegen der nicht
+  amtlich festgesetzten oder quotierten Eingangssaetze als `proxy`
+  klassifiziert; Umstellungen der Meldergruppe 1970, der Zinstagemethode
+  1990, auf FIBOR 1997 und auf EURSTR 2019 sind explizit. Die Kette deklariert
+  ausserdem, dass die Runtime die 1948er-Geldvermoegensabschreibung nicht
+  abbildet. Der bestehende `cashBondReturn` gilt gemeinsam fuer Cash,
+  Geldmarkt und Anleihetranchen; Duration, Laufzeitpraemie, Kreditrisiko und
+  Mark-to-Market von Anleihen bleiben unmodelliert. Negative Raten bleiben
+  signiert; das Datenartefakt enthaelt keine zusaetzliche Aufzinsung,
+  Produktkosten, Bankmarge oder Steuer. Der geforderte EZB-
+  Administratorhinweis fuer EURSTR ist in den Datenmetadaten und der
+  Lizenzbeilage verlinkt.
 * `app/simulator/simulator-data.js` – Historische Datenprojektion mit
-  generiertem `global_equity_research_index` und `inflation_de`, tief eingefrorenes
+  generiertem `global_equity_research_index`, `inflation_de` und
+  `zinssatz_de`, tief eingefrorenes
   `HistoricalDataManifestV1`, Mortalitäts- und Stress-Presets.
 * `app/simulator/historical-backtest-contract.js` – DOM-freier, im Produktbacktest aktivierter Manifest-/SHA-256-/`HistoricalYearRecordV1`-Contract. Validiert das Dataset einmal je Revision/Hash, liefert immutable Records und prueft Einzelpfad- bzw. Cohort-Batch-Perioden vor der Rechenschleife. Die aktive Zeitachse `realized_t_decision_t_minus_1_v1` verwendet realisierte Markt-/Makrowerte aus `t` und CAPE decision-as-of aus `t-1`.
 * `app/simulator/simulation-data-inventory.js` – DOM-freier
@@ -352,8 +373,9 @@ Diese Grenze ist fachlich gewollt: Balance kennt derzeit keinen belastbaren aktu
   Reihen sowie Demografie-, Pflege-, Hinterbliebenen-, Steuer-/Tranchen-,
   Renten-/Sozial-, Stress-/Regime- und Default-/Fallbackklassen. Eigene
   Reihen-Segmente und kanonische SHA-256-Wertfingerprints sichern
-  Reproduzierbarkeit; Aktienproxy und deutsche VPI-Kette besitzen aufgeloeste
-  offene Quell-/Lizenzketten, bleiben als Ganzes aber `not_validated`; `unresolved`
+  Reproduzierbarkeit; Aktienproxy, deutsche VPI- und Geldmarktkette besitzen
+  aufgeloeste offene Quell-/Lizenz- beziehungsweise Nutzungsketten, bleiben
+  als Ganzes aber `not_validated`; `unresolved`
   blockiert fuer die anderen Reihen externe Validierungs- und
   Datenersatzbehauptungen, ohne deren technisch reproduzierbaren
   Runtime-Backtest zu blockieren.

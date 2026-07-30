@@ -160,7 +160,20 @@ DOM-freier, versionierter Raw-Vertrag fuer einen vollstaendigen Monte-Carlo-Lauf
 - `extractMonteCarloReplayArgsV1()` – rekonstruiert die DOM-freien Runnerargumente fuer einen deterministischen Re-Run.
 - `buildMonteCarloExportV1()` / `readMonteCarloExportV1()` / `createMonteCarloExportDownload()` – erzeugen und lesen `MonteCarloExportV1` mit SHA-256-Runfingerprint, App-/Engineprovenienz, Forward-Policy und eindeutigem sicheren Dateinamen. Das befristete Legacy-Read-Aliasregister ist seit Slice 11 leer; nur kanonische KPI-Felder werden erkannt.
 
-**Snapshotlinie:** `MonteCarloSnapshotPolicyV1` trennt die unveraenderliche Referenz `pre-hardening-v1`, versionierte semantische Post-Slice-Referenzen und den extern noch nicht freigegebenen Integrationskandidaten `monte-carlo-v1-final`. Solange kein extern freigegebener Nachfolger vorliegt, ist die oeffentliche `currentReference` `null`; `post-backtest-data-03-v1` ist ein davon getrennter, bis zum externen Re-Review `pending` markierter CPI-Messkandidat im Delta-Ledger. Der veraenderliche Zeiger wird aus der eingefrorenen Ergebnisprojektion ausgeschlossen. Pending Kandidaten werden daher weder zur aktuellen Referenz erklaert noch wegen einer reinen Zeigeraenderung dupliziert. Fruehere Suite- und Backtest-Datenreferenzen werden nicht ueberschrieben. Unerklaerte Deltas blockieren die Fortschreibung.
+**Snapshotlinie:** `MonteCarloSnapshotPolicyV1` trennt die unveraenderliche
+Referenz `pre-hardening-v1`, versionierte semantische Post-Slice-Referenzen
+und den extern noch nicht freigegebenen Integrationskandidaten
+`monte-carlo-v1-final`. Solange kein extern freigegebener Nachfolger
+vorliegt, ist die oeffentliche `currentReference` `null`;
+`post-backtest-data-04-v1` ist ein davon getrennter, bis zum erneuten
+externen Review `pending` markierter Cash-/Geldmarkt-Messkandidat auf Basis
+des unveraenderlichen CPI-Kandidaten `post-backtest-data-03-v1`. Der
+veraenderliche Zeiger wird aus der eingefrorenen Ergebnisprojektion
+ausgeschlossen. Pending Kandidaten werden daher weder zur aktuellen Referenz
+erklaert noch wegen einer reinen Zeigeraenderung dupliziert. Fruehere Suite-
+und Backtest-Datenreferenzen werden nicht ueberschrieben. Fixture-spezifische
+Vergleichsausnahmen stehen nur in der Messfixture, nie im produktiven
+Runtimevertrag. Unerklaerte Deltas blockieren die Fortschreibung.
 
 **Einbindung:** `simulator-monte-carlo.js` erzeugt Request und Resultat direkt aus den tatsaechlich verwendeten Laufdaten. `monte-carlo-ui.js` stellt den Download erst danach bereit; es gibt keine automatische Persistenz oder Uebertragung.
 
@@ -587,7 +600,8 @@ Historische Datenprojektion 1925-2025, Mortalitätstafeln und Stress-Presets.
 Die Aktienlevels werden nicht mehr als zweite Zahlenreihe gepflegt, sondern
 aus `global-equity-research-chain.js` importiert. Die deutschen
 Inflationswerte werden ebenso ausschliesslich aus
-`german-cpi-chain.js` projiziert.
+`german-cpi-chain.js` projiziert. `zinssatz_de` stammt ausschliesslich aus
+`german-cash-money-market-chain.js`.
 
 **Exporte:**
 - `HISTORICAL_DATA` – historische Marktdaten mit dem neutralen Feld
@@ -596,7 +610,8 @@ Inflationswerte werden ebenso ausschliesslich aus
 - `CARE_ENTRY_PROB` – Pflegeeintrittswahrscheinlichkeiten (BARMER)
 - `STRESS_PRESETS` – Stresstest-Szenarien (GFC, Stagflation, Lost Decade, System-Krise etc.)
 
-**Dependencies:** `global-equity-research-chain.js`, `german-cpi-chain.js`
+**Dependencies:** `global-equity-research-chain.js`, `german-cpi-chain.js`,
+`german-cash-money-market-chain.js`
 
 ---
 
@@ -660,7 +675,51 @@ Namensnennung – 2.0. Details liegen in
 
 ---
 
-## 23c. `simulation-data-inventory.js`
+## 23c. `german-cash-money-market-chain.js`
+
+Generiertes, tief eingefrorenes Datenartefakt fuer den deutschen
+Cash-/Overnight-Geldmarkt-Bruttoertragsproxy 1925-2025. Das Buildskript
+prueft das wiederverwendete JST-R6-Original, die gepinnte
+Bundesbank-Langreihen-PDF und den mechanischen Layout-Extrakt. Zusaetzlich
+liest es die Primaer-PDF mit dem festgelegten Poppler `pdftohtml` 25.07.0,
+rekonstruiert die 77 Bundesbankwerte koordinatenbasiert und verlangt exakte
+Uebereinstimmung mit dem Layoutpfad. Ein unabhaengiger Testreader
+rekonstruiert alle 101 Werte ohne den Generator direkt aus JST-XLSX und PDF.
+
+Die Segmente bleiben maschinenlesbar getrennt: JST `DEU.stir` 1925-1944 als
+Proxy, der offen ausgewiesene 1944-Carry-forward fuer 1945-1948 als
+Schaetzung, der Bundesbank-publizierte Frankfurt-Banken-Proxy 1949-1996,
+FIBOR 1997-1998, EONIA
+1999-2018, der EONIA-/EURSTR-Uebergang 2019 und EURSTR 2020-2025. Der
+publizierte Jahresdurchschnitt wird genau einmal als einfacher
+Brutto-Jahresertragsproxy verwendet; Produktkosten, Bankmarge und Steuer sind
+nicht Bestandteil der Reihe. Negative Raten bleiben signiert. Die
+Methodenbrueche 1970 und 1990, der 1948-Waehrungsreformbruch und der
+EZB-EURSTR-Disclaimer sind maschinenlesbar.
+
+Der bestehende Laufzeitvertrag heisst `cashBondReturn`: dieselbe Reihe wirkt
+auf operative Liquiditaet, Geldmarktpositionen, den cash-nahen Pflegebucket
+und Anleihetranchen. Fuer Anleihen ist sie ausdruecklich nur ein
+fristigkeitsinkongruenter Modellproxy; Duration, Laufzeitpraemie, Kreditrisiko
+und Marktwertbewegungen sind nicht abgebildet. Der 1948-Zinswert bildet die
+separate 100:6,5-Abschreibung wesentlicher RM-Geldvermoegen nicht ab.
+
+**Exporte:**
+
+- `GERMAN_CASH_MONEY_MARKET_CHAIN` – Version, Quellenhashes,
+  Waehrungsregime, Returnkonvention, Anwendungsbereich, Methoden-/
+  Waehrungsbrueche, Disclaimer, Primaer-PDF-Oracle, Qualitaetssegmente,
+  Lueckenregel und Jahreswerte;
+- `GERMAN_CASH_MONEY_MARKET_ANNUAL_RETURNS` – kanonische
+  1925-2025-Laufzeitprojektion.
+
+**Erzeugung:** `npm run build:german-cash-money-market-data`; read-only Gate:
+`npm run verify:german-cash-money-market-data`. Details und Quellenbedingungen
+liegen in `data/historical/german-cash-money-market-chain/`.
+
+---
+
+## 23d. `simulation-data-inventory.js`
 
 DOM-freier, unveraenderlicher Evidenz- und Quell-Gate-Contract fuer
 historische Reihen und statische Simulationsdaten. Das Modul ersetzt weder
@@ -670,7 +729,7 @@ Backtestcontract.
 **Exporte:**
 
 - `SIMULATION_DATA_INVENTORY` – `SimulationDataInventoryV1`, Revision
-  `2026-07-29.4`, mit sechs reihenspezifischen Historieneintraegen und sieben
+  `2026-07-29.5`, mit sechs reihenspezifischen Historieneintraegen und sieben
   statischen Kategorien;
 - `validateSimulationDataInventory()` – prueft Pflichtfelder,
   Evidenzvokabular, lueckenlose 1925-2025-Qualitaetssegmente,
@@ -683,9 +742,10 @@ Backtestcontract.
   Reproduzierbarkeit, externe Validierung und Erlaubnis zum Datenersatz.
 
 `unresolved` bleibt technisch reproduzierbar, darf aber weder eine externe
-Validierung noch einen lizenzierten Datenersatz behaupten. Die Aktienproxy
-besitzt bekannte Quellen-/Lizenzfelder, bleibt wegen ihrer Proxy- und
-Modellsegmente jedoch `not_validated`. Modellannahmen,
+Validierung noch einen lizenzierten Datenersatz behaupten. Aktien-, CPI- und
+Cashkette besitzen bekannte Quellen-/Lizenz- beziehungsweise Nutzungsfelder,
+bleiben wegen ihrer Proxy-/Schaetzsegmente und ausstehender externer
+Validierung jedoch `not_validated`. Modellannahmen,
 Nutzereingaben, Stressparameter, abgeleitete Werte und fehlende Modelle tragen
 getrennte Evidenzklassen.
 

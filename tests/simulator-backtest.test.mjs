@@ -1,4 +1,5 @@
 import { runBacktest } from '../app/simulator/simulator-backtest.js';
+import { GERMAN_CASH_MONEY_MARKET_ANNUAL_RETURNS } from '../app/simulator/german-cash-money-market-chain.js';
 import { HISTORICAL_DATA } from '../app/simulator/simulator-data.js';
 import { EngineAPI } from '../engine/index.mjs';
 import { CONFIG } from '../engine/config.mjs';
@@ -45,6 +46,22 @@ function createMockDocument(initialValues = {}) {
     return {
         getElementById: (id) => getOrCreate(id)
     };
+}
+
+function assertCashRateMarker(row, year, label) {
+    assert(row, `${label}: backtest row ${year} should exist`);
+    const sourceRatePct = GERMAN_CASH_MONEY_MARKET_ANNUAL_RETURNS[year];
+    assertEqual(HISTORICAL_DATA[year].zinssatz_de, sourceRatePct, `${label}: runtime history should use the generated source rate`);
+    const interestTrace = row.row?.balance_trace?.find(entry => entry.phase === 'after_cash_interest');
+    assert(interestTrace, `${label}: balance trace should expose the cash-interest phase`);
+    assertClose(
+        interestTrace.cashInterestEarned,
+        interestTrace.liqBasisForInterest * (sourceRatePct / 100),
+        1e-9,
+        `${label}: generated source rate should be applied exactly once`
+    );
+    assertClose(row.row?.cashInterestEarned, interestTrace.cashInterestEarned, 1e-9, `${label}: row and trace should expose the same interest`);
+    assertClose(row.row?.portfolio_flow_delta, 0, 1e-6, `${label}: signed interest should reconcile without FlowDelta`);
 }
 
 const prevDocument = global.document;
@@ -121,6 +138,11 @@ try {
         assert(Object.isFrozen(window.globalBacktestData?.result), 'UI retains an immutable canonical BacktestRunResultV1');
         assertEqual(window.globalBacktestData?.result?.request?.engine?.buildId, EngineAPI.getVersion().build, 'UI captures the engine build used by the run');
         assert(/^[a-f0-9]{64}$/.test(window.globalBacktestData?.result?.request?.engine?.configFingerprint?.value), 'UI captures a deterministic engine config fingerprint');
+        assertCashRateMarker(
+            window.globalBacktestData?.rows?.find(entry => entry.jahr === 2000),
+            2000,
+            'High-rate marker'
+        );
         assert(
             global.document.getElementById('simulationSummary').innerHTML.includes(
                 formatCurrency(window.globalBacktestData.result.metrics.values.wealth_end_nominal_eur)
@@ -399,12 +421,13 @@ try {
         global.document.getElementById('monteCarloResults').style.display = 'none';
         runBacktest();
 
-        const row2020 = window.globalBacktestData?.rows?.find(entry => entry.jahr === 2020);
-        assert(row2020, 'Negative-interest fixture should contain 2020');
-        assert(row2020.row?.cashInterestEarned < 0, '2020 cash interest should retain its negative sign');
-        assertClose(row2020.row?.portfolio_flow_delta, 0, 1e-6, 'Negative cash interest should reconcile without FlowDelta');
-        const interestTrace = row2020.row?.balance_trace?.find(entry => entry.phase === 'after_cash_interest');
-        assert(interestTrace?.cashInterestEarned < 0, 'Balance trace should retain signed negative cash interest');
+        const rows = window.globalBacktestData?.rows || [];
+        const row2019 = rows.find(entry => entry.jahr === 2019);
+        const row2020 = rows.find(entry => entry.jahr === 2020);
+        assertCashRateMarker(row2019, 2019, 'EONIA/EURSTR transition marker');
+        assertCashRateMarker(row2020, 2020, 'EURSTR negative-rate marker');
+        assert(row2019.row?.cashInterestEarned < 0, '2019 transition-year cash interest should retain its negative sign');
+        assert(row2020.row?.cashInterestEarned < 0, '2020 EURSTR cash interest should retain its negative sign');
     }
 
     console.log('✅ Simulator backtest tests passed');

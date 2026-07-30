@@ -293,7 +293,14 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 
 #### `monte-carlo-measurement-contract.test.mjs`
 **Zweck:** Validiert Golden Cases, unveraenderliche Snapshot-Linie, Delta-Ledger, Same-Runtime-Exaktheit sowie Direct-/Worker-/Chunk-Paritaet.
-- **Aktuelle Referenz:** Die oeffentliche `currentReference` ist `null`, solange kein extern freigegebener Nachfolger vorliegt; `post-backtest-data-03-v1` ist der getrennte, noch extern zu reviewende CPI-Datenkandidat. Der veraenderliche Zeiger ist aus der eingefrorenen Ergebnisprojektion ausgeschlossen. Keine fruehere Fixture wird ueberschrieben und eine reine Zeigeraenderung erzeugt keinen Folgesnapshot.
+- **Aktuelle Referenz:** Die oeffentliche `currentReference` ist `null`,
+  solange kein extern freigegebener Nachfolger vorliegt;
+  `post-backtest-data-04-v1` ist der getrennte, noch extern zu reviewende
+  Cash-/Geldmarkt-Datenkandidat auf Basis des unveraenderlichen
+  Slice-03-Kandidaten. Der veraenderliche Zeiger ist aus der eingefrorenen
+  Ergebnisprojektion ausgeschlossen. Keine fruehere Fixture wird
+  ueberschrieben und eine reine Zeigeraenderung erzeugt keinen
+  Folgesnapshot.
 - **Slice-02-Delta:** Die harte Nullsemantik fuer `maxSkimPctOfEq` und das Equity-Gesamtbudget veraendert im festen Acht-Run-Fall nur Volatilitaet und maximalen Drawdown von Run 6 sowie die davon abgeleitete Median-Volatilitaet.
 - **Invarianten:** Direct-Runner-CaR, alle anderen Pfad-/Aggregatwerte, Outcome-Inventar, Missingness und Datenprovenienz bleiben exakt.
 - **Slice-11-Kandidat:** `post-suite-data-11-v1` bleibt bis zum externen Review
@@ -311,6 +318,14 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
   CaR-, Sampling- und Auto-Optimize-Projektionen ein. Der Erzeugungsmodus
   verweigert ein Ueberschreiben; der Kandidat bleibt bis zum externen Review
   `pending`. Die oeffentliche `currentReference` bleibt deshalb `null`.
+- **Backtest-Data-Slice-04-Kandidat:** `post-backtest-data-04-v1` baut
+  unveraenderlich auf dem Slice-03-Kandidaten auf und friert nur die neue
+  Cash-/Geldmarkt-Datenprovenienz samt erwarteten Modellprojektionen ein.
+  Der Kandidat bleibt bis zum erneuten externen Review `pending`.
+- **Historische Fixture-Kompatibilitaet:** Vergleichsausnahmen fuer
+  unveraenderliche Pending-Fixtures stehen ausschliesslich in
+  `snapshot-policy-v1.json`. Der produktive Runtime-Vertrag enthaelt weder
+  Fixture-Pfade noch ein `ignoredHistoricalFixtureFields`-Feld.
 - **Ressourcenmessung:** Das feste Standardprofil mit 100.000 Runs ergab
   977,62585 gesamte Worker-Result-Byte pro Run; der Laufzeitvertrag verwendet
   gerundete 978 Byte pro Run.
@@ -628,7 +643,10 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 - **Mindest-Flex:** Stresstest 2005-2014 mit lokalem Same-Year-Invariant bei Status `applied`, Logstatus und FlowDelta-Pruefung inklusive 3-Bucket-Modus.
 - **Profilverbund-Transparenz:** Backtest-Ergebnis behaelt die profilgenaue `minimumFlexProfiles`-Aufteilung.
 - **Realentnahme:** Historische Jahreszeilen führen den kumulierten Inflationsfaktor fort und deflationieren die effektive Entnahme.
-- **Negativzins:** Der 2019-2020-Fall behaelt negative Cashzinsen in Ergebnis und Balance-Trace und reconciliiert FlowDelta.
+- **Zinsmarker:** Hochzins 2000, der EONIA-/EURSTR-Uebergang 2019 und das
+  reine negative EURSTR-Jahr 2020 werden vom generierten Quellenwert ueber
+  `cashBondReturn` bis zur exakten Zinsgutschrift im Balance-Trace
+  nachgerechnet; `portfolio_flow_delta` bleibt jeweils null.
 
 #### `simulator-backtest-ui.test.mjs`
 **Zweck:** Testet den DOM-armen UI-/Accessibility-Vertrag des historischen Backtests.
@@ -713,6 +731,51 @@ Post-Slice-02-Zielstand und das aktive Backtest-Ziel.
 - **D-20:** Die isolierte Endjahreskorrektur 2024 haelt nominales
   Endvermoegen konstant und erklaert die dokumentierten +7.758,95 EUR
   Realwert rein aus dem Deflator.
+- **Bilanzgate:** Vorher und nachher bleibt der maximale absolute
+  `portfolio_flow_delta` unter 1 EUR.
+
+#### `german-cash-money-market-chain.test.mjs`
+**Zweck:** Testet die generierte deutsche 1925-2025-Cash-/
+Overnight-Geldmarktproxykette.
+- **Quellenhashes:** JST-R6-Original, Bundesbank-Langreihen-PDF und
+  mechanischer Layout-Extrakt stimmen mit den gepinnten SHA-256-Werten
+  ueberein. Der Rohdatenhash umfasst nur die beiden Primaerquellen; der
+  abgeleitete Extrakt besitzt einen getrennten Hash.
+- **Laufzeit:** 101 endliche Jahreswerte werden ausschliesslich aus dem
+  generierten Modul in `HISTORICAL_DATA` und `annualData` projiziert.
+- **Naehte:** JST, Schaetzbruecke, Frankfurt-Tagesgeld, FIBOR, EONIA,
+  Uebergang 2019 und EURSTR besitzen feste Segmentgrenzen; Negativzinsen
+  bleiben signiert.
+- **Qualifikation:** Die 1949-1996-Werte sind wegen der nicht amtlich
+  festgesetzten oder quotierten Meldesaetze als `proxy` klassifiziert.
+  Meldergruppen-, Zinstage-, FIBOR- und EURSTR-Uebergaenge, die nicht
+  modellierte Geldvermoegensabschreibung 1948 sowie der EZB-
+  Administratorhinweis sind maschinenlesbar.
+- **Anwendungsgrenze:** Der einfache Brutto-Jahresproxy wird vom bestehenden
+  `cashBondReturn` auf Cash, Geldmarkt, Pflegebucket und Anleihetranchen
+  angewandt. Fuer Anleihen bildet er weder Duration, Laufzeitpraemie,
+  Kreditrisiko noch Mark-to-Market ab; zusaetzliche Aufzinsung,
+  Produktkosten und Steuer sind ausgeschlossen.
+
+#### `german-cash-money-market-source-reconstruction.test.mjs`
+**Zweck:** Rekonstruiert alle 101 Werte unabhaengig aus dem JST-Original und
+direkt aus der gepinnten Bundesbank-PDF. Ein eigenstaendiger
+koordinatenbasierter `pdftohtml`-Reader prueft 77 Jahreswerte gegen das
+Generatorartefakt, die einzige erlaubte 1945-1948-Luecke und das schreibfreie
+Verifikationsgate; der abgeleitete Layout-Extrakt ist nicht das Oracle.
+
+#### `german-cash-money-market-backtest-delta.test.mjs`
+**Zweck:** Validiert die Slice-04-Vorher-/Nachher-Evidenz gegen den
+eingefrorenen Post-Slice-03-Zielstand und das aktive Backtest-Ziel.
+- **Identitaet:** Input-Hashes und Outcome-Klassen aller sieben
+  Referenzfaelle bleiben stabil.
+- **Deltas:** Vermoegen, Entnahmen, Steuern, Kuerzungsmetriken, Drawdown,
+  Runway und FlowDelta tragen die alleinige Ursache
+  `german_cash_money_market_chain`.
+- **Marker:** Backtest und Monte Carlo verwenden in 2000/2001 denselben
+  generierten aktuellen Jahreswert; der Legacy-Vergleich bleibt sichtbar
+  `t-1`. Die Runtime-Zinsgutschrift wird zusaetzlich fuer Hochzins 2000,
+  Uebergang 2019 und negatives EURSTR 2020 bis zum FlowDelta nachgerechnet.
 - **Bilanzgate:** Vorher und nachher bleibt der maximale absolute
   `portfolio_flow_delta` unter 1 EUR.
 
@@ -1050,8 +1113,11 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `historical-backtest-metrics.test.mjs` | ~170 | Versioniertes Metrikwoerterbuch, Reconciliation, Missingness und Outcome-Regeln |
 | `historical-backtest-cohorts.test.mjs` | ~210 | Feste Rolling-Cohort-Fenster, Batch-Preflight, Outcome-/Ausschlussinventar und Aussagegrenze |
 | `historical-backtest-export.test.mjs` | ~310 | Raw-JSON/CSV, Fingerprints, Provenienz, Roundtrip, HTML-/Formelinjektionsschutz |
-| `historical-data-manifest.test.mjs` | ~165 | Manifestvollstaendigkeit, unresolved-Gates, kanonischer SHA-256 und immutable Lookup |
+| `historical-data-manifest.test.mjs` | ~180 | Manifestvollstaendigkeit, unresolved-Gates, kanonischer SHA-256 und immutable Lookup |
 | `global-equity-research-chain.test.mjs` | ~100 | Gepinnte offene Eingaben, 1925-2025-Verkettung, Laenderluecken, Evidenzsegmente und neutrale Identitaet |
+| `german-cash-money-market-chain.test.mjs` | ~360 | Gepinnte JST-/Bundesbank-Eingaben, 1925-2025-Kette, Methodenbrueche, Waehrungsreformgrenze, Cash-/Bond-Anwendung, Disclaimer und Hashbruecken |
+| `german-cash-money-market-source-reconstruction.test.mjs` | ~230 | Unabhaengige PDF-Koordinatenrekonstruktion aller 77 Bundesbank-Jahre plus JST, einzig erlaubte Schaetzluecke und read-only Generatorgate |
+| `german-cash-money-market-backtest-delta.test.mjs` | ~340 | Slice-04-Vorher-/Nachher-Beleg, Markerjahre, Steuer-/Kostenabgrenzung und FlowDelta |
 | `historical-data-robustness.test.mjs` | ~60 | Fehlende Marktdaten |
 | `simulation-data-inventory.test.mjs` | ~330 | Historien-/Statik-Inventar, Evidenzklassen, Wertfingerprints und fail-closed Quell-/Lizenz-Gates |
 | `liquidity-guardrail.test.mjs` | ~100 | Liquiditäts-Guardrails |

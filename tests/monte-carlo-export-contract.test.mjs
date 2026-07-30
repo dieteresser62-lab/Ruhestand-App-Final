@@ -181,6 +181,21 @@ const schemaGolden = JSON.parse(fs.readFileSync(
     assert(/^[a-f0-9]{64}$/.test(request.data.fingerprint.value), 'data fingerprint is a SHA-256 hex value');
     assertEqual(request.execution.chunkConfiguration.strategy, 'single-chunk-v1', 'request records the exact serial chunk policy');
     assertEqual(request.snapshotPolicy.currentReference, null, 'request must not advertise a pending snapshot as the current reference');
+    assertEqual(
+        request.snapshotPolicy.policy,
+        'immutable-baseline-with-versioned-pending-candidates',
+        'snapshot policy must describe unpromoted versioned candidates while the current reference is empty'
+    );
+    assertEqual(
+        request.snapshotPolicy.promotionRule,
+        'current-reference-remains-null-until-external-approval',
+        'snapshot policy must make external approval the promotion boundary'
+    );
+    assertEqual(
+        Object.hasOwn(request.snapshotPolicy, 'ignoredHistoricalFixtureFields'),
+        false,
+        'runtime exports must not carry fixture-specific comparison paths'
+    );
     assert(Object.isFrozen(request) && Object.isFrozen(request.scenario.normalizedInputs), 'request is deeply immutable');
     validateMonteCarloRunRequestV1(request);
 }

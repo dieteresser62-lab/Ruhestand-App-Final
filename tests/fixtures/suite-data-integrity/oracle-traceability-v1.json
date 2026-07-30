@@ -944,10 +944,10 @@
   },
   "deltaBaselines": [
     { "id": "backtest-baseline", "file": "tests/fixtures/simulator-backtest-baseline-v1.json", "gitBlobSha1": "7b2cb702ad3c3c1501d5ddd4abb71a497b95ca3c", "expectedDelta": "none" },
-    { "id": "backtest-target", "file": "tests/fixtures/simulator-backtest-target-v1.json", "gitBlobSha1": "dae30b5a873e30c8f62dd5e69f44656c4bcf9466", "expectedDelta": "backtest_data_03", "deltaEvidence": "tests/fixtures/german-cpi-chain-backtest-delta-v1.json" },
-    { "id": "mc-snapshot-policy", "file": "tests/fixtures/monte-carlo-measurement/snapshot-policy-v1.json", "gitBlobSha1": "677eb702dc5d40c905e9d9be010b3dcae04379eb", "expectedDelta": "backtest_data_02", "deltaEvidence": "tests/fixtures/monte-carlo-measurement/post-backtest-data-02-v3.json" },
+    { "id": "backtest-target", "file": "tests/fixtures/simulator-backtest-target-v1.json", "gitBlobSha1": "2e4ffd5a1b4bd265d344c4f27fe3d396f1faee1a", "expectedDelta": "backtest_data_04", "deltaEvidence": "tests/fixtures/german-cash-money-market-backtest-delta-v1.json" },
+    { "id": "mc-snapshot-policy", "file": "tests/fixtures/monte-carlo-measurement/snapshot-policy-v1.json", "gitBlobSha1": "5f30181533224e87a41be3941441fd103d2d44d2", "expectedDelta": "backtest_data_04", "deltaEvidence": "tests/fixtures/monte-carlo-measurement/post-backtest-data-04-v1.json" },
     { "id": "mc-final", "file": "tests/fixtures/monte-carlo-measurement/monte-carlo-v1-final.json", "gitBlobSha1": "f9dde37e5dff1e2d9459cb494a5780e7b85342d7", "expectedDelta": "none" },
-    { "id": "flow-delta-ledger", "file": "tests/fixtures/monte-carlo-measurement/delta-ledger-v1.json", "gitBlobSha1": "76ce3572dac1898beee10f26eef70f80b704404c", "expectedDelta": "backtest_data_03", "deltaEvidence": "tests/fixtures/monte-carlo-measurement/post-backtest-data-03-v1.json" },
+    { "id": "flow-delta-ledger", "file": "tests/fixtures/monte-carlo-measurement/delta-ledger-v1.json", "gitBlobSha1": "9db916c8fcd23488d4b273d3b8042ae953e4be64", "expectedDelta": "backtest_data_04", "deltaEvidence": "tests/fixtures/monte-carlo-measurement/post-backtest-data-04-v1.json" },
     { "id": "generated-engine", "file": "engine.js", "gitBlobSha1": "ec49961ed58134928723be5ddb6185e11f7fbcb5", "expectedDelta": "none_after_build" }
   ]
 }

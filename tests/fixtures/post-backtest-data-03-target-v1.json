@@ -6,7 +6,7 @@
         "equityReturnRatio": 0.007544561879,
         "goldPct": -2.7,
         "inflationPct": 1.3,
-        "interestPct": 4.12,
+        "interestPct": 4.25,
         "sourceYear": 2000,
         "wagePct": 2.5
       },
@@ -32,7 +32,7 @@
         },
         "interest": {
           "sourceYear": 1999,
-          "valuePct": 2.74
+          "valuePct": 2.5
         },
         "wageAdjustment": {
           "sourceYear": 2000,
@@ -62,7 +62,7 @@
         },
         "interest": {
           "sourceYear": 2000,
-          "valuePct": 4.12
+          "valuePct": 4.25
         },
         "temporalConventionId": "realized_t_decision_t_minus_1_v1",
         "wageAdjustment": {
@@ -78,7 +78,7 @@
         "equityReturnRatio": -0.136094927399,
         "goldPct": 4.3,
         "inflationPct": 2,
-        "interestPct": 4.38,
+        "interestPct": 3.75,
         "sourceYear": 2001,
         "wagePct": 1.9
       },
@@ -104,7 +104,7 @@
         },
         "interest": {
           "sourceYear": 2000,
-          "valuePct": 4.12
+          "valuePct": 4.25
         },
         "wageAdjustment": {
           "sourceYear": 2001,
@@ -134,7 +134,7 @@
         },
         "interest": {
           "sourceYear": 2001,
-          "valuePct": 4.38
+          "valuePct": 3.75
         },
         "temporalConventionId": "realized_t_decision_t_minus_1_v1",
         "wageAdjustment": {
@@ -154,7 +154,7 @@
   "cases": [
     {
       "alerts": [],
-      "canonicalRowsHash": "d1d14b337f13b9926b8f8d35135f4547480fc17626bac1593520280982d11af0",
+      "canonicalRowsHash": "1d5e87fbdfa29bdc370b4d720b4ccc15c513704ada0f0ec129d286dcc9b95ee7",
       "expectedRowCount": 6,
       "id": "completed_2000_2005",
       "inputHash": "4fb90382bc7af1fad54fb11014e5e23862d5b561cfd992428c74e5f78397df0a",
@@ -337,7 +337,7 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 2006806.67,
+            "portfolioTotalEnd": 2006884.67,
             "reductionPct": 0,
             "regime": "peak_stable",
             "tax": 0,
@@ -346,7 +346,7 @@
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 1.3,
-            "liquiditaet": 62472,
+            "liquiditaet": 62550,
             "vpwFallbackHint": "dynamic_flex_off",
             "wertAktien": 1944334.67,
             "wertGold": 0
@@ -363,7 +363,7 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 1714490.86,
+            "portfolioTotalEnd": 1714241.21,
             "reductionPct": 6.416584,
             "regime": "side_long",
             "tax": 0,
@@ -372,7 +372,7 @@
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 2,
-            "liquiditaet": 54770.27,
+            "liquiditaet": 54520.63,
             "vpwFallbackHint": "dynamic_flex_off",
             "wertAktien": 1659720.58,
             "wertGold": 0
@@ -389,7 +389,7 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 1388402.31,
+            "portfolioTotalEnd": 1387842.04,
             "reductionPct": 46.400788,
             "regime": "bear_deep",
             "tax": 0,
@@ -398,9 +398,9 @@
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 1.6,
-            "liquiditaet": 22444.61,
+            "liquiditaet": 22433.61,
             "vpwFallbackHint": "dynamic_flex_off",
-            "wertAktien": 1365957.7,
+            "wertAktien": 1365408.42,
             "wertGold": 0
           }
         },
@@ -415,7 +415,7 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 1693115.83,
+            "portfolioTotalEnd": 1692425.95,
             "reductionPct": 53.544083,
             "regime": "side_long",
             "tax": 0,
@@ -424,28 +424,28 @@
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 1.6,
-            "liquiditaet": 44556.78,
+            "liquiditaet": 44549.92,
             "vpwFallbackHint": "dynamic_flex_off",
-            "wertAktien": 1648559.05,
+            "wertAktien": 1647876.03,
             "wertGold": 0
           }
         }
       ],
-      "summaryText": "Startjahr 2000 Endjahr 2005 Outcome Vollständig Angeforderte Jahre 6 Wirtschaftlich ausgewertete Jahre 6 Jahreszeilen 6 Startvermögen 2.020.000,00 € Endvermögen 1.693.115,83 € Gesamte Entnahmen 176.400,00 € Max. Kürzungsdauer (≥ 10 %) 4 Jahre Jahre mit Kürzung (≥ 10 %) 4 von 6 Gezahlte Steuern 0,00 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 €",
+      "summaryText": "Startjahr 2000 Endjahr 2005 Outcome Vollständig Angeforderte Jahre 6 Wirtschaftlich ausgewertete Jahre 6 Jahreszeilen 6 Startvermögen 2.020.000,00 € Endvermögen 1.692.425,95 € Gesamte Entnahmen 176.400,00 € Max. Kürzungsdauer (≥ 10 %) 4 Jahre Jahre mit Kürzung (≥ 10 %) 4 von 6 Gezahlte Steuern 0,00 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 €",
       "uiStatus": {
         "code": "BACKTEST_COMPLETED",
         "kind": "completed",
         "text": "Backtest vollständig abgeschlossen Code: BACKTEST_COMPLETED Ursache: 6 von 6 angeforderten Jahren wurden wirtschaftlich ausgewertet. Nächster Schritt: Prüfen Sie Summary, Warnhinweise, Jahresprotokoll und Raw-Export gemeinsam."
       },
       "values": {
-        "lastRowPortfolioTotalEnd": 1693115.83,
-        "lastWrapperPortfolio": 1693115.83,
+        "lastRowPortfolioTotalEnd": 1692425.95,
+        "lastWrapperPortfolio": 1692425.95,
         "maxAbsolutePortfolioFlowDelta": 0,
-        "maxDrawdownPct": 40.319973,
+        "maxDrawdownPct": 40.343729,
         "maxReductionStreak": 4,
         "minRunwayCoveragePct": 75.585921,
         "startWealth": 2000000,
-        "summaryEndWealth": 1693115.83,
+        "summaryEndWealth": 1692425.95,
         "totalTax": 0,
         "totalWithdrawal": 176400,
         "yearsWithReductionAtLeast10Pct": 4
@@ -453,7 +453,7 @@
     },
     {
       "alerts": [],
-      "canonicalRowsHash": "a4b07f962c46c04dbea52cd750c00a003d4d0009d982a632b069c60dab7dfb42",
+      "canonicalRowsHash": "3731cac5e44a9bb4c6809230864675bc58e1656a8a8d3f9f7b5a7ef711b78f80",
       "expectedRowCount": 61,
       "id": "completed_1960_2020",
       "inputHash": "3a08ea0c492d3ef517e7cc239506b067c8151227a61332568f4381885514c032",
@@ -609,7 +609,7 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 2163608.86,
+            "portfolioTotalEnd": 2163397.03,
             "reductionPct": 0,
             "regime": "peak_stable",
             "tax": 2173.75,
@@ -618,7 +618,7 @@
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 1.6,
-            "liquiditaet": 39551.12,
+            "liquiditaet": 39339.3,
             "vpwFallbackHint": "dynamic_flex_off",
             "wertAktien": 2124057.74,
             "wertGold": 0
@@ -635,7 +635,7 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 2412149.86,
+            "portfolioTotalEnd": 2411997.47,
             "reductionPct": 7.874016,
             "regime": "peak_hot",
             "tax": 5554.06,
@@ -644,7 +644,7 @@
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 2.5,
-            "liquiditaet": 96751.18,
+            "liquiditaet": 96598.8,
             "vpwFallbackHint": "dynamic_flex_off",
             "wertAktien": 2315398.68,
             "wertGold": 0
@@ -661,7 +661,7 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 177107688.76,
+            "portfolioTotalEnd": 176111286.92,
             "reductionPct": 94.174903,
             "regime": "peak_hot",
             "tax": 59382.8,
@@ -670,9 +670,9 @@
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 1.4,
-            "liquiditaet": 454069.93,
+            "liquiditaet": 456387.54,
             "vpwFallbackHint": "dynamic_flex_off",
-            "wertAktien": 176653618.83,
+            "wertAktien": 175654899.38,
             "wertGold": 0
           }
         },
@@ -687,7 +687,7 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 180149514.86,
+            "portfolioTotalEnd": 179135437.66,
             "reductionPct": 99.778011,
             "regime": "peak_stable",
             "tax": 0,
@@ -696,36 +696,36 @@
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 0.5,
-            "liquiditaet": 341183.05,
+            "liquiditaet": 343660.61,
             "vpwFallbackHint": "dynamic_flex_off",
-            "wertAktien": 179808331.82,
+            "wertAktien": 178791777.05,
             "wertGold": 0
           }
         }
       ],
-      "summaryText": "Startjahr 1960 Endjahr 2020 Outcome Vollständig Angeforderte Jahre 61 Wirtschaftlich ausgewertete Jahre 61 Jahreszeilen 61 Startvermögen 2.020.000,00 € Endvermögen 180.149.514,86 € Gesamte Entnahmen 4.093.414,61 € Max. Kürzungsdauer (≥ 10 %) 59 Jahre Jahre mit Kürzung (≥ 10 %) 59 von 61 Gezahlte Steuern 765.209,43 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 €",
+      "summaryText": "Startjahr 1960 Endjahr 2020 Outcome Vollständig Angeforderte Jahre 61 Wirtschaftlich ausgewertete Jahre 61 Jahreszeilen 61 Startvermögen 2.020.000,00 € Endvermögen 179.135.437,66 € Gesamte Entnahmen 4.093.414,61 € Max. Kürzungsdauer (≥ 10 %) 59 Jahre Jahre mit Kürzung (≥ 10 %) 59 von 61 Gezahlte Steuern 766.632,65 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 €",
       "uiStatus": {
         "code": "BACKTEST_COMPLETED",
         "kind": "completed",
         "text": "Backtest vollständig abgeschlossen Code: BACKTEST_COMPLETED Ursache: 61 von 61 angeforderten Jahren wurden wirtschaftlich ausgewertet. Nächster Schritt: Prüfen Sie Summary, Warnhinweise, Jahresprotokoll und Raw-Export gemeinsam."
       },
       "values": {
-        "lastRowPortfolioTotalEnd": 180149514.86,
-        "lastWrapperPortfolio": 180149514.86,
+        "lastRowPortfolioTotalEnd": 179135437.66,
+        "lastWrapperPortfolio": 179135437.66,
         "maxAbsolutePortfolioFlowDelta": 0,
-        "maxDrawdownPct": 40.024982,
+        "maxDrawdownPct": 40.158872,
         "maxReductionStreak": 59,
-        "minRunwayCoveragePct": 71.554004,
+        "minRunwayCoveragePct": 71.554003,
         "startWealth": 2000000,
-        "summaryEndWealth": 180149514.86,
-        "totalTax": 765209.43,
+        "summaryEndWealth": 179135437.66,
+        "totalTax": 766632.65,
         "totalWithdrawal": 4093414.61,
         "yearsWithReductionAtLeast10Pct": 59
       }
     },
     {
       "alerts": [],
-      "canonicalRowsHash": "7fee5aa51c1fdac92d924fd5260d8617e8e86f1d659db99f49945d3b6fb2e389",
+      "canonicalRowsHash": "f1ffb7529cea0b5213a47ceaedacb14e230c1998a818ed619c539df49394d4bb",
       "expectedRowCount": 4,
       "id": "completed_numeraire_seam_1949_1952",
       "inputHash": "d2b24432c05cbafbabbe4ca835a7ee923fbeb7ac0d2c342e45a7acdf18732e60",
@@ -881,7 +881,7 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 2872959.02,
+            "portfolioTotalEnd": 2873373.24,
             "reductionPct": 0,
             "regime": "peak_hot",
             "tax": 5496.78,
@@ -890,7 +890,7 @@
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 7.035204,
-            "liquiditaet": 56269.13,
+            "liquiditaet": 56683.35,
             "vpwFallbackHint": "dynamic_flex_off",
             "wertAktien": 2816689.89,
             "wertGold": 0
@@ -907,7 +907,7 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 3384522.11,
+            "portfolioTotalEnd": 3384622.98,
             "reductionPct": 14.17853,
             "regime": "peak_hot",
             "tax": 8639.92,
@@ -916,7 +916,7 @@
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": -6.4,
-            "liquiditaet": 111016.31,
+            "liquiditaet": 111117.17,
             "vpwFallbackHint": "dynamic_flex_off",
             "wertAktien": 3273505.81,
             "wertGold": 0
@@ -933,7 +933,7 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 4285962.26,
+            "portfolioTotalEnd": 4286059.6,
             "reductionPct": 20.886124,
             "regime": "peak_hot",
             "tax": 1503.63,
@@ -942,7 +942,7 @@
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 7.6,
-            "liquiditaet": 101465,
+            "liquiditaet": 101562.35,
             "vpwFallbackHint": "dynamic_flex_off",
             "wertAktien": 4184497.26,
             "wertGold": 0
@@ -959,7 +959,7 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 5146008.66,
+            "portfolioTotalEnd": 5145999.78,
             "reductionPct": 17.620788,
             "regime": "peak_hot",
             "tax": 4270.33,
@@ -968,28 +968,28 @@
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 2.1,
-            "liquiditaet": 106155.5,
+            "liquiditaet": 106146.62,
             "vpwFallbackHint": "dynamic_flex_off",
             "wertAktien": 5039853.16,
             "wertGold": 0
           }
         }
       ],
-      "summaryText": "Startjahr 1949 Endjahr 1952 Outcome Vollständig Angeforderte Jahre 4 Wirtschaftlich ausgewertete Jahre 4 Jahreszeilen 4 Startvermögen 2.020.000,00 € Endvermögen 5.146.008,66 € Gesamte Entnahmen 121.200,00 € Max. Kürzungsdauer (≥ 10 %) 3 Jahre Jahre mit Kürzung (≥ 10 %) 3 von 4 Gezahlte Steuern 19.910,66 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 €",
+      "summaryText": "Startjahr 1949 Endjahr 1952 Outcome Vollständig Angeforderte Jahre 4 Wirtschaftlich ausgewertete Jahre 4 Jahreszeilen 4 Startvermögen 2.020.000,00 € Endvermögen 5.145.999,78 € Gesamte Entnahmen 121.200,00 € Max. Kürzungsdauer (≥ 10 %) 3 Jahre Jahre mit Kürzung (≥ 10 %) 3 von 4 Gezahlte Steuern 19.910,66 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 €",
       "uiStatus": {
         "code": "BACKTEST_COMPLETED",
         "kind": "completed",
         "text": "Backtest vollständig abgeschlossen Code: BACKTEST_COMPLETED Ursache: 4 von 4 angeforderten Jahren wurden wirtschaftlich ausgewertet. Nächster Schritt: Prüfen Sie Summary, Warnhinweise, Jahresprotokoll und Raw-Export gemeinsam."
       },
       "values": {
-        "lastRowPortfolioTotalEnd": 5146008.66,
-        "lastWrapperPortfolio": 5146008.66,
+        "lastRowPortfolioTotalEnd": 5145999.78,
+        "lastWrapperPortfolio": 5145999.78,
         "maxAbsolutePortfolioFlowDelta": 0,
         "maxDrawdownPct": 0,
         "maxReductionStreak": 3,
         "minRunwayCoveragePct": 70.419352,
         "startWealth": 2000000,
-        "summaryEndWealth": 5146008.66,
+        "summaryEndWealth": 5145999.78,
         "totalTax": 19910.66,
         "totalWithdrawal": 121200,
         "yearsWithReductionAtLeast10Pct": 3
@@ -997,7 +997,7 @@
     },
     {
       "alerts": [],
-      "canonicalRowsHash": "7c79bc142e2faef97fa34d9c7ffd16558cf0d2e0ec41848ade9371880047f116",
+      "canonicalRowsHash": "acbdad297eea65851081f1163905e669f80445609869e9ca18421e2c575c7478",
       "expectedRowCount": 10,
       "id": "three_bucket_minimum_flex_2005_2014",
       "inputHash": "653e5e3d4233319611c26d3a195523ecdf8e3aa5d5f7e8e7e45915edb4bf7261",
@@ -1153,7 +1153,7 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 552344.77,
+            "portfolioTotalEnd": 552351.79,
             "reductionPct": 10,
             "regime": "side_long",
             "tax": 1979.94,
@@ -1162,7 +1162,7 @@
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 1.6,
-            "liquiditaet": 71930.93,
+            "liquiditaet": 71937.95,
             "vpwFallbackHint": "dynamic_flex_off",
             "wertAktien": 480413.84,
             "wertGold": 0
@@ -1179,18 +1179,18 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 571483.57,
+            "portfolioTotalEnd": 571738.39,
             "reductionPct": 24.409449,
             "regime": "peak_hot",
-            "tax": 3678.81,
+            "tax": 3683.75,
             "withdrawal": 33600
           },
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 1.6,
-            "liquiditaet": 90848.35,
+            "liquiditaet": 90982.81,
             "vpwFallbackHint": "dynamic_flex_off",
-            "wertAktien": 480635.22,
+            "wertAktien": 480755.58,
             "wertGold": 0
           }
         },
@@ -1205,18 +1205,18 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 383799.21,
+            "portfolioTotalEnd": 386570.64,
             "reductionPct": 63.785819,
             "regime": "peak_hot",
-            "tax": 6060.88,
+            "tax": 6017.41,
             "withdrawal": 32400
           },
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 1.5,
-            "liquiditaet": 130513.57,
+            "liquiditaet": 131774.98,
             "vpwFallbackHint": "dynamic_flex_off",
-            "wertAktien": 253285.64,
+            "wertAktien": 254795.66,
             "wertGold": 0
           }
         },
@@ -1231,45 +1231,45 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 383033.24,
+            "portfolioTotalEnd": 385842.24,
             "reductionPct": 67.276669,
             "regime": "peak_hot",
-            "tax": 2972.05,
+            "tax": 2990.35,
             "withdrawal": 32400
           },
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 1,
-            "liquiditaet": 124042.22,
+            "liquiditaet": 125386.79,
             "vpwFallbackHint": "dynamic_flex_off",
-            "wertAktien": 258991.02,
+            "wertAktien": 260455.46,
             "wertGold": 0
           }
         }
       ],
-      "summaryText": "Startjahr 2005 Endjahr 2014 Outcome Vollständig Angeforderte Jahre 10 Wirtschaftlich ausgewertete Jahre 10 Jahreszeilen 10 Startvermögen 500.000,00 € Endvermögen 383.033,24 € Gesamte Entnahmen 328.800,00 € Max. Kürzungsdauer (≥ 10 %) 10 Jahre Jahre mit Kürzung (≥ 10 %) 10 von 10 Gezahlte Steuern 29.171,93 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 €",
+      "summaryText": "Startjahr 2005 Endjahr 2014 Outcome Vollständig Angeforderte Jahre 10 Wirtschaftlich ausgewertete Jahre 10 Jahreszeilen 10 Startvermögen 500.000,00 € Endvermögen 385.842,24 € Gesamte Entnahmen 328.800,00 € Max. Kürzungsdauer (≥ 10 %) 10 Jahre Jahre mit Kürzung (≥ 10 %) 10 von 10 Gezahlte Steuern 29.182,67 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 €",
       "uiStatus": {
         "code": "BACKTEST_COMPLETED",
         "kind": "completed",
         "text": "Backtest vollständig abgeschlossen Code: BACKTEST_COMPLETED Ursache: 10 von 10 angeforderten Jahren wurden wirtschaftlich ausgewertet. Nächster Schritt: Prüfen Sie Summary, Warnhinweise, Jahresprotokoll und Raw-Export gemeinsam."
       },
       "values": {
-        "lastRowPortfolioTotalEnd": 383033.24,
-        "lastWrapperPortfolio": 383033.24,
+        "lastRowPortfolioTotalEnd": 385842.24,
+        "lastWrapperPortfolio": 385842.24,
         "maxAbsolutePortfolioFlowDelta": 0,
-        "maxDrawdownPct": 34.801083,
+        "maxDrawdownPct": 34.421546,
         "maxReductionStreak": 10,
-        "minRunwayCoveragePct": 95.549082,
+        "minRunwayCoveragePct": 96.40839,
         "startWealth": 500000,
-        "summaryEndWealth": 383033.24,
-        "totalTax": 29171.93,
+        "summaryEndWealth": 385842.24,
+        "totalTax": 29182.67,
         "totalWithdrawal": 328800,
         "yearsWithReductionAtLeast10Pct": 10
       }
     },
     {
       "alerts": [],
-      "canonicalRowsHash": "e7cbfb2dfa882c7a214e3105c9a8836a4b84a86899d0765d9028cef09d88b049",
+      "canonicalRowsHash": "0e3cd5f7ca6100ae7e8fb9eaf447f61020f046917eb77f8f087ea7c47d9eee9f",
       "expectedRowCount": 2,
       "id": "capital_poor_ruin_2000_2005",
       "inputHash": "20093d9f6c8285d9d912581c900ef84d14b3f51bdf2e55f9dea8140fd89ab3e5",
@@ -1425,7 +1425,7 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 29773.19,
+            "portfolioTotalEnd": 29782.94,
             "reductionPct": 100,
             "regime": "peak_stable",
             "tax": 1290.26,
@@ -1434,7 +1434,7 @@
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 1.3,
-            "liquiditaet": 7875.68,
+            "liquiditaet": 7885.43,
             "vpwFallbackHint": "dynamic_flex_off",
             "wertAktien": 21897.51,
             "wertGold": 0
@@ -1451,7 +1451,7 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": null,
             "portfolioFlowDelta": null,
-            "portfolioTotalEnd": 26793.05,
+            "portfolioTotalEnd": 26802.8,
             "reductionPct": null,
             "regime": "BANKRUPT",
             "tax": 0,
@@ -1460,28 +1460,28 @@
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 2,
-            "liquiditaet": 26793.05,
+            "liquiditaet": 26802.8,
             "vpwFallbackHint": "no_vpw",
             "wertAktien": 0,
             "wertGold": 0
           }
         }
       ],
-      "summaryText": "Startjahr 2000 Endjahr 2005 Outcome Ruin Angeforderte Jahre 6 Wirtschaftlich ausgewertete Jahre 1 Jahreszeilen 2 Startvermögen 120.000,00 € Endvermögen 26.793,05 € Gesamte Entnahmen 90.000,00 € Max. Kürzungsdauer (≥ 10 %) 1 Jahre Jahre mit Kürzung (≥ 10 %) 1 von 1 Gezahlte Steuern 1.290,26 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 €",
+      "summaryText": "Startjahr 2000 Endjahr 2005 Outcome Ruin Angeforderte Jahre 6 Wirtschaftlich ausgewertete Jahre 1 Jahreszeilen 2 Startvermögen 120.000,00 € Endvermögen 26.802,80 € Gesamte Entnahmen 90.000,00 € Max. Kürzungsdauer (≥ 10 %) 1 Jahre Jahre mit Kürzung (≥ 10 %) 1 von 1 Gezahlte Steuern 1.290,26 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 €",
       "uiStatus": {
         "code": "BACKTEST_RUIN",
         "kind": "ruin",
         "text": "Backtest mit wirtschaftlichem Ruin beendet Code: BACKTEST_RUIN Ursache: Der vereinbarte Floor konnte im Jahr 2001 nicht vollständig gedeckt werden. Nächster Schritt: Prüfen Sie Entnahmebedarf, Vermögensaufteilung und das Ruin-Jahr im Jahresprotokoll."
       },
       "values": {
-        "lastRowPortfolioTotalEnd": 26793.05,
-        "lastWrapperPortfolio": 26793.05,
+        "lastRowPortfolioTotalEnd": 26802.8,
+        "lastWrapperPortfolio": 26802.8,
         "maxAbsolutePortfolioFlowDelta": 0,
-        "maxDrawdownPct": 77.672456,
+        "maxDrawdownPct": 77.664331,
         "maxReductionStreak": 1,
         "minRunwayCoveragePct": 0,
         "startWealth": 120000,
-        "summaryEndWealth": 26793.05,
+        "summaryEndWealth": 26802.8,
         "totalTax": 1290.26,
         "totalWithdrawal": 90000,
         "yearsWithReductionAtLeast10Pct": 1
@@ -1489,7 +1489,7 @@
     },
     {
       "alerts": [],
-      "canonicalRowsHash": "f251b5045748e8721e713e8262dd73ebd5758a95b4b1d61acc2bb5223bdda972",
+      "canonicalRowsHash": "673670958d79899add2ae7876c7a8913e74f9a4cb4d99345006406caebad7041",
       "expectedRowCount": 2,
       "id": "health_bucket_nested_row_summary_positive",
       "inputHash": "a5c01c72490858910f6690147879d5fd07a6a51f2790cdeb39678d911440075c",
@@ -1646,7 +1646,7 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 2349915.47,
+            "portfolioTotalEnd": 2350097.94,
             "reductionPct": 0,
             "regime": "side_long",
             "tax": 2416.97,
@@ -1655,7 +1655,7 @@
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 1,
-            "liquiditaet": 32726.4,
+            "liquiditaet": 32908.86,
             "vpwFallbackHint": "dynamic_flex_off",
             "wertAktien": 2317189.08,
             "wertGold": 0
@@ -1681,14 +1681,14 @@
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 2.2,
-            "liquiditaet": 69594.5,
+            "liquiditaet": 70041.42,
             "vpwFallbackHint": "dynamic_flex_off",
             "wertAktien": 2202000.78,
             "wertGold": 0
           }
         }
       ],
-      "summaryText": "Startjahr 2010 Endjahr 2011 Outcome Vollständig Angeforderte Jahre 2 Wirtschaftlich ausgewertete Jahre 2 Jahreszeilen 2 Startvermögen 2.020.000,00 € Endvermögen 2.271.595,28 € Gesamte Entnahmen 60.000,00 € Max. Kürzungsdauer (≥ 10 %) 0 Jahre Jahre mit Kürzung (≥ 10 %) 0 von 2 Gezahlte Steuern 6.149,12 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 € Pflegebucket 8.000,00 € Pflegebucket-Zieldeckung 40% Pflegebucket-Ziellücke 12.000,00 €",
+      "summaryText": "Startjahr 2010 Endjahr 2011 Outcome Vollständig Angeforderte Jahre 2 Wirtschaftlich ausgewertete Jahre 2 Jahreszeilen 2 Startvermögen 2.020.000,00 € Endvermögen 2.272.042,20 € Gesamte Entnahmen 60.000,00 € Max. Kürzungsdauer (≥ 10 %) 0 Jahre Jahre mit Kürzung (≥ 10 %) 0 von 2 Gezahlte Steuern 6.149,12 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 € Pflegebucket 8.000,00 € Pflegebucket-Zieldeckung 40% Pflegebucket-Ziellücke 12.000,00 €",
       "uiStatus": {
         "code": "BACKTEST_COMPLETED",
         "kind": "completed",
@@ -1696,13 +1696,13 @@
       },
       "values": {
         "lastRowPortfolioTotalEnd": 83759.36,
-        "lastWrapperPortfolio": 2271595.28,
+        "lastWrapperPortfolio": 2272042.2,
         "maxAbsolutePortfolioFlowDelta": 0,
-        "maxDrawdownPct": 3.332894,
+        "maxDrawdownPct": 3.321382,
         "maxReductionStreak": 0,
         "minRunwayCoveragePct": 9.259259,
         "startWealth": 2000000,
-        "summaryEndWealth": 2271595.28,
+        "summaryEndWealth": 2272042.2,
         "totalTax": 2657.61,
         "totalWithdrawal": 60000,
         "yearsWithReductionAtLeast10Pct": 0
@@ -1710,7 +1710,7 @@
     },
     {
       "alerts": [],
-      "canonicalRowsHash": "56be46056fca11bc6c1e5ce369706f7501232ef90acc26aebb054aef57156f3c",
+      "canonicalRowsHash": "426caa35dd6c3bd855752d5fbdca85548040dd355cb9b2840b8e3ce3020b09ba",
       "expectedRowCount": 4,
       "id": "dynamic_flex_cape_2010_2013",
       "inputHash": "2b1a7afe9d7d3589451d6fc4f4dd35fffd1d832864db70c8cd95f38bb1b34c17",
@@ -1866,7 +1866,7 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 2216396.22,
+            "portfolioTotalEnd": 2216837.84,
             "reductionPct": 12.952793,
             "regime": "side_long",
             "tax": 13139.84,
@@ -1875,7 +1875,7 @@
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 1,
-            "liquiditaet": 79207.15,
+            "liquiditaet": 79648.76,
             "vpwFallbackHint": "ok",
             "wertAktien": 2137189.08,
             "wertGold": 0
@@ -1892,8 +1892,8 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 2044853.13,
-            "reductionPct": 26.020263,
+            "portfolioTotalEnd": 2045862.87,
+            "reductionPct": 26.038094,
             "regime": "side_long",
             "tax": 11153.11,
             "withdrawal": 120000
@@ -1901,7 +1901,7 @@
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 2.2,
-            "liquiditaet": 149342.11,
+            "liquiditaet": 150351.85,
             "vpwFallbackHint": "ok",
             "wertAktien": 1895511.02,
             "wertGold": 0
@@ -1918,8 +1918,8 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 2135926.68,
-            "reductionPct": 38.613901,
+            "portfolioTotalEnd": 2139197.97,
+            "reductionPct": 38.645924,
             "regime": "peak_hot",
             "tax": 29884.38,
             "withdrawal": 111000
@@ -1927,7 +1927,7 @@
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 1.9,
-            "liquiditaet": 434454.68,
+            "liquiditaet": 437725.98,
             "vpwFallbackHint": "ok",
             "wertAktien": 1701472,
             "wertGold": 0
@@ -1944,8 +1944,8 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 2408329.39,
-            "reductionPct": 50.666649,
+            "portfolioTotalEnd": 2412711.9,
+            "reductionPct": 50.739275,
             "regime": "peak_hot",
             "tax": 37059.59,
             "withdrawal": 108000
@@ -1953,28 +1953,28 @@
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 1.5,
-            "liquiditaet": 690015.55,
+            "liquiditaet": 694398.05,
             "vpwFallbackHint": "ok",
             "wertAktien": 1718313.85,
             "wertGold": 0
           }
         }
       ],
-      "summaryText": "Startjahr 2010 Endjahr 2013 Outcome Vollständig Angeforderte Jahre 4 Wirtschaftlich ausgewertete Jahre 4 Jahreszeilen 4 Startvermögen 2.020.000,00 € Endvermögen 2.408.329,39 € Gesamte Entnahmen 492.000,00 € Max. Kürzungsdauer (≥ 10 %) 4 Jahre Jahre mit Kürzung (≥ 10 %) 4 von 4 Gezahlte Steuern 91.236,92 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 €",
+      "summaryText": "Startjahr 2010 Endjahr 2013 Outcome Vollständig Angeforderte Jahre 4 Wirtschaftlich ausgewertete Jahre 4 Jahreszeilen 4 Startvermögen 2.020.000,00 € Endvermögen 2.412.711,90 € Gesamte Entnahmen 492.000,00 € Max. Kürzungsdauer (≥ 10 %) 4 Jahre Jahre mit Kürzung (≥ 10 %) 4 von 4 Gezahlte Steuern 91.236,92 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 €",
       "uiStatus": {
         "code": "BACKTEST_COMPLETED",
         "kind": "completed",
         "text": "Backtest vollständig abgeschlossen Code: BACKTEST_COMPLETED Ursache: 4 von 4 angeforderten Jahren wurden wirtschaftlich ausgewertet. Nächster Schritt: Prüfen Sie Summary, Warnhinweise, Jahresprotokoll und Raw-Export gemeinsam."
       },
       "values": {
-        "lastRowPortfolioTotalEnd": 2408329.39,
-        "lastWrapperPortfolio": 2408329.39,
+        "lastRowPortfolioTotalEnd": 2412711.9,
+        "lastWrapperPortfolio": 2412711.9,
         "maxAbsolutePortfolioFlowDelta": 0,
-        "maxDrawdownPct": 7.73973,
+        "maxDrawdownPct": 7.712561,
         "maxReductionStreak": 4,
         "minRunwayCoveragePct": 47.279805,
         "startWealth": 2000000,
-        "summaryEndWealth": 2408329.39,
+        "summaryEndWealth": 2412711.9,
         "totalTax": 91236.92,
         "totalWithdrawal": 492000,
         "yearsWithReductionAtLeast10Pct": 4
@@ -1990,14 +1990,14 @@
           "lastRowPortfolioTotalEnd": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
             "legacyObserved": 1358556.54,
-            "numericDelta": 334559.29,
-            "targetExpected": 1693115.83
+            "numericDelta": 333869.41,
+            "targetExpected": 1692425.95
           },
           "lastWrapperPortfolio": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
             "legacyObserved": 1358556.54,
-            "numericDelta": 334559.29,
-            "targetExpected": 1693115.83
+            "numericDelta": 333869.41,
+            "targetExpected": 1692425.95
           },
           "maxReductionStreak": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
@@ -2008,8 +2008,8 @@
           "summaryEndWealth": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
             "legacyObserved": 1358556.54,
-            "numericDelta": 334559.29,
-            "targetExpected": 1693115.83
+            "numericDelta": 333869.41,
+            "targetExpected": 1692425.95
           },
           "totalWithdrawal": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
@@ -2035,26 +2035,26 @@
           "lastRowPortfolioTotalEnd": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
             "legacyObserved": 95592662.28,
-            "numericDelta": 84556852.58,
-            "targetExpected": 180149514.86
+            "numericDelta": 83542775.38,
+            "targetExpected": 179135437.66
           },
           "lastWrapperPortfolio": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
             "legacyObserved": 95592662.28,
-            "numericDelta": 84556852.58,
-            "targetExpected": 180149514.86
+            "numericDelta": 83542775.38,
+            "targetExpected": 179135437.66
           },
           "summaryEndWealth": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
             "legacyObserved": 95592662.28,
-            "numericDelta": 84556852.58,
-            "targetExpected": 180149514.86
+            "numericDelta": 83542775.38,
+            "targetExpected": 179135437.66
           },
           "totalTax": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
             "legacyObserved": 783692.68,
-            "numericDelta": -18483.25,
-            "targetExpected": 765209.43
+            "numericDelta": -17060.03,
+            "targetExpected": 766632.65
           },
           "totalWithdrawal": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
@@ -2075,13 +2075,13 @@
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
             "legacyObserved": null,
             "numericDelta": null,
-            "targetExpected": 5146008.66
+            "targetExpected": 5145999.78
           },
           "lastWrapperPortfolio": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
             "legacyObserved": null,
             "numericDelta": null,
-            "targetExpected": 5146008.66
+            "targetExpected": 5145999.78
           },
           "maxAbsolutePortfolioFlowDelta": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
@@ -2099,7 +2099,7 @@
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
             "legacyObserved": null,
             "numericDelta": null,
-            "targetExpected": 5146008.66
+            "targetExpected": 5145999.78
           },
           "totalTax": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
@@ -2131,26 +2131,26 @@
           "lastRowPortfolioTotalEnd": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
             "legacyObserved": 385123.95,
-            "numericDelta": -2090.71,
-            "targetExpected": 383033.24
+            "numericDelta": 718.29,
+            "targetExpected": 385842.24
           },
           "lastWrapperPortfolio": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
             "legacyObserved": 385123.95,
-            "numericDelta": -2090.71,
-            "targetExpected": 383033.24
+            "numericDelta": 718.29,
+            "targetExpected": 385842.24
           },
           "summaryEndWealth": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
             "legacyObserved": 385123.95,
-            "numericDelta": -2090.71,
-            "targetExpected": 383033.24
+            "numericDelta": 718.29,
+            "targetExpected": 385842.24
           },
           "totalTax": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
             "legacyObserved": 20417.71,
-            "numericDelta": 8754.22,
-            "targetExpected": 29171.93
+            "numericDelta": 8764.96,
+            "targetExpected": 29182.67
           },
           "totalWithdrawal": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
@@ -2171,19 +2171,19 @@
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
             "legacyObserved": null,
             "numericDelta": null,
-            "targetExpected": 26793.05
+            "targetExpected": 26802.8
           },
           "lastWrapperPortfolio": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
             "legacyObserved": 0,
-            "numericDelta": 26793.05,
-            "targetExpected": 26793.05
+            "numericDelta": 26802.8,
+            "targetExpected": 26802.8
           },
           "summaryEndWealth": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
             "legacyObserved": 7687.5,
-            "numericDelta": 19105.55,
-            "targetExpected": 26793.05
+            "numericDelta": 19115.3,
+            "targetExpected": 26802.8
           },
           "totalTax": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
@@ -2210,7 +2210,7 @@
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
             "legacyObserved": null,
             "numericDelta": null,
-            "targetExpected": 2271595.28
+            "targetExpected": 2272042.2
           },
           "maxAbsolutePortfolioFlowDelta": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
@@ -2228,7 +2228,7 @@
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
             "legacyObserved": null,
             "numericDelta": null,
-            "targetExpected": 2271595.28
+            "targetExpected": 2272042.2
           },
           "totalTax": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
@@ -2260,20 +2260,20 @@
           "lastRowPortfolioTotalEnd": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
             "legacyObserved": 2327407.8,
-            "numericDelta": 80921.59,
-            "targetExpected": 2408329.39
+            "numericDelta": 85304.1,
+            "targetExpected": 2412711.9
           },
           "lastWrapperPortfolio": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
             "legacyObserved": 2327407.8,
-            "numericDelta": 80921.59,
-            "targetExpected": 2408329.39
+            "numericDelta": 85304.1,
+            "targetExpected": 2412711.9
           },
           "summaryEndWealth": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
             "legacyObserved": 2327407.8,
-            "numericDelta": 80921.59,
-            "targetExpected": 2408329.39
+            "numericDelta": 85304.1,
+            "targetExpected": 2412711.9
           },
           "totalTax": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
@@ -2313,8 +2313,8 @@
           "delta": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
             "legacyObserved": 1358556.54,
-            "numericDelta": 334559.29,
-            "targetExpected": 1693115.83
+            "numericDelta": 333869.41,
+            "targetExpected": 1692425.95
           },
           "id": "completed_2000_2005"
         },
@@ -2322,8 +2322,8 @@
           "delta": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
             "legacyObserved": 95592662.28,
-            "numericDelta": 84556852.58,
-            "targetExpected": 180149514.86
+            "numericDelta": 83542775.38,
+            "targetExpected": 179135437.66
           },
           "id": "completed_1960_2020"
         },
@@ -2332,7 +2332,7 @@
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
             "legacyObserved": null,
             "numericDelta": null,
-            "targetExpected": 5146008.66
+            "targetExpected": 5145999.78
           },
           "id": "completed_numeraire_seam_1949_1952"
         },
@@ -2340,8 +2340,8 @@
           "delta": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
             "legacyObserved": 385123.95,
-            "numericDelta": -2090.71,
-            "targetExpected": 383033.24
+            "numericDelta": 718.29,
+            "targetExpected": 385842.24
           },
           "id": "three_bucket_minimum_flex_2005_2014"
         },
@@ -2349,8 +2349,8 @@
           "delta": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
             "legacyObserved": 7687.5,
-            "numericDelta": 19105.55,
-            "targetExpected": 26793.05
+            "numericDelta": 19115.3,
+            "targetExpected": 26802.8
           },
           "id": "capital_poor_ruin_2000_2005"
         },
@@ -2359,7 +2359,7 @@
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
             "legacyObserved": null,
             "numericDelta": null,
-            "targetExpected": 2271595.28
+            "targetExpected": 2272042.2
           },
           "id": "health_bucket_nested_row_summary_positive"
         },
@@ -2367,8 +2367,8 @@
           "delta": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
             "legacyObserved": 2327407.8,
-            "numericDelta": 80921.59,
-            "targetExpected": 2408329.39
+            "numericDelta": 85304.1,
+            "targetExpected": 2412711.9
           },
           "id": "dynamic_flex_cape_2010_2013"
         }
@@ -2432,8 +2432,8 @@
     "temporalConventionId": "realized_t_decision_t_minus_1_v1"
   },
   "detailToggleOracle": {
-    "detailedCanonicalRowsHash": "d1d14b337f13b9926b8f8d35135f4547480fc17626bac1593520280982d11af0",
-    "normalCanonicalRowsHash": "d1d14b337f13b9926b8f8d35135f4547480fc17626bac1593520280982d11af0",
+    "detailedCanonicalRowsHash": "1d5e87fbdfa29bdc370b4d720b4ccc15c513704ada0f0ec129d286dcc9b95ee7",
+    "normalCanonicalRowsHash": "1d5e87fbdfa29bdc370b4d720b4ccc15c513704ada0f0ec129d286dcc9b95ee7",
     "payloadStable": true,
     "projectionDependency": "Only rendered columns change with backtestLogDetailLevel; canonical rows and raw JSON/CSV export do not."
   },
@@ -2699,7 +2699,7 @@
   "negativeCases": [
     {
       "alerts": [],
-      "canonicalRowsHash": "1a212b7b334b7a88f02f30150b386f02135e377c7189148bf993bad5871332d1",
+      "canonicalRowsHash": "97e2783dc0fccba5ed418c0cfeeda03d692fc9b6057fdce2789891a0e78490f5",
       "expectedRowCount": 0,
       "id": "negative_single_year_2010",
       "inputHash": "9d17d3ae44a88df7077a195b728527f5f6bff6a603d7ebaf8acb3f167b69967c",
@@ -2855,7 +2855,7 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 2349915.47,
+            "portfolioTotalEnd": 2350097.94,
             "reductionPct": 0,
             "regime": "side_long",
             "tax": 2416.97,
@@ -2864,28 +2864,28 @@
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 1,
-            "liquiditaet": 32726.4,
+            "liquiditaet": 32908.86,
             "vpwFallbackHint": "dynamic_flex_off",
             "wertAktien": 2317189.08,
             "wertGold": 0
           }
         }
       ],
-      "summaryText": "Startjahr 2010 Endjahr 2010 Outcome Vollständig Angeforderte Jahre 1 Wirtschaftlich ausgewertete Jahre 1 Jahreszeilen 1 Startvermögen 2.020.000,00 € Endvermögen 2.349.915,47 € Gesamte Entnahmen 30.000,00 € Max. Kürzungsdauer (≥ 10 %) 0 Jahre Jahre mit Kürzung (≥ 10 %) 0 von 1 Gezahlte Steuern 2.416,97 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 €",
+      "summaryText": "Startjahr 2010 Endjahr 2010 Outcome Vollständig Angeforderte Jahre 1 Wirtschaftlich ausgewertete Jahre 1 Jahreszeilen 1 Startvermögen 2.020.000,00 € Endvermögen 2.350.097,94 € Gesamte Entnahmen 30.000,00 € Max. Kürzungsdauer (≥ 10 %) 0 Jahre Jahre mit Kürzung (≥ 10 %) 0 von 1 Gezahlte Steuern 2.416,97 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 €",
       "uiStatus": {
         "code": "BACKTEST_COMPLETED",
         "kind": "completed",
         "text": "Backtest vollständig abgeschlossen Code: BACKTEST_COMPLETED Ursache: 1 von 1 angeforderten Jahren wurden wirtschaftlich ausgewertet. Nächster Schritt: Prüfen Sie Summary, Warnhinweise, Jahresprotokoll und Raw-Export gemeinsam."
       },
       "values": {
-        "lastRowPortfolioTotalEnd": 2349915.47,
-        "lastWrapperPortfolio": 2349915.47,
+        "lastRowPortfolioTotalEnd": 2350097.94,
+        "lastWrapperPortfolio": 2350097.94,
         "maxAbsolutePortfolioFlowDelta": 0,
         "maxDrawdownPct": 0,
         "maxReductionStreak": 0,
         "minRunwayCoveragePct": 73.196529,
         "startWealth": 2000000,
-        "summaryEndWealth": 2349915.47,
+        "summaryEndWealth": 2350097.94,
         "totalTax": 2416.97,
         "totalWithdrawal": 30000,
         "yearsWithReductionAtLeast10Pct": 0
@@ -3227,7 +3227,7 @@
     },
     {
       "alerts": [],
-      "canonicalRowsHash": "00d4e4426ff647ed231a58133fda4a43250ea231e73c2bb4a0ffce4291c3681b",
+      "canonicalRowsHash": "05b615907d27cf7017e90e89dec127f2652f06097c0eb3a987c0a31e3ca5ccbc",
       "expectedRowCount": 1,
       "id": "negative_missing_middle_year_2000_2002",
       "inputHash": "1998565282ce1f330bf96cafbd136eaaffbda15d97567f80d72d5f4d9a75a91d",
@@ -3383,7 +3383,7 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 2005031.85,
+            "portfolioTotalEnd": 2005081.72,
             "reductionPct": 0,
             "regime": "peak_stable",
             "tax": 1637.8,
@@ -3392,7 +3392,7 @@
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 1.3,
-            "liquiditaet": 39942.72,
+            "liquiditaet": 39992.59,
             "vpwFallbackHint": "dynamic_flex_off",
             "wertAktien": 1965089.12,
             "wertGold": 0
@@ -3409,7 +3409,7 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 1709714.4,
+            "portfolioTotalEnd": 1709391.54,
             "reductionPct": 6.416584,
             "regime": "side_long",
             "tax": 483.12,
@@ -3418,7 +3418,7 @@
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 2,
-            "liquiditaet": 62063.94,
+            "liquiditaet": 61741.08,
             "vpwFallbackHint": "dynamic_flex_off",
             "wertAktien": 1647650.46,
             "wertGold": 0
@@ -3427,7 +3427,7 @@
         {
           "jahr": 2002,
           "row": {
-            "action": "BÄR (Kein Handlungsbedarf)",
+            "action": "Runway-Notfüllung (Bär)",
             "equityReturnRatio": -0.293966929,
             "goldReturnRatio": 0.194,
             "healthBucketCoveragePct": 0,
@@ -3435,7 +3435,7 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 1196411.35,
+            "portfolioTotalEnd": 1195937.18,
             "reductionPct": 16.094691,
             "regime": "bear_deep",
             "tax": 0,
@@ -3444,28 +3444,28 @@
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 1.4,
-            "liquiditaet": 33115.63,
+            "liquiditaet": 33641.46,
             "vpwFallbackHint": "dynamic_flex_off",
-            "wertAktien": 1163295.72,
+            "wertAktien": 1162295.72,
             "wertGold": 0
           }
         }
       ],
-      "summaryText": "Startjahr 2000 Endjahr 2002 Outcome Vollständig Angeforderte Jahre 3 Wirtschaftlich ausgewertete Jahre 3 Jahreszeilen 3 Startvermögen 2.020.000,00 € Endvermögen 1.196.411,35 € Gesamte Entnahmen 90.000,00 € Max. Kürzungsdauer (≥ 10 %) 1 Jahre Jahre mit Kürzung (≥ 10 %) 1 von 3 Gezahlte Steuern 2.120,92 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 €",
+      "summaryText": "Startjahr 2000 Endjahr 2002 Outcome Vollständig Angeforderte Jahre 3 Wirtschaftlich ausgewertete Jahre 3 Jahreszeilen 3 Startvermögen 2.020.000,00 € Endvermögen 1.195.937,18 € Gesamte Entnahmen 90.000,00 € Max. Kürzungsdauer (≥ 10 %) 1 Jahre Jahre mit Kürzung (≥ 10 %) 1 von 3 Gezahlte Steuern 2.120,92 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 €",
       "uiStatus": {
         "code": "BACKTEST_COMPLETED",
         "kind": "completed",
         "text": "Backtest vollständig abgeschlossen Code: BACKTEST_COMPLETED Ursache: 3 von 3 angeforderten Jahren wurden wirtschaftlich ausgewertet. Nächster Schritt: Prüfen Sie Summary, Warnhinweise, Jahresprotokoll und Raw-Export gemeinsam."
       },
       "values": {
-        "lastRowPortfolioTotalEnd": 1196411.35,
-        "lastWrapperPortfolio": 1196411.35,
+        "lastRowPortfolioTotalEnd": 1195937.18,
+        "lastWrapperPortfolio": 1195937.18,
         "maxAbsolutePortfolioFlowDelta": 0,
-        "maxDrawdownPct": 40.329559,
+        "maxDrawdownPct": 40.354691,
         "maxReductionStreak": 1,
         "minRunwayCoveragePct": 75.958001,
         "startWealth": 2000000,
-        "summaryEndWealth": 1196411.35,
+        "summaryEndWealth": 1195937.18,
         "totalTax": 2120.92,
         "totalWithdrawal": 90000,
         "yearsWithReductionAtLeast10Pct": 1
@@ -3473,7 +3473,7 @@
     },
     {
       "alerts": [],
-      "canonicalRowsHash": "5ffbd7e0c8e8be79023f68ea4424f9fbe54b95ae970ba492dd3cbf977e9a1c55",
+      "canonicalRowsHash": "b0b85c2e1b02aae845c8bc9509a313074cb58e2ea5888931f0f624e5751c0dcc",
       "expectedRowCount": 2,
       "id": "negative_non_finite_gold_return_2001_2002",
       "inputHash": "77c77f5e878e586e13f58170b9da0f92e849e294bd4cf7527fa28adda7c0ecd1",
@@ -3629,7 +3629,7 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 1720968.13,
+            "portfolioTotalEnd": 1720586.94,
             "reductionPct": 20,
             "regime": "side_long",
             "tax": 692.25,
@@ -3638,7 +3638,7 @@
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 2,
-            "liquiditaet": 63157.99,
+            "liquiditaet": 62776.79,
             "vpwFallbackHint": "dynamic_flex_off",
             "wertAktien": 1657810.15,
             "wertGold": 0
@@ -3655,7 +3655,7 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 1205953.72,
+            "portfolioTotalEnd": 1205379.94,
             "reductionPct": 29.411765,
             "regime": "bear_deep",
             "tax": 0,
@@ -3664,28 +3664,28 @@
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 1.4,
-            "liquiditaet": 35484.93,
+            "liquiditaet": 34911.15,
             "vpwFallbackHint": "dynamic_flex_off",
             "wertAktien": 1170468.79,
             "wertGold": 0
           }
         }
       ],
-      "summaryText": "Startjahr 2001 Endjahr 2002 Outcome Vollständig Angeforderte Jahre 2 Wirtschaftlich ausgewertete Jahre 2 Jahreszeilen 2 Startvermögen 2.020.000,00 € Endvermögen 1.205.953,72 € Gesamte Entnahmen 57.600,00 € Max. Kürzungsdauer (≥ 10 %) 2 Jahre Jahre mit Kürzung (≥ 10 %) 2 von 2 Gezahlte Steuern 692,25 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 €",
+      "summaryText": "Startjahr 2001 Endjahr 2002 Outcome Vollständig Angeforderte Jahre 2 Wirtschaftlich ausgewertete Jahre 2 Jahreszeilen 2 Startvermögen 2.020.000,00 € Endvermögen 1.205.379,94 € Gesamte Entnahmen 57.600,00 € Max. Kürzungsdauer (≥ 10 %) 2 Jahre Jahre mit Kürzung (≥ 10 %) 2 von 2 Gezahlte Steuern 692,25 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 €",
       "uiStatus": {
         "code": "BACKTEST_COMPLETED",
         "kind": "completed",
         "text": "Backtest vollständig abgeschlossen Code: BACKTEST_COMPLETED Ursache: 2 von 2 angeforderten Jahren wurden wirtschaftlich ausgewertet. Nächster Schritt: Prüfen Sie Summary, Warnhinweise, Jahresprotokoll und Raw-Export gemeinsam."
       },
       "values": {
-        "lastRowPortfolioTotalEnd": 1205953.72,
-        "lastWrapperPortfolio": 1205953.72,
+        "lastRowPortfolioTotalEnd": 1205379.94,
+        "lastWrapperPortfolio": 1205379.94,
         "maxAbsolutePortfolioFlowDelta": 0,
-        "maxDrawdownPct": 39.702314,
+        "maxDrawdownPct": 39.731003,
         "maxReductionStreak": 2,
         "minRunwayCoveragePct": 111.914474,
         "startWealth": 2000000,
-        "summaryEndWealth": 1205953.72,
+        "summaryEndWealth": 1205379.94,
         "totalTax": 692.25,
         "totalWithdrawal": 57600,
         "yearsWithReductionAtLeast10Pct": 2

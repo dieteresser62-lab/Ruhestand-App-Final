@@ -2,9 +2,10 @@
 
 **Pruefdatum:** 2026-07-29
 **Pruefer:** Claude (Primary reviewer & Analyst)
-**Status:** Korrekturprogramm beauftragt; Slice 01 lokal committed; Slice 02
-nach Nutzerentscheidung Variante 1 durch Codex technisch nachgebessert;
-erneutes externes Review, Freigabe und Commit ausstehend
+**Status:** Korrekturprogramm in Umsetzung; Slice 01 bis 03 technisch
+freigegeben und lokal committed; Claude hat Slice 04 mit CR04-1 bis CR04-9
+blockiert; Codex hat die Findings technisch nachgebessert, aber erneutes
+externes Review, Freigabe und Commit stehen aus
 **Pruefgegenstand:** Exportdatei
 `backtest-2000-2025-89fc3e368d64-2026-07-29T10-00-22.287Z.json`
 **Anlass:** Nutzerseitige Verifikation nach Abschluss der Suite-Datenintegritaet-
@@ -757,10 +758,13 @@ reine Stressparameter duerfen im Manifest nicht dieselbe Evidenzklasse tragen.
   nach Claude-Zweitreview Runde 2 freigegeben und als Commit `289471b`
   vorhanden. Die Auflagen CR02-13 bis CR02-16 sind als vorgeschaltetes
   Slice-03-Gate technisch nachgezogen. Slice 03 ist auf demselben Branch
-  umgesetzt und technisch validiert. S03-STOP-01 wurde nach ausdruecklicher
+  umgesetzt, technisch validiert und in Claudes Drittreview technisch
+  freigegeben. Die Auflagen CR03-15 und CR03-16 wurden als vorgeschaltetes
+  Slice-04-Gate geschlossen. S03-STOP-01 wurde nach ausdruecklicher
   Nutzerfreigabe durch die gezielte Erweiterung der Engine-Untergrenze von
-  `-10` auf `-15` Prozent aufgeloest; die Vollsuite ist mit
-  12.440/12.440 Assertions gruen. Externes Review und Freigabe stehen aus.
+  `-10` auf `-15` Prozent aufgeloest. Claude hat Slice 04 mit CR04-1 bis
+  CR04-9 blockiert. Codex hat die Findings technisch nachgebessert; erneutes
+  externes Review und Freigabe bleiben ausstehend.
 - Dokumentierter Ausgangsstand der Nachrechnung: `ca982cf`.
 - Nutzerentscheidung vom 2026-07-29: Die Umsetzung bleibt ausdruecklich auf
   dem vorhandenen Branch `codex/suite-datenintegritaet-hardening`; es wird
@@ -920,8 +924,10 @@ segmentierte `global_equity_research_index`-Kette 1925-2025.
 Die gezielten Quellen-, Runtime-, Manifest-, Inventar-, Backtestdelta-,
 Monte-Carlo- und Integrationsgates sowie `npm test` mit 12.440/12.440
 Assertions sind gruen. S03-STOP-01 wurde durch die vom Nutzer freigegebene
-Engine-Untergrenze von `-15` Prozent aufgeloest. Technisches Review und
-Freigabe stehen aus; Codex nimmt keine Selbstfreigabe vor.
+Engine-Untergrenze von `-15` Prozent aufgeloest. Claudes Drittreview hat den
+technischen Stand freigegeben; CR03-15 und CR03-16 wurden als
+Slice-04-Vorgates umgesetzt. Codex nimmt keine Selbstfreigabe fuer
+Folgeslices vor.
 
 **Abhaengigkeit:** Slice 1.
 
@@ -947,12 +953,63 @@ VPI-Jahresdurchschnittsreihe.
 
 ### Slice 4 - Cash- und Geldmarktrendite
 
+**Slice-Dokument:**
+[`SLICE_BACKTEST_DATENPRUEFUNG_04_CASH_GELDMARKTRENDITE.md`](SLICE_BACKTEST_DATENPRUEFUNG_04_CASH_GELDMARKTRENDITE.md)
+
+**Umsetzungsstatus:** am 2026-07-30 nach Claudes blockierendem Review
+technisch nachgebessert. Die Korrekturen umfassen ein direktes PDF-
+Koordinatenoracle, wahrheitsgemaesse Cash-/Bond-Anwendung, vollstaendige
+Methoden- und Quellenqualifikation, die 1948er-Geldvermoegensgrenze,
+nachgerechnete Zinsmarker, den EZB-EURSTR-Hinweis sowie getrennte Primaer-,
+Derived- und Fixture-Vertraege. Jahreswerte, Engine-Semantik,
+Referenz-Outcomes und `FlowDelta` bleiben unveraendert. Die gezielten Gates
+und `npm test` mit 147 Testdateien und 14.270/14.270 Assertions sind gruen;
+fehlgeschlagene Dateien und offene Handles: jeweils 0. Erneutes externes
+Review und Freigabe stehen aus; Codex nimmt keine Selbstfreigabe vor.
+
+**Rueckdokumentation 2026-07-29**
+
+- Die Kette verwendet JST `DEU.stir` 1925-1944, eine explizite
+  1944-Carry-forward-Schaetzbruecke 1945-1948 und Bundesbank-
+  Frankfurt-Tagesgeld/FIBOR/EONIA/EURSTR 1949-2025.
+- Der publizierte Jahresdurchschnitt ist ein einfacher Brutto-
+  Jahresertragsproxy, kein erreichbarer Endkundenreturn. Der bestehende
+  `cashBondReturn` gilt auch fuer Anleihetranchen, bildet dort aber keine
+  Duration, Laufzeitpraemie, Kreditrisiken oder Mark-to-Market-Effekte ab.
+  Zusaetzliche Aufzinsung, Produktkosten, Bankmarge und Steuer sind
+  ausgeschlossen; Negativzinsen bleiben signiert.
+- Die gepinnte Bundesbank-PDF wird im Generator direkt mit Poppler
+  `pdftohtml` 25.07.0 gelesen und fuer 77 Jahre exakt gegen den abgeleiteten
+  Layout-Extrakt geprueft. Der unabhaengige Rekonstruktionstest liest
+  ebenfalls die PDF, aber mit einer getrennten Koordinatenauswahl.
+- 1949-1996 ist `proxy`, weil die gemeldeten Saetze nicht amtlich festgesetzt
+  oder quotiert waren. Meldergruppenwechsel 1970, Zinstagewechsel 1990,
+  FIBOR 1997, EURSTR 2019 und die Quellenkette ueber Fritz Knapp/Bundesbank
+  sind dokumentiert.
+- Die Runtime wendet die nominale Abschreibung grosser Reichsmark-Bar- und
+  Bank-/Sparguthaben von 1948 nicht an. Der 2,13-Prozent-Carry-forward darf
+  deshalb nicht als durchgehende reale Geldvermoegenshistorie gelesen
+  werden.
+- Wertehash
+  `cf5471a345234984ac3ff8de57bffdb3128c1046e01ec998198721325ede9b69`,
+  Primaerquellenhash
+  `ea1608b5dee7e00ae7bf24bb651cb01cd3f0d5423b54cdf21b9f975cced30722`,
+  Derived-Artefakthash
+  `eae9ce9d4a172ecce6264fde18a618f810b4f11af2adb4bd53d1670fca44a97a`,
+  Manifest-/Inventarrevision `2026-07-29.5`, Dataset-Hash
+  `6a1ff0c9245d66d5aec69d85e216daf8c0c005804f70868f681452b47353e543`.
+- Alle sieben Backtest-Outcome-Klassen bleiben unveraendert;
+  `portfolio_flow_delta` bleibt in den Vergleichsfaellen exakt null.
+- CR03-15 und CR03-16 sind als getestete Vorgates geschlossen, ohne die
+  historische Slice-03-Snapshot-Fixture umzuschreiben.
+
 **Abhaengigkeit:** Slice 1.
 
 **Ziel**
 
-`zinssatz_de` repraesentiert eine investierbare deutsche
-Cash-/Geldmarktrendite und keinen unklaren Leitzins-Stichtag.
+`zinssatz_de` repraesentiert einen dokumentierten deutschen Cash-/Bond-
+Bruttoertragsproxy und keinen unklaren Leitzins-Stichtag. Er beansprucht
+weder einen erreichbaren Endkundenreturn noch einen historischen Bondindex.
 
 **Scope**
 

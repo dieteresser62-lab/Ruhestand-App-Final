@@ -340,9 +340,9 @@ for (const baseline of inventory.deltaBaselines) {
         baseline.gitBlobSha1,
         `${baseline.id} changed without declared delta evidence`
     );
-    assert(['none', 'none_after_build', 'backtest_data_02', 'backtest_data_03'].includes(baseline.expectedDelta),
+    assert(['none', 'none_after_build', 'backtest_data_02', 'backtest_data_03', 'backtest_data_04'].includes(baseline.expectedDelta),
         `${baseline.id} must declare its expected delta class`);
-    if (baseline.expectedDelta === 'backtest_data_02' || baseline.expectedDelta === 'backtest_data_03') {
+    if (['backtest_data_02', 'backtest_data_03', 'backtest_data_04'].includes(baseline.expectedDelta)) {
         assert(
             typeof baseline.deltaEvidence === 'string'
                 && fs.existsSync(path.join(projectRoot, baseline.deltaEvidence)),

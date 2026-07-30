@@ -88,6 +88,15 @@ Netzwerkpfade.
 * **CAPE-Return-Policy fuer VPW:** Die kontinuierliche CAPE-to-Return-Policy ist als expliziter Config-Modus `cape_continuous` verfuegbar. Default bleibt `legacy_step`, weil lokale Backtest-Vergleiche sichtbare Entnahme-/Endvermoegens-Deltas zeigen und der Default-Wechsel fachlich freigegeben werden muss.
 * **Mindest-Flex p.a.:** Wird in Backtest, Monte Carlo, Sweep und Profilverbund bis in die Engine durchgereicht; Scenario-/Backtest-Logs zeigen Status, Blockiergrund und effektive Mindest-Flex-Wirkung.
 * **Historische Backtest-Zeitachse:** Der Backtest verwendet validierte Jahresrecords mit realisierten Aktien-, Gold-, Cash-/Bond-, Inflations- und Lohnwerten aus dem Simulationsjahr `t`; CAPE bleibt als zu Jahresbeginn bekannter Policywert auf `t-1`. Unvollstaendige Perioden oder Lookback-Fenster werden vor der Rechnung als `incomplete` abgewiesen. Monte Carlo, Sweep und Worker verwenden weiterhin ihre eigenen Recordpfade.
+* **Reproduzierbare Cash-/Bond-Proxykette:** `zinssatz_de` stammt aus einer
+  gepinnten 1925-2025-Kette. Ab 1949 wird die Bundesbank-PDF im Build direkt
+  und koordinatenbasiert gegen einen getrennten Layout-Extrakt geprueft.
+  Der gemeinsame Runtimewert `cashBondReturn` ist ein Interbank-Bruttoproxy
+  fuer Cash, Geldmarkt und Anleihetranchen, kein erreichbarer
+  Endkundenreturn und kein historischer Bondindex. Die nicht modellierte
+  Geldvermoegensabschreibung der Waehrungsreform 1948 sowie Laufzeit-,
+  Kredit- und Mark-to-Market-Risiken von Anleihen bleiben ausdrueckliche
+  Modellgrenzen.
 * **Dateninventar und Evidenz-Gates:** `SimulationDataInventoryV1` inventarisiert
   die sechs historischen Reihen mit eigenen 1925-2025-Qualitaetssegmenten
   sowie Demografie-, Pflege-, Hinterbliebenen-, Steuer-/Tranchen-,
@@ -366,12 +375,16 @@ gelten die nachfolgend dokumentierten abweichenden Bedingungen.
 
 Die Forschungsdaten unter
 `data/historical/global-equity-research-chain/` und
-`data/historical/german-cpi-chain/` sowie die daraus erzeugten Werte
+`data/historical/german-cpi-chain/` sowie die Cash-/Geldmarktdaten unter
+`data/historical/german-cash-money-market-chain/` und die daraus erzeugten Werte
 unterliegen teilweise `CC BY-NC-SA 4.0`, einschließlich
-Nichtkommerzialitäts- und Share-Alike-Bedingungen. OECD- und EZB-Bedingungen
-gelten zusätzlich; für die Destatis-Anteile gilt die Datenlizenz Deutschland
+Nichtkommerzialitäts- und Share-Alike-Bedingungen. OECD-, EZB- und
+Bundesbank/ESCB-Bedingungen gelten zusätzlich; für die Destatis-Anteile gilt die Datenlizenz Deutschland
 – Namensnennung – Version 2.0. Vor einer kommerziellen Verteilung des Repositories,
 eines `dist/`-Standes oder einer ausführbaren Anwendung ist eine gesonderte
-Lizenzprüfung erforderlich. Details und Namensnennung:
+Lizenzprüfung erforderlich. Fuer EURSTR gilt zusaetzlich der in der
+Cash-/Geldmarkt-Lizenzbeilage verlinkte Administratorhinweis der EZB. Details
+und Namensnennung:
 `data/historical/global-equity-research-chain/LICENSE.md` und
-`data/historical/german-cpi-chain/LICENSE.md`.
+`data/historical/german-cpi-chain/LICENSE.md` sowie
+`data/historical/german-cash-money-market-chain/LICENSE.md`.

@@ -17,7 +17,8 @@ export const MONTE_CARLO_SNAPSHOT_POLICY = Object.freeze({
     currentReference: null,
     deltaLedger: 'delta-ledger-v1',
     finalCandidate: 'monte-carlo-v1-final',
-    policy: 'immutable-baseline-with-versioned-post-slice-references'
+    policy: 'immutable-baseline-with-versioned-pending-candidates',
+    promotionRule: 'current-reference-remains-null-until-external-approval'
 });
 
 // The time-boxed V1 read-compatibility window ended with Slice 11. Keeping the
