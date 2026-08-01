@@ -127,9 +127,13 @@ commit-blocking.
 - Cash/money-market proxy segments: JST `1925-1944`, estimated bridge
   `1945-1948`, Bundesbank overnight/FIBOR `1949-1998`, EONIA `1999-2018`,
   EONIA/EURSTR transition `2019` and EURSTR `2020-2025`
+- Gold proxy/derived segments: year-end policy/official price times JST
+  year-end FX `1925-1944`, explicit estimated bridge `1945-1950`, year-end policy price times JST year-end FX
+  `1951-1967`, Bundesbank Frankfurt fixing `1968-1998` and World Bank gold
+  price divided by Bundesbank USD/EUR `1999-2025`
 - Machine-readable manifest: `HISTORICAL_DATA_MANIFEST`, schema `HistoricalDataManifestV1`
-- Dataset ID/revision: `ruhestandsapp-historical-data-v1` / `2026-07-29.5`
-- Canonical content hash: `6a1ff0c9245d66d5aec69d85e216daf8c0c005804f70868f681452b47353e543`
+- Dataset ID/revision: `ruhestandsapp-historical-data-v1` / `2026-08-01.1`
+- Canonical content hash: `e2ee9db77d02cca23ca451e16ed16b565de44411807c550e49f415e7bed45d0a`
 - Hash algorithm: SHA-256 over canonical JSON (`sha256-canonical-json-v1`); year keys are numeric ascending, object fields lexical, and numbers are locale-independent JSON tokens.
 - Backtest lookback contract: four complete years before `startYear`; the contract-derived technical bounds are therefore `1929-2025`. The Backtest UI reads these bounds from the active provider, sets both year inputs dynamically, and validates against the same contract.
 
@@ -192,10 +196,13 @@ its mechanically extracted table pages, hashes, attribution and source terms
 live under `data/historical/german-cash-money-market-chain/`. Rebuild it with
 `npm run build:german-cash-money-market-data` and verify the read-only
 reconstruction with `npm run verify:german-cash-money-market-data`. Build and
-verify read the primary PDF with Poppler `pdftohtml` 25.07.0 and require an
-independent coordinate-based 77-year oracle to agree exactly with the
-layout-text selection. The layout text is a derived artifact and is excluded
-from the primary-source `rawDataHash`.
+verify read the primary PDF with Poppler `pdftohtml` at the compatible minimum
+version 25.07.0 and require an independent coordinate-based 77-year oracle to
+agree exactly with the layout-text selection. The executable is resolved
+through `RUHESTANDSAPP_PDFTOHTML`, `RUHESTANDSAPP_POPPLER_BIN` or `PATH`; no
+developer-specific package path or exact patch version is part of the
+contract. The layout text is a derived artifact and is excluded from the
+primary-source `rawDataHash`.
 
 The chain uses JST R6 `DEU.stir` for 1925-1944 as a non-homogeneous
 short-rate proxy. The missing 1945-1948 observations are an explicit
@@ -232,6 +239,52 @@ the generated 101-return hash is
 The ECB administrator disclaimer for EURSTR is referenced in
 `data/historical/german-cash-money-market-chain/LICENSE.md`.
 
+The canonical gold field is `gold_eur_perf`. Its generated source module is
+`app/simulator/gold-german-investor-chain.js`; pinned JST, Bundesbank and
+World Bank inputs, source hashes, attribution, licence boundaries and method
+notes live under `data/historical/gold-german-investor-chain/`. Rebuild it
+with `npm run build:gold-german-investor-data` and verify the read-only
+reconstruction with `npm run verify:gold-german-investor-data`.
+
+The chain measures nominal gold-price changes in the declared German investor
+currency using segment-specific timing. The early proxy multiplies a US
+year-end gold-price anchor by JST R6 end-of-year `DEU.xrusd` for 1925-1944
+and 1951-1967. The 1933 anchor is the final RFC purchase price of USD 34.06,
+fixed on 18 December and reported by the Federal Reserve Bank of New York;
+1934 then uses the statutory USD 35 price. The 1945-1950 gap is
+an explicit estimated zero-return bridge across the post-war and
+currency-reform discontinuity; it is not an observed investable return.
+Bundesbank series `BBEX3.A.XAU.DEM.EA.AC.C03` supplies the Frankfurt fixing in
+DEM per kilogram for 1968-1998. The 1968 seam compares its partial-year
+average from 18 June with the 1967 policy/FX anchor. From 1999, World Bank
+annual Gold USD/troy-ounce levels are divided by Bundesbank
+`BBEX3.A.USD.EUR.BB.AC.A04` annual USD-per-EUR levels. The 1999 seam converts
+the 1998 Frankfurt level at 1.95583 DEM/EUR and
+32.15074656862798 troy ounces per kilogram.
+
+The 1968 seam is deliberately mixed timing: a 1967 year-end anchor is compared
+with a partial-year annual average beginning on 18 June. Consecutive Frankfurt
+annual averages are used from 1969. The 1933/1934 US policy transition, the
+1961 DEM revaluation, the 1971 suspension of dollar gold convertibility, the
+1973 move to generalized floating and both source seams are machine-readable
+discontinuities.
+
+The runtime applies each resulting gross annual percentage exactly once.
+Product premium, bid/ask spread, storage, tax and tracking cost are excluded.
+All 101 years are finite. Twelve literal zeros remain, but none is an
+unexplained fallback: 1942-1944 and 1951-1953 require exact equality of both
+policy-price and FX components; 1945-1950 is the visible estimated bridge.
+JST observations for 1946-1949 are exposed separately as excluded inputs,
+because Reichsmark/post-reform observations do not form a continuous
+investable numeraire. The bridge holds nominal gold flat and is therefore
+negative in real terms under positive inflation. All 101 years still enter
+the legacy Monte Carlo pool; proxy years and the bridge can understate modeled
+gold volatility and are not claims about repeatable market returns. The
+primary-input hash is
+`133ed7c3d79a313de4a64f94e54b4f0e06e4f7b24ab4182aa5263958cae49b7d`;
+the generated return hash is
+`068a15a99c665b48dc14a187b654033d292c9de6ed3cf712f7e789ddcec049aa`.
+
 ### Manifest status terms
 
 - Resolution fields (`variant`, `currency`, `region`, `frequency`, `source`,
@@ -244,9 +297,8 @@ The ECB administrator disclaimer for EURSTR is referenced in
 - `fallback_zero` is valid only inside a series segment explicitly listed in
   `missingness.fallbackZeroSegments`. No current series declares such a
   segment.
-- Zero values in `gold_eur_perf` remain numerically unchanged but receive
-  quality `unresolved`; the repository does not currently prove whether these
-  values mean a genuine zero return or unavailable history.
+- Every zero in `gold_eur_perf` carries a machine-readable source-derived or
+  estimated explanation. No zero is used as a silent missing-data fallback.
 
 ### Series manifest
 
@@ -256,19 +308,19 @@ The ECB administrator disclaimer for EURSTR is referenced in
 | `inflation_de` | segmented German national consumer-price chain; excludes HICP/HVPI | not applicable | DE | annual | JST R6 1925-1949; Destatis long series 1950-2024; Destatis current annual table 2025 | JST-derived segment `CC BY-NC-SA 4.0`; Destatis segments Data Licence Germany - attribution - 2.0 | JST consecutive-level changes through 1949; published Destatis annual-average changes from 1950 with source-local seams; excludes the separate 100:6.5 nominal monetary-balance write-down across the 1948 reform | 1925-1949 | required; reject missing/non-finite |
 | `zinssatz_de` | segmented annual-average nominal short/overnight gross `cashBondReturn` proxy | historical German regimes/DEM through 1998; EUR from 1999; percentages do not convert balances and the 1948 write-down is not implemented | DE | annual | JST R6 `DEU.stir` 1925-1944; explicit carry-forward 1945-1948; Bundesbank-published Frankfurt proxy/FIBOR/EONIA/EURSTR 1949-2025; Fritz Knapp/Bundesbank source chain through 1975 | JST-derived segment `CC BY-NC-SA 4.0`; Bundesbank/ESCB terms and ECB EURSTR disclaimer | published annual averages used once through the shared cash/bond path; bond maturity effects, extra compounding, costs, margin and tax are excluded | 1925-1948 | required; reject missing/non-finite |
 | `lohn_de` | `unresolved` | not applicable | DE | annual | `unresolved` | `unresolved` | identity from embedded annual percentage | 1925-1949 | required; reject missing/non-finite |
-| `gold_eur_perf` | `unresolved` | EUR | global | annual | `unresolved` | `unresolved` | identity from embedded annual percentage | 1925-1949 | required; reject missing/non-finite; zero quality unresolved |
+| `gold_eur_perf` | segmented-timing nominal gold-price return proxy in German investor currency | historical German currency/DEM through 1998; EUR from 1999 | global gold price with German investor numeraire | annual | Federal Reserve statutory/1933 RFC year-end prices and JST R6 year-end FX 1925-1967; Bundesbank Frankfurt fixing 1968-1998; World Bank Gold and Bundesbank USD/EUR 1999-2025 | JST-derived input `CC BY-NC-SA 4.0`; World Bank `CC BY 4.0`; Bundesbank/ESCB terms | year-end policy/official gold price times year-end German FX; explicit 1945-1950 bridge; Frankfurt annual-average level changes; World Bank annual-average USD gold divided by annual-average USD/EUR with documented 1968/1999 seams | 1945-1950 | required; reject missing/non-finite and unclassified zeros; every literal zero must be component-proven or explicitly estimated |
 | `cape` | `unresolved` | not applicable | `unresolved` | annual | `unresolved` | `unresolved` | identity from embedded annual ratio | 1925-1949 | required; reject missing/non-finite and non-positive ratios |
 
-The equity, German CPI and German cash/money-market sources, identities,
-transformations and data licences/terms are resolved. The remaining three historical source and licence
-statuses remain intentionally unresolved. A resolved source chain does not
-turn any of these research/proxy chains into an externally validated provider
-series.
+The equity, German CPI, German cash/money-market and gold sources, identities,
+transformations and data licences/terms are resolved. The remaining wage and
+CAPE historical source and licence statuses remain intentionally unresolved.
+A resolved source chain does not turn any research/proxy chain into an
+externally validated provider series.
 
 ### Simulation-wide data inventory
 
 `app/simulator/simulation-data-inventory.js` adds the wider, immutable
-`SimulationDataInventoryV1`, revision `2026-07-29.5`. The existing
+`SimulationDataInventoryV1`, revision `2026-08-01.1`. The existing
 `HistoricalDataManifestV1` remains the active runtime/backtest record contract;
 the wider inventory is an evidence and change gate around that runtime
 contract and the productively used static model-data classes.
@@ -299,7 +351,7 @@ The six historical entries own separate, contiguous `qualitySegments` for
 | `inflation_de` | 1925-1949 `proxy`; 1950-1962 `official` with `proxy_population`; 1963-1991 `official`; 1992-2024 `official`; 2025 `official` | pinned JST/Destatis originals and generated hashes resolve the national VPI chain; territory/population seams remain explicit and HICP/HVPI is excluded |
 | `zinssatz_de` | 1925-1944 `proxy`; 1945-1948 `estimated`; 1949-1996 Frankfurt overnight `proxy`; 1997-1998 FIBOR O/N `official`; 1999-2018 EONIA `official`; 2019 transition `official`; 2020-2025 EURSTR `official` | primary PDF and derived layout path agree exactly; 1970/1990 methods, 1948 monetary discontinuity and EURSTR disclaimer are explicit; the shared bond application remains a maturity-mismatched gross model proxy |
 | `lohn_de` | 1925-1949 `estimated`; 1950-2023 `unresolved`; 2024-2025 separately `unresolved` | nominal wage/pension-adjustment identity and D-20 reconciliation unresolved |
-| `gold_eur_perf` | zero ranges 1925-1932, 1934-1960 and 1962-1968 separately `unresolved`; remaining ranges separately inventoried | 42 zeros, gold-price source, market regime and USD/DM/EUR conversion unresolved |
+| `gold_eur_perf` | 1925-1944 `proxy`; 1945-1950 `estimated`; 1951-1967 `proxy`; 1968, 1969-1998, 1999 and 2000-2025 separately `derived` | source hashes and seams are reproducible; twelve source-derived or explicitly estimated zeros are explained; early market access, post-war bridge and annual-average/product-cost limitations prevent an investable-product or externally validated claim |
 | `cape` | 1925-1949 `estimated`; 1950-2025 `unresolved` | productive `t-1` use is known; external region, series and reconstruction are unresolved |
 
 `qualitySegments` are evidence segments, not a rewrite of the runtime
@@ -327,13 +379,13 @@ The source gate deliberately separates three questions:
    class.
 3. `replacementAllowed` is false until the external-validation gate passes.
 
-Therefore all six historical series can replay deterministically. The equity
-inflation and cash entries now have resolved source, licence/terms, retrieval
-and raw-data hashes, but their external-validation statuses remain
+Therefore all six historical series can replay deterministically. The equity,
+inflation, cash and gold entries now have resolved source, licence/terms,
+retrieval and raw-data hashes, but their external-validation statuses remain
 `not_validated`. Equity is a research proxy with a modelled 2021-2025 dividend
 component; inflation includes a JST proxy through 1949 and explicit official
-territory/population seams; cash includes a proxy and an explicit estimated
-post-war bridge. The remaining three series retain their unresolved
+territory/population seams; cash and gold each include proxy segments and an
+explicit estimated post-war bridge. Wage and CAPE retain their unresolved
 replacement gates. Later data-replacement
 slices must update their exact series entry, raw-data and embedded-value
 hashes, segments, transformation and source/license evidence together.
@@ -369,11 +421,11 @@ does not replace this runtime manifest and does not upgrade any field to
 | Open item | Current state | Required owner and next evidence | Blocking effect |
 | --- | --- | --- | --- |
 | exact equity provider-index identity | intentionally not applicable: `global_equity_research_index` is a named research proxy | external methodology review may compare it with licensed provider indices without renaming the proxy | blocks claims of provider-index equivalence, not deterministic use |
-| variants and primary sources for the remaining three series | `unresolved` | exact series identifiers, definitions, retrieval/data dates and permitted source chain | blocks research-grade FV-G02 for those series |
-| licenses/usage rights for the remaining three series | `unresolved` | license text, use/redistribution scope and review date; legal review where needed | blocks their replacement, integration or redistribution |
+| variants and primary sources for the remaining two series | wage and CAPE remain `unresolved` | exact series identifiers, definitions, retrieval/data dates and permitted source chain | blocks research-grade FV-G02 for those series |
+| licenses/usage rights for the remaining two series | wage and CAPE remain `unresolved` | license text, use/redistribution scope and review date; legal review where needed | blocks their replacement, integration or redistribution |
 | equity proxy segments | original and filtered JST/OECD/ECB inputs, hashes and transformation resolved; 1925-1950 USD proxy and 2021-2025 frozen-dividend model | independent methodology validation and future dividend-source replacement | prevents provider-index and externally-validated claims |
 | cash/money-market proxy segments | JST and Bundesbank inputs, hashes and transformation resolved; 1925-1944 non-homogeneous proxy and 1945-1948 carry-forward bridge | independent methodology validation and future observed pre-1949 replacement | prevents claims of a continuous investable product return and external validation |
-| zero-valued `gold_eur_perf` observations | 42 records with unresolved quality: 1925-1932, 1934-1960 and 1962-1968 | evidence whether each segment is genuine zero return, missing data or an assumption, followed by a new manifest revision | blocks gold-effect and holdout claims; values must not be silently reinterpreted |
+| early and seam `gold_eur_perf` methodology | source chain and all zeros are technically resolved; 1925-1967 remains a policy/FX proxy, 1945-1950 an estimated bridge, 1968 a partial-year seam and 1999 a source/numeraire seam | independent methodology validation, investability/access evidence and product-cost sensitivity | prevents claims of a continuous investable retail-gold return or external validation |
 | CAPE region | `unresolved` | exact market/region and transformation contract | blocks international CAPE/policy comparison |
 
 The embedded 1925-2025 history and every period or rolling cohort derived from
@@ -419,7 +471,8 @@ rejects non-finite required returns before portfolio mutation.
 - `inflation_de`: open, segmented German annual-average national CPI chain
 - `zinssatz_de`: annual German rate proxy
 - `lohn_de`: annual wage growth proxy
-- `gold_eur_perf`: annual gold return proxy
+- `gold_eur_perf`: annual-average gold return proxy in German investor
+  currency with explicit policy/FX, bridge, Frankfurt and EUR segments
 - `cape`: CAPE valuation proxy
 
 ## Follow-up actions
@@ -428,4 +481,5 @@ rejects non-finite required returns before portfolio mutation.
   research proxy.
 - Replace the frozen 2020 dividend component when an open observed
   total-return source for 2021-2025 becomes available.
-- Clarify zero values in early `gold_eur_perf` years (`no data` vs `assumed 0`).
+- Independently validate the early gold market-access proxy and quantify
+  product premium, spread, storage and tax sensitivity.

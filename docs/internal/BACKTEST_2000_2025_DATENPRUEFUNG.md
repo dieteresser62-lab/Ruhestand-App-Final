@@ -1028,6 +1028,15 @@ weder einen erreichbaren Endkundenreturn noch einen historischen Bondindex.
 
 ### Slice 5 - Goldrendite in deutscher Anlegerwaehrung
 
+**Slice-Dokument:**
+[`SLICE_BACKTEST_DATENPRUEFUNG_05_GOLD_DEUTSCHE_ANLEGERWAEHRUNG.md`](SLICE_BACKTEST_DATENPRUEFUNG_05_GOLD_DEUTSCHE_ANLEGERWAEHRUNG.md)
+
+**Umsetzungsstatus:** am 2026-07-30 durch Codex auf Basis des extern
+freigegebenen Slice-04-Ergebnisdokuments technisch umgesetzt. Die Auflagen
+CR04-10 (portable Poppler-Toolchain) und CR04-13 (Inventarrevision) sind als
+getestete Vorgates geschlossen. Review, Freigabe und Commit stehen aus; Codex
+nimmt keine Selbstfreigabe vor.
+
 **Abhaengigkeit:** Slice 1.
 
 **Ziel**
@@ -1047,9 +1056,33 @@ stillschweigende Nullrenditen.
 
 - Jeder der derzeit 42 ungeklaerten Nullwerte ist aufgeloest oder als
   nicht beobachtbar markiert.
-- Waehrungs- und Jahresendkonvention sind reproduzierbar.
+- Waehrungs- und Jahreskonvention sind reproduzierbar.
 - Goldfreie Portfolios bleiben durch den Datenersatz ergebnisgleich.
 - Goldhaltige Referenzlaeufe besitzen erklaerte Vorher-/Nachher-Deltas.
+
+**Technisches Ergebnis**
+
+- `gold_eur_perf` wird fuer alle 101 Returnjahre 1925-2025 aus dem
+  generierten `GoldGermanInvestorChainV1` projiziert. Der Returnhash ist
+  `068a15a99c665b48dc14a187b654033d292c9de6ed3cf712f7e789ddcec049aa`.
+- Die Kette trennt Jahresend-Policy-/JST-FX-Proxy mit offiziellem RFC-Anker
+  1933, explizite Schaetzbruecke 1945-1950,
+  Bundesbank-Frankfurt-Fixing und World-Bank-Gold/Bundesbank-USD/EUR. Alle
+  zwoelf literal verbleibenden Nullen sind erklaert; es gibt kein
+  Fallback-Zero-Segment.
+- Manifest und Inventar tragen Revision `2026-08-01.1`, Dataset-Hash
+  `e2ee9db77d02cca23ca451e16ed16b565de44411807c550e49f415e7bed45d0a`
+  und denselben Goldwertehash.
+- Alle sieben goldfreien Referenzfaelle behalten Outcome und Finanzmetriken
+  exakt; `portfolio_flow_delta` ist null. Ein echter sechsjaehriger
+  goldhaltiger UI-/Provider-/Backtestlauf 2000-2005 friert alle acht
+  Finanzmetriken, beide Outcomes, Row-Hashes und FlowDelta vor/nach dem
+  Datenersatz ein; unter anderem betraegt das Endvermoegensdelta
+  `-55.479,30 EUR`.
+- `post-backtest-data-05-v1` liegt als unveraenderlicher, weiterhin
+  `pending` markierter Monte-Carlo-Kandidat auf Slice 04 vor.
+- `npm test` ist mit 15.055/15.055 Assertions gruen; Quellen-Verify-Gates
+  fuer Poppler, Cash-/Geldmarkt- und Goldkette sind ebenfalls gruen.
 
 ### Slice 6 - CAPE sowie Lohn-/Rentenfortschreibungsreihe
 
@@ -1353,7 +1386,7 @@ bestaetigt. Keiner wurde aus dem Dokument uebernommen.
 | `minimumFlexAnnual` gleich 0 in 2001, 2005, 2009, 2010 | D-17 | bestaetigt, einschliesslich der vier Statuswerte |
 | Liquiditaet endet in 2004, 2005 und 2012 bei 0 EUR | D-02 | bestaetigt |
 | End-Snapshot mischt fortgeschriebene und unveraenderte Felder | D-16 | bestaetigt: SAP 152.143,06 gegen 55.362,56 EUR, UBS 1.535.092,96 gegen 558.597,12 EUR, Liquiditaet 188.734,51 gegen 361.165,05 EUR |
-| 42 ungeklaerte Nullwerte in `gold_eur_perf` | Slice 5 | bestaetigt, Jahre 1925 bis 1968 mit Luecken 1933, 1961 |
+| 42 ungeklaerte Nullwerte in `gold_eur_perf` | Slice 5 | Ausgangsbefund bestaetigt; technisch durch die segmentierte Quell-/Proxykette ersetzt. Zwoelf erklaerte Nullreturns bleiben, davon sechs explizit geschaetzt |
 | Exakter Replay widerlegt den Replay-Teil von D-12 | Korrekturhinweis | akzeptiert, siehe Richtigstellung unten |
 
 Zusaetzliche Beobachtung zu D-16, die den Befund stuetzt: Der End-Snapshot

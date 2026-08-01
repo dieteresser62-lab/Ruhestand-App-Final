@@ -241,8 +241,8 @@ console.log('Test 6: fallback_zero is visible and only valid inside manifested s
     assertEqual(invalidFallbackError?.code, 'HISTORICAL_FALLBACK_ZERO_NOT_MANIFESTED', 'Fallback outside segment should fail');
 
     const currentGoldZero = createHistoricalBacktestContractProvider().getRecord(1950).realized.goldReturn;
-    assertEqual(currentGoldZero.value, 0, 'Current embedded gold zero should remain numerically unchanged');
-    assertEqual(currentGoldZero.qualityStatus, 'unresolved', 'Ambiguous current gold zero must not be invented as fallback_zero');
+    assertEqual(currentGoldZero.value, 0, 'Explicit post-war gold bridge should retain its literal zero');
+    assertEqual(currentGoldZero.qualityStatus, 'estimated', 'Post-war gold bridge should remain visibly estimated');
 }
 console.log('✓ explicit fallback-zero policy OK');
 

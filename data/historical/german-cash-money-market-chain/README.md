@@ -25,11 +25,19 @@ This directory contains the pinned source material for
     `c1bb91fe56ea50d4f27af5c0fc897d481e89ae38ce41eaecab62134c9354981d`.
 
 The generator verifies all three file hashes. It then reads the primary PDF
-itself with Poppler `pdftohtml` 25.07.0 and reconstructs all 77 Bundesbank
-overnight observations from XML coordinates. Those observations must agree
-exactly with the independently selected layout-text values. The manual
-rendered-page check remains review documentation only and is not represented
-as machine evidence.
+itself with Poppler `pdftohtml` 25.07.0 or newer and reconstructs all 77
+Bundesbank overnight observations from XML coordinates. The executable is
+resolved from `RUHESTANDSAPP_PDFTOHTML`, `RUHESTANDSAPP_POPPLER_BIN` or
+`PATH`; no developer-specific WinGet path is embedded in code. Those
+observations must agree exactly with the independently selected layout-text
+values. A newer compatible Poppler release therefore cannot change a source
+value silently. The manual rendered-page check remains review documentation
+only and is not represented as machine evidence.
+
+Poppler is a development/test prerequisite, not an application runtime
+dependency. On Windows it can be installed with
+`winget install oschwartz10612.Poppler`; verify the local toolchain with
+`npm run verify:poppler-toolchain`.
 
 ## Transformation
 

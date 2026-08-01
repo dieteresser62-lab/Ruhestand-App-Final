@@ -218,7 +218,8 @@ export const GERMAN_CASH_MONEY_MARKET_CHAIN = deepFreeze({
       "tool": {
         "implementation": "Poppler",
         "executable": "pdftohtml",
-        "version": "25.07.0",
+        "minimumCompatibleVersion": "25.07.0",
+        "compatibilityRule": "version_greater_than_or_equal_to_minimum_and_exact_source_value_agreement",
         "arguments": [
           "-xml",
           "-f",

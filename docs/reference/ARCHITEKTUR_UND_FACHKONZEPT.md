@@ -1873,7 +1873,7 @@ von der Fertigstellungsreihenfolge. Die Startjahr- und Folgejahrlogik liegt in
 | `inflation_de` | deutsche Inflationsreihe bzw. Proxy | 1925-2025 |
 | `zinssatz_de` | deutscher Kurz-/Zinsproxy | 1925-2025 |
 | `lohn_de` | deutsche Lohnentwicklungsreihe bzw. Proxy | 1925-2025 |
-| `gold_eur_perf` | Gold-EUR-Performance; frühe Jahre enthalten Null-Fallbacks und müssen quellenfachlich weiter geklärt werden | 1925-2025, belastbarer ab späterer Historie |
+| `gold_eur_perf` | segmentierte Gold-Bruttorendite in deutscher Anlegerwährung: Jahresend-Policypreis/JST-Jahresend-FX mit offiziellem RFC-Anker 1933, explizite Nachkriegs-Schaetzbruecke, Bundesbank-Frankfurt-Fixing und World-Bank-Gold/Bundesbank-FX; kein Produktreturn | 1925-2025, frühe Markt-/Währungssegmente bleiben Proxy bzw. Schätzung |
 | `cape` | CAPE-/Shiller-Bewertungsproxy | 1925-2025 |
 
 **Provenienz-Hinweis `global_equity_research_index`:**
@@ -2427,7 +2427,9 @@ dem vollstaendigen vierjaehrigen Marktkontext die technischen Grenzen
 `startYear === endYear` ist bei vollstaendigem Record/Lookback gueltig. Die
 Aktienreihe markiert 1925-1950 als `proxy`, 1951-2020 als `backtested` und
 2021-2025 als `estimated`; andere Reihen besitzen eigene Qualitaetssegmente.
-Zahlreiche Gold-Nullwerte bleiben `unresolved`. Diese Qualitaetsmarker werden
+Die Goldkette trennt Proxy-, Schaetz- und abgeleitete Segmente. Alle zwoelf
+literal verbleibenden Nullreturns sind quell- oder modellseitig erklaert; die
+1945-1950-Bruecke bleibt sichtbar `estimated`. Diese Qualitaetsmarker werden
 angezeigt und im Raw-Export erhalten.
 
 ### C.8.2 Daten-, Zeit- und Outcome-Vertrag

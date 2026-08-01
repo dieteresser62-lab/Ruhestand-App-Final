@@ -95,8 +95,35 @@ for (const seriesId of historicalSeriesIds) {
 }
 assertEqual(
     SIMULATION_DATA_INVENTORY.historicalSeries.gold_eur_perf.qualitySegments.length,
-    6,
-    'Gold should expose its zero-value ambiguity as series-specific segments'
+    9,
+    'Gold should expose its source, bridge and currency seams as series-specific segments'
+);
+assertEqual(
+    JSON.stringify(
+        SIMULATION_DATA_INVENTORY.historicalSeries.gold_eur_perf.qualitySegments
+            .map(({ startYear, endYear, evidenceClass }) => ({
+                startYear,
+                endYear,
+                evidenceClass
+            }))
+    ),
+    JSON.stringify([
+        { startYear: 1925, endYear: 1932, evidenceClass: 'proxy' },
+        { startYear: 1933, endYear: 1933, evidenceClass: 'proxy' },
+        { startYear: 1934, endYear: 1944, evidenceClass: 'proxy' },
+        { startYear: 1945, endYear: 1950, evidenceClass: 'estimated' },
+        { startYear: 1951, endYear: 1967, evidenceClass: 'proxy' },
+        { startYear: 1968, endYear: 1968, evidenceClass: 'derived' },
+        { startYear: 1969, endYear: 1998, evidenceClass: 'derived' },
+        { startYear: 1999, endYear: 1999, evidenceClass: 'derived' },
+        { startYear: 2000, endYear: 2025, evidenceClass: 'derived' }
+    ]),
+    'Gold should expose the policy/FX, post-war, Frankfurt and EUR seams without gaps'
+);
+assertEqual(
+    SIMULATION_DATA_INVENTORY.historicalSeries.gold_eur_perf.source.status,
+    'known',
+    'Gold should resolve its pinned JST, Bundesbank and World Bank source chain'
 );
 assert(
     SIMULATION_DATA_INVENTORY.historicalSeries.global_equity_research_index.qualitySegments
@@ -333,7 +360,7 @@ for (const seriesId of historicalSeriesIds) {
     assertEqual(gate.technicallyReproducible, true, `${seriesId} should remain reproducible`);
     assertEqual(gate.externallyValidated, false, `${seriesId} must not claim external validation`);
     assertEqual(gate.replacementAllowed, false, `${seriesId} must not pass the replacement gate`);
-    if (['global_equity_research_index', 'inflation_de', 'zinssatz_de'].includes(seriesId)) {
+    if (['global_equity_research_index', 'inflation_de', 'zinssatz_de', 'gold_eur_perf'].includes(seriesId)) {
         assertEqual(gate.unresolvedFields.length, 0, `${seriesId} source and license fields should be resolved`);
     } else {
         assert(gate.unresolvedFields.includes('source'), `${seriesId} should expose its source blocker`);

@@ -6,6 +6,11 @@ import path from 'node:path';
 import process from 'node:process';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
+import {
+    isPopplerVersionCompatible,
+    POPPLER_MINIMUM_VERSION,
+    resolvePopplerTool
+} from './lib/poppler-toolchain.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -40,7 +45,6 @@ const WAR_GAP_START_YEAR = 1945;
 const WAR_GAP_END_YEAR = 1948;
 const JST_LAST_OBSERVED_YEAR = 1944;
 const BUNDESBANK_FIRST_YEAR = 1949;
-const POPPLER_PDFTOHTML_VERSION = '25.07.0';
 const PDF_FIRST_PAGE = 15;
 const PDF_LAST_PAGE = 16;
 const ECB_ESTR_DISCLAIMER_URL =
@@ -139,64 +143,22 @@ function assertPinnedSourceHashes() {
     }
 }
 
-function pdftohtmlCandidates() {
-    const candidates = [];
-    if (process.env.RUHESTANDSAPP_PDFTOHTML) {
-        candidates.push(process.env.RUHESTANDSAPP_PDFTOHTML);
-    }
-    if (process.platform === 'win32' && process.env.LOCALAPPDATA) {
-        candidates.push(path.join(
-            process.env.LOCALAPPDATA,
-            'Microsoft',
-            'WinGet',
-            'Packages',
-            'oschwartz10612.Poppler_Microsoft.Winget.Source_8wekyb3d8bbwe',
-            `poppler-${POPPLER_PDFTOHTML_VERSION}`,
-            'Library',
-            'bin',
-            'pdftohtml.exe'
-        ));
-    }
-    candidates.push('pdftohtml');
-    return [...new Set(candidates)];
-}
-
 function resolvePinnedPdftohtml() {
-    const probes = [];
-    for (const executable of pdftohtmlCandidates()) {
-        const probe = spawnSync(executable, ['-v'], {
-            encoding: 'utf8',
-            windowsHide: true
-        });
-        const versionOutput = `${probe.stdout || ''}\n${probe.stderr || ''}`;
-        const version = versionOutput.match(/pdftohtml version\s+([^\s]+)/)?.[1] || null;
-        probes.push({
-            executable,
-            status: probe.status,
-            errorCode: probe.error?.code || null,
-            version
-        });
-        if (probe.status === 0 && version === POPPLER_PDFTOHTML_VERSION) {
-            return executable;
-        }
-    }
-    fail('Pinned Poppler pdftohtml implementation is unavailable', {
-        requiredImplementation: 'Poppler',
-        requiredVersion: POPPLER_PDFTOHTML_VERSION,
-        environmentOverride: 'RUHESTANDSAPP_PDFTOHTML',
-        probes
-    });
+    return resolvePopplerTool().executable;
 }
 
 function parseBundesbankCoordinateXml(xml) {
     const producerMatch = xml.match(/<pdf2xml\s+producer="([^"]+)"\s+version="([^"]+)"/);
     if (
         producerMatch?.[1] !== 'poppler'
-        || producerMatch?.[2] !== POPPLER_PDFTOHTML_VERSION
+        || !isPopplerVersionCompatible(
+            producerMatch?.[2] || null,
+            POPPLER_MINIMUM_VERSION
+        )
     ) {
         fail('Bundesbank coordinate extraction has an unexpected producer', {
             expectedProducer: 'poppler',
-            expectedVersion: POPPLER_PDFTOHTML_VERSION,
+            minimumVersion: POPPLER_MINIMUM_VERSION,
             actualProducer: producerMatch?.[1] || null,
             actualVersion: producerMatch?.[2] || null
         });
@@ -732,7 +694,7 @@ function buildArtifact() {
                 tool: {
                     implementation: 'Poppler',
                     executable: 'pdftotext',
-                    version: POPPLER_PDFTOHTML_VERSION,
+                    version: '25.07.0',
                     arguments: ['-layout', '-f', '15', '-l', '16']
                 },
                 selectedColumn: 'first Overnight funds column in each annual-average table'
@@ -742,7 +704,8 @@ function buildArtifact() {
                 tool: {
                     implementation: 'Poppler',
                     executable: 'pdftohtml',
-                    version: POPPLER_PDFTOHTML_VERSION,
+                    minimumCompatibleVersion: POPPLER_MINIMUM_VERSION,
+                    compatibilityRule: 'version_greater_than_or_equal_to_minimum_and_exact_source_value_agreement',
                     arguments: ['-xml', '-f', '15', '-l', '16', '-hidden', '-i', '-noframes']
                 },
                 selection: 'first numeric text node with left coordinate 280-350 following each year node at left coordinate 100-199',

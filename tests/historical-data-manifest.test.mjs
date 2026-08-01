@@ -45,7 +45,7 @@ console.log('Test 1: manifest contains all required reproducibility fields');
 validateHistoricalDataManifest(HISTORICAL_DATA_MANIFEST);
 assertEqual(HISTORICAL_DATA_MANIFEST.schemaVersion, 'HistoricalDataManifestV1', 'Manifest schema should be versioned');
 assertEqual(HISTORICAL_DATA_MANIFEST.datasetId, 'ruhestandsapp-historical-data-v1', 'Manifest ID should be stable');
-assertEqual(HISTORICAL_DATA_MANIFEST.revision, '2026-07-29.5', 'Manifest revision should be explicit');
+assertEqual(HISTORICAL_DATA_MANIFEST.revision, '2026-08-01.1', 'Manifest revision should be explicit');
 assertEqual(HISTORICAL_DATA_MANIFEST.period.startYear, 1925, 'Manifest start year should match embedded history');
 assertEqual(HISTORICAL_DATA_MANIFEST.period.endYear, 2025, 'Manifest end year should match embedded history');
 assertEqual(HISTORICAL_DATA_MANIFEST.lookback.backtestYears, 4, 'Backtest lookback should be explicit');
@@ -80,6 +80,7 @@ for (const seriesId of requiredSeries.filter(seriesId => (
     seriesId !== 'global_equity_research_index'
         && seriesId !== 'inflation_de'
         && seriesId !== 'zinssatz_de'
+        && seriesId !== 'gold_eur_perf'
 ))) {
     const series = HISTORICAL_DATA_MANIFEST.series[seriesId];
     assertEqual(series.source.status, 'unresolved', `${seriesId} source must remain unresolved without evidence`);
@@ -117,15 +118,22 @@ assert(
         && interestSeries.transformation.value.includes('tax'),
     'Cash transform should rule out double accrual and embedded tax'
 );
+const goldSeries = HISTORICAL_DATA_MANIFEST.series.gold_eur_perf;
+assertEqual(goldSeries.source.status, 'known', 'Gold source chain should be resolved');
+assertEqual(goldSeries.license.status, 'known', 'Gold source licences should be explicit');
+assertEqual(goldSeries.variant.status, 'known', 'Gold annual-average return variant should be resolved');
+assertEqual(goldSeries.estimatedSegments.length, 1, 'Gold should expose one explicit post-war bridge');
+assertEqual(goldSeries.estimatedSegments[0].startYear, 1945, 'Gold bridge should begin with the source gap');
+assertEqual(goldSeries.estimatedSegments[0].endYear, 1950, 'Gold bridge should end before the 1951 DEM proxy');
 assertEqual(
-    HISTORICAL_DATA_MANIFEST.series.gold_eur_perf.missingness.fallbackZeroSegments.length,
+    goldSeries.missingness.fallbackZeroSegments.length,
     0,
-    'Ambiguous gold zero values must not be silently manifested as fallback_zero'
+    'Gold values must not use silent fallback-zero segments'
 );
 assertEqual(
-    HISTORICAL_DATA_MANIFEST.series.gold_eur_perf.missingness.zeroValuePolicy,
-    'unresolved_if_zero',
-    'Ambiguous gold zeros should carry unresolved quality'
+    goldSeries.missingness.zeroValuePolicy,
+    'literal_value',
+    'Gold zeros should be either source-derived literals or covered by the explicit estimated bridge'
 );
 console.log('✓ resolved chains, unresolved claims and zero policy OK');
 
@@ -204,7 +212,7 @@ for (const seriesId of requiredSeries) {
     assertEqual(inventorySeries.id, HISTORICAL_DATA_MANIFEST.series[seriesId].id, `${seriesId} inventory identity should match runtime manifest`);
     assertEqual(
         inventorySeries.rawDataHash.status,
-        ['global_equity_research_index', 'inflation_de', 'zinssatz_de'].includes(seriesId)
+        ['global_equity_research_index', 'inflation_de', 'zinssatz_de', 'gold_eur_perf'].includes(seriesId)
             ? 'known'
             : 'unresolved',
         `${seriesId} should reflect whether an external raw-data hash is available`

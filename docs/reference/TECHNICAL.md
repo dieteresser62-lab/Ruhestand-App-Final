@@ -349,7 +349,8 @@ Diese Grenze ist fachlich gewollt: Balance kennt derzeit keinen belastbaren aktu
   1925-1944 ab; 1945-1948 ist ein expliziter 1944-Carry-forward; die
   Bundesbank-Langreihe liefert Frankfurt-Tagesgeld/FIBOR, EONIA und EURSTR ab
   1949. Das Build-Gate liest die gepinnte PDF selbst mit Poppler
-  `pdftohtml` 25.07.0 und verlangt fuer alle 77 PDF-Jahre exakte
+  `pdftohtml` ab der kompatiblen Mindestversion 25.07.0 und verlangt fuer alle
+  77 PDF-Jahre exakte
   Uebereinstimmung mit dem getrennten Layout-Extrakt; nur JST und PDF gehen
   in den Primaerquellenhash ein. Die Jahre 1949-1996 sind wegen der nicht
   amtlich festgesetzten oder quotierten Eingangssaetze als `proxy`
@@ -363,9 +364,23 @@ Diese Grenze ist fachlich gewollt: Balance kennt derzeit keinen belastbaren aktu
   Produktkosten, Bankmarge oder Steuer. Der geforderte EZB-
   Administratorhinweis fuer EURSTR ist in den Datenmetadaten und der
   Lizenzbeilage verlinkt.
+* `app/simulator/gold-german-investor-chain.js` – deterministisch erzeugte,
+  tief eingefrorene 1925-2025-Gold-Bruttorenditekette in deutscher
+  Anlegerwaehrung. Die Segmente sind als US-Jahresend-Policypreis mal
+  JST-Jahresend-FX 1925-1932 und 1934-1944, offizieller RFC-Jahresendpreis
+  1933, explizite Schaetzbruecke 1945-1950, Policypreis mal JST-Jahresend-FX
+  1951-1967, Bundesbank-Frankfurt-Fixing 1968-1998 und World-Bank-Goldpreis
+  geteilt durch Bundesbank-USD/EUR 1999-2025 getrennt. Die Regimebrueche
+  1933/1934, 1961, 1968, 1971/1973 und 1999 sind maschinenlesbar; fehlende und nicht endliche Werte schlagen
+  fail-closed fehl. Alle zwoelf literal verbleibenden Nullreturns tragen eine
+  quell- oder modellseitige Erklaerung. Produktaufschlag, Spread, Verwahrung,
+  Steuer und Tracking sind nicht Bestandteil der Reihe. Die Nullbruecke ist
+  nominal und damit bei positiver Inflation real negativ; Proxy- und
+  Brueckenjahre bleiben im Legacy-Monte-Carlo-Pool und koennen dessen
+  modellierte Goldvolatilitaet druecken.
 * `app/simulator/simulator-data.js` – Historische Datenprojektion mit
-  generiertem `global_equity_research_index`, `inflation_de` und
-  `zinssatz_de`, tief eingefrorenes
+  generiertem `global_equity_research_index`, `inflation_de`, `zinssatz_de`
+  und `gold_eur_perf`, tief eingefrorenes
   `HistoricalDataManifestV1`, Mortalitäts- und Stress-Presets.
 * `app/simulator/historical-backtest-contract.js` – DOM-freier, im Produktbacktest aktivierter Manifest-/SHA-256-/`HistoricalYearRecordV1`-Contract. Validiert das Dataset einmal je Revision/Hash, liefert immutable Records und prueft Einzelpfad- bzw. Cohort-Batch-Perioden vor der Rechenschleife. Die aktive Zeitachse `realized_t_decision_t_minus_1_v1` verwendet realisierte Markt-/Makrowerte aus `t` und CAPE decision-as-of aus `t-1`.
 * `app/simulator/simulation-data-inventory.js` – DOM-freier
@@ -373,10 +388,10 @@ Diese Grenze ist fachlich gewollt: Balance kennt derzeit keinen belastbaren aktu
   Reihen sowie Demografie-, Pflege-, Hinterbliebenen-, Steuer-/Tranchen-,
   Renten-/Sozial-, Stress-/Regime- und Default-/Fallbackklassen. Eigene
   Reihen-Segmente und kanonische SHA-256-Wertfingerprints sichern
-  Reproduzierbarkeit; Aktienproxy, deutsche VPI- und Geldmarktkette besitzen
-  aufgeloeste offene Quell-/Lizenz- beziehungsweise Nutzungsketten, bleiben
+  Reproduzierbarkeit; Aktienproxy, deutsche VPI-, Geldmarkt- und Goldkette
+  besitzen aufgeloeste Quell-/Lizenz- beziehungsweise Nutzungsketten, bleiben
   als Ganzes aber `not_validated`; `unresolved`
-  blockiert fuer die anderen Reihen externe Validierungs- und
+  blockiert fuer Lohn- und CAPE-Reihe externe Validierungs- und
   Datenersatzbehauptungen, ohne deren technisch reproduzierbaren
   Runtime-Backtest zu blockieren.
 

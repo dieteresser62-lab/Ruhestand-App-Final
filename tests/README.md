@@ -4,7 +4,7 @@
 
 This directory contains the comprehensive testing infrastructure for the Ruhestand-App-Final project. The tests are designed to be zero-dependency, using native Node.js ESM and a custom test runner, avoiding the need for heavy frameworks like Jest or Mocha.
 
-**Test-Statistik:** 140 entdeckte Testdateien mit 11.375 von 11.375 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (nach der technischen Review-Nachbesserung von Backtest-Datenpruefung Slice 02 mit `npm test` am 2026-07-29 verifiziert). `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen und bestand mit 27/27 Einstiegspunkt-/Zusatzflows, darunter Preview/Commit, realer 3-Bucket-Bear-Pfad, Hybridprofil-Blocker, Import/Recovery, Sweep, Optimizer-Apply sowie vier isolierte Monte-Carlo-Browserfaelle.
+**Test-Statistik:** 150 entdeckte Testdateien mit 15.055 von 15.055 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (nach der technischen Blocker-Nachbesserung von Backtest-Datenpruefung Slice 05 mit `npm test` am 2026-08-01 verifiziert). `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen und bestand mit 27/27 Einstiegspunkt-/Zusatzflows, darunter Preview/Commit, realer 3-Bucket-Bear-Pfad, Hybridprofil-Blocker, Import/Recovery, Sweep, Optimizer-Apply sowie vier isolierte Monte-Carlo-Browserfaelle.
 
 Die Zahl beschreibt nur die Node-Standardsuite. `npm run test:browser`, `npm run test:coverage` und ein echter Tauri-Build sind getrennte Gates und in den Assertions nicht enthalten.
 
@@ -295,9 +295,9 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 **Zweck:** Validiert Golden Cases, unveraenderliche Snapshot-Linie, Delta-Ledger, Same-Runtime-Exaktheit sowie Direct-/Worker-/Chunk-Paritaet.
 - **Aktuelle Referenz:** Die oeffentliche `currentReference` ist `null`,
   solange kein extern freigegebener Nachfolger vorliegt;
-  `post-backtest-data-04-v1` ist der getrennte, noch extern zu reviewende
-  Cash-/Geldmarkt-Datenkandidat auf Basis des unveraenderlichen
-  Slice-03-Kandidaten. Der veraenderliche Zeiger ist aus der eingefrorenen
+  `post-backtest-data-05-v1` ist der getrennte, noch extern zu reviewende
+  Gold-Datenkandidat auf Basis des unveraenderlichen Slice-04-Kandidaten. Der
+  veraenderliche Zeiger ist aus der eingefrorenen
   Ergebnisprojektion ausgeschlossen. Keine fruehere Fixture wird
   ueberschrieben und eine reine Zeigeraenderung erzeugt keinen
   Folgesnapshot.
@@ -322,6 +322,11 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
   unveraenderlich auf dem Slice-03-Kandidaten auf und friert nur die neue
   Cash-/Geldmarkt-Datenprovenienz samt erwarteten Modellprojektionen ein.
   Der Kandidat bleibt bis zum erneuten externen Review `pending`.
+- **Backtest-Data-Slice-05-Kandidat:** `post-backtest-data-05-v1` baut
+  unveraenderlich auf dem Slice-04-Kandidaten auf und friert die neue
+  Gold-Datenprovenienz samt erwarteten Modellprojektionen ein. Der Kandidat
+  bleibt `pending`; weder Slice 04 noch eine andere Eingangsfixture wird
+  ueberschrieben.
 - **Historische Fixture-Kompatibilitaet:** Vergleichsausnahmen fuer
   unveraenderliche Pending-Fixtures stehen ausschliesslich in
   `snapshot-policy-v1.json`. Der produktive Runtime-Vertrag enthaelt weder
@@ -763,10 +768,16 @@ direkt aus der gepinnten Bundesbank-PDF. Ein eigenstaendiger
 koordinatenbasierter `pdftohtml`-Reader prueft 77 Jahreswerte gegen das
 Generatorartefakt, die einzige erlaubte 1945-1948-Luecke und das schreibfreie
 Verifikationsgate; der abgeleitete Layout-Extrakt ist nicht das Oracle.
+Poppler `pdftohtml` ab Version 25.07.0 ist deshalb eine fail-closed
+Testvoraussetzung. Das Programm wird ueber `PATH`,
+`RUHESTANDSAPP_POPPLER_BIN` oder `RUHESTANDSAPP_PDFTOHTML` aufgeloest;
+`npm run verify:poppler-toolchain` prueft die Installation. Der Test bindet
+nicht an eine konkrete Patchversion oder einen lokalen WinGet-Paketpfad.
 
 #### `german-cash-money-market-backtest-delta.test.mjs`
 **Zweck:** Validiert die Slice-04-Vorher-/Nachher-Evidenz gegen den
-eingefrorenen Post-Slice-03-Zielstand und das aktive Backtest-Ziel.
+eingefrorenen Post-Slice-03-Zielstand und die archivierte, byteidentische
+Post-Slice-04-Zielkopie.
 - **Identitaet:** Input-Hashes und Outcome-Klassen aller sieben
   Referenzfaelle bleiben stabil.
 - **Deltas:** Vermoegen, Entnahmen, Steuern, Kuerzungsmetriken, Drawdown,
@@ -779,11 +790,43 @@ eingefrorenen Post-Slice-03-Zielstand und das aktive Backtest-Ziel.
 - **Bilanzgate:** Vorher und nachher bleibt der maximale absolute
   `portfolio_flow_delta` unter 1 EUR.
 
+#### `gold-german-investor-chain.test.mjs`
+**Zweck:** Testet die generierte 1925-2025-Goldkette in deutscher
+Anlegerwaehrung.
+- **Quellenidentitaet:** JST-R6-XLSX, zwei Bundesbank-SDMX-CSV-Snapshots und
+  World-Bank-Pink-Sheet-XLSX stimmen mit den gepinnten SHA-256-Werten
+  ueberein.
+- **Rekonstruktion:** 101 endliche Jahresreturns werden ausschliesslich aus
+  dem generierten Modul in `HISTORICAL_DATA` und `annualData` projiziert;
+  Markerformeln pruefen den offiziellen RFC-Jahresendanker 1933, den
+  gesetzlichen 1934-Anker sowie Frankfurt- und EUR-Naehte unabhaengig. Die
+  Zeitkonvention trennt Jahresend-, Teiljahres- und Jahresdurchschnittsregime.
+- **Nullwerte:** Alle zwoelf literal verbleibenden Nullen tragen eine
+  source-derived oder explizit estimated Erklaerung. Abgeleitete Nullen
+  muessen Gleichheit beider Quellkomponenten belegen; unklassifizierte Nullen
+  und Fallback-Zero-Segmente sind verboten.
+- **Anwendung:** Der Goldreturn wird genau einmal auf den Goldbestand
+  angewandt. Produktaufschlag, Spread, Verwahrung, Steuer und Tracking sind
+  nicht Teil der Datenreihe.
+
+#### `gold-german-investor-backtest-delta.test.mjs`
+**Zweck:** Validiert die isolierte Slice-05-Vorher-/Nachher-Evidenz.
+- **Goldfreie Invarianz:** Alle sieben festen goldfreien
+  Charakterisierungsfaelle behalten Finanzmetriken, Outcomes und FlowDelta
+  exakt; abweichende Row-Hashes entstehen nur durch diagnostische
+  Goldreturnfelder.
+- **Gold-Witness:** Ein echter sechsjaehriger UI-/Provider-/Backtestlauf
+  2000-2005 mit 200.000 EUR Start-Gold und aktivem Zehn-Prozent-Ziel wird
+  einmal gegen die Slice-04-Goldwerte und einmal gegen die aktuelle Kette
+  ausgefuehrt. Acht Finanzmetriken, Outcomes, Row-Hashes und FlowDelta werden
+  vorher/nachher eingefroren; mindestens ein Finanzwert muss sich wirksam
+  aendern.
+
 #### `simulation-data-inventory.test.mjs`
 **Zweck:** Testet das simulationsweite Evidenzinventar und seine Quell-Gates.
 - **Historieninventar:** Sechs eigene, lueckenlose 1925-2025-Segmentvertraege
-  einschliesslich der aufgeloesten D-15-/D-20-Quellketten und der
-  verbleibenden Gold-Nullwert-Risiken.
+  einschliesslich der aufgeloesten Aktien-, VPI-, Cash-/Geldmarkt- und
+  Gold-Quellketten.
 - **Statische Klassen:** Demografie, Pflege, Hinterbliebene, Steuern/Tranchen,
   Rente/Sozialversicherung, Stress/Regime und Default-/Fallbackwerte besitzen
   Implementierungsabdeckung und getrennte Evidenzklassen.
@@ -1118,6 +1161,9 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `german-cash-money-market-chain.test.mjs` | ~360 | Gepinnte JST-/Bundesbank-Eingaben, 1925-2025-Kette, Methodenbrueche, Waehrungsreformgrenze, Cash-/Bond-Anwendung, Disclaimer und Hashbruecken |
 | `german-cash-money-market-source-reconstruction.test.mjs` | ~230 | Unabhaengige PDF-Koordinatenrekonstruktion aller 77 Bundesbank-Jahre plus JST, einzig erlaubte Schaetzluecke und read-only Generatorgate |
 | `german-cash-money-market-backtest-delta.test.mjs` | ~340 | Slice-04-Vorher-/Nachher-Beleg, Markerjahre, Steuer-/Kostenabgrenzung und FlowDelta |
+| `gold-german-investor-chain.test.mjs` | ~460 | Gepinnte JST-/Bundesbank-/World-Bank-Eingaben, 1925-2025-Goldkette, Naehte, Nullwerterklaerungen, Runtimeprojektion und read-only Generatorgate |
+| `gold-german-investor-backtest-delta.test.mjs` | ~240 | Slice-05-Invarianz goldfreier Faelle und deterministischer goldhaltiger Delta-Witness |
+| `poppler-toolchain.test.mjs` | ~15 | Portierbare Aufloesung, Mindestversionsvertrag und Ablehnung inkompatibler Poppler-Versionen |
 | `historical-data-robustness.test.mjs` | ~60 | Fehlende Marktdaten |
 | `simulation-data-inventory.test.mjs` | ~330 | Historien-/Statik-Inventar, Evidenzklassen, Wertfingerprints und fail-closed Quell-/Lizenz-Gates |
 | `liquidity-guardrail.test.mjs` | ~100 | Liquiditäts-Guardrails |

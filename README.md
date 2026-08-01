@@ -97,6 +97,17 @@ Netzwerkpfade.
   Geldvermoegensabschreibung der Waehrungsreform 1948 sowie Laufzeit-,
   Kredit- und Mark-to-Market-Risiken von Anleihen bleiben ausdrueckliche
   Modellgrenzen.
+* **Reproduzierbare Goldkette:** `gold_eur_perf` stammt vollstaendig aus
+  `gold-german-investor-chain.js`. Die 1925-2025-Kette kombiniert eine
+  ausdruecklich als Proxy markierte US-Goldpreis-/deutsche-Jahresend-FX-Historie
+  mit gesondertem offiziellem RFC-Jahresendpreis 1933, eine
+  sichtbare Schaetzbruecke 1945-1950, das Bundesbank-Frankfurter Goldfixing
+  und ab 1999 World-Bank-Goldpreise mit Bundesbank-USD/EUR. Alle zwoelf
+  literal verbleibenden Nullwerte sind quell- oder modellseitig erklaert;
+  Produktaufschlag, Spread, Verwahrung und Steuer bleiben ausserhalb der
+  Bruttorenditereihe. Jahresend-, Teiljahres- und Jahresdurchschnittssegmente
+  sind getrennt dokumentiert; die nominale Nullbruecke und fruehen Proxyjahre
+  bleiben eine sichtbare Monte-Carlo-Modellgrenze.
 * **Dateninventar und Evidenz-Gates:** `SimulationDataInventoryV1` inventarisiert
   die sechs historischen Reihen mit eigenen 1925-2025-Qualitaetssegmenten
   sowie Demografie-, Pflege-, Hinterbliebenen-, Steuer-/Tranchen-,
@@ -279,6 +290,16 @@ Die Anwendung ist bewusst minimalistisch gehalten, hat aber für den vollen Funk
 1.  **Browser:** Ein moderner Browser (Chrome, Edge, Firefox) mit Unterstützung für ES6-Module und die File System Access API (für Dateiimport/-export; Jahresabschluss-Snapshots liegen intern in IndexedDB).
 2.  **Node.js (optional, nur Browservariante):** Für den automatischen Abruf von Online-Kursdaten (ETF-Preise) wird dort ein lokaler Proxy benötigt. Dieser setzt eine installierte [Node.js](https://nodejs.org/)-Laufzeitumgebung voraus. Die Tauri-Variante bringt ihren Loopback-Proxy selbst mit.
     *   *Ohne Node.js im Browserbetrieb:* Die App startet normal, aber der Button "Online-Update" im Tranchen-Manager ist ohne Funktion. Manuelle Kurspflege ist weiterhin möglich.
+3.  **Poppler ab 25.07.0 (nur Entwicklung und Tests):** Das
+    Primaerquellengate der historischen Cash-/Geldmarktkette liest die
+    gepinnte Bundesbank-PDF mit `pdftohtml`. Das Programm muss ueber `PATH`,
+    `RUHESTANDSAPP_POPPLER_BIN` oder `RUHESTANDSAPP_PDFTOHTML` erreichbar
+    sein. Unter Windows kann Poppler beispielsweise mit
+    `winget install oschwartz10612.Poppler` installiert werden. Die
+    Installation laesst sich mit `npm run verify:poppler-toolchain` pruefen.
+    Eine neuere kompatible Poppler-Version wird nicht allein wegen ihrer
+    Versionsnummer abgewiesen; Quellenhash und extrahierte 77-Jahres-Reihe
+    bleiben fail-closed gepinnt.
 
 ---
 
@@ -376,9 +397,11 @@ gelten die nachfolgend dokumentierten abweichenden Bedingungen.
 Die Forschungsdaten unter
 `data/historical/global-equity-research-chain/` und
 `data/historical/german-cpi-chain/` sowie die Cash-/Geldmarktdaten unter
-`data/historical/german-cash-money-market-chain/` und die daraus erzeugten Werte
+`data/historical/german-cash-money-market-chain/` und die Golddaten unter
+`data/historical/gold-german-investor-chain/` und die daraus erzeugten Werte
 unterliegen teilweise `CC BY-NC-SA 4.0`, einschließlich
-Nichtkommerzialitäts- und Share-Alike-Bedingungen. OECD-, EZB- und
+Nichtkommerzialitäts- und Share-Alike-Bedingungen; World-Bank-Anteile stehen
+unter `CC BY 4.0`. OECD-, EZB- und
 Bundesbank/ESCB-Bedingungen gelten zusätzlich; für die Destatis-Anteile gilt die Datenlizenz Deutschland
 – Namensnennung – Version 2.0. Vor einer kommerziellen Verteilung des Repositories,
 eines `dist/`-Standes oder einer ausführbaren Anwendung ist eine gesonderte
@@ -387,4 +410,5 @@ Cash-/Geldmarkt-Lizenzbeilage verlinkte Administratorhinweis der EZB. Details
 und Namensnennung:
 `data/historical/global-equity-research-chain/LICENSE.md` und
 `data/historical/german-cpi-chain/LICENSE.md` sowie
-`data/historical/german-cash-money-market-chain/LICENSE.md`.
+`data/historical/german-cash-money-market-chain/LICENSE.md` und
+`data/historical/gold-german-investor-chain/LICENSE.md`.

@@ -7,6 +7,11 @@ import { runBacktest } from '../app/simulator/simulator-backtest.js';
 import { getCommonInputs } from '../app/simulator/simulator-portfolio.js';
 import { simulateOneYear } from '../app/simulator/simulator-engine-wrapper.js';
 import { annualData, HISTORICAL_DATA } from '../app/simulator/simulator-data.js';
+import { HISTORICAL_DATA_MANIFEST } from '../app/simulator/simulator-data.js';
+import {
+    computeHistoricalDatasetHash,
+    createHistoricalBacktestContractProvider
+} from '../app/simulator/historical-backtest-contract.js';
 import { EngineAPI } from '../engine/index.mjs';
 import { CONFIG } from '../engine/config.mjs';
 import { formatPercentValue } from '../app/simulator/simulator-formatting.js';
@@ -89,6 +94,39 @@ const METRIC_DICTIONARY_V1 = Object.freeze({
         legacySource: 'max(abs(rows[].row.portfolio_flow_delta))'
     }
 });
+
+const FINANCIAL_DELTA_METRICS = Object.freeze([
+    'summaryEndWealth',
+    'totalWithdrawal',
+    'totalTax',
+    'yearsWithReductionAtLeast10Pct',
+    'maxReductionStreak',
+    'maxDrawdownPct',
+    'minRunwayCoveragePct',
+    'maxAbsolutePortfolioFlowDelta'
+]);
+
+const SLICE_04_GOLD_RETURNS_2000_2005 = Object.freeze({
+    2000: -2.7,
+    2001: 4.3,
+    2002: 19.4,
+    2003: 11.7,
+    2004: 2.2,
+    2005: 22.3
+});
+
+function createSlice04GoldReferenceProvider() {
+    const records = Object.fromEntries(
+        Object.entries(HISTORICAL_DATA).map(([year, record]) => [year, { ...record }])
+    );
+    for (const [year, value] of Object.entries(SLICE_04_GOLD_RETURNS_2000_2005)) {
+        records[year] = { ...records[year], gold_eur_perf: value };
+    }
+    const manifest = structuredClone(HISTORICAL_DATA_MANIFEST);
+    manifest.revision = 'slice-04-gold-reference-2000-2005';
+    manifest.contentHash.value = computeHistoricalDatasetHash(records);
+    return createHistoricalBacktestContractProvider({ records, manifest });
+}
 
 const BASE_DOM_VALUES = Object.freeze({
     simStartJahr: 2000,
@@ -424,6 +462,7 @@ function runScenario({
     checkedIds = [],
     expectedRowCount,
     detailledTranches = null,
+    historicalDataProvider = null,
     historicalMutation = null,
     onAssign = null,
     projectionOverride = null,
@@ -450,7 +489,7 @@ function runScenario({
     const getCaptured = installBacktestDataCapture(onAssign);
     const restoreHistorical = historicalMutation ? historicalMutation() : () => {};
     try {
-        runBacktest();
+        runBacktest(historicalDataProvider ? { historicalDataProvider } : {});
     } finally {
         restoreHistorical();
     }
@@ -629,7 +668,9 @@ function buildTargetDeltaReport(legacy, target) {
                 numericDelta: Number.isFinite(legacyValue) && Number.isFinite(targetValue)
                     ? round(targetValue - legacyValue, 6)
                     : null,
-                cause: 'D-01 realized fields use source year t; CAPE remains decision-as-of t-1'
+                cause: before
+                    ? 'D-01 realized fields use source year t; CAPE remains decision-as-of t-1'
+                    : 'Slice 05 adds a real gold-holding reference scenario to the target contract'
             }]];
         }));
         return {
@@ -638,7 +679,9 @@ function buildTargetDeltaReport(legacy, target) {
             targetOutcome: entry.outcomeObservation,
             rowProjectionChanged: before?.canonicalRowsHash !== entry.canonicalRowsHash,
             rowProjectionCause: before?.canonicalRowsHash !== entry.canonicalRowsHash
-                ? 'D-01 time-axis alignment and signed negative-cash-interest reconciliation'
+                ? (before
+                    ? 'D-01 time-axis alignment and signed negative-cash-interest reconciliation'
+                    : 'Slice 05 adds a real gold-holding reference scenario to the target contract')
                 : null,
             metricDeltas
         };
@@ -793,6 +836,48 @@ try {
         }
     ];
 
+    const goldDetailTranches = [
+        {
+            trancheId: 'gold-reference:eq-old',
+            sourceProfileId: 'gold-reference',
+            marketValue: 1700000,
+            costBasis: 1350000,
+            shares: 1000,
+            purchasePrice: 1350,
+            currentPrice: 1700,
+            purchaseDate: '1990-01-01',
+            type: 'aktien_alt',
+            category: 'equity',
+            tqf: 0.3
+        },
+        {
+            trancheId: 'gold-reference:gold',
+            sourceProfileId: 'gold-reference',
+            marketValue: 200000,
+            costBasis: 180000,
+            shares: 100,
+            purchasePrice: 1800,
+            currentPrice: 2000,
+            purchaseDate: '1999-01-01',
+            type: 'gold',
+            category: 'gold',
+            tqf: 1
+        },
+        {
+            trancheId: 'gold-reference:cash',
+            sourceProfileId: 'gold-reference',
+            marketValue: 100000,
+            costBasis: 100000,
+            shares: 1000,
+            purchasePrice: 100,
+            currentPrice: 100,
+            purchaseDate: '1999-01-01',
+            type: 'geldmarkt',
+            category: 'money_market',
+            tqf: 0
+        }
+    ];
+
     const completedShort = runScenario({
         id: 'completed_2000_2005',
         values: { simStartJahr: 2000, simEndJahr: 2005 },
@@ -808,6 +893,57 @@ try {
         detailLevel: 'detailed',
         notes: ['Detail-toggle probe; not a separate versioned business scenario.']
     });
+    const goldHoldingScenario = {
+        id: 'gold_holding_2000_2005',
+        values: {
+            simStartJahr: 2000,
+            simEndJahr: 2005,
+            goldAllokationAktiv: 'true',
+            goldAllokationProzent: 10,
+            goldFloorProzent: 0,
+            goldSteuerfrei: 'true'
+        },
+        expectedRowCount: 6,
+        detailledTranches: goldDetailTranches,
+        oracleClass: 'target_expected',
+        notes: ['Real six-year UI/backtest gold-holding sentinel for the Slice-04 to Slice-05 data-chain delta.']
+    };
+    const goldHoldingBefore = runScenario({
+        ...goldHoldingScenario,
+        historicalDataProvider: createSlice04GoldReferenceProvider()
+    });
+    const goldHoldingAfter = runScenario(goldHoldingScenario);
+    const goldDataDeltaOracle = {
+        scenarioId: goldHoldingAfter.id,
+        period: goldHoldingAfter.period,
+        cause: 'gold_german_investor_chain',
+        beforeProvider: {
+            revision: 'slice-04-gold-reference-2000-2005',
+            annualReturnsPct: SLICE_04_GOLD_RETURNS_2000_2005
+        },
+        afterProvider: {
+            revision: HISTORICAL_DATA_MANIFEST.revision,
+            contentHash: HISTORICAL_DATA_MANIFEST.contentHash.value
+        },
+        outcome: {
+            before: goldHoldingBefore.outcomeObservation,
+            after: goldHoldingAfter.outcomeObservation
+        },
+        canonicalRowsHash: {
+            before: goldHoldingBefore.canonicalRowsHash,
+            after: goldHoldingAfter.canonicalRowsHash,
+            changed: goldHoldingBefore.canonicalRowsHash !== goldHoldingAfter.canonicalRowsHash
+        },
+        financialMetrics: Object.fromEntries(FINANCIAL_DELTA_METRICS.map(metricName => {
+            const before = goldHoldingBefore.values[metricName];
+            const after = goldHoldingAfter.values[metricName];
+            return [metricName, {
+                before,
+                after,
+                delta: before === null || after === null ? null : round(after - before, 9)
+            }];
+        }))
+    };
     const completedLong = runScenario({
         id: 'completed_1960_2020',
         values: { simStartJahr: 1960, simEndJahr: 2020, p1StartAlter: 18 },
@@ -1007,10 +1143,11 @@ try {
         oracleClass: 'target_expected',
         generatedBy: 'tests/simulator-backtest-characterization.test.mjs',
         exclusions: ['timestamps', 'object identities', 'absolute local paths'],
-        approvedContractChangePaths: ['alignmentOracle', 'cases', 'negativeCases', 'pensionWealthOracle'],
+        approvedContractChangePaths: ['alignmentOracle', 'cases', 'negativeCases', 'pensionWealthOracle', 'goldDataDeltaOracle'],
         metricDictionary: METRIC_DICTIONARY_V1,
         alignmentOracle: buildAlignmentOracle(),
         pensionWealthOracle,
+        goldDataDeltaOracle,
         reductionBoundaryOracle: buildReductionBoundaryOracle(backtestSource),
         legacyGlobalSchema: buildLegacySchemaOracle(global.window.globalBacktestData),
         detailToggleOracle: {
@@ -1021,6 +1158,7 @@ try {
         },
         cases: [
             completedShort,
+            goldHoldingAfter,
             completedLong,
             completedNumeraireSeam,
             threeBucketMinimumFlex,
@@ -1037,7 +1175,22 @@ try {
         ].map(entry => ({ ...entry, oracleClass: 'target_expected' }))
     };
 
-    assertEqual(actual.cases.length, 7, 'seven runtime characterization cases should be present');
+    assertEqual(actual.cases.length, 8, 'eight runtime characterization cases should be present');
+    assertEqual(goldHoldingBefore.inputHash, goldHoldingAfter.inputHash, 'Gold before/after runs should use identical inputs and period');
+    assertEqual(goldHoldingAfter.inputs.goldAktiv, true, 'Gold reference should activate the real gold path');
+    assertEqual(goldHoldingBefore.observedRowCount, 6, 'Gold before reference should complete six years');
+    assertEqual(goldHoldingAfter.observedRowCount, 6, 'Gold after reference should complete six years');
+    assert(goldDataDeltaOracle.canonicalRowsHash.changed, 'Gold data replacement should change the real backtest rows');
+    assert(
+        Object.values(goldDataDeltaOracle.financialMetrics)
+            .some(metric => Number.isFinite(metric.delta) && metric.delta !== 0),
+        'Gold data replacement should change at least one contracted financial metric'
+    );
+    assert(
+        goldDataDeltaOracle.financialMetrics.maxAbsolutePortfolioFlowDelta.before < 1
+            && goldDataDeltaOracle.financialMetrics.maxAbsolutePortfolioFlowDelta.after < 1,
+        'Gold before/after reference should keep FlowDelta below one euro'
+    );
     assertEqual(pensionWealthProbe.observedRowCount, 2, 'active-pension integration probe should complete two backtest years');
     assert(pensionWealthOracle !== null, 'active-pension integration probe should publish its explicit oracle');
     assert(actual.reductionBoundaryOracle.countedByLegacyOperator, 'exact 10% must be counted by the legacy operator');

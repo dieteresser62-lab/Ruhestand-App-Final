@@ -16,7 +16,7 @@ const fixturePath = path.join(
     'german-cash-money-market-backtest-delta-v1.json'
 );
 const beforePath = path.join(directory, 'fixtures', 'post-backtest-data-03-target-v1.json');
-const afterPath = path.join(directory, 'fixtures', 'simulator-backtest-target-v1.json');
+const afterPath = path.join(directory, 'fixtures', 'post-backtest-data-04-target-v1.json');
 const beforeBytes = fs.readFileSync(beforePath);
 const afterBytes = fs.readFileSync(afterPath);
 const before = JSON.parse(beforeBytes);
@@ -122,11 +122,11 @@ console.log('Test 1: before/after fixtures and the sole intended cause are pinne
 assertEqual(fixture.schemaVersion, 'GermanCashMoneyMarketBacktestDeltaV1', 'Delta fixture should be versioned');
 assertEqual(fixture.cause, 'german_cash_money_market_chain', 'Delta fixture should name the sole intended cause');
 assertEqual(sha256(beforeBytes), fixture.beforeTarget.sha256, 'Post-Slice-03 target should match its pinned hash');
-assertEqual(sha256(afterBytes), fixture.afterTarget.sha256, 'Active target should match its pinned hash');
+assertEqual(sha256(afterBytes), fixture.afterTarget.sha256, 'Archived Slice-04 target should match its pinned hash');
 assertEqual(
     fixture.afterTarget.interestAnnualReturnHash,
     GERMAN_CASH_MONEY_MARKET_CHAIN.hashes.annualReturnHash,
-    'Delta fixture should pin the active interest chain'
+    'Delta fixture should pin the Slice-04 interest chain'
 );
 assert(
     fixture.beforeTarget.interestAnnualReturnHash !== fixture.afterTarget.interestAnnualReturnHash,
@@ -137,7 +137,7 @@ console.log('✓ evidence fixtures and cause OK');
 console.log('Test 2: reference cases retain identity, outcome and explained metrics');
 const beforeCases = indexCases(before.cases);
 const afterCases = indexCases(after.cases);
-assertEqual(fixture.cases.length, after.cases.length, 'Every active target case should have delta evidence');
+assertEqual(fixture.cases.length, after.cases.length, 'Every Slice-04 target case should have delta evidence');
 for (const testCase of fixture.cases) {
     const identity = caseIdentity(testCase);
     const beforeCase = beforeCases.get(identity);

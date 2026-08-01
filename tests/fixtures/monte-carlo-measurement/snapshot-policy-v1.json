@@ -50,7 +50,8 @@
   "historicalFixtureCompatibility": {
     "appliesToSnapshotIds": [
       "post-backtest-data-03-v1",
-      "post-backtest-data-04-v1"
+      "post-backtest-data-04-v1",
+      "post-backtest-data-05-v1"
     ],
     "ignoredResultPaths": [
       "contracts.snapshotPolicy.currentReference",

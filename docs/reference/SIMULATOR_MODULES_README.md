@@ -165,9 +165,9 @@ Referenz `pre-hardening-v1`, versionierte semantische Post-Slice-Referenzen
 und den extern noch nicht freigegebenen Integrationskandidaten
 `monte-carlo-v1-final`. Solange kein extern freigegebener Nachfolger
 vorliegt, ist die oeffentliche `currentReference` `null`;
-`post-backtest-data-04-v1` ist ein davon getrennter, bis zum erneuten
-externen Review `pending` markierter Cash-/Geldmarkt-Messkandidat auf Basis
-des unveraenderlichen CPI-Kandidaten `post-backtest-data-03-v1`. Der
+`post-backtest-data-05-v1` ist ein davon getrennter, bis zum erneuten
+externen Review `pending` markierter Gold-Daten-Messkandidat auf Basis des
+unveraenderlichen Cash-/Geldmarkt-Kandidaten `post-backtest-data-04-v1`. Der
 veraenderliche Zeiger wird aus der eingefrorenen Ergebnisprojektion
 ausgeschlossen. Pending Kandidaten werden daher weder zur aktuellen Referenz
 erklaert noch wegen einer reinen Zeigeraenderung dupliziert. Fruehere Suite-
@@ -601,7 +601,8 @@ Die Aktienlevels werden nicht mehr als zweite Zahlenreihe gepflegt, sondern
 aus `global-equity-research-chain.js` importiert. Die deutschen
 Inflationswerte werden ebenso ausschliesslich aus
 `german-cpi-chain.js` projiziert. `zinssatz_de` stammt ausschliesslich aus
-`german-cash-money-market-chain.js`.
+`german-cash-money-market-chain.js`; `gold_eur_perf` ausschliesslich aus
+`gold-german-investor-chain.js`.
 
 **Exporte:**
 - `HISTORICAL_DATA` – historische Marktdaten mit dem neutralen Feld
@@ -611,7 +612,7 @@ Inflationswerte werden ebenso ausschliesslich aus
 - `STRESS_PRESETS` – Stresstest-Szenarien (GFC, Stagflation, Lost Decade, System-Krise etc.)
 
 **Dependencies:** `global-equity-research-chain.js`, `german-cpi-chain.js`,
-`german-cash-money-market-chain.js`
+`german-cash-money-market-chain.js`, `gold-german-investor-chain.js`
 
 ---
 
@@ -681,7 +682,9 @@ Generiertes, tief eingefrorenes Datenartefakt fuer den deutschen
 Cash-/Overnight-Geldmarkt-Bruttoertragsproxy 1925-2025. Das Buildskript
 prueft das wiederverwendete JST-R6-Original, die gepinnte
 Bundesbank-Langreihen-PDF und den mechanischen Layout-Extrakt. Zusaetzlich
-liest es die Primaer-PDF mit dem festgelegten Poppler `pdftohtml` 25.07.0,
+liest es die Primaer-PDF mit Poppler `pdftohtml` ab der kompatiblen
+Mindestversion 25.07.0, aufgeloest ueber explizite Umgebungsvariable oder
+`PATH`,
 rekonstruiert die 77 Bundesbankwerte koordinatenbasiert und verlangt exakte
 Uebereinstimmung mit dem Layoutpfad. Ein unabhaengiger Testreader
 rekonstruiert alle 101 Werte ohne den Generator direkt aus JST-XLSX und PDF.
@@ -719,7 +722,41 @@ liegen in `data/historical/german-cash-money-market-chain/`.
 
 ---
 
-## 23d. `simulation-data-inventory.js`
+## 23d. `gold-german-investor-chain.js`
+
+Generiertes, tief eingefrorenes Datenartefakt fuer die nominale
+Gold-Bruttorendite in deutscher Anlegerwaehrung 1925-2025. Das Buildskript
+prueft die gepinnten JST-, Bundesbank- und World-Bank-Quelldateien und
+  rekonstruiert die segmentierte Jahresend-/Jahresdurchschnittskette
+  fail-closed.
+
+Die Segmente bleiben getrennt: US-Jahresend-Policypreis mal JST-Jahresend-
+`DEU.xrusd` 1925-1932 und 1934-1944, offizieller RFC-Jahresendpreis 1933,
+eine explizite Nullreturn-Schaetzbruecke 1945-1950, Policypreis mal
+JST-Jahresend-FX 1951-1967, Bundesbank-Frankfurt-Fixing in DEM/kg 1968-1998 und
+World-Bank-Gold in USD/Feinunze geteilt durch Bundesbank USD/EUR 1999-2025.
+1968 ist eine Teiljahresnaht ab 18. Juni; 1999 konvertiert 1998 mit
+1,95583 DEM/EUR und 32,15074656862798 Feinunzen/kg. Alle zwoelf literal
+verbleibenden Nullreturns sind durch Brueckenklassifikation oder unveraenderte
+Quellkomponenten belegt; unklassifizierte Nullen schlagen fail-closed fehl.
+Die nominale Bruecke ist real gerichtet, und Proxy-/Brueckenjahre bleiben als
+sichtbare Modellgrenze im Legacy-Monte-Carlo-Pool.
+
+**Exporte:**
+
+- `GOLD_GERMAN_INVESTOR_CHAIN` – Version, Quellen- und Wertehashes,
+  Waehrungsregime, Returnkonvention, Naehte, Qualitaetssegmente,
+  Nullwerterklaerungen und Jahreswerte;
+- `GOLD_GERMAN_INVESTOR_ANNUAL_RETURNS` – kanonische
+  1925-2025-Laufzeitprojektion.
+
+**Erzeugung:** `npm run build:gold-german-investor-data`; read-only Gate:
+`npm run verify:gold-german-investor-data`. Details und Quellenbedingungen
+liegen in `data/historical/gold-german-investor-chain/`.
+
+---
+
+## 23e. `simulation-data-inventory.js`
 
 DOM-freier, unveraenderlicher Evidenz- und Quell-Gate-Contract fuer
 historische Reihen und statische Simulationsdaten. Das Modul ersetzt weder
@@ -729,7 +766,7 @@ Backtestcontract.
 **Exporte:**
 
 - `SIMULATION_DATA_INVENTORY` – `SimulationDataInventoryV1`, Revision
-  `2026-07-29.5`, mit sechs reihenspezifischen Historieneintraegen und sieben
+  `2026-08-01.1`, mit sechs reihenspezifischen Historieneintraegen und sieben
   statischen Kategorien;
 - `validateSimulationDataInventory()` – prueft Pflichtfelder,
   Evidenzvokabular, lueckenlose 1925-2025-Qualitaetssegmente,
@@ -742,9 +779,9 @@ Backtestcontract.
   Reproduzierbarkeit, externe Validierung und Erlaubnis zum Datenersatz.
 
 `unresolved` bleibt technisch reproduzierbar, darf aber weder eine externe
-Validierung noch einen lizenzierten Datenersatz behaupten. Aktien-, CPI- und
-Cashkette besitzen bekannte Quellen-/Lizenz- beziehungsweise Nutzungsfelder,
-bleiben wegen ihrer Proxy-/Schaetzsegmente und ausstehender externer
+Validierung noch einen lizenzierten Datenersatz behaupten. Aktien-, CPI-,
+Cash- und Goldkette besitzen bekannte Quellen-/Lizenz- beziehungsweise
+Nutzungsfelder, bleiben wegen ihrer Proxy-/Schaetzsegmente und ausstehender externer
 Validierung jedoch `not_validated`. Modellannahmen,
 Nutzereingaben, Stressparameter, abgeleitete Werte und fehlende Modelle tragen
 getrennte Evidenzklassen.

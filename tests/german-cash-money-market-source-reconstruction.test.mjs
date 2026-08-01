@@ -9,6 +9,11 @@ import {
     GERMAN_CASH_MONEY_MARKET_ANNUAL_RETURNS,
     GERMAN_CASH_MONEY_MARKET_CHAIN
 } from '../app/simulator/german-cash-money-market-chain.js';
+import {
+    isPopplerVersionCompatible,
+    POPPLER_MINIMUM_VERSION,
+    resolvePopplerTool
+} from '../scripts/lib/poppler-toolchain.mjs';
 
 console.log('--- German Cash/Money-Market Independent Source Reconstruction Tests ---');
 
@@ -19,7 +24,6 @@ const sourcePaths = Object.freeze({
     bundesbankPdf: path.join(projectRoot, 'data', 'historical', 'german-cash-money-market-chain', 'originals', 'bundesbank-long-series-2026-03-05.pdf'),
     bundesbankTextExtract: path.join(projectRoot, 'data', 'historical', 'german-cash-money-market-chain', 'originals', 'bundesbank-money-market-pages-15-16-layout.txt')
 });
-const requiredPdftohtmlVersion = '25.07.0';
 
 function sha256(bytes) {
     return createHash('sha256').update(bytes).digest('hex');
@@ -37,41 +41,7 @@ function decodeXml(value) {
 }
 
 function resolveIndependentPdftohtml() {
-    const candidates = [
-        process.env.RUHESTANDSAPP_PDFTOHTML,
-        process.platform === 'win32' && process.env.LOCALAPPDATA
-            ? path.join(
-                process.env.LOCALAPPDATA,
-                'Microsoft',
-                'WinGet',
-                'Packages',
-                'oschwartz10612.Poppler_Microsoft.Winget.Source_8wekyb3d8bbwe',
-                `poppler-${requiredPdftohtmlVersion}`,
-                'Library',
-                'bin',
-                'pdftohtml.exe'
-            )
-            : null,
-        'pdftohtml'
-    ].filter(Boolean);
-
-    for (const executable of [...new Set(candidates)]) {
-        const probe = spawnSync(executable, ['-v'], {
-            encoding: 'utf8',
-            windowsHide: true
-        });
-        const output = `${probe.stdout || ''}\n${probe.stderr || ''}`;
-        if (
-            probe.status === 0
-            && output.includes(`pdftohtml version ${requiredPdftohtmlVersion}`)
-        ) {
-            return executable;
-        }
-    }
-    throw new Error(
-        `Independent PDF oracle requires Poppler pdftohtml ${requiredPdftohtmlVersion}; `
-        + 'set RUHESTANDSAPP_PDFTOHTML when it is not on PATH.'
-    );
+    return resolvePopplerTool().executable;
 }
 
 function extractIndependentBundesbankPdfRates() {
@@ -96,9 +66,13 @@ function extractIndependentBundesbankPdfRates() {
         });
         assertEqual(result.status, 0, `Independent PDF extraction should succeed: ${result.stderr}`);
         const xml = fs.readFileSync(xmlPath, 'utf8');
+        const producer = xml.match(
+            /<pdf2xml\s+producer="([^"]+)"\s+version="([^"]+)"/
+        );
+        assertEqual(producer?.[1], 'poppler', 'Independent PDF extraction should identify Poppler');
         assert(
-            xml.includes(`<pdf2xml producer="poppler" version="${requiredPdftohtmlVersion}">`),
-            'Independent PDF extraction should identify the pinned Poppler producer'
+            isPopplerVersionCompatible(producer?.[2], POPPLER_MINIMUM_VERSION),
+            'Independent PDF extraction should use a compatible Poppler version'
         );
 
         const nodes = [...xml.matchAll(/<text\s+([^>]*)>([\s\S]*?)<\/text>/g)].map(([, attributes, body]) => {

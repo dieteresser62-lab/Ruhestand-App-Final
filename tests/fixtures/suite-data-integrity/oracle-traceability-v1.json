@@ -944,10 +944,12 @@
   },
   "deltaBaselines": [
     { "id": "backtest-baseline", "file": "tests/fixtures/simulator-backtest-baseline-v1.json", "gitBlobSha1": "7b2cb702ad3c3c1501d5ddd4abb71a497b95ca3c", "expectedDelta": "none" },
-    { "id": "backtest-target", "file": "tests/fixtures/simulator-backtest-target-v1.json", "gitBlobSha1": "2e4ffd5a1b4bd265d344c4f27fe3d396f1faee1a", "expectedDelta": "backtest_data_04", "deltaEvidence": "tests/fixtures/german-cash-money-market-backtest-delta-v1.json" },
-    { "id": "mc-snapshot-policy", "file": "tests/fixtures/monte-carlo-measurement/snapshot-policy-v1.json", "gitBlobSha1": "5f30181533224e87a41be3941441fd103d2d44d2", "expectedDelta": "backtest_data_04", "deltaEvidence": "tests/fixtures/monte-carlo-measurement/post-backtest-data-04-v1.json" },
+    { "id": "backtest-target-post-data-04", "file": "tests/fixtures/post-backtest-data-04-target-v1.json", "gitBlobSha1": "2e4ffd5a1b4bd265d344c4f27fe3d396f1faee1a", "expectedDelta": "backtest_data_04", "deltaEvidence": "tests/fixtures/german-cash-money-market-backtest-delta-v1.json" },
+    { "id": "backtest-target", "file": "tests/fixtures/simulator-backtest-target-v1.json", "gitBlobSha1": "cebb2b0b2fb594616cac9212b5408e08736fd367", "expectedDelta": "backtest_data_05", "deltaEvidence": "tests/fixtures/gold-german-investor-backtest-delta-v2.json" },
+    { "id": "mc-snapshot-policy", "file": "tests/fixtures/monte-carlo-measurement/snapshot-policy-v1.json", "gitBlobSha1": "68e1442dc37bc9b8a5faff65ef13500d666469d3", "expectedDelta": "backtest_data_05", "deltaEvidence": "tests/fixtures/monte-carlo-measurement/post-backtest-data-05-v1.json" },
+    { "id": "mc-post-backtest-data-05", "file": "tests/fixtures/monte-carlo-measurement/post-backtest-data-05-v1.json", "gitBlobSha1": "2eb0f6dabcb4256e8d8db66ce7a68f37e6ac7205", "expectedDelta": "backtest_data_05", "deltaEvidence": "tests/fixtures/monte-carlo-measurement/post-backtest-data-05-v1.json" },
     { "id": "mc-final", "file": "tests/fixtures/monte-carlo-measurement/monte-carlo-v1-final.json", "gitBlobSha1": "f9dde37e5dff1e2d9459cb494a5780e7b85342d7", "expectedDelta": "none" },
-    { "id": "flow-delta-ledger", "file": "tests/fixtures/monte-carlo-measurement/delta-ledger-v1.json", "gitBlobSha1": "9db916c8fcd23488d4b273d3b8042ae953e4be64", "expectedDelta": "backtest_data_04", "deltaEvidence": "tests/fixtures/monte-carlo-measurement/post-backtest-data-04-v1.json" },
+    { "id": "flow-delta-ledger", "file": "tests/fixtures/monte-carlo-measurement/delta-ledger-v1.json", "gitBlobSha1": "ddbd7a6d1b6bd99dd06390c419c441dbcc25fc2f", "expectedDelta": "backtest_data_05", "deltaEvidence": "tests/fixtures/monte-carlo-measurement/post-backtest-data-05-v1.json" },
     { "id": "generated-engine", "file": "engine.js", "gitBlobSha1": "ec49961ed58134928723be5ddb6185e11f7fbcb5", "expectedDelta": "none_after_build" }
   ]
 }

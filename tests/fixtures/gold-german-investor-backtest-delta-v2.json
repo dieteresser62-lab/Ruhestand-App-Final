@@ -1,0 +1,511 @@
+{
+  "schemaVersion": "GoldGermanInvestorBacktestDeltaV2",
+  "cause": "gold_german_investor_chain",
+  "beforeTarget": {
+    "artifact": "post-backtest-data-04-target-v1.json",
+    "sha256": "6374986dccb2a176942e88bdea22059e1ff6f55dec5b3593483408d3f3e39cc9",
+    "goldAnnualReturnHash": "54435976447fac970d46489a90abb809c061ae92615db1ca4467c64d92b10a01"
+  },
+  "afterTarget": {
+    "artifact": "simulator-backtest-target-v1.json",
+    "sha256": "c7c695505935d0e7788b9c73ab2e066b6802a59ae91db5230c84f42d17f8bc1c",
+    "goldAnnualReturnHash": "068a15a99c665b48dc14a187b654033d292c9de6ed3cf712f7e789ddcec049aa"
+  },
+  "goldFreeCases": [
+    {
+      "id": "completed_2000_2005",
+      "period": {
+        "endYear": 2005,
+        "requestedYears": 6,
+        "startYear": 2000
+      },
+      "inputHash": "4fb90382bc7af1fad54fb11014e5e23862d5b561cfd992428c74e5f78397df0a",
+      "outcome": {
+        "before": "completed",
+        "after": "completed"
+      },
+      "canonicalRowsHash": {
+        "before": "d1d14b337f13b9926b8f8d35135f4547480fc17626bac1593520280982d11af0",
+        "after": "ce9fa76e0bde79ea13642bcec6e1bc846bab750ff4a42031fd001f98dcccec4e",
+        "changed": true
+      },
+      "financialMetrics": {
+        "summaryEndWealth": {
+          "before": 1693115.83,
+          "after": 1693115.83,
+          "delta": 0
+        },
+        "totalWithdrawal": {
+          "before": 176400,
+          "after": 176400,
+          "delta": 0
+        },
+        "totalTax": {
+          "before": 0,
+          "after": 0,
+          "delta": 0
+        },
+        "yearsWithReductionAtLeast10Pct": {
+          "before": 4,
+          "after": 4,
+          "delta": 0
+        },
+        "maxReductionStreak": {
+          "before": 4,
+          "after": 4,
+          "delta": 0
+        },
+        "maxDrawdownPct": {
+          "before": 40.319973,
+          "after": 40.319973,
+          "delta": 0
+        },
+        "minRunwayCoveragePct": {
+          "before": 75.585921,
+          "after": 75.585921,
+          "delta": 0
+        },
+        "maxAbsolutePortfolioFlowDelta": {
+          "before": 0,
+          "after": 0,
+          "delta": 0
+        }
+      }
+    },
+    {
+      "id": "completed_1960_2020",
+      "period": {
+        "endYear": 2020,
+        "requestedYears": 61,
+        "startYear": 1960
+      },
+      "inputHash": "3a08ea0c492d3ef517e7cc239506b067c8151227a61332568f4381885514c032",
+      "outcome": {
+        "before": "completed",
+        "after": "completed"
+      },
+      "canonicalRowsHash": {
+        "before": "a4b07f962c46c04dbea52cd750c00a003d4d0009d982a632b069c60dab7dfb42",
+        "after": "d459fcba491c68602bafed28d72111350e403bc9417a4cce346779ada7496841",
+        "changed": true
+      },
+      "financialMetrics": {
+        "summaryEndWealth": {
+          "before": 180149514.86,
+          "after": 180149514.86,
+          "delta": 0
+        },
+        "totalWithdrawal": {
+          "before": 4093414.61,
+          "after": 4093414.61,
+          "delta": 0
+        },
+        "totalTax": {
+          "before": 765209.43,
+          "after": 765209.43,
+          "delta": 0
+        },
+        "yearsWithReductionAtLeast10Pct": {
+          "before": 59,
+          "after": 59,
+          "delta": 0
+        },
+        "maxReductionStreak": {
+          "before": 59,
+          "after": 59,
+          "delta": 0
+        },
+        "maxDrawdownPct": {
+          "before": 40.024982,
+          "after": 40.024982,
+          "delta": 0
+        },
+        "minRunwayCoveragePct": {
+          "before": 71.554004,
+          "after": 71.554004,
+          "delta": 0
+        },
+        "maxAbsolutePortfolioFlowDelta": {
+          "before": 0,
+          "after": 0,
+          "delta": 0
+        }
+      }
+    },
+    {
+      "id": "completed_numeraire_seam_1949_1952",
+      "period": {
+        "endYear": 1952,
+        "requestedYears": 4,
+        "startYear": 1949
+      },
+      "inputHash": "d2b24432c05cbafbabbe4ca835a7ee923fbeb7ac0d2c342e45a7acdf18732e60",
+      "outcome": {
+        "before": "completed",
+        "after": "completed"
+      },
+      "canonicalRowsHash": {
+        "before": "7fee5aa51c1fdac92d924fd5260d8617e8e86f1d659db99f49945d3b6fb2e389",
+        "after": "7fee5aa51c1fdac92d924fd5260d8617e8e86f1d659db99f49945d3b6fb2e389",
+        "changed": false
+      },
+      "financialMetrics": {
+        "summaryEndWealth": {
+          "before": 5146008.66,
+          "after": 5146008.66,
+          "delta": 0
+        },
+        "totalWithdrawal": {
+          "before": 121200,
+          "after": 121200,
+          "delta": 0
+        },
+        "totalTax": {
+          "before": 19910.66,
+          "after": 19910.66,
+          "delta": 0
+        },
+        "yearsWithReductionAtLeast10Pct": {
+          "before": 3,
+          "after": 3,
+          "delta": 0
+        },
+        "maxReductionStreak": {
+          "before": 3,
+          "after": 3,
+          "delta": 0
+        },
+        "maxDrawdownPct": {
+          "before": 0,
+          "after": 0,
+          "delta": 0
+        },
+        "minRunwayCoveragePct": {
+          "before": 70.419352,
+          "after": 70.419352,
+          "delta": 0
+        },
+        "maxAbsolutePortfolioFlowDelta": {
+          "before": 0,
+          "after": 0,
+          "delta": 0
+        }
+      }
+    },
+    {
+      "id": "three_bucket_minimum_flex_2005_2014",
+      "period": {
+        "endYear": 2014,
+        "requestedYears": 10,
+        "startYear": 2005
+      },
+      "inputHash": "653e5e3d4233319611c26d3a195523ecdf8e3aa5d5f7e8e7e45915edb4bf7261",
+      "outcome": {
+        "before": "completed",
+        "after": "completed"
+      },
+      "canonicalRowsHash": {
+        "before": "7c79bc142e2faef97fa34d9c7ffd16558cf0d2e0ec41848ade9371880047f116",
+        "after": "189587a68eeab539f309e08acce9359849b90527cbae073d535b4e1067dbf89f",
+        "changed": true
+      },
+      "financialMetrics": {
+        "summaryEndWealth": {
+          "before": 383033.24,
+          "after": 383033.24,
+          "delta": 0
+        },
+        "totalWithdrawal": {
+          "before": 328800,
+          "after": 328800,
+          "delta": 0
+        },
+        "totalTax": {
+          "before": 29171.93,
+          "after": 29171.93,
+          "delta": 0
+        },
+        "yearsWithReductionAtLeast10Pct": {
+          "before": 10,
+          "after": 10,
+          "delta": 0
+        },
+        "maxReductionStreak": {
+          "before": 10,
+          "after": 10,
+          "delta": 0
+        },
+        "maxDrawdownPct": {
+          "before": 34.801083,
+          "after": 34.801083,
+          "delta": 0
+        },
+        "minRunwayCoveragePct": {
+          "before": 95.549082,
+          "after": 95.549082,
+          "delta": 0
+        },
+        "maxAbsolutePortfolioFlowDelta": {
+          "before": 0,
+          "after": 0,
+          "delta": 0
+        }
+      }
+    },
+    {
+      "id": "capital_poor_ruin_2000_2005",
+      "period": {
+        "endYear": 2005,
+        "requestedYears": 6,
+        "startYear": 2000
+      },
+      "inputHash": "20093d9f6c8285d9d912581c900ef84d14b3f51bdf2e55f9dea8140fd89ab3e5",
+      "outcome": {
+        "before": "ruin",
+        "after": "ruin"
+      },
+      "canonicalRowsHash": {
+        "before": "e7cbfb2dfa882c7a214e3105c9a8836a4b84a86899d0765d9028cef09d88b049",
+        "after": "45fddbaebbd82264b6fbab57d8f47ae4b6e1dd55787fca44583a7879fb7c05f8",
+        "changed": true
+      },
+      "financialMetrics": {
+        "summaryEndWealth": {
+          "before": 26793.05,
+          "after": 26793.05,
+          "delta": 0
+        },
+        "totalWithdrawal": {
+          "before": 90000,
+          "after": 90000,
+          "delta": 0
+        },
+        "totalTax": {
+          "before": 1290.26,
+          "after": 1290.26,
+          "delta": 0
+        },
+        "yearsWithReductionAtLeast10Pct": {
+          "before": 1,
+          "after": 1,
+          "delta": 0
+        },
+        "maxReductionStreak": {
+          "before": 1,
+          "after": 1,
+          "delta": 0
+        },
+        "maxDrawdownPct": {
+          "before": 77.672456,
+          "after": 77.672456,
+          "delta": 0
+        },
+        "minRunwayCoveragePct": {
+          "before": 0,
+          "after": 0,
+          "delta": 0
+        },
+        "maxAbsolutePortfolioFlowDelta": {
+          "before": 0,
+          "after": 0,
+          "delta": 0
+        }
+      }
+    },
+    {
+      "id": "health_bucket_nested_row_summary_positive",
+      "period": {
+        "endYear": 2011,
+        "requestedYears": 2,
+        "startYear": 2010
+      },
+      "inputHash": "a5c01c72490858910f6690147879d5fd07a6a51f2790cdeb39678d911440075c",
+      "outcome": {
+        "before": "completed",
+        "after": "completed"
+      },
+      "canonicalRowsHash": {
+        "before": "f251b5045748e8721e713e8262dd73ebd5758a95b4b1d61acc2bb5223bdda972",
+        "after": "6dbbdbbf5ab5f13db6e7e9dcaec8bd92aad99593a2c4cf05b0edba83bbf3abe3",
+        "changed": true
+      },
+      "financialMetrics": {
+        "summaryEndWealth": {
+          "before": 2271595.28,
+          "after": 2271595.28,
+          "delta": 0
+        },
+        "totalWithdrawal": {
+          "before": 60000,
+          "after": 60000,
+          "delta": 0
+        },
+        "totalTax": {
+          "before": 2657.61,
+          "after": 2657.61,
+          "delta": 0
+        },
+        "yearsWithReductionAtLeast10Pct": {
+          "before": 0,
+          "after": 0,
+          "delta": 0
+        },
+        "maxReductionStreak": {
+          "before": 0,
+          "after": 0,
+          "delta": 0
+        },
+        "maxDrawdownPct": {
+          "before": 3.332894,
+          "after": 3.332894,
+          "delta": 0
+        },
+        "minRunwayCoveragePct": {
+          "before": 9.259259,
+          "after": 9.259259,
+          "delta": 0
+        },
+        "maxAbsolutePortfolioFlowDelta": {
+          "before": 0,
+          "after": 0,
+          "delta": 0
+        }
+      }
+    },
+    {
+      "id": "dynamic_flex_cape_2010_2013",
+      "period": {
+        "endYear": 2013,
+        "requestedYears": 4,
+        "startYear": 2010
+      },
+      "inputHash": "2b1a7afe9d7d3589451d6fc4f4dd35fffd1d832864db70c8cd95f38bb1b34c17",
+      "outcome": {
+        "before": "completed",
+        "after": "completed"
+      },
+      "canonicalRowsHash": {
+        "before": "56be46056fca11bc6c1e5ce369706f7501232ef90acc26aebb054aef57156f3c",
+        "after": "b495e8b954ff92df1152b31051c6cbb0afbd62f58d08638a6060a6ca5a0100fb",
+        "changed": true
+      },
+      "financialMetrics": {
+        "summaryEndWealth": {
+          "before": 2408329.39,
+          "after": 2408329.39,
+          "delta": 0
+        },
+        "totalWithdrawal": {
+          "before": 492000,
+          "after": 492000,
+          "delta": 0
+        },
+        "totalTax": {
+          "before": 91236.92,
+          "after": 91236.92,
+          "delta": 0
+        },
+        "yearsWithReductionAtLeast10Pct": {
+          "before": 4,
+          "after": 4,
+          "delta": 0
+        },
+        "maxReductionStreak": {
+          "before": 4,
+          "after": 4,
+          "delta": 0
+        },
+        "maxDrawdownPct": {
+          "before": 7.73973,
+          "after": 7.73973,
+          "delta": 0
+        },
+        "minRunwayCoveragePct": {
+          "before": 47.279805,
+          "after": 47.279805,
+          "delta": 0
+        },
+        "maxAbsolutePortfolioFlowDelta": {
+          "before": 0,
+          "after": 0,
+          "delta": 0
+        }
+      }
+    }
+  ],
+  "goldHoldingBacktest": {
+    "afterProvider": {
+      "contentHash": "e2ee9db77d02cca23ca451e16ed16b565de44411807c550e49f415e7bed45d0a",
+      "revision": "2026-08-01.1"
+    },
+    "beforeProvider": {
+      "annualReturnsPct": {
+        "2000": -2.7,
+        "2001": 4.3,
+        "2002": 19.4,
+        "2003": 11.7,
+        "2004": 2.2,
+        "2005": 22.3
+      },
+      "revision": "slice-04-gold-reference-2000-2005"
+    },
+    "canonicalRowsHash": {
+      "after": "70f5e6c586d2f93159a8c9e25e6c0fe1edfc079f6a6089aca4036a463b8b00e0",
+      "before": "c6a90f80be97b3b3edd676751856baf63d4832891c4e5d544fa31ce922e40587",
+      "changed": true
+    },
+    "cause": "gold_german_investor_chain",
+    "financialMetrics": {
+      "maxAbsolutePortfolioFlowDelta": {
+        "after": 0,
+        "before": 0,
+        "delta": 0
+      },
+      "maxDrawdownPct": {
+        "after": 34.538776,
+        "before": 33.805127,
+        "delta": 0.733649
+      },
+      "maxReductionStreak": {
+        "after": 4,
+        "before": 4,
+        "delta": 0
+      },
+      "minRunwayCoveragePct": {
+        "after": 95.722447,
+        "before": 75.585921,
+        "delta": 20.136526
+      },
+      "summaryEndWealth": {
+        "after": 1799527.46,
+        "before": 1855006.76,
+        "delta": -55479.3
+      },
+      "totalTax": {
+        "after": 1599.44,
+        "before": 0,
+        "delta": 1599.44
+      },
+      "totalWithdrawal": {
+        "after": 175200,
+        "before": 175200,
+        "delta": 0
+      },
+      "yearsWithReductionAtLeast10Pct": {
+        "after": 4,
+        "before": 4,
+        "delta": 0
+      }
+    },
+    "outcome": {
+      "after": "completed",
+      "before": "completed"
+    },
+    "period": {
+      "endYear": 2005,
+      "requestedYears": 6,
+      "startYear": 2000
+    },
+    "scenarioId": "gold_holding_2000_2005"
+  }
+}

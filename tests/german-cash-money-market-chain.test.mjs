@@ -86,7 +86,15 @@ assertEqual(GERMAN_CASH_MONEY_MARKET_CHAIN.hashes.rawDataScope, 'primary_source_
 assertEqual(GERMAN_CASH_MONEY_MARKET_CHAIN.sourceValidation.primaryPdfReadByCode, true, 'Verification should read the primary PDF');
 assertEqual(GERMAN_CASH_MONEY_MARKET_CHAIN.sourceValidation.independentCoordinateOracleYears, 77, 'PDF coordinate oracle should cover all Bundesbank years');
 assertEqual(GERMAN_CASH_MONEY_MARKET_CHAIN.sourceExtraction.coordinateOracle.tool.implementation, 'Poppler', 'PDF oracle should pin the implementation');
-assertEqual(GERMAN_CASH_MONEY_MARKET_CHAIN.sourceExtraction.coordinateOracle.tool.version, '25.07.0', 'PDF oracle should pin the Poppler version');
+assertEqual(
+    GERMAN_CASH_MONEY_MARKET_CHAIN.sourceExtraction.coordinateOracle.tool.minimumCompatibleVersion,
+    '25.07.0',
+    'PDF oracle should pin the minimum compatible Poppler version'
+);
+assert(
+    GERMAN_CASH_MONEY_MARKET_CHAIN.sourceExtraction.coordinateOracle.tool.compatibilityRule.includes('greater_than_or_equal'),
+    'PDF oracle should accept compatible upgrades only with exact source-value agreement'
+);
 assertEqual(GERMAN_CASH_MONEY_MARKET_CHAIN.sourceExtraction.coordinateOracle.exactAgreementRequired, true, 'PDF and layout paths should require exact agreement');
 assertEqual(Object.hasOwn(GERMAN_CASH_MONEY_MARKET_CHAIN.sourceExtraction, 'visualVerification'), false, 'Machine evidence should not carry an unverifiable visual-review claim');
 console.log('✓ source identities and terms OK');
