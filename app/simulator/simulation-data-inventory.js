@@ -4,9 +4,10 @@ import {
     canonicalizeHistoricalContractValue,
     sha256Hex
 } from './historical-backtest-contract.js';
+import { GERMAN_DEMOGRAPHY_CARE_SURVIVOR_CONTRACT } from './german-demography-care-survivor-contract.js';
 
 export const SIMULATION_DATA_INVENTORY_SCHEMA_VERSION = 'SimulationDataInventoryV1';
-export const SIMULATION_DATA_INVENTORY_REVISION = '2026-08-01.4';
+export const SIMULATION_DATA_INVENTORY_REVISION = '2026-08-01.5';
 
 export const SIMULATION_DATA_EVIDENCE_CLASSES = Object.freeze([
     'official',
@@ -538,66 +539,108 @@ const STATIC_DATA = {
         id: 'mortality_table',
         category: 'demography',
         label: 'Annual mortality probabilities by age and gender',
-        evidenceClass: 'proxy',
+        evidenceClass: 'official',
         implementationLocations: [
-            'app/simulator/simulator-data.js:MORTALITY_TABLE',
+            'app/simulator/german-demography-care-survivor-contract.js:MORTALITY_TABLE',
             'app/simulator/mc-life-events.js'
         ],
         unit: 'annual_probability_ratio',
-        rawDataHash: unresolved(),
-        embeddedValueHash: resolved('f35acbc3388db53cf6df068998974d3a4b13260c7bc35be32be47e32bd3df275'),
-        source: unresolved(),
-        seriesIdentifier: unresolved(),
+        rawDataHash: resolved(GERMAN_DEMOGRAPHY_CARE_SURVIVOR_CONTRACT.sourceFiles.mortality.sha256),
+        embeddedValueHash: resolved(GERMAN_DEMOGRAPHY_CARE_SURVIVOR_CONTRACT.hashes.mortalityTableHash),
+        source: resolved('Destatis Statistischer Bericht Sterbetafeln 2023/2025 (EVAS 12621), Tabellen 12613-b01 und 12613-b02'),
+        seriesIdentifier: resolved('GermanDemographyCareSurvivorContractV1.mortality.table'),
         yearConvention: resolved('period_table_probability_applied_at_simulated_age'),
-        transformation: unresolved(),
-        license: unresolved(),
-        retrievedAt: unresolved(),
-        externalValidationStatus: 'unresolved'
+        transformation: resolved('Official male/female qx at attained age 18-100; legacy model tail 101-110; divers is the unweighted male/female qx mean. No cohort shift or future mortality improvement.'),
+        license: resolved('Data Licence Germany - attribution - version 2.0'),
+        retrievedAt: resolved('2026-08-01'),
+        contractValue: {
+            tableType: 'period',
+            officialPeriod: '2023/2025',
+            officialAgeRange: { startAge: 0, endAge: 100 },
+            runtimeAgeRange: { startAge: 18, endAge: 110 },
+            modelTailAgeRange: { startAge: 101, endAge: 110 },
+            cohortProjection: false,
+            futureMortalityImprovement: false
+        },
+        externalValidationStatus: 'not_validated'
     }),
     care_grade_taxonomy: staticEntry({
         id: 'care_grade_taxonomy',
         category: 'care',
         label: 'Supported care grades and labels',
-        evidenceClass: 'proxy',
+        evidenceClass: 'official',
         implementationLocations: [
-            'app/simulator/simulator-data.js:SUPPORTED_PFLEGE_GRADES',
-            'app/simulator/simulator-data.js:PFLEGE_GRADE_LABELS'
+            'app/simulator/german-demography-care-survivor-contract.js:SUPPORTED_PFLEGE_GRADES',
+            'app/simulator/german-demography-care-survivor-contract.js:PFLEGE_GRADE_LABELS'
         ],
         unit: 'ordinal_grade',
-        rawDataHash: unresolved(),
-        embeddedValueHash: resolved('82e9af7152342ce8db3d6212471fa5107d1f44bc72ae0cf1d9ece5f93bb12885'),
-        source: unresolved(),
-        seriesIdentifier: unresolved(),
-        license: unresolved(),
-        retrievedAt: unresolved(),
-        externalValidationStatus: 'unresolved'
+        rawDataHash: resolved(GERMAN_DEMOGRAPHY_CARE_SURVIVOR_CONTRACT.sourceFiles.care.sha256),
+        embeddedValueHash: resolved(GERMAN_DEMOGRAPHY_CARE_SURVIVOR_CONTRACT.hashes.careTaxonomyHash),
+        source: resolved('Destatis Pflegestatistik 2023, Pflegegrade 1-5'),
+        seriesIdentifier: resolved('GermanDemographyCareSurvivorContractV1.care.taxonomy'),
+        transformation: resolved('Official grade identifiers with simulator display labels.'),
+        license: resolved('Data Licence Germany - attribution - version 2.0'),
+        retrievedAt: resolved('2026-08-01'),
+        externalValidationStatus: 'not_validated'
+    }),
+    care_observed_prevalence: staticEntry({
+        id: 'care_observed_prevalence',
+        category: 'care',
+        label: 'Observed care prevalence by age and sex at year-end 2023',
+        evidenceClass: 'official',
+        implementationLocations: [
+            'app/simulator/german-demography-care-survivor-contract.js:care.officialObservation'
+        ],
+        unit: 'percent_of_population_at_reporting_date',
+        rawDataHash: resolved(GERMAN_DEMOGRAPHY_CARE_SURVIVOR_CONTRACT.sourceFiles.care.sha256),
+        embeddedValueHash: resolved(GERMAN_DEMOGRAPHY_CARE_SURVIVOR_CONTRACT.hashes.careObservationHash),
+        source: resolved('Destatis Pflegestatistik 2023, Tabellen 22421-01 und 22421-02'),
+        seriesIdentifier: resolved('GermanDemographyCareSurvivorContractV1.care.officialObservation'),
+        yearConvention: resolved('observed_stock_and_prevalence_at_2023_12_31'),
+        transformation: resolved('Validation reference only; explicitly prohibited as an annual entry or progression probability.'),
+        license: resolved('Data Licence Germany - attribution - version 2.0'),
+        retrievedAt: resolved('2026-08-01'),
+        contractValue: {
+            runtimeRole: 'validation_only_not_transition_probability',
+            referenceDate: '2023-12-31'
+        },
+        externalValidationStatus: 'not_validated'
     }),
     care_incidence_probabilities: staticEntry({
         id: 'care_incidence_probabilities',
         category: 'care',
         label: 'Age-bucketed annual care-entry probabilities by grade',
-        evidenceClass: 'estimated',
-        implementationLocations: ['app/simulator/simulator-data.js:PFLEGE_GRADE_PROBABILITIES'],
+        evidenceClass: 'model_assumption',
+        implementationLocations: ['app/simulator/german-demography-care-survivor-contract.js:PFLEGE_GRADE_PROBABILITIES'],
         unit: 'annual_probability_ratio',
-        rawDataHash: unresolved(),
-        embeddedValueHash: resolved('9625b37ee3eb7428569702ea0e91a7af7b78cd8b7ff3357204c6e5661f3028a1'),
-        source: unresolved(),
-        seriesIdentifier: unresolved(),
+        rawDataHash: notApplicable(),
+        embeddedValueHash: resolved(GERMAN_DEMOGRAPHY_CARE_SURVIVOR_CONTRACT.hashes.careEntryModelHash),
+        source: notApplicable(),
+        seriesIdentifier: resolved('GermanDemographyCareSurvivorContractV1.care.entryModel'),
         yearConvention: resolved('annual_entry_probability_at_simulated_age_bucket'),
-        transformation: resolved('Prevalence-to-incidence approximation using an assumed four-year average care duration and age-bucket smoothing.'),
-        license: unresolved(),
-        retrievedAt: unresolved(),
-        externalValidationStatus: 'unresolved'
+        transformation: resolved('Legacy effective annual entry hazards retained as an explicit model assumption; eligible initial grades are 1 and 2. No prevalence-to-incidence transformation.'),
+        license: notApplicable(),
+        retrievedAt: notApplicable(),
+        contractValue: {
+            eligibleInitialGrades: [1, 2],
+            minimumEntryAge: 65,
+            derivedFromObservedPrevalence: false
+        },
+        externalValidationStatus: 'not_validated'
     }),
     care_progression_probabilities: staticEntry({
         id: 'care_progression_probabilities',
         category: 'care',
         label: 'Annual care-grade progression probabilities',
         evidenceClass: 'model_assumption',
-        implementationLocations: ['app/simulator/simulator-data.js:PFLEGE_GRADE_PROGRESSION_PROBABILITIES'],
+        implementationLocations: ['app/simulator/german-demography-care-survivor-contract.js:PFLEGE_GRADE_PROGRESSION_PROBABILITIES'],
         unit: 'annual_probability_ratio',
-        embeddedValueHash: resolved('34c6e6fc39b311f911f6c4b7a0d0cb8c2ab248f18802a83ce42bc9b52a56c78d'),
+        embeddedValueHash: resolved(GERMAN_DEMOGRAPHY_CARE_SURVIVOR_CONTRACT.hashes.careProgressionModelHash),
         yearConvention: resolved('annual_transition_to_next_care_grade'),
+        transformation: resolved('Fixed annual one-grade progression probabilities; explicit simulator model assumption.'),
+        contractValue: {
+            derivedFromObservedPrevalence: false
+        },
         externalValidationStatus: 'not_validated'
     }),
     care_cost_presets: staticEntry({
@@ -622,15 +665,16 @@ const STATIC_DATA = {
             'app/simulator/simulator-input-pension.js:readWidowOptions'
         ],
         unit: 'percent_of_partner_pension',
-        embeddedValueHash: resolved('2123b369b84c6a1cc50adb1bf03edae136c71b10f8dc66e9fc6ca10d4f4dbc1a'),
-        contractValue: {
-            defaultMode: 'stop',
-            defaultPercent: 55,
-            percentMinimum: 0,
-            percentMaximum: 100,
-            percentStep: 5
-        },
-        externalValidationStatus: 'not_applicable'
+        source: resolved('Deutsche Rentenversicherung, Renten an Hinterbliebene (reference only)'),
+        seriesIdentifier: resolved('GermanDemographyCareSurvivorContractV1.survivor.runtimeContract'),
+        yearConvention: resolved('scenario_cash_flow_after_partner_death_subject_to configured marriage timing'),
+        transformation: resolved('User-selected percentage of the deceased partner simulated pension; no statutory eligibility or income-offset calculation.'),
+        license: notApplicable(),
+        retrievedAt: resolved('2026-08-01'),
+        rawDataHash: notApplicable(),
+        embeddedValueHash: resolved(GERMAN_DEMOGRAPHY_CARE_SURVIVOR_CONTRACT.hashes.survivorRuntimeContractHash),
+        contractValue: GERMAN_DEMOGRAPHY_CARE_SURVIVOR_CONTRACT.survivor.runtimeContract,
+        externalValidationStatus: 'not_validated'
     }),
     capital_income_tax_parameters: staticEntry({
         id: 'capital_income_tax_parameters',

@@ -381,7 +381,18 @@ Diese Grenze ist fachlich gewollt: Balance kennt derzeit keinen belastbaren aktu
 * `app/simulator/simulator-data.js` – Historische Datenprojektion mit
   generiertem `global_equity_research_index`, `inflation_de`, `zinssatz_de`,
   `lohn_de`, `gold_eur_perf` und `cape`, tief eingefrorenes
-  `HistoricalDataManifestV1`, Mortalitäts- und Stress-Presets.
+  `HistoricalDataManifestV1`, Re-Exports des
+  Demografie-/Pflege-/Hinterbliebenenvertrags und Stress-Presets.
+* `app/simulator/german-demography-care-survivor-contract.js` –
+  deterministisch erzeugter, tief eingefrorener Vertrag aus der
+  Destatis-Periodensterbetafel 2023/2025 und der Pflegestatistik 2023.
+  Amtliche `qx` fuer Mann/Frau 18-100, Modellrand 101-110, die
+  Modellableitung `divers`, amtliche Pflege-Bestandsquoten nur zur
+  Validierung sowie getrennte Pflegeeintritts-, Progressions- und
+  Dauermodelle sind maschinenlesbar. Der Hinterbliebenenblock dokumentiert
+  die vereinfachte Nutzer-Cashflow-Grenze. Build und schreibfreies Verify
+  laufen ueber `build:german-demography-data` beziehungsweise
+  `verify:german-demography-data`.
 * `app/simulator/historical-backtest-contract.js` – DOM-freier, im Produktbacktest aktivierter Manifest-/SHA-256-/`HistoricalYearRecordV1`-Contract. Validiert das Dataset einmal je Revision/Hash einschliesslich geordneter, eindeutiger und begrenzter Reihendiskontinuitaeten, liefert immutable Records und prueft Einzelpfad- bzw. Cohort-Batch-Perioden vor der Rechenschleife. Die aktive Zeitachse `realized_t_decision_t_minus_1_v1` verwendet realisierte Markt-/Makrowerte aus `t`; CAPE exportiert die Dezember-Beobachtung `t-1`, den As-of-Stand `t-1` und das Entscheidungsjahr `t` getrennt und wird ohne zweiten Lag konsumiert.
 * `app/simulator/simulation-data-inventory.js` – DOM-freier
   `SimulationDataInventoryV1`-Evidenzvertrag fuer alle sechs historischen
@@ -666,6 +677,10 @@ Jahreslogs führen Start, Nutzung, Zins, Ende, Zielwert, reale Zieldeckung, Ziel
 * `getCommonInputs()` bündelt sämtliche Rentenfelder inklusive gemeinsamer Indexierung, Hinterbliebenen-Optionen (Modus, Prozentsatz,
   Mindest-Ehejahre) und Partner:innen-spezifischer Parameter. Ältere Felder wie `r2Brutto` werden automatisch migriert, Pflege-
   Konfigurationen parallel gelesen und als strukturierte Inputs zurückgegeben.【F:simulator-portfolio.js†L57-L174】
+* Der UI-Default `percent`/55 ist nur eine frei konfigurierbare
+  Szenarioannahme. Anspruchsvoraussetzungen, kleine/grosse
+  Witwen-/Witwerrente, Einkommensanrechnung, Sterbevierteljahr,
+  Wiederheirat und Sonderregeln werden nicht gesetzlich berechnet.
 * `computeRentAdjRate()` und `computePensionNext()` sorgen dafür, dass beide Rentenstränge dieselbe Anpassungslogik (fix, Lohn,
   CPI) nutzen und dass Erstjahre sauber von Folgejahren getrennt bleiben.【F:simulator-portfolio.js†L285-L332】
   - bis zu 16 charakteristische Szenarien: Vermögens-Perzentile (Worst, P5-P95, Best), Pflege-Extremfälle (längste Dauer, hoechster realer Mehrbedarf, fruehester Eintritt P1 und P2), Risiko-Szenarien (längste Lebensdauer, maximale Kürzung)

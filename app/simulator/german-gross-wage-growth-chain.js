@@ -70,7 +70,14 @@ export const GERMAN_GROSS_WAGE_GROWTH_CHAIN = deepFreeze({
     {
       "year": 1945,
       "type": "wartime_market_observation_break",
-      "treatment": "The JST level-derived rate is retained numerically but classified as estimated; it is not claimed as an observed German market-wage change."
+      "treatment": "The JST level-derived rate is retained numerically but classified as estimated; it is not claimed as an observed German market-wage change.",
+      "retentionRationale": "The selected treatment preserves the internally consistent JST level-change construction through 1946 and avoids an undocumented one-off bridge. It is a continuity choice, not evidence that a market wage was observable.",
+      "sensitivityReference": {
+        "selectedJstLevelDerivedPct": 22.687439143135336,
+        "neutralBridgeAlternativePct": 0,
+        "oneYearPensionEscalationDifferencePp": 22.687439143135336,
+        "requiredInterpretation": "Model assumption requiring a separate zero-growth sensitivity, not an official wage observation."
+      }
     },
     {
       "year": 1947,
@@ -177,7 +184,14 @@ export const GERMAN_GROSS_WAGE_GROWTH_CHAIN = deepFreeze({
       {
         "year": 1945,
         "type": "wartime_market_observation_break",
-        "treatment": "The JST level-derived rate is retained numerically but classified as estimated; it is not claimed as an observed German market-wage change."
+        "treatment": "The JST level-derived rate is retained numerically but classified as estimated; it is not claimed as an observed German market-wage change.",
+        "retentionRationale": "The selected treatment preserves the internally consistent JST level-change construction through 1946 and avoids an undocumented one-off bridge. It is a continuity choice, not evidence that a market wage was observable.",
+        "sensitivityReference": {
+          "selectedJstLevelDerivedPct": 22.687439143135336,
+          "neutralBridgeAlternativePct": 0,
+          "oneYearPensionEscalationDifferencePp": 22.687439143135336,
+          "requiredInterpretation": "Model assumption requiring a separate zero-growth sensitivity, not an official wage observation."
+        }
       },
       {
         "year": 1947,
@@ -205,9 +219,9 @@ export const GERMAN_GROSS_WAGE_GROWTH_CHAIN = deepFreeze({
   },
   "hashes": {
     "rawDataHash": "cfd5c598a8bc846a96966fa8ff7388d80c30f3ada39edbfe90d39f234eef9d9b",
-    "methodHash": "87b7ef615f374dbbc4620be62b6ff46bfa3844e6019324905396a37009704580",
+    "methodHash": "a70edffd33ac27b336932d0b82cae19322dbb92fc755cc20e68d059a49a22357",
     "annualGrowthHash": "e10e581f6994e07ed0a943b3716dd8fd5dea7b8b272d47a546466af8701a3057",
-    "observationContractHash": "1fbc710fc344fe25af7e4293c8d0d08cf80ac67dd6309d7d68415cc42dc674e9"
+    "observationContractHash": "893ff2336573d6cefa1993aaa63fbb9a3b681afdc901ebfd155b931d84b15e98"
   },
   "observationsByYear": {
     "1925": {
@@ -474,6 +488,12 @@ export const GERMAN_GROSS_WAGE_GROWTH_CHAIN = deepFreeze({
       "valuePct": 22.687439143135336,
       "sourceYear": 1945,
       "evidenceClass": "estimated",
+      "modelTreatment": {
+        "selectedTreatment": "retain_level_derived_jst_value",
+        "rationale": "Retaining the value keeps the pinned JST level-change construction internally consistent through its declared 1946 endpoint and avoids inserting an undocumented ad-hoc bridge. Because wartime market observation is not established, the value remains estimated and must be sensitivity-tested against a neutral zero-growth bridge.",
+        "neutralBridgeAlternativePct": 0,
+        "oneYearPensionEscalationDifferencePp": 22.687439143135336
+      },
       "sourceObservation": {
         "priorYear": 1944,
         "priorNominalWageLevel": 4.664102536900737,

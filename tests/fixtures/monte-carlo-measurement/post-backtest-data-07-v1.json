@@ -1,0 +1,353 @@
+{
+  "schemaVersion": "DemographyCareSurvivorRuntimeMeasurementV1",
+  "snapshotId": "post-backtest-data-07-v1",
+  "sourceReference": "post-backtest-data-06-v2",
+  "sliceId": "BACKTEST-DATA-07",
+  "reviewStatus": "pending",
+  "capturedAtUtc": "2026-08-01T16:56:32.1716467Z",
+  "captureEvidence": {
+    "sourceCommit": "02f39f93946234ef000acb7ba9e66f7e912092ca",
+    "sourceReconstruction": "git archive of the immutable Slice-06 basis commit, executed with the same Node runtime and the same fixed profile as the target",
+    "targetWorkingTree": "uncommitted Slice-07 candidate on codex/suite-datenintegritaet-hardening",
+    "comparisonContract": "same seed, inputs, run count, duration, annual data, EngineAPI and Sweep combinations; only the Slice-07 demography/care/survivor runtime state differs",
+    "baselineMutation": "none"
+  },
+  "effectBoundary": {
+    "mortalityRuntimeEffectMeasured": true,
+    "careRuntimeActive": true,
+    "partnerRuntimeActive": true,
+    "survivorBenefitRuntimeActive": true,
+    "sweepRuntimeEffectMeasured": true,
+    "careModelParameterChange": false,
+    "survivorFormulaChange": false,
+    "interpretation": "Numeric deltas are caused by the mortality-table replacement. Care and survivor paths are active in the profile and therefore expose downstream duration and cash-flow effects, but their model parameters and formulas are unchanged in Slice 07."
+  },
+  "changedLeafCount": 44,
+  "changedLeafPathsHash": "31273caa21a9cf63cf289567c58eedaaab8bad47b166e8b724977a4f63e9efc4",
+  "numericDeltaCount": 40,
+  "numericDeltasHash": "3f2f2fd5db5962d43ed45be56c7694d62f333082c2b93856ce3de8bac46c0563",
+  "effectSummary": {
+    "monteCarloLifespanP10Years": -2,
+    "monteCarloLifespanP50Years": -1,
+    "monteCarloLifespanP90Years": -1,
+    "monteCarloMedianEndWealthNominalEur": -105797.440633,
+    "monteCarloAnyCareRunCount": -52,
+    "sweepTargetEq50MedianEndWealthNominalEur": -105797.440633,
+    "sweepTargetEq50WidowP1ActiveYears": -598,
+    "sweepTargetEq50WidowP2ActiveYears": 1933
+  },
+  "sourceMeasurement": {
+    "runtime": {
+      "node": "v25.2.1",
+      "platform": "win32",
+      "architecture": "x64"
+    },
+    "profile": {
+      "runs": 2048,
+      "durationYears": 40,
+      "seed": 20260801,
+      "startAgeP1": 65,
+      "startAgeP2": 62,
+      "careActive": true,
+      "partnerActive": true,
+      "widowMode": "percent",
+      "widowPercent": 0.55,
+      "sweepCombinationCount": 2,
+      "inputHash": "fadc4b7207303a4ad266ffd36c9f91339da67d9ee110a5de3c338c7e28a85ffa"
+    },
+    "monteCarlo": {
+      "outcomeCounts": {
+        "ruin": 2,
+        "allDead": 2045,
+        "horizonExhausted": 1,
+        "technicalError": 0
+      },
+      "lifespanYears": {
+        "p10": 18,
+        "p50": 27,
+        "p90": 33
+      },
+      "finalWealthNominalEur": {
+        "p10": 1539913.706919,
+        "p50": 3488010.239711,
+        "p90": 7595164.47053
+      },
+      "care": {
+        "anyCareRunCount": 1777,
+        "p1EntryRunCount": 1290,
+        "p2EntryRunCount": 1352,
+        "p1CareYearsTotal": 13208,
+        "p2CareYearsTotal": 15333,
+        "bothCareYearsTotal": 4086,
+        "additionalNeedNominalEur": {
+          "p10": 0,
+          "p50": 98307.172999,
+          "p90": 338525.973385
+        }
+      },
+      "modelContract": null,
+      "pathEvidenceHash": "b35d55e7d29c7a272c90c08a1eb31bb5a88d48fc0a81d5ddbd1b09451a34cbe2"
+    },
+    "sweep": [
+      {
+        "comboIdx": 0,
+        "params": {
+          "runwayMin": 24,
+          "runwayTarget": 36,
+          "targetEq": 50,
+          "rebalBand": 5,
+          "maxSkimPct": 10,
+          "maxBearRefillPct": 5,
+          "goldTargetPct": 0,
+          "horizonYears": 35,
+          "survivalQuantile": 0.85,
+          "goGoMultiplier": 1.1
+        },
+        "metrics": {
+          "successProbFloor": 99.902344,
+          "p10EndWealth": 1539913.706919,
+          "medianEndWealth": 3488010.239711,
+          "worst5Drawdown": 55.867705,
+          "minRunwayObserved": 5.585484
+        },
+        "household": {
+          "p1DeathEvents": 2047,
+          "p2DeathEvents": 2045,
+          "allDeadRuns": 2045,
+          "p1CareActiveYears": 11919,
+          "p2CareActiveYears": 13984,
+          "bothCareActiveYears": 3468,
+          "widowP1ActiveYears": 4908,
+          "widowP2ActiveYears": 13173,
+          "totalCareFloorNominalEur": 289668266.628553,
+          "minimumTemporaryFlexFactor": 0.45
+        },
+        "horizon": {
+          "resolutionCount": 50921,
+          "invalidResolutionCount": 0,
+          "minimumYears": 3,
+          "maximumYears": 34
+        },
+        "evidenceHash": "46db846dc0f6e80b4329c972fba5751b632a0d27a4df1fd3930dc4820ae9a1f8"
+      },
+      {
+        "comboIdx": 1,
+        "params": {
+          "runwayMin": 24,
+          "runwayTarget": 36,
+          "targetEq": 70,
+          "rebalBand": 5,
+          "maxSkimPct": 10,
+          "maxBearRefillPct": 5,
+          "goldTargetPct": 0,
+          "horizonYears": 35,
+          "survivalQuantile": 0.85,
+          "goGoMultiplier": 1.1
+        },
+        "metrics": {
+          "successProbFloor": 99.902344,
+          "p10EndWealth": 1558576.825002,
+          "medianEndWealth": 3464672.599367,
+          "worst5Drawdown": 55.028732,
+          "minRunwayObserved": 5.805399
+        },
+        "household": {
+          "p1DeathEvents": 2047,
+          "p2DeathEvents": 2045,
+          "allDeadRuns": 2045,
+          "p1CareActiveYears": 11918,
+          "p2CareActiveYears": 13983,
+          "bothCareActiveYears": 3467,
+          "widowP1ActiveYears": 4908,
+          "widowP2ActiveYears": 13173,
+          "totalCareFloorNominalEur": 289639948.098887,
+          "minimumTemporaryFlexFactor": 0.45
+        },
+        "horizon": {
+          "resolutionCount": 50920,
+          "invalidResolutionCount": 0,
+          "minimumYears": 3,
+          "maximumYears": 34
+        },
+        "evidenceHash": "a5dbf2890f4520138d8be6b05138fee5fff62f6e8c6b3f935217e9b196974aeb"
+      }
+    ]
+  },
+  "targetMeasurement": {
+    "runtime": {
+      "node": "v25.2.1",
+      "platform": "win32",
+      "architecture": "x64"
+    },
+    "profile": {
+      "runs": 2048,
+      "durationYears": 40,
+      "seed": 20260801,
+      "startAgeP1": 65,
+      "startAgeP2": 62,
+      "careActive": true,
+      "partnerActive": true,
+      "widowMode": "percent",
+      "widowPercent": 0.55,
+      "sweepCombinationCount": 2,
+      "inputHash": "fadc4b7207303a4ad266ffd36c9f91339da67d9ee110a5de3c338c7e28a85ffa"
+    },
+    "monteCarlo": {
+      "outcomeCounts": {
+        "ruin": 2,
+        "allDead": 2045,
+        "horizonExhausted": 1,
+        "technicalError": 0
+      },
+      "lifespanYears": {
+        "p10": 16,
+        "p50": 26,
+        "p90": 32
+      },
+      "finalWealthNominalEur": {
+        "p10": 1497557.307181,
+        "p50": 3382212.799078,
+        "p90": 7530694.254775
+      },
+      "care": {
+        "anyCareRunCount": 1725,
+        "p1EntryRunCount": 1159,
+        "p2EntryRunCount": 1315,
+        "p1CareYearsTotal": 10998,
+        "p2CareYearsTotal": 14576,
+        "bothCareYearsTotal": 3208,
+        "additionalNeedNominalEur": {
+          "p10": 0,
+          "p50": 84193.536697,
+          "p90": 306424.653501
+        }
+      },
+      "modelContract": {
+        "schemaVersion": "DemographyCareSurvivorDiagnosticsV1",
+        "contractSchemaVersion": "GermanDemographyCareSurvivorContractV1",
+        "contractRevision": "2026-08-01.1",
+        "hashes": {
+          "rawDataHash": "a21bab59269970d29f1e15ad49b64e82a74348692cc38759e4339e1be1205fc3",
+          "mortalityTableHash": "88c1000eac950016a65e7408127d5c1256683946933b710a0c28f672fde5f232",
+          "careObservationHash": "cf9a310beec3c7d94c65f63f18153eb8718dc5cc87fa21c11eff3e591109a8ee",
+          "careEntryModelHash": "8155dc6bb9a7798bab7ead47fcbb3075baabd00b2d892d90c64e6512fe1280e0",
+          "careProgressionModelHash": "34c6e6fc39b311f911f6c4b7a0d0cb8c2ab248f18802a83ce42bc9b52a56c78d",
+          "careTaxonomyHash": "82e9af7152342ce8db3d6212471fa5107d1f44bc72ae0cf1d9ece5f93bb12885",
+          "survivorRuntimeContractHash": "73e6b04c76698347cfbffeb2e8b3037d04875731850b0fd2e75052df67aacff9"
+        },
+        "mortality": {
+          "tableType": "period",
+          "period": "2023/2025",
+          "cohortProjection": false,
+          "futureMortalityImprovement": false,
+          "officialAgeRange": {
+            "startAge": 0,
+            "endAge": 100
+          },
+          "runtimeAgeRange": {
+            "startAge": 18,
+            "endAge": 110
+          },
+          "tailEvidenceClass": "model_assumption"
+        },
+        "care": {
+          "observedPrevalenceRuntimeRole": "validation_only_not_transition_probability",
+          "entryEvidenceClass": "model_assumption",
+          "progressionEvidenceClass": "model_assumption",
+          "durationEvidenceClass": "user_input_and_model_assumption"
+        },
+        "survivor": {
+          "evidenceClass": "user_input_with_official_reference",
+          "defaultMode": "percent",
+          "defaultPercent": 55,
+          "interpretation": "Scenario cash-flow assumption only; not a statutory entitlement calculation."
+        }
+      },
+      "pathEvidenceHash": "7ef3da54e07b9276ac9a646b3d0ef2a34b58b668b758056df233bbaacbf27257"
+    },
+    "sweep": [
+      {
+        "comboIdx": 0,
+        "params": {
+          "runwayMin": 24,
+          "runwayTarget": 36,
+          "targetEq": 50,
+          "rebalBand": 5,
+          "maxSkimPct": 10,
+          "maxBearRefillPct": 5,
+          "goldTargetPct": 0,
+          "horizonYears": 35,
+          "survivalQuantile": 0.85,
+          "goGoMultiplier": 1.1
+        },
+        "metrics": {
+          "successProbFloor": 99.902344,
+          "p10EndWealth": 1497557.307181,
+          "medianEndWealth": 3382212.799078,
+          "worst5Drawdown": 54.834824,
+          "minRunwayObserved": 4.329615
+        },
+        "household": {
+          "p1DeathEvents": 2047,
+          "p2DeathEvents": 2045,
+          "allDeadRuns": 2045,
+          "p1CareActiveYears": 9840,
+          "p2CareActiveYears": 13264,
+          "bothCareActiveYears": 2695,
+          "widowP1ActiveYears": 4310,
+          "widowP2ActiveYears": 15106,
+          "totalCareFloorNominalEur": 256337611.802068,
+          "minimumTemporaryFlexFactor": 0.45
+        },
+        "horizon": {
+          "resolutionCount": 49123,
+          "invalidResolutionCount": 0,
+          "minimumYears": 4,
+          "maximumYears": 33
+        },
+        "evidenceHash": "03063d54c2448b7953e6da9145b1c100405564468c68ea359051ed1c4015d328"
+      },
+      {
+        "comboIdx": 1,
+        "params": {
+          "runwayMin": 24,
+          "runwayTarget": 36,
+          "targetEq": 70,
+          "rebalBand": 5,
+          "maxSkimPct": 10,
+          "maxBearRefillPct": 5,
+          "goldTargetPct": 0,
+          "horizonYears": 35,
+          "survivalQuantile": 0.85,
+          "goGoMultiplier": 1.1
+        },
+        "metrics": {
+          "successProbFloor": 99.902344,
+          "p10EndWealth": 1499887.666096,
+          "medianEndWealth": 3377037.782165,
+          "worst5Drawdown": 54.227901,
+          "minRunwayObserved": 3.996264
+        },
+        "household": {
+          "p1DeathEvents": 2047,
+          "p2DeathEvents": 2045,
+          "allDeadRuns": 2045,
+          "p1CareActiveYears": 9841,
+          "p2CareActiveYears": 13265,
+          "bothCareActiveYears": 2696,
+          "widowP1ActiveYears": 4310,
+          "widowP2ActiveYears": 15106,
+          "totalCareFloorNominalEur": 256367361.125445,
+          "minimumTemporaryFlexFactor": 0.45
+        },
+        "horizon": {
+          "resolutionCount": 49124,
+          "invalidResolutionCount": 0,
+          "minimumYears": 4,
+          "maximumYears": 33
+        },
+        "evidenceHash": "10961d05625eab1062337ec3498f7dd264651c09f10a9a927cea5ba5d84d85e0"
+      }
+    ]
+  }
+}

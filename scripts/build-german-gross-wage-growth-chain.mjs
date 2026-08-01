@@ -263,6 +263,14 @@ function buildArtifact() {
                 valuePct: annualChangePct,
                 sourceYear: year,
                 evidenceClass: year === 1945 ? 'estimated' : 'proxy',
+                ...(year === 1945 ? {
+                    modelTreatment: {
+                        selectedTreatment: 'retain_level_derived_jst_value',
+                        rationale: 'Retaining the value keeps the pinned JST level-change construction internally consistent through its declared 1946 endpoint and avoids inserting an undocumented ad-hoc bridge. Because wartime market observation is not established, the value remains estimated and must be sensitivity-tested against a neutral zero-growth bridge.',
+                        neutralBridgeAlternativePct: 0,
+                        oneYearPensionEscalationDifferencePp: annualChangePct
+                    }
+                } : {}),
                 sourceObservation: {
                     priorYear: year - 1,
                     priorNominalWageLevel: priorWageLevel,
@@ -308,7 +316,14 @@ function buildArtifact() {
             {
                 year: 1945,
                 type: 'wartime_market_observation_break',
-                treatment: 'The JST level-derived rate is retained numerically but classified as estimated; it is not claimed as an observed German market-wage change.'
+                treatment: 'The JST level-derived rate is retained numerically but classified as estimated; it is not claimed as an observed German market-wage change.',
+                retentionRationale: 'The selected treatment preserves the internally consistent JST level-change construction through 1946 and avoids an undocumented one-off bridge. It is a continuity choice, not evidence that a market wage was observable.',
+                sensitivityReference: {
+                    selectedJstLevelDerivedPct: annualGrowthPct[1945],
+                    neutralBridgeAlternativePct: 0,
+                    oneYearPensionEscalationDifferencePp: annualGrowthPct[1945],
+                    requiredInterpretation: 'Model assumption requiring a separate zero-growth sensitivity, not an official wage observation.'
+                }
             },
             {
                 year: 1947,

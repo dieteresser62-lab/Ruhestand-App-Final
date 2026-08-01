@@ -17,6 +17,8 @@
     "verify:us-shiller-cape-data": "node scripts/build-us-shiller-cape-chain.mjs --verify-only",
     "build:german-gross-wage-data": "node scripts/build-german-gross-wage-growth-chain.mjs",
     "verify:german-gross-wage-data": "node scripts/build-german-gross-wage-growth-chain.mjs --verify-only",
+    "build:german-demography-data": "node scripts/build-german-demography-care-survivor-contract.mjs",
+    "verify:german-demography-data": "node scripts/build-german-demography-care-survivor-contract.mjs --verify-only",
     "verify:poppler-toolchain": "node scripts/check-poppler-toolchain.mjs",
     "build:engine": "node build-engine.mjs",
     "build:engine:strict": "node -e \"process.env.ENGINE_BUILD_STRICT='1'; import('./build-engine.mjs')\"",

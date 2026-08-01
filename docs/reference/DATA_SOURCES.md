@@ -317,6 +317,16 @@ separately marks 1925 as the chain-start normalization, 1945 as an estimated
 wartime/post-war bridge without a market-wage observation, 1947 as the
 JST-to-Destatis source seam and 1948 as currency-reform context. The 1946
 value remains the last JST research-proxy change before that source seam.
+The retained 1945 level-derived value is `+22.687439%`. It is selected to keep
+the pinned JST level-change construction internally consistent through 1946
+instead of inserting an undocumented one-off bridge. This is a continuity
+model choice, not evidence of an observable wartime market wage. The
+machine-readable contract therefore classifies it `estimated`, records a
+neutral 0-percent bridge as the required sensitivity reference and exposes the
+full `22.687439`-percentage-point one-year pension-escalation difference.
+The lohn-indexed 1944-1950 golden case crosses the 1946/1947 seam and freezes
+the rule that the published 1947 change is used directly, without a
+cross-source level ratio.
 The runtime use remains a broad pension-escalation proxy: it is not the
 historical statutory German pension-adjustment series. The combined primary-
 input hash is
@@ -344,6 +354,67 @@ the generated 101-signal hash is
 `d1101958fed64dadf8fba76e9e4e92c8d24e86bd3d21accc42cdb60c247a835f`.
 No explicit open redistribution licence was located for the public publisher
 download; the publisher/Yale disclaimer and this limitation remain explicit.
+
+## Demography, care and survivor contract
+
+The generated and deeply frozen
+`app/simulator/german-demography-care-survivor-contract.js` is reconstructed
+from the pinned originals under
+`data/static/german-demography-care-survivor-contract/`. Rebuild it with
+`npm run build:german-demography-data` and verify the byte-identical,
+read-only reconstruction with `npm run verify:german-demography-data`.
+
+Mortality uses the Destatis **Statistischer Bericht Sterbetafeln 2023/2025**
+(EVAS 12621), tables `12613-b01` and `12613-b02`, for Germany. This is the
+exact machine-readable source name; it is not the separately published
+`Allgemeine Sterbetafel`.
+Official male and female annual death probabilities `qx` are used for attained
+runtime ages 18-100. This is a period observation, not a cohort forecast; no
+future mortality improvement is added. The official source ends at age 100,
+so ages 101-110 retain the former simulator tail as an explicit
+`model_assumption`, with age 110 terminal at probability 1. The runtime
+`divers` table is the unweighted mean of male and female `qx`, not an official
+third Destatis sex table. The mortality source SHA-256 is
+`fbc46083d581e5978c679600875164bcc5af0565a9eb33c57bf33d44ca87aadc`;
+the complete runtime-table hash is
+`88c1000eac950016a65e7408127d5c1256683946933b710a0c28f672fde5f232`.
+
+Care reference data comes from the Destatis care statistics at
+31 December 2023. The contract retains observed stock counts, grade shares and
+age-/sex-specific prevalence for validation only. A prevalence is a reporting-
+date stock ratio and is never divided by an assumed duration or otherwise used
+as an individual annual entry/progression probability. The runtime entry
+hazards for initial grades 1 and 2 and the one-grade progression probabilities
+are separate `model_assumption` objects. Chronic duration continues until
+simulated death; acute duration is a user-range draw with UI defaults 5-10
+years. The care source SHA-256 is
+`a8088d8e95964c5ffade848b9f303d000dc499519512f66f92ee6b8d60aa4280`;
+the observed-reference hash is
+`cf9a310beec3c7d94c65f63f18153eb8718dc5cc87fa21c11eff3e591109a8ee`.
+
+The survivor contract uses the Deutsche Rentenversicherung page
+[Renten an Hinterbliebene](https://www.deutsche-rentenversicherung.de/DRV/DE/Rente/Allgemeine-Informationen/Rentenarten-und-Leistungen/Renten-an-Hinterbliebene/renten-an-hinterbliebene_node.html)
+as a reference for the 55-percent orientation. Runtime behavior remains a
+user-controlled scenario cash flow: percentage or stop, marriage offset and
+minimum marriage duration. It does not calculate statutory eligibility, small
+versus large widow/widower pension, income offset, child/disability/age or
+legacy-law exceptions, death-quarter rules or remarriage settlement.
+The UI-selected default is `percent`/55; the previous inventory claim
+`defaultMode=stop` was incorrect and is repaired.
+
+Both Destatis workbooks use Data Licence Germany – attribution – Version 2.0.
+All data contracts remain `not_validated` until external review; the hashes
+prove reconstruction and identity, not professional suitability.
+
+The pending runtime measurement `post-backtest-data-07-v1` compares the
+immutable Slice-06 basis commit with the Slice-07 candidate under the same
+Node runtime, fixed seed, profile and annual data. It covers 2,048 Monte Carlo
+runs over 40 years and two Sweep combinations with care, both persons and the
+55-percent survivor cash flow active. The fixture stores 40 numeric deltas and
+their hashes. These deltas isolate the mortality-table replacement; care and
+survivor paths expose downstream duration and cash-flow effects, but their
+parameters and formulas did not change in Slice 07. The measurement remains
+`pending` and is not an external validation.
 
 ### Manifest status terms
 

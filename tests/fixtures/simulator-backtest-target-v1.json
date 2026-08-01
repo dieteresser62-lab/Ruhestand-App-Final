@@ -508,8 +508,8 @@
       "revision": "slice-05-effective-cape-reference"
     },
     "canonicalRowsHash": {
-      "after": "aa1c1f9055f2bf58cab6ecf2ad8d0592f8e6165036f3f69896a20d062677e960",
-      "before": "954696f10bb67502318a0b686b69da655694c3760d619e6b49585fcc7a1af59a",
+      "after": "5e9dc4d4649f522491236a88bce02d7c444630edfdeb56771846a880fac50cd4",
+      "before": "f12164bfa97f2e9d1ab49b2e1e85e055540afd777d4ba452472211a101cefe28",
       "changed": true
     },
     "cause": "cape_chain_with_dynamic_flex_enabled_default_legacy_step",
@@ -520,9 +520,9 @@
         "delta": 0
       },
       "maxDrawdownPct": {
-        "after": 6.155115,
-        "before": 6.168737,
-        "delta": -0.013622
+        "after": 6.167425,
+        "before": 6.183847,
+        "delta": -0.016422
       },
       "maxReductionStreak": {
         "after": 8,
@@ -530,24 +530,24 @@
         "delta": 0
       },
       "minRunwayCoveragePct": {
-        "after": 72.719865,
-        "before": 62.235564,
-        "delta": 10.484301
+        "after": 68.979716,
+        "before": 59.691743,
+        "delta": 9.287973
       },
       "summaryEndWealth": {
-        "after": 2783336.86,
-        "before": 2726687.53,
-        "delta": 56649.33
+        "after": 2764111.02,
+        "before": 2739627.94,
+        "delta": 24483.08
       },
       "totalTax": {
-        "after": 95006.65,
-        "before": 95126.84,
-        "delta": -120.19
+        "after": 96130.66,
+        "before": 99585.72,
+        "delta": -3455.06
       },
       "totalWithdrawal": {
-        "after": 771000,
-        "before": 801000,
-        "delta": -30000
+        "after": 774000,
+        "before": 777000,
+        "delta": -3000
       },
       "yearsWithReductionAtLeast10Pct": {
         "after": 8,
@@ -2632,7 +2632,7 @@
     },
     {
       "alerts": [],
-      "canonicalRowsHash": "aa1c1f9055f2bf58cab6ecf2ad8d0592f8e6165036f3f69896a20d062677e960",
+      "canonicalRowsHash": "5e9dc4d4649f522491236a88bce02d7c444630edfdeb56771846a880fac50cd4",
       "expectedRowCount": 8,
       "id": "dynamic_flex_cape_legacy_step_2018_2025",
       "inputHash": "954ba69ca385f791384a1bd4e807e41a2a239628c95c70403f3395377123e47f",
@@ -2788,16 +2788,16 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 1992581.13,
-            "reductionPct": 13.85157,
+            "portfolioTotalEnd": 1989591.93,
+            "reductionPct": 15.781355,
             "regime": "peak_stable",
             "tax": 8094.31,
-            "withdrawal": 87000
+            "withdrawal": 90000
           },
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 1.8,
-            "liquiditaet": 124456.03,
+            "liquiditaet": 121466.83,
             "vpwFallbackHint": "ok",
             "wertAktien": 1868125.1,
             "wertGold": 0
@@ -2814,8 +2814,8 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 2205919.36,
-            "reductionPct": 26.892885,
+            "portfolioTotalEnd": 2202941.82,
+            "reductionPct": 29.034039,
             "regime": "peak_hot",
             "tax": 23475.99,
             "withdrawal": 93000
@@ -2823,7 +2823,7 @@
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 1.4,
-            "liquiditaet": 381486.41,
+            "liquiditaet": 378508.87,
             "vpwFallbackHint": "ok",
             "wertAktien": 1824432.94,
             "wertGold": 0
@@ -2840,18 +2840,18 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 2680541.52,
-            "reductionPct": 19.345392,
+            "portfolioTotalEnd": 2664139.19,
+            "reductionPct": 22.451141,
             "regime": "peak_hot",
-            "tax": 37285.34,
+            "tax": 37354.63,
             "withdrawal": 123000
           },
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 2.2,
-            "liquiditaet": 498527.21,
+            "liquiditaet": 515419.65,
             "vpwFallbackHint": "ok",
-            "wertAktien": 2182014.31,
+            "wertAktien": 2148719.54,
             "wertGold": 0
           }
         },
@@ -2866,8 +2866,8 @@
             "healthBucketEnd": 0,
             "healthBucketTargetGap": 0,
             "portfolioFlowDelta": 0,
-            "portfolioTotalEnd": 2783336.86,
-            "reductionPct": 31.940833,
+            "portfolioTotalEnd": 2764111.02,
+            "reductionPct": 34.666796,
             "regime": "peak_stable",
             "tax": 0,
             "withdrawal": 114000
@@ -2875,31 +2875,304 @@
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 2.2,
-            "liquiditaet": 357146.9,
+            "liquiditaet": 374407.6,
             "vpwFallbackHint": "ok",
-            "wertAktien": 2426189.96,
+            "wertAktien": 2389703.43,
             "wertGold": 0
           }
         }
       ],
-      "summaryText": "Startjahr 2018 Endjahr 2025 Outcome Vollständig Angeforderte Jahre 8 Wirtschaftlich ausgewertete Jahre 8 Jahreszeilen 8 Startvermögen 2.020.000,00 € Endvermögen 2.783.336,86 € Gesamte Entnahmen 771.000,00 € Max. Kürzungsdauer (≥ 10 %) 8 Jahre Jahre mit Kürzung (≥ 10 %) 8 von 8 Gezahlte Steuern 95.006,65 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 €",
+      "summaryText": "Startjahr 2018 Endjahr 2025 Outcome Vollständig Angeforderte Jahre 8 Wirtschaftlich ausgewertete Jahre 8 Jahreszeilen 8 Startvermögen 2.020.000,00 € Endvermögen 2.764.111,02 € Gesamte Entnahmen 774.000,00 € Max. Kürzungsdauer (≥ 10 %) 8 Jahre Jahre mit Kürzung (≥ 10 %) 8 von 8 Gezahlte Steuern 96.130,66 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 €",
       "uiStatus": {
         "code": "BACKTEST_COMPLETED",
         "kind": "completed",
         "text": "Backtest vollständig abgeschlossen Code: BACKTEST_COMPLETED Ursache: 8 von 8 angeforderten Jahren wurden wirtschaftlich ausgewertet. Nächster Schritt: Prüfen Sie Summary, Warnhinweise, Jahresprotokoll und Raw-Export gemeinsam."
       },
       "values": {
-        "lastRowPortfolioTotalEnd": 2783336.86,
-        "lastWrapperPortfolio": 2783336.86,
+        "lastRowPortfolioTotalEnd": 2764111.02,
+        "lastWrapperPortfolio": 2764111.02,
         "maxAbsolutePortfolioFlowDelta": 0,
-        "maxDrawdownPct": 6.155115,
+        "maxDrawdownPct": 6.167425,
         "maxReductionStreak": 8,
-        "minRunwayCoveragePct": 72.719865,
+        "minRunwayCoveragePct": 68.979716,
         "startWealth": 2000000,
-        "summaryEndWealth": 2783336.86,
-        "totalTax": 95006.65,
-        "totalWithdrawal": 771000,
+        "summaryEndWealth": 2764111.02,
+        "totalTax": 96130.66,
+        "totalWithdrawal": 774000,
         "yearsWithReductionAtLeast10Pct": 8
+      }
+    },
+    {
+      "alerts": [],
+      "canonicalRowsHash": "476949789a6e0ad13ae630b57125e60cd23cd7cba91fed2a3ed9bec93fbace24",
+      "expectedRowCount": 7,
+      "id": "wage_indexed_pension_source_seam_1944_1950",
+      "inputHash": "b331c0fcdee24b34be19adcfdb1102ee8b1209f57c6f49c32b20cc9faf9e270a",
+      "inputs": {
+        "accumulationPhase": {
+          "durationYears": 0,
+          "enabled": false,
+          "sparrate": 0,
+          "sparrateIndexing": "0"
+        },
+        "capeRatio": 20,
+        "decumulation": {
+          "bondRefillThreshold": 1.5,
+          "bondTargetFactor": 2,
+          "drawdownTrigger": 20,
+          "mode": "standard"
+        },
+        "depotwertAlt": 2000000,
+        "detailledTranches": null,
+        "dynamicFlex": false,
+        "einstandAlt": 1600000,
+        "flexBudgetAnnual": 0,
+        "flexBudgetRecharge": 0,
+        "flexBudgetYears": 0,
+        "geldmarktEtf": 0,
+        "geschlecht": "m",
+        "goGoActive": false,
+        "goGoMultiplier": 1,
+        "goldAktiv": false,
+        "goldFloorProzent": 0,
+        "goldSteuerfrei": false,
+        "goldZielProzent": 0,
+        "horizonMethod": "survival_quantile",
+        "horizonYears": 30,
+        "kirchensteuerSatz": 0,
+        "longevityBufferYears": 0,
+        "longevityMode": "none",
+        "longevityQuantileShift": 0,
+        "longevityRelativePct": 0,
+        "marketCapeRatio": 20,
+        "maxBearRefillPctOfEq": 5,
+        "maxSkimPctOfEq": 10,
+        "minimumFlexAnnual": 0,
+        "partner": {
+          "aktiv": false,
+          "brutto": 0,
+          "geschlecht": "0",
+          "kirchensteuerPct": 0,
+          "monatsrente": 0,
+          "sparerPauschbetrag": 0,
+          "startAlter": 0,
+          "startInJahren": 0,
+          "steuerquotePct": 0
+        },
+        "pflegeGradeConfigs": {
+          "1": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "2": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "3": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "4": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "5": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          }
+        },
+        "pflegeKostenDrift": 0.035,
+        "pflegeMaxDauer": 5,
+        "pflegeMaxFloor": 0,
+        "pflegeMinDauer": 1,
+        "pflegeModellTyp": "none",
+        "pflegeRampUp": 5,
+        "pflegeRegionalZuschlag": 0,
+        "pflegeStufe1FlexCut": 0,
+        "pflegeStufe1Zusatz": 0,
+        "pflegefallLogikAktivieren": false,
+        "rebalBand": 5,
+        "rebalancingBand": 25,
+        "rentAdjMode": "wage",
+        "rentAdjPct": 0,
+        "renteFesterSatz": 0,
+        "renteIndexierungsart": "lohn",
+        "renteMonatlich": 1500,
+        "renteStartOffsetJahre": 0,
+        "risikoprofil": "sicherheits-dynamisch",
+        "runwayMinMonths": 24,
+        "runwayTargetMonths": 36,
+        "simulationSourceProfileId": null,
+        "startAlter": 65,
+        "startFlexBedarf": 6000,
+        "startFloorBedarf": 24000,
+        "startSPB": 1000,
+        "startVermoegen": 2000000,
+        "stressPreset": "NONE",
+        "survivalQuantile": 0.85,
+        "tagesgeld": 20000,
+        "tailRiskAnnualProbabilityPct": 0,
+        "tailRiskConfigValid": true,
+        "tailRiskCooldownYears": 10,
+        "tailRiskDurationYears": 1,
+        "tailRiskEnabled": false,
+        "tailRiskHorizonYears": 30,
+        "tailRiskInflationShockPct": 6,
+        "tailRiskModel": "event_injection",
+        "tailRiskReturnShockPct": -35,
+        "tailRiskValidationErrors": [],
+        "targetEq": 60,
+        "transitionAge": 65,
+        "transitionYear": 0,
+        "widowOptions": {
+          "marriageOffsetYears": 0,
+          "minMarriageYears": 0,
+          "mode": "0",
+          "percent": 0
+        },
+        "zielLiquiditaet": 20000
+      },
+      "notes": [
+        "Golden case crossing the JST-through-1946 to published-Destatis-from-1947 source seam.",
+        "The 1947 rate is consumed as its published year-t change; no cross-source level ratio is permitted."
+      ],
+      "observedRowCount": 7,
+      "oracleClass": "target_expected",
+      "outcomeObservation": "completed",
+      "period": {
+        "endYear": 1950,
+        "requestedYears": 7,
+        "startYear": 1944
+      },
+      "rowSamples": [
+        {
+          "jahr": 1944,
+          "row": {
+            "action": "Opportunistisches Rebalancing & Liquidität auffüllen",
+            "equityReturnRatio": 0.129964042,
+            "goldReturnRatio": 0,
+            "healthBucketCoveragePct": 0,
+            "healthBucketEnabled": false,
+            "healthBucketEnd": 0,
+            "healthBucketTargetGap": 0,
+            "portfolioFlowDelta": 0,
+            "portfolioTotalEnd": 2267355.01,
+            "reductionPct": 0,
+            "regime": "peak_hot",
+            "tax": 1353.64,
+            "withdrawal": 12000
+          },
+          "wrapper": {
+            "adjPct": 1.432099,
+            "inflationVJ": 2.173913,
+            "liquiditaet": 37426.93,
+            "vpwFallbackHint": "dynamic_flex_off",
+            "wertAktien": 2229928.08,
+            "wertGold": 0
+          }
+        },
+        {
+          "jahr": 1945,
+          "row": {
+            "action": "Opportunistisches Rebalancing & Liquidität auffüllen",
+            "equityReturnRatio": 0.194985596,
+            "goldReturnRatio": 0,
+            "healthBucketCoveragePct": 0,
+            "healthBucketEnabled": false,
+            "healthBucketEnd": 0,
+            "healthBucketTargetGap": 0,
+            "portfolioFlowDelta": 0,
+            "portfolioTotalEnd": 2689858.96,
+            "reductionPct": 6.433412,
+            "regime": "peak_hot",
+            "tax": 1241.07,
+            "withdrawal": 12000
+          },
+          "wrapper": {
+            "adjPct": 22.687439,
+            "inflationVJ": 2.836879,
+            "liquiditaet": 45127.02,
+            "vpwFallbackHint": "dynamic_flex_off",
+            "wertAktien": 2644731.94,
+            "wertGold": 0
+          }
+        },
+        {
+          "jahr": 1949,
+          "row": {
+            "action": "Opportunistisches Rebalancing & Liquidität auffüllen",
+            "equityReturnRatio": 0.443344945,
+            "goldReturnRatio": 0,
+            "healthBucketCoveragePct": 0,
+            "healthBucketEnabled": false,
+            "healthBucketEnd": 0,
+            "healthBucketTargetGap": 0,
+            "portfolioFlowDelta": 0,
+            "portfolioTotalEnd": 3373235.85,
+            "reductionPct": 4.788914,
+            "regime": "peak_hot",
+            "tax": 4681.18,
+            "withdrawal": 13800
+          },
+          "wrapper": {
+            "adjPct": 27.3,
+            "inflationVJ": 7.035204,
+            "liquiditaet": 48649.22,
+            "vpwFallbackHint": "dynamic_flex_off",
+            "wertAktien": 3324586.62,
+            "wertGold": 0
+          }
+        },
+        {
+          "jahr": 1950,
+          "row": {
+            "action": "HEISS (Kein Handlungsbedarf)",
+            "equityReturnRatio": 0.194134228,
+            "goldReturnRatio": 0,
+            "healthBucketCoveragePct": 0,
+            "healthBucketEnabled": false,
+            "healthBucketEnd": 0,
+            "healthBucketTargetGap": 0,
+            "portfolioFlowDelta": 0,
+            "portfolioTotalEnd": 4011360.79,
+            "reductionPct": 5.440911,
+            "regime": "peak_hot",
+            "tax": 0,
+            "withdrawal": 9000
+          },
+          "wrapper": {
+            "adjPct": 10.7,
+            "inflationVJ": -6.4,
+            "liquiditaet": 41358.1,
+            "vpwFallbackHint": "dynamic_flex_off",
+            "wertAktien": 3970002.68,
+            "wertGold": 0
+          }
+        }
+      ],
+      "summaryText": "Startjahr 1944 Endjahr 1950 Outcome Vollständig Angeforderte Jahre 7 Wirtschaftlich ausgewertete Jahre 7 Jahreszeilen 7 Startvermögen 2.020.000,00 € Endvermögen 4.011.360,79 € Gesamte Entnahmen 78.000,00 € Max. Kürzungsdauer (≥ 10 %) 1 Jahre Jahre mit Kürzung (≥ 10 %) 1 von 7 Gezahlte Steuern 7.275,89 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 €",
+      "uiStatus": {
+        "code": "BACKTEST_COMPLETED",
+        "kind": "completed",
+        "text": "Backtest vollständig abgeschlossen Code: BACKTEST_COMPLETED Ursache: 7 von 7 angeforderten Jahren wurden wirtschaftlich ausgewertet. Nächster Schritt: Prüfen Sie Summary, Warnhinweise, Jahresprotokoll und Raw-Export gemeinsam."
+      },
+      "values": {
+        "lastRowPortfolioTotalEnd": 4011360.79,
+        "lastWrapperPortfolio": 4011360.79,
+        "maxAbsolutePortfolioFlowDelta": 0,
+        "maxDrawdownPct": 12.499665,
+        "maxReductionStreak": 1,
+        "minRunwayCoveragePct": 80.944245,
+        "startWealth": 2000000,
+        "summaryEndWealth": 4011360.79,
+        "totalTax": 7275.89,
+        "totalWithdrawal": 78000,
+        "yearsWithReductionAtLeast10Pct": 1
       }
     },
     {
@@ -3784,13 +4057,13 @@
             "cause": "Slice 05 adds a real gold-holding reference scenario to the target contract",
             "legacyObserved": null,
             "numericDelta": null,
-            "targetExpected": 2783336.86
+            "targetExpected": 2764111.02
           },
           "lastWrapperPortfolio": {
             "cause": "Slice 05 adds a real gold-holding reference scenario to the target contract",
             "legacyObserved": null,
             "numericDelta": null,
-            "targetExpected": 2783336.86
+            "targetExpected": 2764111.02
           },
           "maxAbsolutePortfolioFlowDelta": {
             "cause": "Slice 05 adds a real gold-holding reference scenario to the target contract",
@@ -3808,25 +4081,82 @@
             "cause": "Slice 05 adds a real gold-holding reference scenario to the target contract",
             "legacyObserved": null,
             "numericDelta": null,
-            "targetExpected": 2783336.86
+            "targetExpected": 2764111.02
           },
           "totalTax": {
             "cause": "Slice 05 adds a real gold-holding reference scenario to the target contract",
             "legacyObserved": null,
             "numericDelta": null,
-            "targetExpected": 95006.65
+            "targetExpected": 96130.66
           },
           "totalWithdrawal": {
             "cause": "Slice 05 adds a real gold-holding reference scenario to the target contract",
             "legacyObserved": null,
             "numericDelta": null,
-            "targetExpected": 771000
+            "targetExpected": 774000
           },
           "yearsWithReductionAtLeast10Pct": {
             "cause": "Slice 05 adds a real gold-holding reference scenario to the target contract",
             "legacyObserved": null,
             "numericDelta": null,
             "targetExpected": 8
+          }
+        },
+        "rowProjectionCause": "Slice 05 adds a real gold-holding reference scenario to the target contract",
+        "rowProjectionChanged": true,
+        "targetOutcome": "completed"
+      },
+      {
+        "id": "wage_indexed_pension_source_seam_1944_1950",
+        "legacyOutcome": null,
+        "metricDeltas": {
+          "lastRowPortfolioTotalEnd": {
+            "cause": "Slice 05 adds a real gold-holding reference scenario to the target contract",
+            "legacyObserved": null,
+            "numericDelta": null,
+            "targetExpected": 4011360.79
+          },
+          "lastWrapperPortfolio": {
+            "cause": "Slice 05 adds a real gold-holding reference scenario to the target contract",
+            "legacyObserved": null,
+            "numericDelta": null,
+            "targetExpected": 4011360.79
+          },
+          "maxAbsolutePortfolioFlowDelta": {
+            "cause": "Slice 05 adds a real gold-holding reference scenario to the target contract",
+            "legacyObserved": null,
+            "numericDelta": null,
+            "targetExpected": 0
+          },
+          "maxReductionStreak": {
+            "cause": "Slice 05 adds a real gold-holding reference scenario to the target contract",
+            "legacyObserved": null,
+            "numericDelta": null,
+            "targetExpected": 1
+          },
+          "summaryEndWealth": {
+            "cause": "Slice 05 adds a real gold-holding reference scenario to the target contract",
+            "legacyObserved": null,
+            "numericDelta": null,
+            "targetExpected": 4011360.79
+          },
+          "totalTax": {
+            "cause": "Slice 05 adds a real gold-holding reference scenario to the target contract",
+            "legacyObserved": null,
+            "numericDelta": null,
+            "targetExpected": 7275.89
+          },
+          "totalWithdrawal": {
+            "cause": "Slice 05 adds a real gold-holding reference scenario to the target contract",
+            "legacyObserved": null,
+            "numericDelta": null,
+            "targetExpected": 78000
+          },
+          "yearsWithReductionAtLeast10Pct": {
+            "cause": "Slice 05 adds a real gold-holding reference scenario to the target contract",
+            "legacyObserved": null,
+            "numericDelta": null,
+            "targetExpected": 1
           }
         },
         "rowProjectionCause": "Slice 05 adds a real gold-holding reference scenario to the target contract",
@@ -4032,9 +4362,18 @@
             "cause": "Slice 05 adds a real gold-holding reference scenario to the target contract",
             "legacyObserved": null,
             "numericDelta": null,
-            "targetExpected": 2783336.86
+            "targetExpected": 2764111.02
           },
           "id": "dynamic_flex_cape_legacy_step_2018_2025"
+        },
+        {
+          "delta": {
+            "cause": "Slice 05 adds a real gold-holding reference scenario to the target contract",
+            "legacyObserved": null,
+            "numericDelta": null,
+            "targetExpected": 4011360.79
+          },
+          "id": "wage_indexed_pension_source_seam_1944_1950"
         },
         {
           "delta": {
@@ -4056,7 +4395,7 @@
         }
       ],
       "ruinFrequency": {
-        "denominator": 10,
+        "denominator": 11,
         "legacyRuinCases": 1,
         "targetRuinCases": 1
       }

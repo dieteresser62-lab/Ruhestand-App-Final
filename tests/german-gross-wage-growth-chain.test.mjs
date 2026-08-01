@@ -79,6 +79,22 @@ assertJsonEqual(
 assertEqual(GERMAN_GROSS_WAGE_GROWTH_PCT[2020], -0.9, 'Negative wage growth must remain signed');
 assertEqual(GERMAN_GROSS_WAGE_GROWTH_PCT[2024], 4.8, '2024 should use the selected Destatis gross-earnings series, not pension adjustment');
 assertEqual(GERMAN_GROSS_WAGE_GROWTH_PCT[2025], 3.4, '2025 should use the current published annual change');
+const wartime1945 = GERMAN_GROSS_WAGE_GROWTH_CHAIN.observationsByYear[1945];
+assertClose(wartime1945.valuePct, 22.687439143135336, 1e-12, '1945 retained JST value should stay numerically explicit');
+assertEqual(
+    wartime1945.modelTreatment.selectedTreatment,
+    'retain_level_derived_jst_value',
+    '1945 continuity choice should be machine-readable'
+);
+assert(
+    wartime1945.modelTreatment.rationale.includes('sensitivity-tested against a neutral zero-growth bridge'),
+    '1945 retention rationale should require the documented sensitivity'
+);
+const sourceSeam1947 = GERMAN_GROSS_WAGE_GROWTH_CHAIN.discontinuities.find(entry => entry.year === 1947);
+assert(
+    sourceSeam1947.treatment.includes('no cross-source level ratio'),
+    '1947 seam should prohibit a cross-source level ratio'
+);
 console.log('✓ source boundaries and discontinuities OK');
 
 console.log('Test 3: JST proxy and runtime projection are explicit and complete');

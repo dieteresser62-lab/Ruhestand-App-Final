@@ -66,6 +66,7 @@ import {
     recordMonteCarloPathSummaryV1,
     resolveMonteCarloTerminalOutcomeV1
 } from './monte-carlo-chunk-result.js';
+import { GERMAN_DEMOGRAPHY_CARE_SURVIVOR_CONTRACT } from './german-demography-care-survivor-contract.js';
 
 export { MC_HEATMAP_BINS, pickWorstRun, createMonteCarloBuffers, buildMonteCarloAggregates };
 export { buildStartYearCdf, pickStartYearIndex } from './mc-year-sampling.js';
@@ -82,6 +83,37 @@ function createMonteCarloHouseholdLifeContractV2() {
         widowBenefitStartPolicy: 'not-before-deceased-pension-start-offset',
         deltaLedgerId: 'A08-2',
         deltaLedgerIds: ['A08-2', 'A08-8']
+    };
+}
+
+export function createDemographyCareSurvivorDiagnosticsV1() {
+    const contract = GERMAN_DEMOGRAPHY_CARE_SURVIVOR_CONTRACT;
+    return {
+        schemaVersion: 'DemographyCareSurvivorDiagnosticsV1',
+        contractSchemaVersion: contract.schemaVersion,
+        contractRevision: contract.revision,
+        hashes: { ...contract.hashes },
+        mortality: {
+            tableType: contract.mortality.tableType,
+            period: contract.mortality.period,
+            cohortProjection: contract.mortality.cohortProjection,
+            futureMortalityImprovement: contract.mortality.futureMortalityImprovement,
+            officialAgeRange: { ...contract.mortality.officialAgeRange },
+            runtimeAgeRange: { ...contract.mortality.runtimeAgeRange },
+            tailEvidenceClass: contract.mortality.tailAssumption.evidenceClass
+        },
+        care: {
+            observedPrevalenceRuntimeRole: contract.care.officialObservation.runtimeRole,
+            entryEvidenceClass: contract.care.entryModel.evidenceClass,
+            progressionEvidenceClass: contract.care.progressionModel.evidenceClass,
+            durationEvidenceClass: contract.care.durationModel.evidenceClass
+        },
+        survivor: {
+            evidenceClass: contract.survivor.evidenceClass,
+            defaultMode: contract.survivor.runtimeContract.defaultMode,
+            defaultPercent: contract.survivor.runtimeContract.defaultPercent,
+            interpretation: contract.survivor.modelBoundary.interpretation
+        }
     };
 }
 
@@ -351,7 +383,8 @@ export async function runMonteCarloChunk({
         dataVersion: getDataVersion()
     });
     samplingDiagnostics.modelContracts = {
-        householdLife: createMonteCarloHouseholdLifeContractV2()
+        householdLife: createMonteCarloHouseholdLifeContractV2(),
+        demographyCareSurvivor: createDemographyCareSurvivorDiagnosticsV1()
     };
     const { pathSummaries, pathMissingness } = createMonteCarloPathSummaryV1(runCount, {
         buffers,

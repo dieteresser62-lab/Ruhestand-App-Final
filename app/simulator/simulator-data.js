@@ -18,6 +18,14 @@ import { GERMAN_CASH_MONEY_MARKET_ANNUAL_RETURNS } from './german-cash-money-mar
 import { GERMAN_GROSS_WAGE_GROWTH_PCT } from './german-gross-wage-growth-chain.js';
 import { GOLD_GERMAN_INVESTOR_ANNUAL_RETURNS } from './gold-german-investor-chain.js';
 import { US_SHILLER_CAPE_BY_RETURN_YEAR } from './us-shiller-cape-chain.js';
+export {
+  GERMAN_DEMOGRAPHY_CARE_SURVIVOR_CONTRACT,
+  MORTALITY_TABLE,
+  PFLEGE_GRADE_LABELS,
+  PFLEGE_GRADE_PROBABILITIES,
+  PFLEGE_GRADE_PROGRESSION_PROBABILITIES,
+  SUPPORTED_PFLEGE_GRADES
+} from './german-demography-care-survivor-contract.js';
 
 // --- DATA & CONFIG ---
 
@@ -389,54 +397,6 @@ export const DATASET_META = Object.freeze({
   }
 });
 
-/**
- * Altersabhängige Eintrittswahrscheinlichkeiten für Pflegegrade 1–5.
- *
- * Quelle: BARMER Pflegereport 2024, Kapitel 2. Die dort veröffentlichten
- * Prävalenzen pro Pflegegrad wurden auf Jahresinzidenzen heruntergebrochen,
- * indem wir eine durchschnittliche Pflegedauer von vier Jahren annehmen und
- * die Werte über 5-Jahres-Altersbuckets glätten. Die Summe der Grade ergibt
- * somit den jährlichen Eintritt in irgendeinen Pflegegrad.
- */
-export const SUPPORTED_PFLEGE_GRADES = [1, 2, 3, 4, 5];
-
-export const PFLEGE_GRADE_LABELS = {
-  1: 'Pflegegrad 1 – geringe Beeinträchtigung',
-  2: 'Pflegegrad 2 – erhebliche Beeinträchtigung',
-  3: 'Pflegegrad 3 – schwere Beeinträchtigung',
-  4: 'Pflegegrad 4 – schwerste Beeinträchtigung',
-  5: 'Pflegegrad 5 – besondere Anforderungen'
-};
-
-/**
- * Jährliche Wahrscheinlichkeiten für Verschlechterung des Pflegegrades (Progression).
- *
- * Basierend auf Studien zur Pflegebedürftigkeitsentwicklung:
- * - Niedrigere Grade verschlechtern sich häufiger (mehr "Raum nach oben")
- * - Höhere Grade haben geringere Progressionsraten
- * - Im Durchschnitt dauert es 6-8 Jahre von PG1 bis PG5
- *
- * Beispiel: Bei PG2 beträgt die Wahrscheinlichkeit 12% pro Jahr,
- * im nächsten Jahr zu PG3 zu wechseln.
- */
-export const PFLEGE_GRADE_PROGRESSION_PROBABILITIES = {
-  1: 0.15,  // PG1 → PG2: 15% pro Jahr
-  2: 0.12,  // PG2 → PG3: 12% pro Jahr
-  3: 0.10,  // PG3 → PG4: 10% pro Jahr
-  4: 0.08,  // PG4 → PG5: 8% pro Jahr
-  5: 0.00   // PG5: Keine weitere Verschlechterung möglich
-};
-
-export const PFLEGE_GRADE_PROBABILITIES = {
-  65: { 1: 0.012, 2: 0.006, 3: 0.003, 4: 0.0015, 5: 0.0005 },
-  70: { 1: 0.020, 2: 0.010, 3: 0.005, 4: 0.0025, 5: 0.0010 },
-  75: { 1: 0.035, 2: 0.018, 3: 0.009, 4: 0.0045, 5: 0.0020 },
-  80: { 1: 0.055, 2: 0.032, 3: 0.016, 4: 0.0075, 5: 0.0035 },
-  85: { 1: 0.085, 2: 0.055, 3: 0.032, 4: 0.0150, 5: 0.0070 },
-  90: { 1: 0.120, 2: 0.080, 3: 0.050, 4: 0.0280, 5: 0.0120 },
-  95: { 1: 0.140, 2: 0.090, 3: 0.060, 4: 0.0350, 5: 0.0150 }
-};
-
 export const REGIME_CLASSIFICATION_THRESHOLDS = Object.freeze({
   inflationHighPct: 5,
   equityPoorRatio: 0,
@@ -559,31 +519,6 @@ export const HISTORICAL_DATA = {
   2023: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[2023], inflation_de: GERMAN_CPI_INFLATION_RATES[2023], zinssatz_de: GERMAN_CASH_MONEY_MARKET_ANNUAL_RETURNS[2023], lohn_de: GERMAN_GROSS_WAGE_GROWTH_PCT[2023], gold_eur_perf: GOLD_GERMAN_INVESTOR_ANNUAL_RETURNS[2023], cape: US_SHILLER_CAPE_BY_RETURN_YEAR[2023] },
   2024: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[2024], inflation_de: GERMAN_CPI_INFLATION_RATES[2024], zinssatz_de: GERMAN_CASH_MONEY_MARKET_ANNUAL_RETURNS[2024], lohn_de: GERMAN_GROSS_WAGE_GROWTH_PCT[2024], gold_eur_perf: GOLD_GERMAN_INVESTOR_ANNUAL_RETURNS[2024], cape: US_SHILLER_CAPE_BY_RETURN_YEAR[2024] },
   2025: { global_equity_research_index: GLOBAL_EQUITY_RESEARCH_INDEX_LEVELS[2025], inflation_de: GERMAN_CPI_INFLATION_RATES[2025], zinssatz_de: GERMAN_CASH_MONEY_MARKET_ANNUAL_RETURNS[2025], lohn_de: GERMAN_GROSS_WAGE_GROWTH_PCT[2025], gold_eur_perf: GOLD_GERMAN_INVESTOR_ANNUAL_RETURNS[2025], cape: US_SHILLER_CAPE_BY_RETURN_YEAR[2025] }
-};
-
-/**
- * Sterbetafeln für Männer und Frauen
- */
-export const MORTALITY_TABLE = {
-  m: {
-    18: 0.0008, 19: 0.0008, 20: 0.0009, 21: 0.0009, 22: 0.0009, 23: 0.0009, 24: 0.0009, 25: 0.0009, 26: 0.0009, 27: 0.0009, 28: 0.0010, 29: 0.0010,
-    30: 0.0010, 31: 0.0010, 32: 0.0011, 33: 0.0011, 34: 0.0011, 35: 0.0012, 36: 0.0012, 37: 0.0013, 38: 0.0013, 39: 0.0014,
-    40: 0.0015, 41: 0.0016, 42: 0.0017, 43: 0.0018, 44: 0.0019, 45: 0.0020, 46: 0.0021, 47: 0.0022, 48: 0.0024, 49: 0.0026,
-    50: 0.003, 51: 0.003, 52: 0.004, 53: 0.004, 54: 0.004, 55: 0.005, 56: 0.005, 57: 0.006, 58: 0.006, 59: 0.007, 60: 0.007, 61: 0.008, 62: 0.009, 63: 0.009, 64: 0.010, 65: 0.010, 66: 0.011, 67: 0.012, 68: 0.013, 69: 0.014, 70: 0.016, 71: 0.017, 72: 0.019, 73: 0.021, 74: 0.023, 75: 0.026, 76: 0.029, 77: 0.032, 78: 0.036, 79: 0.040, 80: 0.045, 81: 0.051, 82: 0.057, 83: 0.065, 84: 0.073, 85: 0.083, 86: 0.094, 87: 0.107, 88: 0.121, 89: 0.137, 90: 0.155, 91: 0.175, 92: 0.197, 93: 0.221, 94: 0.247, 95: 0.275, 96: 0.305, 97: 0.337, 98: 0.370, 99: 0.400, 100: 0.430, 101: 0.46, 102: 0.49, 103: 0.52, 104: 0.55, 105: 0.6, 106: 0.65, 107: 0.7, 108: 0.8, 109: 0.9, 110: 1
-  },
-  w: {
-    18: 0.0004, 19: 0.0004, 20: 0.0004, 21: 0.0004, 22: 0.0004, 23: 0.0004, 24: 0.0004, 25: 0.0005, 26: 0.0005, 27: 0.0005, 28: 0.0005, 29: 0.0005,
-    30: 0.0005, 31: 0.0006, 32: 0.0006, 33: 0.0006, 34: 0.0007, 35: 0.0007, 36: 0.0007, 37: 0.0008, 38: 0.0008, 39: 0.0009,
-    40: 0.0010, 41: 0.0011, 42: 0.0011, 43: 0.0012, 44: 0.0013, 45: 0.0014, 46: 0.0015, 47: 0.0016, 48: 0.0017, 49: 0.0018,
-    50: 0.002, 51: 0.002, 52: 0.002, 53: 0.003, 54: 0.003, 55: 0.003, 56: 0.004, 57: 0.004, 58: 0.004, 59: 0.005, 60: 0.005, 61: 0.006, 62: 0.006, 63: 0.007, 64: 0.007, 65: 0.007, 66: 0.008, 67: 0.008, 68: 0.009, 69: 0.010, 70: 0.011, 71: 0.012, 72: 0.013, 73: 0.015, 74: 0.016, 75: 0.018, 76: 0.021, 77: 0.023, 78: 0.026, 79: 0.030, 80: 0.034, 81: 0.039, 82: 0.044, 83: 0.050, 84: 0.057, 85: 0.066, 86: 0.076, 87: 0.087, 88: 0.100, 89: 0.115, 90: 0.131, 91: 0.149, 92: 0.169, 93: 0.191, 94: 0.215, 95: 0.241, 96: 0.269, 97: 0.298, 98: 0.329, 99: 0.360, 100: 0.390, 101: 0.42, 102: 0.45, 103: 0.48, 104: 0.51, 105: 0.55, 106: 0.6, 107: 0.65, 108: 0.75, 109: 0.85, 110: 1
-  },
-  // Divers: Durchschnitt von männlich und weiblich
-  d: {
-    18: 0.0006, 19: 0.0006, 20: 0.00065, 21: 0.00065, 22: 0.00065, 23: 0.00065, 24: 0.00065, 25: 0.0007, 26: 0.0007, 27: 0.0007, 28: 0.00075, 29: 0.00075,
-    30: 0.00075, 31: 0.0008, 32: 0.00085, 33: 0.00085, 34: 0.0009, 35: 0.00095, 36: 0.00095, 37: 0.00105, 38: 0.00105, 39: 0.00115,
-    40: 0.00125, 41: 0.00135, 42: 0.0014, 43: 0.0015, 44: 0.0016, 45: 0.0017, 46: 0.0018, 47: 0.0019, 48: 0.00205, 49: 0.0022,
-    50: 0.0025, 51: 0.0025, 52: 0.003, 53: 0.0035, 54: 0.0035, 55: 0.004, 56: 0.0045, 57: 0.005, 58: 0.005, 59: 0.006, 60: 0.006, 61: 0.007, 62: 0.0075, 63: 0.008, 64: 0.0085, 65: 0.0085, 66: 0.0095, 67: 0.010, 68: 0.011, 69: 0.012, 70: 0.0135, 71: 0.0145, 72: 0.016, 73: 0.018, 74: 0.0195, 75: 0.022, 76: 0.025, 77: 0.0275, 78: 0.031, 79: 0.035, 80: 0.0395, 81: 0.045, 82: 0.0505, 83: 0.0575, 84: 0.065, 85: 0.0745, 86: 0.085, 87: 0.097, 88: 0.1105, 89: 0.126, 90: 0.143, 91: 0.162, 92: 0.183, 93: 0.206, 94: 0.231, 95: 0.258, 96: 0.287, 97: 0.3175, 98: 0.3495, 99: 0.38, 100: 0.41, 101: 0.44, 102: 0.47, 103: 0.50, 104: 0.53, 105: 0.575, 106: 0.625, 107: 0.675, 108: 0.775, 109: 0.875, 110: 1
-  }
 };
 
 /**

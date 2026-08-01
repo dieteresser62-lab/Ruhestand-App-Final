@@ -79,6 +79,7 @@ const postBacktestData06 = readFixtureUnlessWriting(
     'post-backtest-data-06-v2.json',
     'post-backtest-data-06-v2'
 );
+const postBacktestData07 = readFixture('post-backtest-data-07-v1.json');
 const finalCandidate = readFixture('monte-carlo-v1-final.json');
 const benchmarkContract = readFixture('benchmark-contract-v1.json');
 const benchmarkResults = readFixture('benchmark-results-2026-07-22.json');
@@ -980,6 +981,11 @@ function computeKpiDelta(low, high) {
     assertEqual(snapshotPolicy.referenceClasses.length, 5, 'Snapshot policy must distinguish baseline, Monte Carlo, Suite-Data, Backtest-Data and final-candidate references');
     const baselineClass = snapshotPolicy.referenceClasses.find(entry => entry.id === 'pre-hardening-v1');
     assert(baselineClass?.immutable === true && baselineClass?.overwriteAllowed === false, 'Pre-hardening reference must be immutable');
+    assertEqual(
+        snapshotPolicy.pendingDataCandidates.at(-1),
+        'post-backtest-data-07-v1',
+        'Snapshot policy must retain Slice 07 as the latest pending data candidate'
+    );
     assertEqual(snapshotPolicy.comparisonRules.sameRuntime, 'exact', 'Same-runtime snapshots must be exact');
     assertEqual(snapshotPolicy.comparisonRules.widenToleranceAfterFailure, false, 'Tolerance widening after failure must be forbidden');
     assertEqual(
@@ -1183,6 +1189,25 @@ function computeKpiDelta(low, high) {
         assert(!sourceText.includes(postBacktestData06.capturedAtUtc), 'Slice 06 V2 timestamp must not be a test-source literal');
         assertEqual(postBacktestData06.captureEvidence.measuredHistoricalDataHash, postBacktestData06.metadata.dataVersion.annualDataHash, 'Capture evidence must bind the measured annual-data hash');
     }
+    const backtestData07Entries = deltaLedger.entries.filter(entry => entry.sliceId === 'BACKTEST-DATA-07');
+    assertEqual(backtestData07Entries.length, 1, 'Backtest-Data Slice 07 must ledger its dedicated demography/care/survivor runtime measurement');
+    for (const field of deltaLedger.requiredEntryFields) {
+        assert(Object.prototype.hasOwnProperty.call(backtestData07Entries[0], field), `Backtest-Data Slice 07 delta entry must contain ${field}`);
+    }
+    assertEqual(backtestData07Entries[0].sourceReference, 'post-backtest-data-06-v2', 'Slice 07 measurement must retain the Slice 06 Monte Carlo input reference');
+    assertEqual(backtestData07Entries[0].targetReference, 'post-backtest-data-07-v1', 'Slice 07 measurement must target its separate pending candidate');
+    assertEqual(postBacktestData07.snapshotId, 'post-backtest-data-07-v1', 'Slice 07 runtime measurement must use the policy identifier');
+    assertEqual(postBacktestData07.sourceReference, 'post-backtest-data-06-v2', 'Slice 07 runtime measurement must bind the Slice 06 predecessor');
+    assertEqual(postBacktestData07.reviewStatus, 'pending', 'Codex must not approve its own Slice 07 runtime measurement');
+    assertEqual(postBacktestData07.effectBoundary.mortalityRuntimeEffectMeasured, true, 'Slice 07 measurement must exercise mortality');
+    assertEqual(postBacktestData07.effectBoundary.careRuntimeActive, true, 'Slice 07 measurement must activate care');
+    assertEqual(postBacktestData07.effectBoundary.partnerRuntimeActive, true, 'Slice 07 measurement must activate the partner path');
+    assertEqual(postBacktestData07.effectBoundary.survivorBenefitRuntimeActive, true, 'Slice 07 measurement must activate survivor benefits');
+    assertEqual(postBacktestData07.effectBoundary.sweepRuntimeEffectMeasured, true, 'Slice 07 measurement must include Sweep');
+    assertEqual(postBacktestData07.numericDeltaCount, 40, 'Slice 07 measurement must retain all measured numeric deltas');
+    assertEqual(postBacktestData07.targetMeasurement.profile.runs, 2048, 'Slice 07 runtime profile must retain its fixed run count');
+    assertEqual(postBacktestData07.targetMeasurement.profile.durationYears, 40, 'Slice 07 runtime profile must retain its fixed duration');
+    assertEqual(postBacktestData07.targetMeasurement.sweep.length, 2, 'Slice 07 runtime profile must measure both fixed Sweep combinations');
     const slice12Entries = deltaLedger.entries.filter(entry => entry.sliceId === '12');
     assertEqual(slice12Entries.length, 1, 'Slice 12 must ledger the integrated final candidate separately');
     for (const field of deltaLedger.requiredEntryFields) {

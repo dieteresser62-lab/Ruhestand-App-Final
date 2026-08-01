@@ -40,6 +40,14 @@
       "purpose": "Integration candidate created in Slice 12."
     }
   ],
+  "pendingDataCandidates": [
+    "post-backtest-data-02-v3",
+    "post-backtest-data-03-v1",
+    "post-backtest-data-04-v1",
+    "post-backtest-data-05-v1",
+    "post-backtest-data-06-v2",
+    "post-backtest-data-07-v1"
+  ],
   "comparisonRules": {
     "sameRuntime": "exact",
     "crossRuntime": "field-specific tolerances declared in the snapshot before execution",

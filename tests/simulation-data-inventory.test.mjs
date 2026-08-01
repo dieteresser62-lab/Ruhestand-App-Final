@@ -38,6 +38,7 @@ import {
     MONTE_CARLO_START_YEAR_MODES
 } from '../app/simulator/monte-carlo-parameters.js';
 import { PFLEGE_COST_PRESETS } from '../app/simulator/simulator-ui-pflege.js';
+import { GERMAN_DEMOGRAPHY_CARE_SURVIVOR_CONTRACT } from '../app/simulator/german-demography-care-survivor-contract.js';
 
 console.log('--- Simulation Data Inventory Tests ---');
 
@@ -267,10 +268,15 @@ for (const entry of allEntries) {
         }
     }
 }
+assertEqual(
+    SIMULATION_DATA_INVENTORY.staticData.mortality_table.source.value,
+    'Destatis Statistischer Bericht Sterbetafeln 2023/2025 (EVAS 12621), Tabellen 12613-b01 und 12613-b02',
+    'Mortality inventory must name the pinned statistical report, not the separate Allgemeine Sterbetafel product'
+);
 assert(
-    SIMULATION_DATA_INVENTORY.staticData.care_incidence_probabilities.evidenceClass
-        !== SIMULATION_DATA_INVENTORY.staticData.care_progression_probabilities.evidenceClass,
-    'Estimated care incidence and progression assumptions should not share one evidence class'
+    SIMULATION_DATA_INVENTORY.staticData.care_observed_prevalence.evidenceClass
+        !== SIMULATION_DATA_INVENTORY.staticData.care_incidence_probabilities.evidenceClass,
+    'Official care prevalence and entry assumptions should not share one evidence class'
 );
 assert(
     SIMULATION_DATA_INVENTORY.staticData.stress_presets.evidenceClass
@@ -320,6 +326,7 @@ const staticValues = {
         grades: SUPPORTED_PFLEGE_GRADES,
         labels: PFLEGE_GRADE_LABELS
     },
+    care_observed_prevalence: GERMAN_DEMOGRAPHY_CARE_SURVIVOR_CONTRACT.care.officialObservation,
     care_incidence_probabilities: PFLEGE_GRADE_PROBABILITIES,
     care_progression_probabilities: PFLEGE_GRADE_PROGRESSION_PROBABILITIES,
     care_cost_presets: PFLEGE_COST_PRESETS,
@@ -364,8 +371,8 @@ console.log('Test 7: source-local user/tax defaults match their inventoried cont
         'Widow percentage HTML defaults should match the inventory'
     );
     assert(
-        simulatorHtml.includes(`<option value="${widowContract.defaultMode}">`),
-        'Widow mode should remain available in the UI'
+        simulatorHtml.includes(`<option value="${widowContract.defaultMode}" selected>`),
+        'Widow mode inventory default should match the selected UI option'
     );
     assertSimulationDataValueHash('widow_benefit_parameters', widowContract);
 

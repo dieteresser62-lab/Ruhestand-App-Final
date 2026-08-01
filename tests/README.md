@@ -4,7 +4,7 @@
 
 This directory contains the comprehensive testing infrastructure for the Ruhestand-App-Final project. The tests are designed to be zero-dependency, using native Node.js ESM and a custom test runner, avoiding the need for heavy frameworks like Jest or Mocha.
 
-**Test-Statistik:** 150 entdeckte Testdateien mit 15.055 von 15.055 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (nach der technischen Blocker-Nachbesserung von Backtest-Datenpruefung Slice 05 mit `npm test` am 2026-08-01 verifiziert). `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen und bestand mit 27/27 Einstiegspunkt-/Zusatzflows, darunter Preview/Commit, realer 3-Bucket-Bear-Pfad, Hybridprofil-Blocker, Import/Recovery, Sweep, Optimizer-Apply sowie vier isolierte Monte-Carlo-Browserfaelle.
+**Test-Statistik:** 159 entdeckte Testdateien mit 17.855 von 17.855 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (nach der technischen Nachbesserung der drei Slice-07-Review-Blocker mit `npm test` am 2026-08-01 verifiziert). `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen und bestand mit 27/27 Einstiegspunkt-/Zusatzflows, darunter Preview/Commit, realer 3-Bucket-Bear-Pfad, Hybridprofil-Blocker, Import/Recovery, Sweep, Optimizer-Apply sowie vier isolierte Monte-Carlo-Browserfaelle.
 
 Die Zahl beschreibt nur die Node-Standardsuite. `npm run test:browser`, `npm run test:coverage` und ein echter Tauri-Build sind getrennte Gates und in den Assertions nicht enthalten.
 
@@ -56,7 +56,7 @@ Consumer und Provenienz, nicht eigenstaendig eine KPI-Wirkung.
 npm run test:coverage
 ```
 
-Der Coverage-Runner loescht `.coverage/`, startet die Standardsuite mit `NODE_V8_COVERAGE` und schreibt bei gruener Standardsuite `.coverage/summary.json`. Der Report wertet Projektdateien unter `app/`, `engine/`, `workers/` und `types/` aus. Die Messung nach der Slice-16-Review-Nachbesserung liegt bei 77,89% approximativer Coverage aus ausfuehrbaren V8-Zeilenbereichen (38.479/49.403 Zeilen in 207 Dateien). `npm run test:coverage` erzwingt zusaetzlich ein 50-Prozent-Dateigate fuer `worker-job-runner.js` und `results-renderers.js`; ein fehlender Inventareintrag oder eine Unterschreitung beendet den Lauf rot. Playwright-Ausfuehrung fliesst nicht in diese Node-V8-Zahl ein. Der durch den neuen DOM-Vertrag teilweise in Node ausgefuehrte Orchestrierungspfad `app/simulator/simulator-sweep.js` erreicht dort 6,22%; Browseranteile bleiben ausserhalb dieser Messung. Coverage bleibt eine Risikomessung, kein Freigabe-, Wirksamkeits- oder Eignungsnachweis und insbesondere keine echte JavaScript-Statement-Metrik.
+Der Coverage-Runner loescht `.coverage/`, startet die Standardsuite mit `NODE_V8_COVERAGE` und schreibt bei gruener Standardsuite `.coverage/summary.json`. Der Report wertet Projektdateien unter `app/`, `engine/`, `workers/` und `types/` aus. Die Messung nach der Slice-07-Review-Nachbesserung liegt bei 78,10% approximativer Coverage aus ausfuehrbaren V8-Zeilenbereichen (38.920/49.836 Zeilen in 215 Dateien). `npm run test:coverage` erzwingt zusaetzlich ein 50-Prozent-Dateigate fuer `worker-job-runner.js` und `results-renderers.js`; ein fehlender Inventareintrag oder eine Unterschreitung beendet den Lauf rot. Playwright-Ausfuehrung fliesst nicht in diese Node-V8-Zahl ein. Der durch den neuen DOM-Vertrag teilweise in Node ausgefuehrte Orchestrierungspfad `app/simulator/simulator-sweep.js` erreicht dort 6,22%; Browseranteile bleiben ausserhalb dieser Messung. Coverage bleibt eine Risikomessung, kein Freigabe-, Wirksamkeits- oder Eignungsnachweis und insbesondere keine echte JavaScript-Statement-Metrik.
 
 Monte-Carlo-Abschlussgate in Slice 12:
 
@@ -295,8 +295,9 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 **Zweck:** Validiert Golden Cases, unveraenderliche Snapshot-Linie, Delta-Ledger, Same-Runtime-Exaktheit sowie Direct-/Worker-/Chunk-Paritaet.
 - **Aktuelle Referenz:** Die oeffentliche `currentReference` ist `null`,
   solange kein extern freigegebener Nachfolger vorliegt;
-  `post-backtest-data-06-v2` ist der getrennte, noch extern zu reviewende
-  CAPE-/Lohn-Datenkandidat auf Basis des unveraenderlichen V1-Vorgaengers. Der
+  `post-backtest-data-07-v1` ist der neueste getrennte, noch extern zu
+  reviewende Demografie-/Pflege-/Hinterbliebenen-Messkandidat auf Basis von
+  `post-backtest-data-06-v2`. Der
   veraenderliche Zeiger ist aus der eingefrorenen
   Ergebnisprojektion ausgeschlossen. Keine fruehere Fixture wird
   ueberschrieben und eine reine Zeigeraenderung erzeugt keinen
@@ -335,6 +336,13 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
   messen, und belegt gegen Slice 05 exakt null numerische Deltas; nur Identitaet,
   Erfassungsnachweis, Messscope und `annualDataHash` duerfen abweichen. Beide
   Slice-06-Kandidaten bleiben `pending`.
+- **Backtest-Data-Slice-07-Kandidat:** `post-backtest-data-07-v1` vergleicht
+  bei identischem Node, Profil, Seed und Input den unveraenderlichen
+  Slice-06-Basiscommit mit dem Slice-07-Arbeitsstand. Der Lauf umfasst 2.048
+  Runs, 40 Jahre, aktiven Pflege-/Partner-/Hinterbliebenenpfad und zwei
+  Sweep-Kombinationen. 40 numerische Deltas, 44 geaenderte Blaetter und ihre
+  Hashes sind eingefroren; der Kandidat bleibt bis zum externen Review
+  `pending`.
 - **Historische Fixture-Kompatibilitaet:** Vergleichsausnahmen fuer
   unveraenderliche Pending-Fixtures stehen ausschliesslich in
   `snapshot-policy-v1.json`. Der produktive Runtime-Vertrag enthaelt weder
@@ -844,6 +852,37 @@ Anlegerwaehrung.
 - **Negativ-Gates:** Erfundenes `unresolved`, unbelegte externe Validierung und
   statische Wertdrift schlagen fail-closed fehl.
 
+#### `german-demography-care-survivor-contract.test.mjs`
+**Zweck:** Validiert den generierten Demografie-/Pflege-/Hinterbliebenenvertrag.
+- **Sterblichkeit:** Perioden- statt Kohortensemantik, Destatis-Periode
+  2023/2025, Mann/Frau/divers-Marker, offizieller Altersbereich 18-100,
+  expliziter Modellrand 101-110 und fehlende kuenftige
+  Mortalitaetsverbesserung.
+- **Pflege:** Amtliche Bestandszahlen/Praevalenzen bleiben
+  `validation_only_not_transition_probability`; Eintritt Grad 1/2,
+  Progression und Dauer sind getrennte Modellannahmen.
+- **Hinterbliebene:** `percent`/55 entspricht dem UI-Default, bleibt aber
+  ausdruecklich keine gesetzliche Anspruchsberechnung.
+- **Runtime/Diagnose:** Re-Exports und
+  `DemographyCareSurvivorDiagnosticsV1` tragen Revision, Hashes und
+  Aussagegrenzen; das Verify-Gate rekonstruiert byteidentisch.
+
+#### `german-demography-care-survivor-source-reconstruction.test.mjs`
+**Zweck:** Rekonstruiert mit einem separaten ZIP/XML-Leser alle 166 amtlichen
+Runtime-`qx` fuer Mann/Frau und Alter 18-100 direkt aus dem gepinnten
+Destatis-Workbook. Zusaetzlich werden Pflege-Gesamtbestand, alle fuenf
+Pflegegradbestaende und 21 Alters-/Geschlechts-Praevalenzmarker aus dem
+zweiten Original nachgerechnet.
+
+#### `demography-care-survivor-runtime-measurement.test.mjs`
+**Zweck:** Reproduziert die stochastische Slice-06-zu-Slice-07-Wirkung mit
+identischem 2.048-Run-/40-Jahres-Profil und festem Seed. Der Test kann den
+unveraenderlichen Basiscommit ueber `DEMOGRAPHY_MEASUREMENT_RUNTIME_ROOT`
+laden, aktiviert Pflege, Partner und 55-Prozent-Hinterbliebenen-Cashflow und
+vergleicht Monte Carlo sowie zwei Sweep-Kombinationen exakt mit
+`post-backtest-data-07-v1`. Er prueft Deltazahl, Hashkette, aktive
+Pflege-/Todes-/Hinterbliebenenpfade und verweigert unerklaerte Abweichungen.
+
 #### `historical-backtest-metrics.test.mjs`
 **Zweck:** Testet das vollstaendige `HistoricalBacktestMetricsV1`-Woerterbuch und die reine Ableitung aus kanonischen Rohzeilen.
 - **Definitionen:** Eindeutige IDs, Einheiten, nominal/real-Basis, Nenner, Rundung, Missingness, Outcome-Regel und Rohquellen fuer alle 24 Metriken.
@@ -864,11 +903,11 @@ Anlegerwaehrung.
 
 #### `simulator-backtest-characterization.test.mjs`
 **Zweck:** Vergleicht die unveraenderte Slice-01-Baseline `legacy_observed` mit dem separaten D-01-Zieloracle `target_expected`.
-- **Golden Cases:** kurzer und langer Completed-Pfad, 3-Bucket/Mindest-Flex, Ruin, Pflegebucket-Projektionsluecke, Dynamic-Flex/CAPE sowie zwei lohnindexierte JST-Fenster 1930-1940 und 1935-1946.
+- **Golden Cases:** kurzer und langer Completed-Pfad, 3-Bucket/Mindest-Flex, Ruin, Pflegebucket-Projektionsluecke, Dynamic-Flex/CAPE, zwei lohnindexierte JST-Fenster 1930-1940 und 1935-1946 sowie der Lohnquellen-Nahtzeuge 1944-1950.
 - **Negative Cases:** Einjahreslauf, NaN-/rueckwaertige Periode, mittlere Datenluecke und nicht-finite Goldrendite.
 - **Messvertrag:** kanonische Input- und Row-Hashes, Non-Mutation, Metrikwoerterbuch, 2000/2001-Alignment sowie kontrollierte Abloesung von `legacy_schema_v0` durch `backtest_ui_state_v1`; Detailtoggle-Paritaet bleibt erhalten.
-- **Delta-Gate:** `BacktestTemporalDeltaReportV1` benennt jede geaenderte Metrik samt Ursache und berichtet Endvermoegens-, Ruinfall- sowie Downstream-Consumer-Auswirkungen; nicht gespeicherte Zieldeltas schlagen fehl. `CapeWageBacktestDeltaEvidenceV3` vergleicht CAPE- und Lohnpfade gegen den Basiscommit und prueft fuer die beiden fruehen Lohnfaelle zusaetzlich die abgeloeste konstante 3-Prozent-Reihe, Kuerzungsjahre und `portfolio_flow_delta`.
-- **Fixtures:** `fixtures/simulator-backtest-baseline-v1.json` bleibt read-only; `fixtures/simulator-backtest-target-v1.json` darf kontrolliert mit `UPDATE_BACKTEST_TARGET=1 node tests/run-single.mjs tests/simulator-backtest-characterization.test.mjs` erzeugt werden. `cape-wage-backtest-delta-v1.json` bleibt wegen des uebernommenen `mean`-/20-Jahre-Horizonts als ungueltig superseded, V2 wegen fehlenden fruehen Lohnwirkungsscope als unvollstaendig superseded; V3 ist die aktive Deltaevidenz.
+- **Delta-Gate:** `BacktestTemporalDeltaReportV1` benennt jede geaenderte Metrik samt Ursache und berichtet Endvermoegens-, Ruinfall- sowie Downstream-Consumer-Auswirkungen; nicht gespeicherte Zieldeltas schlagen fehl. `CapeWageBacktestDeltaEvidenceV3` bleibt als bytegehashtes Slice-06-Archiv erhalten. `DemographyCareSurvivorBacktestDeltaEvidenceV1` bindet den neuen Sterbetafelhash, den Lohnnahtzeugen und fuer aktiven sowie CAPE-inaktiven Arm den direkten Slice-06-zu-Slice-07-Vergleich; der innerhalb Slice 07 gemessene CAPE-an/aus-Effekt bleibt davon getrennt. Pflege/Hinterbliebene sind im deterministischen Backtest inaktiv.
+- **Fixtures:** `fixtures/simulator-backtest-baseline-v1.json` und die bytegehashte Slice-06-V3-Evidenz bleiben read-only; `fixtures/simulator-backtest-target-v1.json` darf kontrolliert mit `UPDATE_BACKTEST_TARGET=1 node tests/run-single.mjs tests/simulator-backtest-characterization.test.mjs` erzeugt werden. Die Slice-07-Evidenz wird einmalig mit `CREATE_BACKTEST_DATA_07_DELTA=1` angelegt und danach nicht ueberschrieben.
 
 #### `simulator-real-withdrawal-contract.test.mjs`
 **Zweck:** Testet den Simulatorvertrag für echte Realentnahmen.

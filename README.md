@@ -116,6 +116,17 @@ Netzwerkpfade.
   Ungeklaerte Quelle, Reihenkennung, Lizenz oder Abrufstand bleiben
   `unresolved` und blockieren eine Behauptung externer Validierung oder einen
   Datenersatz. Details: `docs/reference/DATA_SOURCES.md`.
+* **Demografie-/Pflegevertrag:** Die Sterbewahrscheinlichkeiten fuer
+  Alter 18-100 stammen reproduzierbar aus dem Destatis-`Statistischen Bericht
+  Sterbetafeln 2023/2025` (EVAS 12621), Tabellen `12613-b01` und `12613-b02`;
+  101-110 bleiben ein offengelegter Modellrand und `divers` eine
+  Modellableitung. Amtliche Pflegequoten 2023 dienen nur als
+  Bestands-/Praevalenzreferenz und werden nicht in individuelle
+  Jahresuebergaenge umgerechnet. Pflegeeintritt, Progression und Dauer bleiben
+  getrennte Modellannahmen. Die 55-Prozent-Hinterbliebenenoption ist ein
+  vereinfachter Nutzer-Cashflow, keine gesetzliche Anspruchsberechnung.
+  Build/Verify: `npm run build:german-demography-data` und
+  `npm run verify:german-demography-data`.
 * **Reproduzierbarer Backtest-Export:** Die Backtest-Buttons erzeugen nur auf ausdrueckliche Nutzeraktion ein versioniertes Raw-JSON oder eine technische CSV-Rohdatenansicht. JSON enthaelt Request, Outcome, Daten-/Zeitachsen-/Engineprovenienz, Portfolio-Snapshots, Jahresrecords/-zeilen und Metriken als echte Zahlen. Run-/Request-ID und SHA-256-Fingerprint identifizieren den kanonischen Lauf; der Exportzeitpunkt gehoert nicht zum Result-Fingerprint. Der Export enthaelt die vollstaendigen lokalen Finanzannahmen und sollte entsprechend vertraulich behandelt werden.
 * **Backtest-Status und Rolling Cohorts:** Die Zeitraumfelder zeigen manifestabgeleitete Grenzen und feldnahe Fehler. Ein fokussierbarer Live-Status trennt `completed`, `ruin`, `incomplete` und `technical_error`; Nutzertexte nennen einen stabilen Code, Ursache und naechsten Schritt ohne Stacktrace. Optional lassen sich feste, ueberlappende Rolling Cohorts fuer den gewaehlten Zeitraum auswerten. Das Inventar trennt Outcomes und Ausschluesse; historische Einzelpfade und Cohorts bleiben In-sample-Diagnosen, keine unabhaengigen Versuche und keine Erfolgswahrscheinlichkeit.
 * **Auto-Optimize Dynamic-Flex-Modus:** `inherit`, `force_on`, `force_off`; Dynamic-Flex-Parameter sind nur bei effektiv aktivem Dynamic-Flex optimierbar, inklusive Safety-Guards gegen zu aggressive Lösungen.

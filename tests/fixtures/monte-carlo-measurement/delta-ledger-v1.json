@@ -271,6 +271,30 @@
         "sharedAnnualDataFingerprintOnly": true,
         "interpretation": "Runtime CAPE and wage effects are evidenced by the separate backtest and CAPE-sampling delta oracles, not by this Monte Carlo candidate."
       }
+    },
+    {
+      "sliceId": "BACKTEST-DATA-07",
+      "sourceReference": "post-backtest-data-06-v2",
+      "targetReference": "post-backtest-data-07-v1",
+      "fieldPath": "sourceMeasurement/targetMeasurement.{monteCarlo,sweep}/effectSummary",
+      "formulaBefore": "Monte Carlo and Sweep used the prior embedded mortality table; no versioned Backtest-Data Slice 07 runtime measurement activated mortality, care, partner death and survivor benefits together",
+      "formulaAfter": "A fixed 2,048-run, 40-year profile measures the Destatis period-life-table replacement against the immutable Slice-06 basis with active chronic care, an active partner, 55-percent survivor benefits and two common-random-number Sweep allocations",
+      "expectedDirection": "Higher mortality shortens measured lifespan and generally reduces care exposure; financial and survivor-duration deltas remain path-dependent and are frozen exactly rather than assigned a universal beneficial or adverse sign",
+      "goldenCaseIds": ["DCS-MC-SWEEP-01"],
+      "reviewStatus": "pending",
+      "measurementScope": {
+        "runs": 2048,
+        "durationYears": 40,
+        "mortalityRuntimeEffectMeasured": true,
+        "careRuntimeActive": true,
+        "partnerRuntimeActive": true,
+        "survivorBenefitRuntimeActive": true,
+        "sweepRuntimeEffectMeasured": true,
+        "sweepCombinationCount": 2,
+        "numericDeltaCount": 40,
+        "careModelParameterChange": false,
+        "survivorFormulaChange": false
+      }
     }
   ],
   "requiredEntryFields": [

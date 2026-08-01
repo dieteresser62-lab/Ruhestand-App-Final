@@ -2,9 +2,10 @@
 
 **Pruefdatum:** 2026-07-29
 **Pruefer:** Claude (Primary reviewer & Analyst)
-**Status:** Korrekturprogramm in Umsetzung; Slice 01 bis 05 extern freigegeben
-und lokal committed; Slice 06 ist technisch umgesetzt, aber externes Review,
-Freigabe und Commit stehen aus
+**Status:** Korrekturprogramm in Umsetzung; Slice 01 bis 06 extern technisch
+freigegeben und lokal committed; die drei Blocker aus dem ersten Slice-07-
+Review sind technisch nachgebessert und selbstgeprueft, aber erneutes externes
+Review, Freigabe und Commit stehen aus
 **Pruefgegenstand:** Exportdatei
 `backtest-2000-2025-89fc3e368d64-2026-07-29T10-00-22.287Z.json`
 **Anlass:** Nutzerseitige Verifikation nach Abschluss der Suite-Datenintegritaet-
@@ -1091,8 +1092,9 @@ stillschweigende Nullrenditen.
 **Umsetzungsstatus:** am 2026-08-01 durch Codex auf Basis des extern
 freigegebenen und als Commit `a7038e5` vorliegenden Slice-05-Ergebnisdokuments
 technisch umgesetzt und nach den blockierenden Claude-Reviews zu CR06-1 bis
-CR06-19 nachgebessert. Die technischen Korrekturen sind abgeschlossen;
-erneutes externes Review, Freigabe und Commit bleiben ausstehend.
+CR06-19 nachgebessert. Claude hat den technischen Stand in Runde 3
+freigegeben; er liegt als lokaler Commit `02f39f9` vor. CR06-21 und CR06-22
+wurden als Vorgates an Slice 07 uebergeben.
 
 **Abhaengigkeit:** Slice 1.
 
@@ -1176,6 +1178,16 @@ ohne die vom Nutzer bestaetigte funktionale Rentenfortschreibung zu ersetzen.
 
 ### Slice 7 - Demografie-, Pflege- und Hinterbliebenendaten
 
+**Slice-Dokument:**
+[`SLICE_BACKTEST_DATENPRUEFUNG_07_DEMOGRAFIE_PFLEGE_HINTERBLIEBENE.md`](SLICE_BACKTEST_DATENPRUEFUNG_07_DEMOGRAFIE_PFLEGE_HINTERBLIEBENE.md)
+
+**Umsetzungsstatus:** am 2026-08-01 auf Basis des technisch freigegebenen und
+als Commit `02f39f9` vorliegenden Slice-06-Ergebnisdokuments durch Codex
+technisch umgesetzt und selbstgeprueft. CR06-21 und CR06-22 sind als
+vorgeschaltete Gates geschlossen. Die Blocker CR07-1 bis CR07-3 aus dem ersten
+Claude-Review sind technisch nachgebessert. Erneutes externes Review, Freigabe
+und Commit bleiben ausstehend; Codex nimmt keine Selbstfreigabe vor.
+
 **Abhaengigkeit:** Slice 1.
 
 **Ziel**
@@ -1197,6 +1209,56 @@ amtliche Quellen und die beabsichtigte Simulationssemantik geprüft.
 - Perioden- und Kohortensterblichkeit werden nicht vermischt.
 - Defaults und Modellannahmen sind von amtlichen Beobachtungen getrennt.
 - Markerprofile fuer Alter, Geschlecht, Pflege und Hinterbliebene bestehen.
+
+**Technisches Ergebnis**
+
+- Der Destatis-`Statistische Bericht Sterbetafeln 2023/2025` (EVAS 12621),
+  Tabellen `12613-b01` und `12613-b02`, sowie die Pflegestatistik 2023 sind
+  als Original-XLSX mit Quellen-, Abruf-, Lizenz- und SHA-256-Vertrag gepinnt.
+  Der generierte Vertrag `GermanDemographyCareSurvivorContractV1`
+  traegt Revision `2026-08-01.1`; sein Rohdatenhash lautet
+  `a21bab59269970d29f1e15ad49b64e82a74348692cc38759e4339e1be1205fc3`,
+  der Sterbetafelhash
+  `88c1000eac950016a65e7408127d5c1256683946933b710a0c28f672fde5f232`.
+- Die Runtime-Alter 18 bis 100 stammen fuer Mann und Frau aus der amtlichen
+  Periodentafel. Alter 101 bis 110 ist ein explizites Modellende; `divers` ist
+  eine offengelegte Modellableitung. Eine Kohortentafel oder kuenftige
+  Mortalitaetsverbesserung wird nicht behauptet.
+- Pflege-Bestandsquoten und Pflegegradzaehlungen sind nur
+  Beobachtungs-/Validierungsdaten. Eintritt, Progression und Dauer bleiben
+  getrennte Modellannahmen; die falsche Praevalenz-zu-Inzidenz-Behauptung ist
+  entfernt. Der 55-Prozent-Hinterbliebenen-Default bleibt ein vereinfachter
+  Cashflow-Vertrag ohne gesetzliche Anspruchsberechnung.
+- CR06-21 ist mit einem Lohnmodus-Golden-Case 1944 bis 1950 geschlossen.
+  CR06-22 ist durch Modellstatus, Beibehaltungsgrund und
+  Nullbruecken-Sensitivitaet fuer den 1945er JST-Wert geschlossen; der
+  Lohnwertehash blieb unveraendert.
+- Die unveraenderte Slice-06-Deltafixture ist per SHA-256 an die neue
+  `demography-care-survivor-backtest-delta-v1.json` gebunden. Der direkte
+  Slice-06-zu-Slice-07-Vergleich des aktiven `survival_quantile`-/Dynamic-
+  Flex-Falls ergibt Endvermoegen `-19.225,84 EUR`, Entnahmen `+3.000 EUR`,
+  Steuer `+1.124,01 EUR` und Runway-Deckung `-3,740149` Prozentpunkte. Der
+  CAPE-inaktive Referenzarm ergibt `+12.940,41 EUR`, `-24.000 EUR`,
+  `+4.458,88 EUR` und `-2,543821` Prozentpunkte. Outcome bleibt jeweils
+  `completed` und `portfolio_flow_delta` null. Der davon getrennte CAPE-an/
+  aus-Vergleich innerhalb Slice 07 wird nicht mehr als Sterbetafelwirkung
+  ausgegeben. Die neun uebrigen vorhandenen Faelle bleiben unveraendert; der
+  elfte Golden Case ist der neue Lohnnahtzeuge.
+- `post-backtest-data-07-v1` reproduziert denselben Pflege-/Partner-/
+  Hinterbliebenenfall mit festem Seed auf dem Slice-06-Basiscommit und dem
+  Slice-07-Arbeitsstand: 2.048 Runs, 40 Jahre und zwei Sweep-Kombinationen.
+  P10/P50/P90 der Lebensdauer sinken um 2/1/1 Jahre, das mediane nominale
+  MC-Endvermoegen um `105.797,440633 EUR` und die Zahl der Runs mit Pflege um
+  52. Im 50-Prozent-Aktien-Sweep sinkt das Median-Endvermoegen ebenfalls um
+  `105.797,440633 EUR`; Witwenjahre P1/P2 verschieben sich um -598/+1.933.
+  Die `pending`-Fixture bindet 40 numerische Deltas sowie Pfad- und
+  Wertehashes, ohne eine fruehere Messfixture zu ueberschreiben.
+- `npm test` ist mit 159 Dateien und 17.855/17.855 Assertions gruen. Alle
+  sieben Quellen-Verify-Gates, 27/27 Browser-Workflows, Coverage,
+  Doku-Evidenz und `git diff --check` bestehen. Die neue unabhaengige
+  Quellenrekonstruktion umfasst 696/696 Assertions; das neue Runtime-Messgate
+  19/19 Assertions. Coverage liegt bei 78,10 Prozent, beide Pflicht-
+  Datei-Gates bestehen.
 
 ### Slice 8 - Liquiditaets-Runway und Puffervertrag
 

@@ -165,9 +165,9 @@ Referenz `pre-hardening-v1`, versionierte semantische Post-Slice-Referenzen
 und den extern noch nicht freigegebenen Integrationskandidaten
 `monte-carlo-v1-final`. Solange kein extern freigegebener Nachfolger
 vorliegt, ist die oeffentliche `currentReference` `null`;
-`post-backtest-data-05-v1` ist ein davon getrennter, bis zum erneuten
-externen Review `pending` markierter Gold-Daten-Messkandidat auf Basis des
-unveraenderlichen Cash-/Geldmarkt-Kandidaten `post-backtest-data-04-v1`. Der
+`post-backtest-data-07-v1` ist der neueste getrennte, bis zum erneuten
+externen Review `pending` markierte Demografie-/Pflege-/Hinterbliebenen-
+Messkandidat auf Basis von `post-backtest-data-06-v2`. Der
 veraenderliche Zeiger wird aus der eingefrorenen Ergebnisprojektion
 ausgeschlossen. Pending Kandidaten werden daher weder zur aktuellen Referenz
 erklaert noch wegen einer reinen Zeigeraenderung dupliziert. Fruehere Suite-
@@ -599,7 +599,8 @@ Zufallszahlen und Statistik (Formatierung wird aus `app/shared/shared-formatting
 ---
 
 ## 23. `simulator-data.js`
-Historische Datenprojektion 1925-2025, Mortalitätstafeln und Stress-Presets.
+Historische Datenprojektion 1925-2025, Re-Exports des
+Demografie-/Pflegevertrags und Stress-Presets.
 Die Aktienlevels werden nicht mehr als zweite Zahlenreihe gepflegt, sondern
 aus `global-equity-research-chain.js` importiert. Die deutschen
 Inflationswerte werden ebenso ausschliesslich aus
@@ -610,16 +611,48 @@ Inflationswerte werden ebenso ausschliesslich aus
 **Exporte:**
 - `HISTORICAL_DATA` – historische Marktdaten mit dem neutralen Feld
   `global_equity_research_index` sowie Gold, Inflation, Zins, Lohn und CAPE
-- `MORTALITY_TABLE` – Sterbetafeln nach Geschlecht und Alter
-- `CARE_ENTRY_PROB` – Pflegeeintrittswahrscheinlichkeiten (BARMER)
+- `MORTALITY_TABLE` – generierte Periodensterbetafel nach Geschlecht und Alter
+- `PFLEGE_GRADE_PROBABILITIES` – explizite Modellannahmen fuer initialen
+  Pflegeeintritt in Grad 1 oder 2; keine amtliche Praevalenz
 - `STRESS_PRESETS` – Stresstest-Szenarien (GFC, Stagflation, Lost Decade, System-Krise etc.)
 
 **Dependencies:** `global-equity-research-chain.js`, `german-cpi-chain.js`,
-`german-cash-money-market-chain.js`, `gold-german-investor-chain.js`
+`german-cash-money-market-chain.js`, `gold-german-investor-chain.js`,
+`german-demography-care-survivor-contract.js`
 
 ---
 
-## 23a. `global-equity-research-chain.js`
+## 23a. `german-demography-care-survivor-contract.js`
+
+Generiertes, tief eingefrorenes Datenartefakt fuer Sterblichkeit,
+Pflegebeobachtungen/-modellannahmen und Hinterbliebenengrenzen.
+
+- Destatis `Statistischer Bericht Sterbetafeln 2023/2025` (EVAS 12621),
+  Tabellen `12613-b01` und `12613-b02`: amtliche `qx` fuer Mann/Frau und Alter
+  18-100; Alter 101-110 ist ein separater Modellrand, `divers` der
+  ungewichtete Mittelwert und keine amtliche dritte Tabelle.
+- Destatis-Pflegestatistik 2023: Bestandszahlen, Pflegegradanteile und
+  alters-/geschlechtsspezifische Pflegequoten nur als
+  `validation_only_not_transition_probability`.
+- Pflegeeintritt Grad 1/2, Progression und Dauer sind getrennte
+  Modellannahmen. Die fruehere unbelegte Praevalenz-durch-vier-Herleitung ist
+  entfernt.
+- Der Hinterbliebenenvertrag beschreibt `percent`/55 als UI-Default und
+  grenzt die vereinfachte Cashflow-Logik von einer gesetzlichen
+  Anspruchsberechnung ab.
+- `monte-carlo-runner.js` exportiert Revision, Hashes und Semantikgrenzen als
+  `DemographyCareSurvivorDiagnosticsV1`.
+- `post-backtest-data-07-v1` misst mit festem Seed 2.048 Runs ueber 40 Jahre
+  und zwei Sweep-Kombinationen. Pflege, Partner und Hinterbliebenen-Cashflow
+  sind aktiv; 40 numerische Slice-06-zu-Slice-07-Deltas bleiben bis zum
+  externen Review `pending`.
+
+**Build:** `npm run build:german-demography-data`
+**Verify:** `npm run verify:german-demography-data`
+
+---
+
+## 23b. `global-equity-research-chain.js`
 
 Generiertes, tief eingefrorenes Datenartefakt fuer die offene
 16-Laender-Aktien-Forschungsproxykette. Das Buildskript prueft die Original-
@@ -642,7 +675,7 @@ Datenwerte stehen separat unter `CC BY-NC-SA 4.0`; Details liegen in
 
 ---
 
-## 23b. `german-cpi-chain.js`
+## 23c. `german-cpi-chain.js`
 
 Generiertes, tief eingefrorenes Datenartefakt fuer die deutsche
 Jahresdurchschnitts-Verbraucherpreisinflation 1925-2025. Das Buildskript
@@ -679,7 +712,7 @@ Namensnennung – 2.0. Details liegen in
 
 ---
 
-## 23c. `german-cash-money-market-chain.js`
+## 23d. `german-cash-money-market-chain.js`
 
 Generiertes, tief eingefrorenes Datenartefakt fuer den deutschen
 Cash-/Overnight-Geldmarkt-Bruttoertragsproxy 1925-2025. Das Buildskript
@@ -725,7 +758,7 @@ liegen in `data/historical/german-cash-money-market-chain/`.
 
 ---
 
-## 23d. `gold-german-investor-chain.js`
+## 23e. `gold-german-investor-chain.js`
 
 Generiertes, tief eingefrorenes Datenartefakt fuer die nominale
 Gold-Bruttorendite in deutscher Anlegerwaehrung 1925-2025. Das Buildskript
@@ -759,7 +792,7 @@ liegen in `data/historical/gold-german-investor-chain/`.
 
 ---
 
-## 23e. `german-gross-wage-growth-chain.js`
+## 23f. `german-gross-wage-growth-chain.js`
 
 Generiertes, tief eingefrorenes Datenartefakt fuer den Destatis-Index der
 durchschnittlichen Bruttomonatsverdienste ohne Sonderzahlungen. Die
@@ -780,7 +813,7 @@ proxy und keine gesetzliche Rentenanpassungsreihe.
 
 ---
 
-## 23f. `us-shiller-cape-chain.js`
+## 23g. `us-shiller-cape-chain.js`
 
 Generiertes, tief eingefrorenes Datenartefakt fuer Robert J. Shillers
 konventionelles Price-CAPE des US-Aktienmarkts. Fuer Returnjahr `t` wird die
@@ -802,7 +835,7 @@ Vorkriegsinputs betroffenen Entscheidungsjahre 1925-1935 sind `estimated`,
 
 ---
 
-## 23g. `simulation-data-inventory.js`
+## 23h. `simulation-data-inventory.js`
 
 DOM-freier, unveraenderlicher Evidenz- und Quell-Gate-Contract fuer
 historische Reihen und statische Simulationsdaten. Das Modul ersetzt weder
