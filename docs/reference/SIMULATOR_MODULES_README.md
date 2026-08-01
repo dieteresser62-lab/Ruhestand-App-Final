@@ -263,13 +263,16 @@ DOM-freier Sweep-Runner für Worker-Jobs (Combos + RunRanges) mit deterministisc
 ### `historical-backtest-contract.js`
 
 DOM-freier, im historischen Produktbacktest aktivierter Daten- und Jahrescontract. Er
-validiert `HISTORICAL_DATA_MANIFEST` und den kanonischen SHA-256-Fingerprint
-einmal je Revision/Hash, baut einen immutable Lookup von
+validiert `HISTORICAL_DATA_MANIFEST`, seine geordneten, eindeutigen
+Reihendiskontinuitaeten und den kanonischen SHA-256-Fingerprint einmal je
+Revision/Hash, baut einen immutable Lookup von
 `HistoricalYearRecordV1` und stellt Einzelpfad-/Cohort-Batch-Preflights bereit.
 Jeder Record trennt ex-post `realized` von `decisionAsOf` und traegt
 `sourceYear`, `asOfYear`, Einheit, Ableitung und Qualitaetsstatus. Die aktive
 Konvention `realized_t_decision_t_minus_1_v1` verwendet realisierte Werte aus
-`t` und CAPE decision-as-of aus `t-1`.
+`t`. CAPE traegt Beobachtungsjahr `t-1`, Beobachtungsmonat Dezember, As-of-Jahr
+`t-1` und Entscheidungsjahr `t` getrennt; die unter `t` gespeicherte
+Entscheidungsreihe wird ohne zweiten Lag konsumiert.
 
 **Hauptfunktionen / Exporte:**
 - `createHistoricalBacktestContractProvider()` – gecachter Datasetvalidator und immutable Provider mit abgeleiteten Bounds sowie `preparePeriod()`/`prepareBatch()`.
@@ -756,7 +759,50 @@ liegen in `data/historical/gold-german-investor-chain/`.
 
 ---
 
-## 23e. `simulation-data-inventory.js`
+## 23e. `german-gross-wage-growth-chain.js`
+
+Generiertes, tief eingefrorenes Datenartefakt fuer den Destatis-Index der
+durchschnittlichen Bruttomonatsverdienste ohne Sonderzahlungen. Die
+publizierte Veraenderung des Berichtsjahres `t` wird bei
+`rentAdjMode=wage` genau einmal im Simulationsjahr `t` angewendet. Der
+offizielle Abschnitt umfasst 1947-2025; 1925-1946 wird aus aufeinanderfolgenden
+JST-R6-`DEU.wage`-Nominallohnstaenden als Forschungsproxy abgeleitet. Gebiet,
+fruehe Quellenpraezision und die amtlichen Methodenbrueche 1991, 2007 und 2022
+sind explizite Segmente. Die Reihe ist ein funktionaler Rentenfortschreibungs-
+proxy und keine gesetzliche Rentenanpassungsreihe.
+
+**Exporte:** `GERMAN_GROSS_WAGE_GROWTH_CHAIN` und
+`GERMAN_GROSS_WAGE_GROWTH_PCT`.
+
+**Erzeugung:** `npm run build:german-gross-wage-data`; read-only Gate:
+`npm run verify:german-gross-wage-data`. Quelle, Hash und Lizenz stehen unter
+`data/historical/german-gross-wage-growth-chain/`.
+
+---
+
+## 23f. `us-shiller-cape-chain.js`
+
+Generiertes, tief eingefrorenes Datenartefakt fuer Robert J. Shillers
+konventionelles Price-CAPE des US-Aktienmarkts. Fuer Returnjahr `t` wird die
+Dezemberbeobachtung `t-1` ausgewaehlt und mit Beobachtungs-, As-of- und
+Entscheidungsjahr exportiert. Der Runtime-Contract liest den unter `t`
+gespeicherten Wert einmal. Total-Return-CAPE sowie globale oder deutsche
+Marktinterpretationen sind ausgeschlossen. Fuer den oeffentlichen
+Publisherdownload wurde keine ausdrueckliche offene Redistributionserlaubnis
+gefunden; diese Nutzungsgrenze bleibt dokumentiert. Die durch interpolierte
+Vorkriegsinputs betroffenen Entscheidungsjahre 1925-1935 sind `estimated`,
+1936-2025 ist `backtested`.
+
+**Exporte:** `US_SHILLER_CAPE_CHAIN` und
+`US_SHILLER_CAPE_BY_RETURN_YEAR`.
+
+**Erzeugung:** `npm run build:us-shiller-cape-data`; read-only Gate:
+`npm run verify:us-shiller-cape-data`. Quelle und Nutzungsgrenze stehen unter
+`data/historical/us-shiller-cape-chain/`.
+
+---
+
+## 23g. `simulation-data-inventory.js`
 
 DOM-freier, unveraenderlicher Evidenz- und Quell-Gate-Contract fuer
 historische Reihen und statische Simulationsdaten. Das Modul ersetzt weder
@@ -766,10 +812,11 @@ Backtestcontract.
 **Exporte:**
 
 - `SIMULATION_DATA_INVENTORY` – `SimulationDataInventoryV1`, Revision
-  `2026-08-01.1`, mit sechs reihenspezifischen Historieneintraegen und sieben
+  `2026-08-01.4`, mit sechs reihenspezifischen Historieneintraegen und sieben
   statischen Kategorien;
 - `validateSimulationDataInventory()` – prueft Pflichtfelder,
   Evidenzvokabular, lueckenlose 1925-2025-Qualitaetssegmente,
+  geordnete und eindeutige Reihendiskontinuitaeten,
   Implementierungsabdeckung sowie fail-closed External-Validation-Gates;
 - `computeSimulationDataValueHash()` /
   `assertSimulationDataValueHash()` – kanonischer SHA-256-Abgleich gegen
@@ -779,12 +826,17 @@ Backtestcontract.
   Reproduzierbarkeit, externe Validierung und Erlaubnis zum Datenersatz.
 
 `unresolved` bleibt technisch reproduzierbar, darf aber weder eine externe
-Validierung noch einen lizenzierten Datenersatz behaupten. Aktien-, CPI-,
-Cash- und Goldkette besitzen bekannte Quellen-/Lizenz- beziehungsweise
-Nutzungsfelder, bleiben wegen ihrer Proxy-/Schaetzsegmente und ausstehender externer
-Validierung jedoch `not_validated`. Modellannahmen,
+Validierung noch einen lizenzierten Datenersatz behaupten. Alle sechs
+Historienketten besitzen bekannte Quellen- und Lizenz- oder Nutzungsfelder,
+bleiben wegen Proxy-/Schaetzsegmenten, CAPE-Nutzungsgrenze und ausstehender
+externer Validierung jedoch `not_validated`. Modellannahmen,
 Nutzereingaben, Stressparameter, abgeleitete Werte und fehlende Modelle tragen
 getrennte Evidenzklassen.
+
+Der Lohnpfad trennt 1945 als `estimated` von den umgebenden JST-Proxydaten
+und fuehrt die Jahre 1925 (Startnormalisierung), 1945 (keine
+Marktlohnbeobachtung), 1947 (JST-/Destatis-Quellennaht) und 1948
+(Waehrungsreformkontext) als maschinenlesbare Diskontinuitaeten.
 
 **Dependencies:** `historical-backtest-contract.js` fuer kanonische
 Serialisierung und browserkompatibles SHA-256.

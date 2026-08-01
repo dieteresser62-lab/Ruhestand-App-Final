@@ -45,6 +45,10 @@ function clone(value) {
     return JSON.parse(JSON.stringify(value));
 }
 
+function assertJsonEqual(actual, expected, message) {
+    assertEqual(JSON.stringify(actual), JSON.stringify(expected), message);
+}
+
 function captureError(callback) {
     try {
         callback();
@@ -198,6 +202,42 @@ assertEqual(
     SIMULATION_DATA_INVENTORY.historicalSeries.zinssatz_de.source.status,
     'known',
     'German cash should resolve its pinned JST and Bundesbank source chain'
+);
+assertJsonEqual(
+    SIMULATION_DATA_INVENTORY.historicalSeries.lohn_de.qualitySegments
+        .map(({ startYear, endYear, evidenceClass }) => ({ startYear, endYear, evidenceClass })),
+    [
+        { startYear: 1925, endYear: 1925, evidenceClass: 'proxy' },
+        { startYear: 1926, endYear: 1944, evidenceClass: 'proxy' },
+        { startYear: 1945, endYear: 1945, evidenceClass: 'estimated' },
+        { startYear: 1946, endYear: 1946, evidenceClass: 'proxy' },
+        { startYear: 1947, endYear: 1955, evidenceClass: 'official' },
+        { startYear: 1956, endYear: 1990, evidenceClass: 'official' },
+        { startYear: 1991, endYear: 2006, evidenceClass: 'official' },
+        { startYear: 2007, endYear: 2021, evidenceClass: 'official' },
+        { startYear: 2022, endYear: 2025, evidenceClass: 'official' }
+    ],
+    'German wage quality should expose source, territory, precision and method seams'
+);
+assertJsonEqual(
+    SIMULATION_DATA_INVENTORY.historicalSeries.lohn_de.discontinuities
+        .map(({ year, type }) => ({ year, type })),
+    [
+        { year: 1925, type: 'start_boundary' },
+        { year: 1945, type: 'wartime_market_observation_break' },
+        { year: 1947, type: 'source_seam' },
+        { year: 1948, type: 'currency_reform_context' }
+    ],
+    'German wage inventory should expose every early seam'
+);
+assertJsonEqual(
+    SIMULATION_DATA_INVENTORY.historicalSeries.cape.qualitySegments
+        .map(({ startYear, endYear, evidenceClass }) => ({ startYear, endYear, evidenceClass })),
+    [
+        { startYear: 1925, endYear: 1935, evidenceClass: 'estimated' },
+        { startYear: 1936, endYear: 2025, evidenceClass: 'backtested' }
+    ],
+    'CAPE quality should delimit the interpolation-affected vintage'
 );
 console.log('✓ series-specific quality segmentation OK');
 
@@ -360,12 +400,7 @@ for (const seriesId of historicalSeriesIds) {
     assertEqual(gate.technicallyReproducible, true, `${seriesId} should remain reproducible`);
     assertEqual(gate.externallyValidated, false, `${seriesId} must not claim external validation`);
     assertEqual(gate.replacementAllowed, false, `${seriesId} must not pass the replacement gate`);
-    if (['global_equity_research_index', 'inflation_de', 'zinssatz_de', 'gold_eur_perf'].includes(seriesId)) {
-        assertEqual(gate.unresolvedFields.length, 0, `${seriesId} source and license fields should be resolved`);
-    } else {
-        assert(gate.unresolvedFields.includes('source'), `${seriesId} should expose its source blocker`);
-        assert(gate.unresolvedFields.includes('license'), `${seriesId} should expose its license blocker`);
-    }
+    assertEqual(gate.unresolvedFields.length, 0, `${seriesId} source and license fields should be resolved`);
 }
 console.log('✓ source gates OK');
 
@@ -397,6 +432,11 @@ console.log('Test 9: fabricated provenance and false validation claims fail clos
     drifted.equityCrashRatio = -0.20;
     const hashError = captureError(() => assertSimulationDataValueHash('regime_classification_thresholds', drifted));
     assertEqual(hashError?.code, 'SIMULATION_DATA_HASH_MISMATCH', 'Static value drift should fail the hash gate');
+
+    const invalidSeamInventory = clone(SIMULATION_DATA_INVENTORY);
+    invalidSeamInventory.historicalSeries.lohn_de.discontinuities[1].year = 1925;
+    const seamError = captureError(() => validateSimulationDataInventory(invalidSeamInventory));
+    assertEqual(seamError?.code, 'SIMULATION_DATA_DISCONTINUITIES_INVALID', 'Duplicate or unordered inventory seams should fail closed');
 }
 console.log('✓ negative provenance and hash gates OK');
 

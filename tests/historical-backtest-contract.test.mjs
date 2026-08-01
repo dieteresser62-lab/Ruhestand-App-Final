@@ -49,6 +49,7 @@ function makeFixtureManifest(records, suffix, customize = null) {
     for (const series of Object.values(manifest.series)) {
         series.period = { ...manifest.period };
         series.estimatedSegments = [];
+        series.discontinuities = [];
         series.missingness.fallbackZeroSegments = [];
         series.revision = manifest.revision;
     }
@@ -104,9 +105,12 @@ console.log('Test 2: HistoricalYearRecordV1 separates realized and decision-as-o
     assertEqual(record.realized.cashBondReturn.sourceYear, 2000, 'Cash/bond source year should be t');
     assertEqual(record.realized.inflation.sourceYear, 2000, 'Inflation source year should be t');
     assertEqual(record.realized.wagePensionAdjustment.value, 100, 'Wage/pension marker should use t');
-    assertEqual(record.decisionAsOf.capeRatio.value, 19, 'CAPE should use the last pre-decision value');
+    assertEqual(record.decisionAsOf.capeRatio.value, 20, 'CAPE should use the decision signal embedded under return year t');
     assertEqual(record.decisionAsOf.capeRatio.sourceYear, 1999, 'CAPE source year should be t-1');
     assertEqual(record.decisionAsOf.capeRatio.asOfYear, 1999, 'CAPE as-of year should be t-1');
+    assertEqual(record.decisionAsOf.capeRatio.observationYear, 1999, 'CAPE observation year should be t-1');
+    assertEqual(record.decisionAsOf.capeRatio.observationMonth, 12, 'CAPE observation month should be December');
+    assertEqual(record.decisionAsOf.capeRatio.decisionYear, 2000, 'CAPE decision year should be t');
     assertEqual(record.alignmentStatus, 'approved_d01', 'D-01 alignment should be visibly approved');
 
     const lookAheadRecord = clone(record);
@@ -338,8 +342,8 @@ console.log('Test 10: approved realized fields align with active Monte Carlo ann
     assertEqual(record.realized.cashBondReturn.value, mc.zinssatz, 'Cash/bond return should align with MC year t');
     assertEqual(record.realized.inflation.value, mc.inflation, 'Inflation should align with MC year t');
     assertEqual(record.realized.wagePensionAdjustment.value, mc.lohn, 'Wage adjustment should align with MC year t');
-    assertEqual(record.decisionAsOf.capeRatio.value, HISTORICAL_DATA[1999].cape, 'CAPE should remain the known t-1 policy value');
-    assert(record.decisionAsOf.capeRatio.value !== mc.capeRatio, 'CAPE must intentionally differ from MC sampled t to prevent look-ahead');
+    assertEqual(record.decisionAsOf.capeRatio.value, HISTORICAL_DATA[2000].cape, 'CAPE should consume the December t-1 signal stored under return year t');
+    assertEqual(record.decisionAsOf.capeRatio.value, mc.capeRatio, 'Backtest and MC should consume the same no-look-ahead CAPE decision signal for year t');
 }
 console.log('✓ approved D-01 versus active MC alignment OK');
 console.log('✓ assignment inventory OK');

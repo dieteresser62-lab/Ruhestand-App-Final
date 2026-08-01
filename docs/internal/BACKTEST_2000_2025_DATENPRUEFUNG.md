@@ -2,10 +2,9 @@
 
 **Pruefdatum:** 2026-07-29
 **Pruefer:** Claude (Primary reviewer & Analyst)
-**Status:** Korrekturprogramm in Umsetzung; Slice 01 bis 03 technisch
-freigegeben und lokal committed; Claude hat Slice 04 mit CR04-1 bis CR04-9
-blockiert; Codex hat die Findings technisch nachgebessert, aber erneutes
-externes Review, Freigabe und Commit stehen aus
+**Status:** Korrekturprogramm in Umsetzung; Slice 01 bis 05 extern freigegeben
+und lokal committed; Slice 06 ist technisch umgesetzt, aber externes Review,
+Freigabe und Commit stehen aus
 **Pruefgegenstand:** Exportdatei
 `backtest-2000-2025-89fc3e368d64-2026-07-29T10-00-22.287Z.json`
 **Anlass:** Nutzerseitige Verifikation nach Abschluss der Suite-Datenintegritaet-
@@ -1086,6 +1085,15 @@ stillschweigende Nullrenditen.
 
 ### Slice 6 - CAPE sowie Lohn-/Rentenfortschreibungsreihe
 
+**Slice-Dokument:**
+[`SLICE_BACKTEST_DATENPRUEFUNG_06_CAPE_LOHN_RENTENFORTSCHREIBUNG.md`](SLICE_BACKTEST_DATENPRUEFUNG_06_CAPE_LOHN_RENTENFORTSCHREIBUNG.md)
+
+**Umsetzungsstatus:** am 2026-08-01 durch Codex auf Basis des extern
+freigegebenen und als Commit `a7038e5` vorliegenden Slice-05-Ergebnisdokuments
+technisch umgesetzt und nach den blockierenden Claude-Reviews zu CR06-1 bis
+CR06-19 nachgebessert. Die technischen Korrekturen sind abgeschlossen;
+erneutes externes Review, Freigabe und Commit bleiben ausstehend.
+
 **Abhaengigkeit:** Slice 1.
 
 **Ziel**
@@ -1108,6 +1116,63 @@ ohne die vom Nutzer bestaetigte funktionale Rentenfortschreibung zu ersetzen.
 - `lohn_de` behauptet keine amtliche Reihenidentitaet, die nicht belegt ist.
 - Bei deaktivierter VPW-/CAPE-Policy verändert eine isolierte
   CAPE-Datenkorrektur das Ergebnis nicht.
+
+**Technisches Ergebnis**
+
+- CAPE wird aus der gepinnten Shiller-Arbeitsmappe als konventionelles
+  US-Price-CAPE erzeugt. Returnjahr `t` verwendet Dezember `t-1` genau einmal;
+  der 101-Signal-Hash lautet
+  `d1101958fed64dadf8fba76e9e4e92c8d24e86bd3d21accc42cdb60c247a835f`.
+- `lohn_de` wird fuer 1925-1946 aus aufeinanderfolgenden JST-R6-`DEU.wage`-
+  Staenden und fuer 1947-2025 aus der Destatis-Langreihe der
+  Bruttomonatsverdienste ohne Sonderzahlungen erzeugt. Gebiets-, Praezisions-
+  und Methodenbrueche sind explizit segmentiert. Der Nahtvertrag markiert
+  1925 als Startnormalisierung, 1945 als geschaetzte Kriegs-/Nachkriegsbruecke
+  ohne Marktlohnbeobachtung, 1947 als JST-/Destatis-Quellennaht und 1948 als
+  Waehrungsreformkontext; der 101-Werte-Hash lautet
+  `e10e581f6994e07ed0a943b3716dd8fd5dea7b8b272d47a546466af8701a3057`.
+- Manifest und Inventar tragen Revision `2026-08-01.4` und Dataset-Hash
+  `c79350c5abf2dee2feeaae65c88ed5e58487f878cb598fdffc132fbf48d01e79`.
+- Unabhaengige Volloracles pruefen alle 101 Goldreturns, alle 101 CAPE-Signale,
+  alle 22 JST-Lohnveraenderungen und alle 79 amtlichen Lohnjahre. Der
+  CAPE-Generator prueft zusaetzlich die Quellheader `Date`, konventionelles
+  `CAPE` und die verworfene `TR CAPE`-Spalte. Die Slice-05-Backtest-Zielfixture
+  bleibt bytegleich als `post-backtest-data-05-target-v1.json` erhalten.
+- Der ausgelieferte Dynamic-Flex-Default `legacy_step` ist fuer 2018-2025 mit
+  exakten Vorher-/Nachhermetriken belegt: Endvermoegen
+  `2.726.687,53 -> 2.783.336,86 EUR`, Entnahmen
+  `801.000 -> 771.000 EUR`, Steuer `95.126,84 -> 95.006,65 EUR` und
+  Runway-Deckung `62,235564 -> 72,719865`; Outcome bleibt `completed`,
+  `portfolio_flow_delta` bleibt null. Der CAPE-inaktive Fall prueft zusaetzlich
+  eine exakte Allowlist aller 35 geaenderten Blattfelder.
+- Zwei fruehe lohnindexierte Golden Cases vergleichen die JST-Kette gegen die
+  abgeloeste konstante 3-Prozent-Reihe. Fuer 1930-1940 betragen die Deltas
+  `-65.261,16 EUR` Endvermoegen, `+51.000 EUR` Entnahmen,
+  `+2.408,26 EUR` Steuer und `7 -> 9` Kuerzungsjahre. Fuer 1935-1946 sind es
+  `-48.418,44 EUR`, `+28.200 EUR`, `+5.003,92 EUR` und `10 -> 1`;
+  Outcome bleibt jeweils `completed`, `portfolio_flow_delta` null.
+- Die aktive Backtest-Deltaevidenz ist
+  `cape-wage-backtest-delta-v3.json`. Sie dokumentiert, dass V1 beim
+  Umbenennen des entfernten `cape_continuous`-Falls irrtuemlich dessen
+  `mean`-/20-Jahre-Horizont behielt, V2 auf die ausgelieferten
+  `survival_quantile`-/30-Jahre-Defaults korrigierte, aber den fruehen
+  Lohnwirkungsscope noch nicht mass. Der Continuous-Fall wurde durch den
+  Default-`legacy_step`-Fall ersetzt und ist kein Slice-06-Daten-Delta-Oracle.
+- `post-backtest-data-06-v1` bleibt als fehlerhafter, unveraenderlicher
+  Vorgaenger erhalten. `post-backtest-data-06-v2` wurde zur Laufzeit
+  zeitgestempelt, dokumentiert die fehlenden CAPE-/Lohn-/Gold-Wirkungsfaelle
+  explizit und belegt gegen Slice 05 exakt null numerische Monte-Carlo-Deltas.
+  Beide Kandidaten bleiben bis zum erneuten externen Review `pending`.
+- Das CAPE-Sampling liest nur noch die vom Aufrufer uebergebenen
+  Entscheidungssignale; die Kandidatendeltas sind in einer eigenen Fixture
+  eingefroren. CAPE 1925-1935 ist `estimated`; der produktive
+  Estimated-History-Filter ab 1951 schliesst dieses Segment vollstaendig aus.
+- Alle sieben read-only Quellen-/Toolchain-Gates sind gruen. `npm test`
+  umfasst nach der Nachbesserung 156 Dateien und 17.022/17.022 Assertions ohne
+  fehlgeschlagene Dateien oder offene Handles. Browser-Smoke ist mit 27/27
+  Workflows gruen; das Coverage-Gate besteht bei 77,88 Prozent gesamt und
+  97,44 Prozent fuer `app/shared/cape-utils.js`. `npm run docs:evidence` und
+  `git diff --check` sind sauber.
 
 ### Slice 7 - Demografie-, Pflege- und Hinterbliebenendaten
 

@@ -295,8 +295,8 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 **Zweck:** Validiert Golden Cases, unveraenderliche Snapshot-Linie, Delta-Ledger, Same-Runtime-Exaktheit sowie Direct-/Worker-/Chunk-Paritaet.
 - **Aktuelle Referenz:** Die oeffentliche `currentReference` ist `null`,
   solange kein extern freigegebener Nachfolger vorliegt;
-  `post-backtest-data-05-v1` ist der getrennte, noch extern zu reviewende
-  Gold-Datenkandidat auf Basis des unveraenderlichen Slice-04-Kandidaten. Der
+  `post-backtest-data-06-v2` ist der getrennte, noch extern zu reviewende
+  CAPE-/Lohn-Datenkandidat auf Basis des unveraenderlichen V1-Vorgaengers. Der
   veraenderliche Zeiger ist aus der eingefrorenen
   Ergebnisprojektion ausgeschlossen. Keine fruehere Fixture wird
   ueberschrieben und eine reine Zeigeraenderung erzeugt keinen
@@ -327,6 +327,14 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
   Gold-Datenprovenienz samt erwarteten Modellprojektionen ein. Der Kandidat
   bleibt `pending`; weder Slice 04 noch eine andere Eingangsfixture wird
   ueberschrieben.
+- **Backtest-Data-Slice-06-Kandidat:** `post-backtest-data-06-v1` bleibt als
+  unveraenderlicher Kandidat mit unvollstaendig behauptetem Messumfang und
+  fehlerhaftem Evidenzvertrag erhalten. `post-backtest-data-06-v2` ist sein
+  zur Laufzeit zeitgestempelter Nachfolger. V2 sagt explizit, dass die sechs
+  Golden Cases weder Gold-, CAPE-Sampling- noch lohnindexierte Rentenwirkung
+  messen, und belegt gegen Slice 05 exakt null numerische Deltas; nur Identitaet,
+  Erfassungsnachweis, Messscope und `annualDataHash` duerfen abweichen. Beide
+  Slice-06-Kandidaten bleiben `pending`.
 - **Historische Fixture-Kompatibilitaet:** Vergleichsausnahmen fuer
   unveraenderliche Pending-Fixtures stehen ausschliesslich in
   `snapshot-policy-v1.json`. Der produktive Runtime-Vertrag enthaelt weder
@@ -856,11 +864,11 @@ Anlegerwaehrung.
 
 #### `simulator-backtest-characterization.test.mjs`
 **Zweck:** Vergleicht die unveraenderte Slice-01-Baseline `legacy_observed` mit dem separaten D-01-Zieloracle `target_expected`.
-- **Golden Cases:** kurzer und langer Completed-Pfad, 3-Bucket/Mindest-Flex, Ruin, Pflegebucket-Projektionsluecke sowie Dynamic-Flex/CAPE.
+- **Golden Cases:** kurzer und langer Completed-Pfad, 3-Bucket/Mindest-Flex, Ruin, Pflegebucket-Projektionsluecke, Dynamic-Flex/CAPE sowie zwei lohnindexierte JST-Fenster 1930-1940 und 1935-1946.
 - **Negative Cases:** Einjahreslauf, NaN-/rueckwaertige Periode, mittlere Datenluecke und nicht-finite Goldrendite.
 - **Messvertrag:** kanonische Input- und Row-Hashes, Non-Mutation, Metrikwoerterbuch, 2000/2001-Alignment sowie kontrollierte Abloesung von `legacy_schema_v0` durch `backtest_ui_state_v1`; Detailtoggle-Paritaet bleibt erhalten.
-- **Delta-Gate:** `BacktestTemporalDeltaReportV1` benennt jede geaenderte Metrik samt Ursache und berichtet Endvermoegens-, Ruinfall- sowie Downstream-Consumer-Auswirkungen; nicht gespeicherte Zieldeltas schlagen fehl.
-- **Fixtures:** `fixtures/simulator-backtest-baseline-v1.json` bleibt read-only; `fixtures/simulator-backtest-target-v1.json` darf kontrolliert mit `UPDATE_BACKTEST_TARGET=1 node tests/run-single.mjs tests/simulator-backtest-characterization.test.mjs` erzeugt werden.
+- **Delta-Gate:** `BacktestTemporalDeltaReportV1` benennt jede geaenderte Metrik samt Ursache und berichtet Endvermoegens-, Ruinfall- sowie Downstream-Consumer-Auswirkungen; nicht gespeicherte Zieldeltas schlagen fehl. `CapeWageBacktestDeltaEvidenceV3` vergleicht CAPE- und Lohnpfade gegen den Basiscommit und prueft fuer die beiden fruehen Lohnfaelle zusaetzlich die abgeloeste konstante 3-Prozent-Reihe, Kuerzungsjahre und `portfolio_flow_delta`.
+- **Fixtures:** `fixtures/simulator-backtest-baseline-v1.json` bleibt read-only; `fixtures/simulator-backtest-target-v1.json` darf kontrolliert mit `UPDATE_BACKTEST_TARGET=1 node tests/run-single.mjs tests/simulator-backtest-characterization.test.mjs` erzeugt werden. `cape-wage-backtest-delta-v1.json` bleibt wegen des uebernommenen `mean`-/20-Jahre-Horizonts als ungueltig superseded, V2 wegen fehlenden fruehen Lohnwirkungsscope als unvollstaendig superseded; V3 ist die aktive Deltaevidenz.
 
 #### `simulator-real-withdrawal-contract.test.mjs`
 **Zweck:** Testet den Simulatorvertrag für echte Realentnahmen.
@@ -1161,11 +1169,17 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `german-cash-money-market-chain.test.mjs` | ~360 | Gepinnte JST-/Bundesbank-Eingaben, 1925-2025-Kette, Methodenbrueche, Waehrungsreformgrenze, Cash-/Bond-Anwendung, Disclaimer und Hashbruecken |
 | `german-cash-money-market-source-reconstruction.test.mjs` | ~230 | Unabhaengige PDF-Koordinatenrekonstruktion aller 77 Bundesbank-Jahre plus JST, einzig erlaubte Schaetzluecke und read-only Generatorgate |
 | `german-cash-money-market-backtest-delta.test.mjs` | ~340 | Slice-04-Vorher-/Nachher-Beleg, Markerjahre, Steuer-/Kostenabgrenzung und FlowDelta |
+| `german-gross-wage-growth-chain.test.mjs` | ~370 | JST-/Destatis-Quellidentitaet, Gebiet, Praezision, Methodenbrueche, Runtimeprojektion, Hash- und Generatorgate |
+| `german-gross-wage-independent-oracle.test.mjs` | ~180 | Unabhaengiger XLSX-Parser fuer 22 JST-Lohnveraenderungen und zustandsbasierter HTML-Parser fuer alle 79 amtlichen Jahre |
 | `gold-german-investor-chain.test.mjs` | ~460 | Gepinnte JST-/Bundesbank-/World-Bank-Eingaben, 1925-2025-Goldkette, Naehte, Nullwerterklaerungen, Runtimeprojektion und read-only Generatorgate |
 | `gold-german-investor-backtest-delta.test.mjs` | ~240 | Slice-05-Invarianz goldfreier Faelle und deterministischer goldhaltiger Delta-Witness |
+| `gold-german-investor-independent-oracle.test.mjs` | ~230 | Zweiter quellnaher XLSX-/CSV-Parser und unabhaengige Vollrekonstruktion aller 101 Goldreturns |
 | `poppler-toolchain.test.mjs` | ~15 | Portierbare Aufloesung, Mindestversionsvertrag und Ablehnung inkompatibler Poppler-Versionen |
 | `historical-data-robustness.test.mjs` | ~60 | Fehlende Marktdaten |
 | `simulation-data-inventory.test.mjs` | ~330 | Historien-/Statik-Inventar, Evidenzklassen, Wertfingerprints und fail-closed Quell-/Lizenz-Gates |
+| `us-shiller-cape-chain.test.mjs` | ~930 | Gepinntes Shiller-XLS, 101 Dezember-t-1-Entscheidungssignale, Headeridentitaet, Qualitaetssegment, No-Double-Lag und Generatorgate |
+| `us-shiller-cape-independent-oracle.test.mjs` | ~220 | Zweiter OLE-/BIFF-Parser und unabhaengige Vollrekonstruktion aller 101 Shiller-CAPE-Entscheidungssignale aus der gepinnten Monatsquelle |
+| `cape-utils.test.mjs` | ~20 | Explizite Entscheidungssignal-Eingabe, genaue Kandidatendeltas und vollstaendiger Estimated-History-Ausschluss des CAPE-Schaetzsegments |
 | `liquidity-guardrail.test.mjs` | ~100 | Liquiditäts-Guardrails |
 | `market-analyzer.test.mjs` | ~150 | Markt-Regime-Klassifizierung |
 | `mc-worker-contract.test.mjs` | ~170 | MC-Worker-Entrypoint, Lifecycle und Fehlervertraege |

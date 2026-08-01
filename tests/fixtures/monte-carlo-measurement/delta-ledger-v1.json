@@ -210,7 +210,67 @@
       "formulaAfter": "Monte Carlo samples the reproducible segmented-timing German-investor gold return chain: US year-end policy/official price times JST year-end German FX through 1944 and 1951-1967, including the 1933 RFC year-end purchase price; an explicit estimated zero-return bridge for 1945-1950; Bundesbank Frankfurt DEM annual averages through 1998; and World Bank gold converted with Bundesbank annual-average USD/EUR from 1999",
       "expectedDirection": "gold-holding financial paths and aggregate deltas may change in either direction; fixed seed, equity, inflation and cash inputs, runtime, worker layout, outcome semantics and calculation formulas stay unchanged, and every captured value is frozen in a separate pending snapshot",
       "goldenCaseIds": ["GC-RISK-01", "GC-CUT-01", "GC-CARE-01", "GC-OUTCOME-01", "GC-SAMPLING-01", "GC-CAR-01"],
-      "reviewStatus": "pending"
+      "reviewStatus": "pending",
+      "knownEvidenceDefect": {
+        "capturedAtUtcStatus": "invalid_predates_measured_code_state",
+        "goldHoldingCaseIncluded": false,
+        "goldRuntimeEffectMeasured": false,
+        "correctionReference": "post-backtest-data-06-v2",
+        "handling": "The immutable candidate is preserved. Its timestamp and gold-effect scope must not be used as evidence; the V2 successor records a runtime-clock capture time and complete explicit scope."
+      }
+    },
+    {
+      "sliceId": "BACKTEST-DATA-06",
+      "sourceReference": "post-backtest-data-05-v1",
+      "targetReference": "post-backtest-data-06-v1",
+      "fieldPath": "metadata.dataVersion/result.{pathSummaries,riskKpis,realWithdrawalP10,samplingDiagnostics}/carResult/autoOptimizeResult",
+      "formulaBefore": "Monte Carlo sampled the Slice-05 annual-data pool with the effective double-lagged CAPE decision mapping and the prior unresolved lohn_de literals",
+      "formulaAfter": "The V1 candidate fingerprints the generated US Shiller conventional CAPE decision chain and the first generated wage chain, but its fixed golden cases request neither CAPE start-year sampling nor wage-indexed pension escalation",
+      "expectedDirection": "No numeric result change was measured. Only snapshot identity, timestamp, annualDataHash and measurement-scope provenance differ; the V1 wording did not state this boundary precisely enough",
+      "goldenCaseIds": ["GC-RISK-01", "GC-CUT-01", "GC-CARE-01", "GC-OUTCOME-01", "GC-SAMPLING-01", "GC-CAR-01"],
+      "reviewStatus": "pending",
+      "measurementScope": {
+        "goldHoldingCaseIncluded": false,
+        "goldRuntimeEffectMeasured": false,
+        "capeSamplingCaseIncluded": false,
+        "capeRuntimeEffectMeasured": false,
+        "wageIndexedPensionCaseIncluded": false,
+        "wageRuntimeEffectMeasured": false,
+        "derivedRegimeEffectExpected": false,
+        "numericDeltaCount": 0,
+        "interpretation": "The existing Monte Carlo golden cases contain no gold holding, CAPE sampling request or wage-indexed pension path. Regimes do not consume CAPE or wage."
+      },
+      "knownEvidenceDefect": {
+        "numericDeltaCount": 0,
+        "capeRuntimeEffectMeasured": false,
+        "wageRuntimeEffectMeasured": false,
+        "capturedAtUtcStatus": "source_literal_with_weak_lower_bound",
+        "correctionReference": "post-backtest-data-06-v2",
+        "handling": "The immutable V1 candidate is preserved. It must not be cited as CAPE or wage runtime-effect evidence; V2 records runtime-clock capture evidence and the exact zero-delta field boundary."
+      }
+    },
+    {
+      "sliceId": "BACKTEST-DATA-06",
+      "sourceReference": "post-backtest-data-06-v1",
+      "targetReference": "post-backtest-data-06-v2",
+      "fieldPath": "snapshot identity/capture evidence/metadata.dataVersion.annualDataHash/result.result.samplingDiagnostics.dataVersion.annualDataHash",
+      "formulaBefore": "V1 preserved the data fingerprint but used a timestamp literal and language that could be read as CAPE, wage or regime runtime-effect evidence",
+      "formulaAfter": "V2 is captured from the runtime clock under refuse-overwrite semantics and explicitly measures zero numeric deltas because the fixed cases request neither CAPE start-year sampling nor wage-indexed pension escalation; regime classification uses equity return and inflation only",
+      "expectedDirection": "Exactly zero numeric result deltas. Changed leaves are restricted to snapshot identity, runtime capture evidence, explicit measurement-scope fields and the two annualDataHash provenance fields",
+      "goldenCaseIds": ["GC-RISK-01", "GC-CUT-01", "GC-CARE-01", "GC-OUTCOME-01", "GC-SAMPLING-01", "GC-CAR-01"],
+      "reviewStatus": "pending",
+      "measurementScope": {
+        "goldHoldingCaseIncluded": false,
+        "goldRuntimeEffectMeasured": false,
+        "capeSamplingCaseIncluded": false,
+        "capeRuntimeEffectMeasured": false,
+        "wageIndexedPensionCaseIncluded": false,
+        "wageRuntimeEffectMeasured": false,
+        "derivedRegimeEffectExpected": false,
+        "numericDeltaCount": 0,
+        "sharedAnnualDataFingerprintOnly": true,
+        "interpretation": "Runtime CAPE and wage effects are evidenced by the separate backtest and CAPE-sampling delta oracles, not by this Monte Carlo candidate."
+      }
     }
   ],
   "requiredEntryFields": [

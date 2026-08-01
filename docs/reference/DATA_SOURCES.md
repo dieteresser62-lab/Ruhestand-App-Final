@@ -131,15 +131,27 @@ commit-blocking.
   year-end FX `1925-1944`, explicit estimated bridge `1945-1950`, year-end policy price times JST year-end FX
   `1951-1967`, Bundesbank Frankfurt fixing `1968-1998` and World Bank gold
   price divided by Bundesbank USD/EUR `1999-2025`
+- Wage/pension-escalation proxy: consecutive-level changes from JST R6
+  `DEU.wage` `1925-1946`; Destatis annual change in average gross monthly
+  earnings without special payments `1947-2025`, segmented at the territorial
+  boundary and the documented method breaks `1991`, `2007` and `2022`.
+  Machine-readable seams mark the 1925 start normalization, the 1945
+  wartime/post-war observation break (`estimated`), the JST-to-Destatis source
+  seam in 1947 and the 1948 currency-reform context
+- CAPE decision signal: US Shiller conventional price CAPE observed in
+  December `t-1` and stored under return year `t`, `1925-2025`; decision years
+  `1925-1935` are `estimated` because the trailing ten-year input includes
+  Shiller's interpolated pre-1926 Cowles history
 - Machine-readable manifest: `HISTORICAL_DATA_MANIFEST`, schema `HistoricalDataManifestV1`
-- Dataset ID/revision: `ruhestandsapp-historical-data-v1` / `2026-08-01.1`
-- Canonical content hash: `e2ee9db77d02cca23ca451e16ed16b565de44411807c550e49f415e7bed45d0a`
+- Dataset ID/revision: `ruhestandsapp-historical-data-v1` / `2026-08-01.4`
+- Canonical content hash: `c79350c5abf2dee2feeaae65c88ed5e58487f878cb598fdffc132fbf48d01e79`
 - Hash algorithm: SHA-256 over canonical JSON (`sha256-canonical-json-v1`); year keys are numeric ascending, object fields lexical, and numbers are locale-independent JSON tokens.
 - Backtest lookback contract: four complete years before `startYear`; the contract-derived technical bounds are therefore `1929-2025`. The Backtest UI reads these bounds from the active provider, sets both year inputs dynamically, and validates against the same contract.
 
 The DOM-free contract lives in
 `app/simulator/historical-backtest-contract.js`. It validates the full dataset
-once per manifest revision/content hash, creates an immutable lookup of
+once per manifest revision/content hash, validates ordered, unique and bounded
+series discontinuities, creates an immutable lookup of
 `HistoricalYearRecordV1`, and performs one period preflight per single-path
 request or cohort batch. The productive historical backtest and its rolling
 cohorts consume this provider. Monte Carlo, sweep, optimizer and worker data
@@ -285,6 +297,54 @@ primary-input hash is
 the generated return hash is
 `068a15a99c665b48dc14a187b654033d292c9de6ed3cf712f7e789ddcec049aa`.
 
+The canonical wage field is `lohn_de`. Its generated module is
+`app/simulator/german-gross-wage-growth-chain.js`; the pinned JST R6 workbook,
+Destatis HTML, hashes, attribution and licence notes live under
+`data/historical/german-gross-wage-growth-chain/`. Rebuild with
+`npm run build:german-gross-wage-data` and verify with
+`npm run verify:german-gross-wage-data`. The selected identity is the annual
+change in the Destatis index of average gross monthly earnings without special
+payments. The published year-`t` percentage is applied once in simulation year
+`t` when `rentAdjMode=wage`. Years 1925-1946 use changes independently derived
+from consecutive JST R6 `DEU.wage` nominal-wage levels and remain a research
+proxy. Destatis covers 1947-1990 for the former federal territory and 1991-2025
+for post-reunification Germany. The published 2007 coverage change and the
+2022 switch to the earnings survey split the official segment; the low,
+one-decimal 1947-1955 index levels range from 1.9 to 4.5. The 1947 change also
+uses the preceding 1946 level 1.8, exposing a maximum documented relative
+half-unit precision effect of about 2.8 percent. The discontinuity contract
+separately marks 1925 as the chain-start normalization, 1945 as an estimated
+wartime/post-war bridge without a market-wage observation, 1947 as the
+JST-to-Destatis source seam and 1948 as currency-reform context. The 1946
+value remains the last JST research-proxy change before that source seam.
+The runtime use remains a broad pension-escalation proxy: it is not the
+historical statutory German pension-adjustment series. The combined primary-
+input hash is
+`cfd5c598a8bc846a96966fa8ff7388d80c30f3ada39edbfe90d39f234eef9d9b`;
+the generated 101-value hash is
+`e10e581f6994e07ed0a943b3716dd8fd5dea7b8b272d47a546466af8701a3057`.
+
+The canonical CAPE field is `cape`. Its generated module is
+`app/simulator/us-shiller-cape-chain.js`; the pinned publisher workbook and
+usage boundary live under `data/historical/us-shiller-cape-chain/`. Rebuild
+with `npm run build:us-shiller-cape-data` and verify with
+`npm run verify:us-shiller-cape-data`. The selected identity is Robert J.
+Shiller's conventional price CAPE for the US stock market, not total-return
+CAPE and not a global or German valuation ratio. For return year `t`, the
+generator selects December `t-1`, stores the signal under `t`, and exports
+observation year/month, as-of year and decision year separately. The runtime
+consumes that generated value once; a second previous-year lookup is forbidden.
+Decision years 1925-1935 are classified as `estimated`, because their trailing
+ten-year CAPE windows still include the interpolated pre-1926 Cowles segment;
+1936-2025 is `backtested`. The Monte-Carlo estimated-history filter starts at
+1951 and therefore excludes that complete affected CAPE vintage when enabled.
+The raw workbook hash is
+`0e3d716f83f51c14f40c5ab5662e767cde4f83fcb7305db24ab003df2c9ee6c5`;
+the generated 101-signal hash is
+`d1101958fed64dadf8fba76e9e4e92c8d24e86bd3d21accc42cdb60c247a835f`.
+No explicit open redistribution licence was located for the public publisher
+download; the publisher/Yale disclaimer and this limitation remain explicit.
+
 ### Manifest status terms
 
 - Resolution fields (`variant`, `currency`, `region`, `frequency`, `source`,
@@ -307,20 +367,18 @@ the generated return hash is
 | `global_equity_research_index` | economically weighted research total-return proxy | USD proxy 1925-1950; German investor currency 1951-2020; EUR 2021-2025 | 16 advanced economies | annual | JST R6; OECD `DSD_STES@DF_FINMARK` 4.0; ECB `EXR` | derived data `CC BY-NC-SA 4.0`; OECD/ESCB terms also apply | generated prior-year economic weights; USD through 1950; German investor currency from 1951; documented price/dividend transformations | 1925-1950 and 2021-2025 | required; reject missing/non-finite and non-positive levels |
 | `inflation_de` | segmented German national consumer-price chain; excludes HICP/HVPI | not applicable | DE | annual | JST R6 1925-1949; Destatis long series 1950-2024; Destatis current annual table 2025 | JST-derived segment `CC BY-NC-SA 4.0`; Destatis segments Data Licence Germany - attribution - 2.0 | JST consecutive-level changes through 1949; published Destatis annual-average changes from 1950 with source-local seams; excludes the separate 100:6.5 nominal monetary-balance write-down across the 1948 reform | 1925-1949 | required; reject missing/non-finite |
 | `zinssatz_de` | segmented annual-average nominal short/overnight gross `cashBondReturn` proxy | historical German regimes/DEM through 1998; EUR from 1999; percentages do not convert balances and the 1948 write-down is not implemented | DE | annual | JST R6 `DEU.stir` 1925-1944; explicit carry-forward 1945-1948; Bundesbank-published Frankfurt proxy/FIBOR/EONIA/EURSTR 1949-2025; Fritz Knapp/Bundesbank source chain through 1975 | JST-derived segment `CC BY-NC-SA 4.0`; Bundesbank/ESCB terms and ECB EURSTR disclaimer | published annual averages used once through the shared cash/bond path; bond maturity effects, extra compounding, costs, margin and tax are excluded | 1925-1948 | required; reject missing/non-finite |
-| `lohn_de` | `unresolved` | not applicable | DE | annual | `unresolved` | `unresolved` | identity from embedded annual percentage | 1925-1949 | required; reject missing/non-finite |
+| `lohn_de` | segmented nominal-wage growth proxy; Destatis average gross monthly earnings without special payments from 1947 | not applicable | JST DEU proxy through 1946; former federal territory through 1990; post-reunification Germany thereafter | annual | JST R6 `DEU.wage` 1925-1946; Destatis annual table 1947-2025 | JST-derived segment `CC BY-NC-SA 4.0`; Destatis Data Licence Germany - attribution - 2.0 | consecutive JST level changes followed by published Destatis year-`t` changes, used once when `rentAdjMode=wage`; explicit seams 1925/1945/1947/1948; not statutory pension adjustment | 1925-1944 and 1946 proxy; 1945 estimated | required; reject missing/non-finite |
 | `gold_eur_perf` | segmented-timing nominal gold-price return proxy in German investor currency | historical German currency/DEM through 1998; EUR from 1999 | global gold price with German investor numeraire | annual | Federal Reserve statutory/1933 RFC year-end prices and JST R6 year-end FX 1925-1967; Bundesbank Frankfurt fixing 1968-1998; World Bank Gold and Bundesbank USD/EUR 1999-2025 | JST-derived input `CC BY-NC-SA 4.0`; World Bank `CC BY 4.0`; Bundesbank/ESCB terms | year-end policy/official gold price times year-end German FX; explicit 1945-1950 bridge; Frankfurt annual-average level changes; World Bank annual-average USD gold divided by annual-average USD/EUR with documented 1968/1999 seams | 1945-1950 | required; reject missing/non-finite and unclassified zeros; every literal zero must be component-proven or explicitly estimated |
-| `cape` | `unresolved` | not applicable | `unresolved` | annual | `unresolved` | `unresolved` | identity from embedded annual ratio | 1925-1949 | required; reject missing/non-finite and non-positive ratios |
+| `cape` | US Shiller conventional price CAPE; excludes total-return CAPE | not applicable | US stock market | annual decision signal | Shiller U.S. Stock Markets 1871-Present workbook, conventional CAPE column | public publisher download; no explicit open redistribution licence located; disclaimer applies | December `t-1` stored under decision/return year `t` and consumed once | 1925-1935 | required; reject missing/non-finite and non-positive ratios |
 
-The equity, German CPI, German cash/money-market and gold sources, identities,
-transformations and data licences/terms are resolved. The remaining wage and
-CAPE historical source and licence statuses remain intentionally unresolved.
-A resolved source chain does not turn any research/proxy chain into an
-externally validated provider series.
+All six historical series now have resolved source identities, transformations
+and licence or usage boundaries. This source resolution does not mark any
+research/proxy chain as externally validated.
 
 ### Simulation-wide data inventory
 
 `app/simulator/simulation-data-inventory.js` adds the wider, immutable
-`SimulationDataInventoryV1`, revision `2026-08-01.1`. The existing
+`SimulationDataInventoryV1`, revision `2026-08-01.4`. The existing
 `HistoricalDataManifestV1` remains the active runtime/backtest record contract;
 the wider inventory is an evidence and change gate around that runtime
 contract and the productively used static model-data classes.
@@ -350,14 +408,14 @@ The six historical entries own separate, contiguous `qualitySegments` for
 | `global_equity_research_index` | 1925-1950 `proxy`; 1951-2020 `backtested`; 2021-2025 `estimated` | source chain is reproducible; 1950 stays in USD so the reconstructed German 1949/1950 factor is not a global return; the modern frozen-dividend model remains an explicit limitation. The local German component still contains a documented currency-reform reconstruction in 1948/1949: Germany contributes about -4.17 percentage points in 1948 and +37.38 percentage points in 1949 despite an economic weight near five percent. This low-evidence proxy artifact is retained, not presented as a market event, and is removed when estimated history is excluded. |
 | `inflation_de` | 1925-1949 `proxy`; 1950-1962 `official` with `proxy_population`; 1963-1991 `official`; 1992-2024 `official`; 2025 `official` | pinned JST/Destatis originals and generated hashes resolve the national VPI chain; territory/population seams remain explicit and HICP/HVPI is excluded |
 | `zinssatz_de` | 1925-1944 `proxy`; 1945-1948 `estimated`; 1949-1996 Frankfurt overnight `proxy`; 1997-1998 FIBOR O/N `official`; 1999-2018 EONIA `official`; 2019 transition `official`; 2020-2025 EURSTR `official` | primary PDF and derived layout path agree exactly; 1970/1990 methods, 1948 monetary discontinuity and EURSTR disclaimer are explicit; the shared bond application remains a maturity-mismatched gross model proxy |
-| `lohn_de` | 1925-1949 `estimated`; 1950-2023 `unresolved`; 2024-2025 separately `unresolved` | nominal wage/pension-adjustment identity and D-20 reconciliation unresolved |
+| `lohn_de` | 1925 `proxy`; 1926-1944 `proxy`; 1945 `estimated`; 1946 `proxy`; 1947-1955, 1956-1990, 1991-2006, 2007-2021 and 2022-2025 `official` | JST and Destatis source identities are resolved; discontinuities 1925/1945/1947/1948 preserve chain start, missing wartime/post-war market observation, source seam and currency-reform context; functional pension use remains an explicitly qualified gross-earnings proxy rather than statutory pension adjustment |
 | `gold_eur_perf` | 1925-1944 `proxy`; 1945-1950 `estimated`; 1951-1967 `proxy`; 1968, 1969-1998, 1999 and 2000-2025 separately `derived` | source hashes and seams are reproducible; twelve source-derived or explicitly estimated zeros are explained; early market access, post-war bridge and annual-average/product-cost limitations prevent an investable-product or externally validated claim |
-| `cape` | 1925-1949 `estimated`; 1950-2025 `unresolved` | productive `t-1` use is known; external region, series and reconstruction are unresolved |
+| `cape` | 1925-2025 `backtested` | US conventional price CAPE and December `t-1` mapping are reproducible; public-source usage boundary lacks an explicit open redistribution licence and external validation remains pending |
 
 `qualitySegments` are evidence segments, not a rewrite of the runtime
 `HistoricalYearRecordV1` completeness statuses. In particular, a finite
 post-1950 number can still be technically present while its external evidence
-remains `unresolved`.
+remains `not_validated`.
 
 The static inventory covers these product classes:
 
@@ -379,16 +437,14 @@ The source gate deliberately separates three questions:
    class.
 3. `replacementAllowed` is false until the external-validation gate passes.
 
-Therefore all six historical series can replay deterministically. The equity,
-inflation, cash and gold entries now have resolved source, licence/terms,
-retrieval and raw-data hashes, but their external-validation statuses remain
-`not_validated`. Equity is a research proxy with a modelled 2021-2025 dividend
-component; inflation includes a JST proxy through 1949 and explicit official
-territory/population seams; cash and gold each include proxy segments and an
-explicit estimated post-war bridge. Wage and CAPE retain their unresolved
-replacement gates. Later data-replacement
-slices must update their exact series entry, raw-data and embedded-value
-hashes, segments, transformation and source/license evidence together.
+Therefore all six historical series can replay deterministically and have
+resolved source, identity, retrieval, raw-data hash and licence or usage
+boundary fields. Their external-validation statuses remain `not_validated`.
+Equity is a research proxy with a modelled 2021-2025 dividend component;
+inflation includes a JST proxy through 1949; cash and gold contain proxy and
+bridge segments; wage contains an early model segment; and CAPE is a US
+publisher research series without an explicit open redistribution licence.
+All replacement gates therefore remain closed pending external review.
 
 ### Cross-domain model source snapshots
 
@@ -421,12 +477,12 @@ does not replace this runtime manifest and does not upgrade any field to
 | Open item | Current state | Required owner and next evidence | Blocking effect |
 | --- | --- | --- | --- |
 | exact equity provider-index identity | intentionally not applicable: `global_equity_research_index` is a named research proxy | external methodology review may compare it with licensed provider indices without renaming the proxy | blocks claims of provider-index equivalence, not deterministic use |
-| variants and primary sources for the remaining two series | wage and CAPE remain `unresolved` | exact series identifiers, definitions, retrieval/data dates and permitted source chain | blocks research-grade FV-G02 for those series |
-| licenses/usage rights for the remaining two series | wage and CAPE remain `unresolved` | license text, use/redistribution scope and review date; legal review where needed | blocks their replacement, integration or redistribution |
+| wage proxy versus statutory pension adjustment | Destatis gross-earnings identity is resolved; runtime use is explicitly only a pension-escalation proxy | independent pension-domain review and, if required, a separate statutory adjustment chain | blocks claims that `lohn_de` reproduces official pension adjustments |
+| Shiller workbook redistribution scope | public download and disclaimer are recorded; no explicit open redistribution licence was located | legal/source-owner clarification before broader redistribution claims | blocks an open-data or unrestricted-redistribution claim, not local deterministic reconstruction |
 | equity proxy segments | original and filtered JST/OECD/ECB inputs, hashes and transformation resolved; 1925-1950 USD proxy and 2021-2025 frozen-dividend model | independent methodology validation and future dividend-source replacement | prevents provider-index and externally-validated claims |
 | cash/money-market proxy segments | JST and Bundesbank inputs, hashes and transformation resolved; 1925-1944 non-homogeneous proxy and 1945-1948 carry-forward bridge | independent methodology validation and future observed pre-1949 replacement | prevents claims of a continuous investable product return and external validation |
 | early and seam `gold_eur_perf` methodology | source chain and all zeros are technically resolved; 1925-1967 remains a policy/FX proxy, 1945-1950 an estimated bridge, 1968 a partial-year seam and 1999 a source/numeraire seam | independent methodology validation, investability/access evidence and product-cost sensitivity | prevents claims of a continuous investable retail-gold return or external validation |
-| CAPE region | `unresolved` | exact market/region and transformation contract | blocks international CAPE/policy comparison |
+| CAPE cross-market interpretation | resolved as US conventional price CAPE | independent methodology review for any global/German policy comparison | blocks treating the US ratio as a global or German valuation measure |
 
 The embedded 1925-2025 history and every period or rolling cohort derived from
 it are exploratory/contaminated for confirmatory research because the data and
@@ -449,7 +505,7 @@ The active backtest record separates ex-post `realized` observations from
 | Cash/bond proxy | `t-1` | `t` | `t-1` | realized `t` |
 | Inflation | `t-1` | `t` | `t-1` | realized `t` |
 | Wage/pension adjustment | `t` via `simStartYear - series.startYear + yearIdx` | `t` | `t-1` | realized `t` |
-| CAPE | `t-1` | `t` | not mapped | decision-as-of `t-1` |
+| CAPE | effective double lag before Slice 06 | return-year `t` key contains December `t-1` signal | not mapped | December observation `t-1`, as-of `t-1`, decision year `t`; no second lag |
 
 Marker tests cover the pension-adjustment offset for 1950, 2000, and 2001. The
 low-level `simulator-year-portfolio.js:readYearReturnRates()` normalizer retains
@@ -470,10 +526,12 @@ rejects non-finite required returns before portfolio mutation.
 - `global_equity_research_index`: open, segmented global equity research index level
 - `inflation_de`: open, segmented German annual-average national CPI chain
 - `zinssatz_de`: annual German rate proxy
-- `lohn_de`: annual wage growth proxy
+- `lohn_de`: JST/Destatis gross-monthly-earnings growth research proxy without
+  special payments; early 1925-1946 JST segment and explicit
+  1925/1945/1947/1948 seams
 - `gold_eur_perf`: annual-average gold return proxy in German investor
   currency with explicit policy/FX, bridge, Frankfurt and EUR segments
-- `cape`: CAPE valuation proxy
+- `cape`: US Shiller conventional price CAPE, December `t-1` decision signal
 
 ## Follow-up actions
 

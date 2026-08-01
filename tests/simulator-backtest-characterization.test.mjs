@@ -21,9 +21,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const legacyFixturePath = path.join(__dirname, 'fixtures', 'simulator-backtest-baseline-v1.json');
 const targetFixturePath = path.join(__dirname, 'fixtures', 'simulator-backtest-target-v1.json');
+const slice06DeltaFixturePath = path.join(__dirname, 'fixtures', 'cape-wage-backtest-delta-v3.json');
 const backtestSourcePath = path.join(__dirname, '..', 'app', 'simulator', 'simulator-backtest.js');
 const backtestRunnerSourcePath = path.join(__dirname, '..', 'app', 'simulator', 'historical-backtest-runner.js');
 const UPDATE_TARGET = process.env.UPDATE_BACKTEST_TARGET === '1';
+const CREATE_SLICE_06_DELTA = process.env.CREATE_BACKTEST_DATA_06_DELTA === '1';
 
 console.log('--- Simulator Backtest Characterization Tests ---');
 
@@ -106,6 +108,19 @@ const FINANCIAL_DELTA_METRICS = Object.freeze([
     'maxAbsolutePortfolioFlowDelta'
 ]);
 
+const CAPE_DISABLED_ALLOWED_LEAF_PATHS = Object.freeze([
+    'result.historicalYearRecords[].dataset.contentHash',
+    'result.historicalYearRecords[].dataset.revision',
+    'result.historicalYearRecords[].decisionAsOf.capeRatio.value',
+    'result.request.dataset.contentHash',
+    'result.request.dataset.manifestHash.value',
+    'result.request.dataset.revision',
+    'result.rows[].vpw.capeRatioUsed',
+    'result.rows[].vpw.expectedReturnCape',
+    'rows[].vpw.capeRatioUsed',
+    'rows[].vpw.expectedReturnCape'
+]);
+
 const SLICE_04_GOLD_RETURNS_2000_2005 = Object.freeze({
     2000: -2.7,
     2001: 4.3,
@@ -114,6 +129,21 @@ const SLICE_04_GOLD_RETURNS_2000_2005 = Object.freeze({
     2004: 2.2,
     2005: 22.3
 });
+const SLICE_05_EFFECTIVE_CAPE_SIGNALS = Object.freeze(JSON.parse(fs.readFileSync(
+    path.join(__dirname, 'fixtures', 'cape-effective-signals-slice-05-v1.json'),
+    'utf8'
+)));
+const SLICE_05_WAGE_RATES_2000_2005 = Object.freeze({
+    2000: 2.5,
+    2001: 1.9,
+    2002: 2.1,
+    2003: 1.2,
+    2004: 1.1,
+    2005: 0.8
+});
+const SLICE_05_EARLY_WAGE_RATES_1925_1946 = Object.freeze(Object.fromEntries(
+    Array.from({ length: 22 }, (_value, index) => [1925 + index, 3])
+));
 
 function createSlice04GoldReferenceProvider() {
     const records = Object.fromEntries(
@@ -126,6 +156,108 @@ function createSlice04GoldReferenceProvider() {
     manifest.revision = 'slice-04-gold-reference-2000-2005';
     manifest.contentHash.value = computeHistoricalDatasetHash(records);
     return createHistoricalBacktestContractProvider({ records, manifest });
+}
+
+function createSlice05CapeWageReferenceProvider({
+    cape = false,
+    wage = false,
+    wageRates = null,
+    revision
+}) {
+    const records = Object.fromEntries(
+        Object.entries(HISTORICAL_DATA).map(([year, record]) => [year, { ...record }])
+    );
+    if (cape) {
+        for (const [year, value] of Object.entries(SLICE_05_EFFECTIVE_CAPE_SIGNALS)) {
+            records[year] = { ...records[year], cape: value };
+        }
+    }
+    const selectedWageRates = wageRates ?? (wage ? SLICE_05_WAGE_RATES_2000_2005 : null);
+    if (selectedWageRates) {
+        for (const [year, value] of Object.entries(selectedWageRates)) {
+            records[year] = { ...records[year], lohn_de: value };
+        }
+    }
+    const manifest = structuredClone(HISTORICAL_DATA_MANIFEST);
+    manifest.revision = revision;
+    manifest.contentHash.value = computeHistoricalDatasetHash(records);
+    return createHistoricalBacktestContractProvider({ records, manifest });
+}
+
+function buildFinancialDataDeltaOracle({ scenarioId, cause, before, after, beforeProvider }) {
+    return {
+        scenarioId,
+        cause,
+        beforeProvider,
+        afterProvider: {
+            revision: HISTORICAL_DATA_MANIFEST.revision,
+            contentHash: HISTORICAL_DATA_MANIFEST.contentHash.value
+        },
+        outcome: {
+            before: before.outcomeObservation,
+            after: after.outcomeObservation
+        },
+        canonicalRowsHash: {
+            before: before.canonicalRowsHash,
+            after: after.canonicalRowsHash,
+            changed: before.canonicalRowsHash !== after.canonicalRowsHash
+        },
+        financialMetrics: Object.fromEntries(FINANCIAL_DELTA_METRICS.map(metricName => {
+            const beforeValue = before.values[metricName];
+            const afterValue = after.values[metricName];
+            return [metricName, {
+                before: beforeValue,
+                after: afterValue,
+                delta: beforeValue === null || afterValue === null ? null : round(afterValue - beforeValue, 9)
+            }];
+        }))
+    };
+}
+
+function capeLegacyStepAssessment(capeRatio) {
+    const valuation = CONFIG.MARKET_VALUATION;
+    const signal = capeRatio >= valuation.EXTREME_OVERVALUED_CAPE
+        ? 'extreme_overvalued'
+        : capeRatio >= valuation.OVERVALUED_CAPE
+            ? 'overvalued'
+            : capeRatio <= valuation.UNDERVALUED_CAPE
+                ? 'undervalued'
+                : 'fair';
+    return {
+        signal,
+        expectedReturn: valuation.EXPECTED_RETURN_BY_SIGNAL[signal]
+    };
+}
+
+function buildCapeLegacyStepThresholdOracle() {
+    const changes = [];
+    for (let returnYear = 1926; returnYear <= 2025; returnYear += 1) {
+        const beforeCape = SLICE_05_EFFECTIVE_CAPE_SIGNALS[returnYear];
+        const afterCape = HISTORICAL_DATA[returnYear].cape;
+        const beforeAssessment = capeLegacyStepAssessment(beforeCape);
+        const afterAssessment = capeLegacyStepAssessment(afterCape);
+        if (beforeAssessment.signal !== afterAssessment.signal
+            || beforeAssessment.expectedReturn !== afterAssessment.expectedReturn) {
+            changes.push({
+                returnYear,
+                beforeCape,
+                afterCape,
+                beforeSignal: beforeAssessment.signal,
+                afterSignal: afterAssessment.signal,
+                beforeExpectedReturn: beforeAssessment.expectedReturn,
+                afterExpectedReturn: afterAssessment.expectedReturn
+            });
+        }
+    }
+    return {
+        policy: 'legacy_step',
+        comparisonStartYear: 1926,
+        comparisonEndYear: 2025,
+        comparisonYearCount: 100,
+        changedYearCount: changes.length,
+        unchangedYearCount: 100 - changes.length,
+        changes
+    };
 }
 
 const BASE_DOM_VALUES = Object.freeze({
@@ -638,7 +770,14 @@ function buildAlignmentOracle() {
                 inflation: { sourceYear: year, valuePct: current.inflation_de },
                 interest: { sourceYear: year, valuePct: current.zinssatz_de },
                 wageAdjustment: { sourceYear: year, valuePct: current.lohn_de },
-                cape: { sourceYear: year - 1, asOfYear: year - 1, value: previous.cape }
+                cape: {
+                    sourceYear: year - 1,
+                    observationYear: year - 1,
+                    observationMonth: 12,
+                    asOfYear: year - 1,
+                    decisionYear: year,
+                    value: current.cape
+                }
             }
         };
     });
@@ -795,6 +934,10 @@ function collectDiffs(expected, actual, pathPrefix = '') {
     ));
 }
 
+function normalizeArrayIndices(pathValue) {
+    return pathValue.replace(/\.\d+(?=\.|$)/g, '[]');
+}
+
 const previousGlobals = {
     document: global.document,
     window: global.window,
@@ -878,13 +1021,65 @@ try {
         }
     ];
 
+    let completedShortCapturedData = null;
+    let completedShortCapeBeforeCapturedData = null;
     const completedShort = runScenario({
         id: 'completed_2000_2005',
         values: { simStartJahr: 2000, simEndJahr: 2005 },
         expectedRowCount: 6,
         detailledTranches: detailTranches,
+        projectionOverride: ({ data, summaryHtml }) => {
+            completedShortCapturedData = data;
+            return { data, summaryHtml };
+        },
         notes: ['Canonical short completed path and detail-tranche non-mutation sentinel.']
     });
+    const completedShortCapeBefore = runScenario({
+        id: 'completed_2000_2005',
+        values: { simStartJahr: 2000, simEndJahr: 2005 },
+        expectedRowCount: 6,
+        detailledTranches: detailTranches,
+        historicalDataProvider: createSlice05CapeWageReferenceProvider({
+            cape: true,
+            revision: 'slice-05-effective-cape-reference'
+        }),
+        projectionOverride: ({ data, summaryHtml }) => {
+            completedShortCapeBeforeCapturedData = data;
+            return { data, summaryHtml };
+        },
+        notes: ['Slice-05 effective CAPE reference for the Dynamic-Flex-disabled neutrality proof.']
+    });
+    const capeDisabledDeltaOracle = buildFinancialDataDeltaOracle({
+        scenarioId: completedShort.id,
+        cause: 'cape_chain_with_dynamic_flex_disabled',
+        before: completedShortCapeBefore,
+        after: completedShort,
+        beforeProvider: {
+            revision: 'slice-05-effective-cape-reference',
+            effectiveDecisionSignals: SLICE_05_EFFECTIVE_CAPE_SIGNALS
+        }
+    });
+    const capeDisabledLeafDiffs = collectDiffs(
+        completedShortCapeBeforeCapturedData,
+        completedShortCapturedData
+    );
+    const normalizedCapeDisabledLeafPaths = Array.from(new Set(
+        capeDisabledLeafDiffs.map(entry => normalizeArrayIndices(entry.path))
+    )).sort();
+    capeDisabledDeltaOracle.leafFieldBoundary = {
+        contract: 'Financial and outcome fields are invariant in this Dynamic-Flex-disabled scenario. Changes are limited to dataset provenance, the CAPE decision input and VPW CAPE inputs that are scenario-inactive here but causally active when Dynamic Flex is enabled.',
+        changedLeafCount: capeDisabledLeafDiffs.length,
+        changedLeafPaths: capeDisabledLeafDiffs.map(entry => entry.path),
+        normalizedChangedLeafPaths: normalizedCapeDisabledLeafPaths,
+        allowedNormalizedLeafPaths: [...CAPE_DISABLED_ALLOWED_LEAF_PATHS].sort(),
+        scenarioInactiveVpwInputs: ['capeRatioUsed', 'expectedReturnCape'],
+        unexpectedLeafPaths: normalizedCapeDisabledLeafPaths.filter(pathValue => !CAPE_DISABLED_ALLOWED_LEAF_PATHS.includes(pathValue))
+    };
+    if (process.env.PRINT_CAPE_DISABLED_LEAF_DIFFS === '1') {
+        console.log('__CAPE_DISABLED_LEAF_DIFFS_START__');
+        console.log(JSON.stringify(capeDisabledLeafDiffs, null, 2));
+        console.log('__CAPE_DISABLED_LEAF_DIFFS_END__');
+    }
     const completedShortDetailed = runScenario({
         id: 'completed_2000_2005_detailed_projection_probe',
         values: { simStartJahr: 2000, simEndJahr: 2005 },
@@ -1017,6 +1212,91 @@ try {
         oracleClass: 'target_expected',
         notes: ['Integrated core-to-backtest sentinel for pension netting and wealth reduction.']
     });
+    const wageActiveScenario = {
+        id: 'wage_indexed_pension_2000_2005',
+        values: {
+            simStartJahr: 2000,
+            simEndJahr: 2005,
+            p1Monatsrente: 1500,
+            p1StartInJahren: 0,
+            rentAdjMode: 'wage',
+            renteIndexierungsart: 'lohn'
+        },
+        expectedRowCount: 6,
+        notes: ['Active wage-indexed pension sentinel for the Slice-05 to Slice-06 wage-chain delta.']
+    };
+    const wageActiveBefore = runScenario({
+        ...wageActiveScenario,
+        historicalDataProvider: createSlice05CapeWageReferenceProvider({
+            wage: true,
+            revision: 'slice-05-wage-reference-2000-2005'
+        })
+    });
+    const wageActiveAfter = runScenario(wageActiveScenario);
+    const wageDataDeltaOracle = buildFinancialDataDeltaOracle({
+        scenarioId: wageActiveAfter.id,
+        cause: 'german_gross_wage_growth_chain',
+        before: wageActiveBefore,
+        after: wageActiveAfter,
+        beforeProvider: {
+            revision: 'slice-05-wage-reference-2000-2005',
+            annualGrowthPct: SLICE_05_WAGE_RATES_2000_2005
+        }
+    });
+    const earlyWageScenarios = [
+        {
+            id: 'wage_indexed_pension_jst_1930_1940',
+            values: {
+                simStartJahr: 1930,
+                simEndJahr: 1940,
+                p1Monatsrente: 1500,
+                p1StartInJahren: 0,
+                rentAdjMode: 'wage',
+                renteIndexierungsart: 'lohn'
+            },
+            expectedRowCount: 11,
+            notes: ['Golden case for the large JST-versus-3-percent wage effect across depression and recovery years.']
+        },
+        {
+            id: 'wage_indexed_pension_jst_1935_1946',
+            values: {
+                simStartJahr: 1935,
+                simEndJahr: 1946,
+                p1Monatsrente: 1500,
+                p1StartInJahren: 0,
+                rentAdjMode: 'wage',
+                renteIndexierungsart: 'lohn'
+            },
+            expectedRowCount: 12,
+            notes: ['Golden case for the qualitative reduction-year reversal caused by the early JST wage segment.']
+        }
+    ];
+    const earlyWageComparisons = earlyWageScenarios.map(scenario => {
+        const before = runScenario({
+            ...scenario,
+            historicalDataProvider: createSlice05CapeWageReferenceProvider({
+                wageRates: SLICE_05_EARLY_WAGE_RATES_1925_1946,
+                revision: `slice-05-constant-wage-reference-${scenario.values.simStartJahr}-${scenario.values.simEndJahr}`
+            })
+        });
+        const after = runScenario(scenario);
+        return {
+            after,
+            oracle: buildFinancialDataDeltaOracle({
+                scenarioId: after.id,
+                cause: 'german_gross_wage_growth_chain_jst_early_segment',
+                before,
+                after,
+                beforeProvider: {
+                    revision: `slice-05-constant-wage-reference-${scenario.values.simStartJahr}-${scenario.values.simEndJahr}`,
+                    annualGrowthPct: SLICE_05_EARLY_WAGE_RATES_1925_1946,
+                    supersededAssumption: 'constant_3_percent_1925_1946'
+                }
+            })
+        };
+    });
+    const earlyWageCases = earlyWageComparisons.map(entry => entry.after);
+    const earlyWageDataDeltaOracles = earlyWageComparisons.map(entry => entry.oracle);
     const threeBucketMinimumFlex = runScenario({
         id: 'three_bucket_minimum_flex_2005_2014',
         values: {
@@ -1078,19 +1358,40 @@ try {
             'The canonical UI/export state is immutable and rejects the former post-run row-injection test hook.'
         ]
     });
-    const dynamicFlexCape = runScenario({
-        id: 'dynamic_flex_cape_2010_2013',
+    const dynamicFlexCapeScenario = {
+        id: 'dynamic_flex_cape_legacy_step_2018_2025',
         values: {
-            simStartJahr: 2010,
-            simEndJahr: 2013,
-            marketCapeRatio: 20,
-            horizonMethod: 'mean',
-            horizonYears: 20
+            simStartJahr: 2018,
+            simEndJahr: 2025,
+            marketCapeRatio: 20
         },
         checkedIds: ['dynamicFlex'],
-        expectedRowCount: 4,
-        notes: ['VPW/CAPE payload and yearly horizon characterization.']
+        expectedRowCount: 8,
+        notes: ['Released default legacy_step Dynamic-Flex/CAPE path across the strongest measured Slice-06 threshold-change window.']
+    };
+    assertEqual(CONFIG.SPENDING_MODEL.DYNAMIC_FLEX.RETURN_POLICY, 'legacy_step', 'Golden case must exercise the released Dynamic-Flex return policy');
+    const dynamicFlexCapeBefore = runScenario({
+        ...dynamicFlexCapeScenario,
+        historicalDataProvider: createSlice05CapeWageReferenceProvider({
+            cape: true,
+            revision: 'slice-05-effective-cape-reference'
+        })
     });
+    const dynamicFlexCape = runScenario(dynamicFlexCapeScenario);
+    const capeLegacyStepDeltaOracle = {
+        returnPolicy: CONFIG.SPENDING_MODEL.DYNAMIC_FLEX.RETURN_POLICY,
+        ...buildFinancialDataDeltaOracle({
+        scenarioId: dynamicFlexCape.id,
+        cause: 'cape_chain_with_dynamic_flex_enabled_default_legacy_step',
+        before: dynamicFlexCapeBefore,
+        after: dynamicFlexCape,
+        beforeProvider: {
+            revision: 'slice-05-effective-cape-reference',
+            effectiveDecisionSignals: SLICE_05_EFFECTIVE_CAPE_SIGNALS
+        }
+        })
+    };
+    const capeLegacyStepThresholdOracle = buildCapeLegacyStepThresholdOracle();
 
     const invalidSingleYear = runScenario({
         id: 'negative_single_year_2010',
@@ -1143,11 +1444,27 @@ try {
         oracleClass: 'target_expected',
         generatedBy: 'tests/simulator-backtest-characterization.test.mjs',
         exclusions: ['timestamps', 'object identities', 'absolute local paths'],
-        approvedContractChangePaths: ['alignmentOracle', 'cases', 'negativeCases', 'pensionWealthOracle', 'goldDataDeltaOracle'],
+        approvedContractChangePaths: [
+            'alignmentOracle',
+            'cases',
+            'negativeCases',
+            'pensionWealthOracle',
+            'goldDataDeltaOracle',
+            'capeDisabledDeltaOracle',
+            'capeLegacyStepDeltaOracle',
+            'capeLegacyStepThresholdOracle',
+            'wageDataDeltaOracle',
+            'earlyWageDataDeltaOracles'
+        ],
         metricDictionary: METRIC_DICTIONARY_V1,
         alignmentOracle: buildAlignmentOracle(),
         pensionWealthOracle,
         goldDataDeltaOracle,
+        capeDisabledDeltaOracle,
+        capeLegacyStepDeltaOracle,
+        capeLegacyStepThresholdOracle,
+        wageDataDeltaOracle,
+        earlyWageDataDeltaOracles,
         reductionBoundaryOracle: buildReductionBoundaryOracle(backtestSource),
         legacyGlobalSchema: buildLegacySchemaOracle(global.window.globalBacktestData),
         detailToggleOracle: {
@@ -1164,7 +1481,8 @@ try {
             threeBucketMinimumFlex,
             ruin,
             healthBucketProjection,
-            dynamicFlexCape
+            dynamicFlexCape,
+            ...earlyWageCases
         ].map(entry => ({ ...entry, oracleClass: 'target_expected' })),
         negativeCases: [
             invalidSingleYear,
@@ -1175,7 +1493,7 @@ try {
         ].map(entry => ({ ...entry, oracleClass: 'target_expected' }))
     };
 
-    assertEqual(actual.cases.length, 8, 'eight runtime characterization cases should be present');
+    assertEqual(actual.cases.length, 10, 'ten runtime characterization cases should be present');
     assertEqual(goldHoldingBefore.inputHash, goldHoldingAfter.inputHash, 'Gold before/after runs should use identical inputs and period');
     assertEqual(goldHoldingAfter.inputs.goldAktiv, true, 'Gold reference should activate the real gold path');
     assertEqual(goldHoldingBefore.observedRowCount, 6, 'Gold before reference should complete six years');
@@ -1191,6 +1509,72 @@ try {
             && goldDataDeltaOracle.financialMetrics.maxAbsolutePortfolioFlowDelta.after < 1,
         'Gold before/after reference should keep FlowDelta below one euro'
     );
+    assert(
+        Object.values(capeDisabledDeltaOracle.financialMetrics)
+            .every(metric => metric.delta === 0 || metric.delta === null),
+        'CAPE-only replacement must be financially neutral while Dynamic Flex is disabled'
+    );
+    assertEqual(capeDisabledDeltaOracle.outcome.before, capeDisabledDeltaOracle.outcome.after, 'CAPE-disabled outcome must remain invariant');
+    assertEqual(capeDisabledDeltaOracle.leafFieldBoundary.changedLeafCount, 35, 'CAPE-disabled full payload should retain the measured 35-leaf boundary');
+    assertEqual(
+        stableStringify(capeDisabledDeltaOracle.leafFieldBoundary.normalizedChangedLeafPaths),
+        stableStringify(capeDisabledDeltaOracle.leafFieldBoundary.allowedNormalizedLeafPaths),
+        'CAPE-disabled payload must not change a field outside the explicit provenance/input/diagnostic allowlist'
+    );
+    assertEqual(capeDisabledDeltaOracle.leafFieldBoundary.unexpectedLeafPaths.length, 0, 'CAPE-disabled payload should have no unexpected leaf changes');
+    assert(
+        Object.values(capeLegacyStepDeltaOracle.financialMetrics)
+            .some(metric => Number.isFinite(metric.delta) && metric.delta !== 0),
+        'CAPE-only replacement should be observable when Dynamic Flex is enabled'
+    );
+    assertEqual(capeLegacyStepDeltaOracle.returnPolicy, 'legacy_step', 'CAPE active delta must measure the released default policy');
+    assertEqual(capeLegacyStepDeltaOracle.financialMetrics.summaryEndWealth.delta, 56649.33, 'Default legacy-step CAPE delta should retain the measured end-wealth effect');
+    assertEqual(capeLegacyStepDeltaOracle.financialMetrics.totalWithdrawal.delta, -30000, 'Default legacy-step CAPE delta should retain the measured withdrawal effect');
+    assertEqual(capeLegacyStepDeltaOracle.financialMetrics.totalTax.delta, -120.19, 'Default legacy-step CAPE delta should retain the measured tax effect');
+    assertEqual(capeLegacyStepDeltaOracle.financialMetrics.minRunwayCoveragePct.delta, 10.484301, 'Default legacy-step CAPE delta should retain the measured runway effect');
+    assertEqual(capeLegacyStepThresholdOracle.comparisonYearCount, 100, 'Legacy-step threshold oracle should cover every comparable decision year');
+    assertEqual(capeLegacyStepThresholdOracle.changedYearCount, 21, 'CAPE replacement should retain the measured 21 legacy-step threshold changes');
+    const threshold2023 = capeLegacyStepThresholdOracle.changes.find(entry => entry.returnYear === 2023);
+    assertEqual(threshold2023?.beforeExpectedReturn, 0.04, '2023 baseline should use the extreme-overvaluation return step');
+    assertEqual(threshold2023?.afterExpectedReturn, 0.07, '2023 target should use the fair-value return step');
+    assert(
+        Object.values(wageDataDeltaOracle.financialMetrics)
+            .some(metric => Number.isFinite(metric.delta) && metric.delta !== 0),
+        'Wage replacement should be observable when wage-indexed pension escalation is enabled'
+    );
+    assertEqual(earlyWageDataDeltaOracles.length, 2, 'Both early JST wage windows must have a delta oracle');
+    const earlyWage1930 = earlyWageDataDeltaOracles.find(entry => entry.scenarioId === 'wage_indexed_pension_jst_1930_1940');
+    assertEqual(earlyWage1930?.outcome.before, 'completed', '1930-1940 baseline should complete');
+    assertEqual(earlyWage1930?.outcome.after, 'completed', '1930-1940 JST case should complete');
+    assertEqual(earlyWage1930?.financialMetrics.summaryEndWealth.before, 2735439.56, '1930-1940 constant-wage baseline end wealth should stay exact');
+    assertEqual(earlyWage1930?.financialMetrics.summaryEndWealth.after, 2670178.4, '1930-1940 JST end wealth should stay exact');
+    assertEqual(earlyWage1930?.financialMetrics.summaryEndWealth.delta, -65261.16, '1930-1940 JST end-wealth delta should stay exact');
+    assertEqual(earlyWage1930?.financialMetrics.totalWithdrawal.delta, 51000, '1930-1940 JST withdrawal delta should stay exact');
+    assertEqual(earlyWage1930?.financialMetrics.totalTax.delta, 2408.26, '1930-1940 JST tax delta should stay exact');
+    assertEqual(earlyWage1930?.financialMetrics.yearsWithReductionAtLeast10Pct.before, 7, '1930-1940 constant-wage baseline reduction years should stay exact');
+    assertEqual(earlyWage1930?.financialMetrics.yearsWithReductionAtLeast10Pct.after, 9, '1930-1940 JST reduction years should stay exact');
+    const earlyWage1935 = earlyWageDataDeltaOracles.find(entry => entry.scenarioId === 'wage_indexed_pension_jst_1935_1946');
+    assertEqual(earlyWage1935?.outcome.before, 'completed', '1935-1946 baseline should complete');
+    assertEqual(earlyWage1935?.outcome.after, 'completed', '1935-1946 JST case should complete');
+    assertEqual(earlyWage1935?.financialMetrics.summaryEndWealth.before, 5141746.5, '1935-1946 constant-wage baseline end wealth should stay exact');
+    assertEqual(earlyWage1935?.financialMetrics.summaryEndWealth.after, 5093328.06, '1935-1946 JST end wealth should stay exact');
+    assertEqual(earlyWage1935?.financialMetrics.summaryEndWealth.delta, -48418.44, '1935-1946 JST end-wealth delta should stay exact');
+    assertEqual(earlyWage1935?.financialMetrics.totalWithdrawal.delta, 28200, '1935-1946 JST withdrawal delta should stay exact');
+    assertEqual(earlyWage1935?.financialMetrics.totalTax.delta, 5003.92, '1935-1946 JST tax delta should stay exact');
+    assertEqual(earlyWage1935?.financialMetrics.yearsWithReductionAtLeast10Pct.before, 10, '1935-1946 constant-wage baseline reduction years should stay exact');
+    assertEqual(earlyWage1935?.financialMetrics.yearsWithReductionAtLeast10Pct.after, 1, '1935-1946 JST reduction years should stay exact');
+    for (const deltaOracle of [
+        capeDisabledDeltaOracle,
+        capeLegacyStepDeltaOracle,
+        wageDataDeltaOracle,
+        ...earlyWageDataDeltaOracles
+    ]) {
+        assert(
+            deltaOracle.financialMetrics.maxAbsolutePortfolioFlowDelta.before < 1
+                && deltaOracle.financialMetrics.maxAbsolutePortfolioFlowDelta.after < 1,
+            `${deltaOracle.cause} should keep FlowDelta below one euro`
+        );
+    }
     assertEqual(pensionWealthProbe.observedRowCount, 2, 'active-pension integration probe should complete two backtest years');
     assert(pensionWealthOracle !== null, 'active-pension integration probe should publish its explicit oracle');
     assert(actual.reductionBoundaryOracle.countedByLegacyOperator, 'exact 10% must be counted by the legacy operator');
@@ -1241,6 +1625,45 @@ try {
             console.error(stableStringify(unexpected.slice(0, 20), 2));
         }
         assertEqual(unexpected.length, 0, 'target delta reporter should find no unexpected deltas');
+    }
+
+    const slice06DeltaEvidence = {
+        schemaVersion: 'CapeWageBacktestDeltaEvidenceV3',
+        baselineCommit: 'a7038e531ebbd4a258192e223feac66614fc28a0',
+        supersession: {
+            v1: {
+                status: 'superseded_invalid_scenario_contract',
+                reason: 'V1 retained horizonMethod=mean and horizonYears=20 from the removed cape_continuous scenario while using the new legacy_step case identity. Its CAPE metrics are therefore not comparable to the released default scenario.',
+                authoritativeSuccessor: 'tests/fixtures/cape-wage-backtest-delta-v2.json'
+            },
+            v2: {
+                status: 'superseded_incomplete_effect_scope',
+                reason: 'V2 corrected the legacy_step scenario to the released survival_quantile defaults but did not measure the new JST-derived 1925-1946 wage segment. V3 preserves the corrected CAPE metrics and adds both early-wage effect oracles.',
+                authoritativeSuccessor: 'tests/fixtures/cape-wage-backtest-delta-v3.json'
+            }
+        },
+        targetManifestRevision: HISTORICAL_DATA_MANIFEST.revision,
+        targetHistoricalDataHash: HISTORICAL_DATA_MANIFEST.contentHash.value,
+        targetFixture: 'tests/fixtures/simulator-backtest-target-v1.json',
+        capeDisabledDeltaOracle,
+        capeLegacyStepThresholdOracle,
+        capeLegacyStepDeltaOracle,
+        wageDataDeltaOracle,
+        earlyWageDataDeltaOracles
+    };
+    if (CREATE_SLICE_06_DELTA) {
+        if (fs.existsSync(slice06DeltaFixturePath)) {
+            throw new Error('Refusing to overwrite immutable Slice-06 CAPE/wage backtest delta evidence');
+        }
+        fs.writeFileSync(slice06DeltaFixturePath, `${stableStringify(slice06DeltaEvidence, 2)}\n`, 'utf8');
+        console.log(`Created ${path.relative(path.join(__dirname, '..'), slice06DeltaFixturePath)}`);
+    } else {
+        const expectedDeltaEvidence = JSON.parse(fs.readFileSync(slice06DeltaFixturePath, 'utf8'));
+        assertEqual(
+            stableStringify(slice06DeltaEvidence),
+            stableStringify(expectedDeltaEvidence),
+            'Separate Slice-06 CAPE/wage delta evidence should reproduce exactly'
+        );
     }
 
     console.log('✅ Simulator backtest characterization tests passed');

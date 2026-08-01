@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "CapeSamplingDeltaEvidenceV1",
+  "baselineCommit": "a7038e531ebbd4a258192e223feac66614fc28a0",
+  "beforeMeaning": "embedded cape field from the baseline data under each candidate year",
+  "afterMeaning": "December t-1 conventional CAPE decision signal under return year t",
+  "tolerance": 0.2,
+  "fallbackToAll": true,
+  "cases": [
+    {
+      "targetCape": 15,
+      "beforeCandidates": [1927, 1931, 1935, 1937, 1939, 1946, 1952, 1954, 1957, 1962, 1969, 1970, 1971, 1974, 1986, 1987, 1988, 1989, 1990, 1991, 2009],
+      "afterCandidates": [1927, 1931, 1934, 1936, 1938, 1939, 1940, 1941, 1946, 1952, 1953, 1955, 1957, 1958, 1959, 1961, 1970, 1971, 1972, 1974, 1987, 1988, 1989, 1990, 1991, 2009],
+      "removedCandidates": [1935, 1937, 1954, 1962, 1969, 1986],
+      "addedCandidates": [1934, 1936, 1938, 1940, 1941, 1953, 1955, 1958, 1959, 1961, 1972]
+    },
+    {
+      "targetCape": 20,
+      "beforeCandidates": [1927, 1930, 1936, 1955, 1956, 1958, 1959, 1960, 1961, 1962, 1963, 1964, 1965, 1966, 1967, 1968, 1969, 1971, 1972, 1973, 1987, 1990, 1992, 1993, 1994, 1995, 2003, 2008, 2010, 2011, 2012, 2013],
+      "afterCandidates": [1928, 1930, 1931, 1936, 1937, 1940, 1956, 1957, 1959, 1960, 1961, 1962, 1963, 1964, 1965, 1966, 1967, 1968, 1969, 1970, 1972, 1973, 1990, 1992, 1993, 1994, 1995, 2003, 2010, 2011, 2012, 2013],
+      "removedCandidates": [1927, 1955, 1958, 1971, 1987, 2008],
+      "addedCandidates": [1928, 1931, 1937, 1940, 1957, 1970]
+    }
+  ]
+}

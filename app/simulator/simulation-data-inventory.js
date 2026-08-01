@@ -6,7 +6,7 @@ import {
 } from './historical-backtest-contract.js';
 
 export const SIMULATION_DATA_INVENTORY_SCHEMA_VERSION = 'SimulationDataInventoryV1';
-export const SIMULATION_DATA_INVENTORY_REVISION = '2026-08-01.1';
+export const SIMULATION_DATA_INVENTORY_REVISION = '2026-08-01.4';
 
 export const SIMULATION_DATA_EVIDENCE_CLASSES = Object.freeze([
     'official',
@@ -93,6 +93,7 @@ function historicalSeries({
     transformation,
     embeddedValueHash,
     qualitySegments,
+    discontinuities = [],
     evidenceClass = 'unresolved',
     implementationLocations = [`app/simulator/simulator-data.js:HISTORICAL_DATA.*.${id}`],
     source = unresolved(),
@@ -120,7 +121,8 @@ function historicalSeries({
         rawDataHash,
         embeddedValueHash: resolved(embeddedValueHash),
         externalValidationStatus,
-        qualitySegments
+        qualitySegments,
+        discontinuities
     };
 }
 
@@ -323,29 +325,99 @@ const HISTORICAL_SERIES = {
     }),
     lohn_de: historicalSeries({
         id: 'lohn_de',
-        label: 'Embedded German wage/pension-adjustment proxy',
+        label: 'German average gross monthly earnings growth proxy without special payments',
         unit: 'percent_per_year',
+        evidenceClass: 'proxy',
+        implementationLocations: [
+            'app/simulator/german-gross-wage-growth-chain.js:GERMAN_GROSS_WAGE_GROWTH_CHAIN',
+            'app/simulator/simulator-data.js:HISTORICAL_DATA.*.lohn_de'
+        ],
+        source: resolved('JST Macrohistory Database R6 DEU.wage; Destatis Index der durchschnittlichen Bruttomonatsverdienste ohne Sonderzahlungen through 2025'),
+        seriesIdentifier: resolved('german_average_gross_monthly_earnings_growth_proxy / GermanGrossWageGrowthChainV2'),
         currency: notApplicable(),
-        transformation: 'Identity projection from the embedded annual percentage; the value adjusts pension inputs in year t.',
-        embeddedValueHash: 'b3798a555defed6eac846437cf7229997100c1b9bd3b11539c655e6d8da17888',
+        yearConvention: resolved('Published year-over-year change for reporting year t is applied once in simulation year t'),
+        transformation: '1925-1946 changes are derived from consecutive JST R6 nominal-wage levels. The 1925 start boundary and 1945 wartime break are separately classified; from 1947 the published Destatis annual change adjusts pension inputs once when rentAdjMode=wage. The 1947 source seam, 1948 currency-reform context, 1990/1991 territorial boundary, 2007 and 2022 method breaks and 1947-1955 precision limit are explicit. This remains a proxy, not the statutory German pension-adjustment series.',
+        license: resolved('JST-derived segment CC BY-NC-SA 4.0; Destatis segment Data Licence Germany - attribution - version 2.0'),
+        retrievedAt: resolved('2026-08-01'),
+        rawDataHash: resolved('cfd5c598a8bc846a96966fa8ff7388d80c30f3ada39edbfe90d39f234eef9d9b'),
+        embeddedValueHash: 'e10e581f6994e07ed0a943b3716dd8fd5dea7b8b272d47a546466af8701a3057',
+        externalValidationStatus: 'not_validated',
         qualitySegments: [
             {
                 startYear: 1925,
-                endYear: 1949,
+                endYear: 1925,
+                evidenceClass: 'proxy',
+                note: 'First in-scope JST level-derived rate; depends on the 1924 out-of-period level and carries a post-hyperinflation normalization boundary.'
+            },
+            {
+                startYear: 1926,
+                endYear: 1944,
+                evidenceClass: 'proxy',
+                note: 'Annual changes derived from consecutive JST R6 DEU nominal-wage levels; a macrohistory research proxy, not a statutory pension adjustment.'
+            },
+            {
+                startYear: 1945,
+                endYear: 1945,
                 evidenceClass: 'estimated',
-                note: 'The early extension is estimated; wage and pension-adjustment identity are unresolved.'
+                note: 'JST level-derived wartime/post-war break value retained for continuity; not claimed as an observed market-wage change.'
             },
             {
-                startYear: 1950,
-                endYear: 2023,
-                evidenceClass: 'unresolved',
-                note: 'The productive functional use is known, but exact nominal wage-series identity is not.'
+                startYear: 1946,
+                endYear: 1946,
+                evidenceClass: 'proxy',
+                note: 'Final JST level-derived transition year immediately before the source seam to published Destatis annual changes.'
             },
             {
-                startYear: 2024,
+                startYear: 1947,
+                endYear: 1955,
+                evidenceClass: 'official',
+                note: 'Published Destatis annual changes for the former federal territory. In-segment current levels are 1.9-4.5; the 1947 change also uses the prior 1946 level 1.8, so one-decimal publication imposes a material precision limit.'
+            },
+            {
+                startYear: 1956,
+                endYear: 1990,
+                evidenceClass: 'official',
+                note: 'Published Destatis annual changes for the former federal territory before reunification.'
+            },
+            {
+                startYear: 1991,
+                endYear: 2006,
+                evidenceClass: 'official',
+                note: 'Published Destatis annual changes for Germany under the territorial definition since 3 October 1990, before the 2007 method break.'
+            },
+            {
+                startYear: 2007,
+                endYear: 2021,
+                evidenceClass: 'official',
+                note: 'Published Destatis annual changes after the documented scope change to producing industry and services.'
+            },
+            {
+                startYear: 2022,
                 endYear: 2025,
-                evidenceClass: 'unresolved',
-                note: 'D-20 identifies placeholder/official-comparator discrepancies requiring source reconciliation.'
+                evidenceClass: 'official',
+                note: 'Published Destatis annual changes from the earnings survey introduced in 2022.'
+            }
+        ],
+        discontinuities: [
+            {
+                year: 1925,
+                type: 'start_boundary',
+                note: 'First in-scope rate depends on the out-of-period JST 1924 level; post-hyperinflation normalization limits comparability.'
+            },
+            {
+                year: 1945,
+                type: 'wartime_market_observation_break',
+                note: 'JST level-derived value is retained as estimated and is not claimed as an observed market-wage change.'
+            },
+            {
+                year: 1947,
+                type: 'source_seam',
+                note: 'Switch from JST level-derived changes through 1946 to published Destatis annual changes without a cross-source level ratio.'
+            },
+            {
+                year: 1948,
+                type: 'currency_reform_context',
+                note: 'Published earnings-index change does not model the separate 100:6.5 monetary-balance write-down.'
             }
         ]
     }),
@@ -427,23 +499,35 @@ const HISTORICAL_SERIES = {
     }),
     cape: historicalSeries({
         id: 'cape',
-        label: 'Embedded CAPE valuation proxy',
+        label: 'US Shiller conventional CAPE decision signal',
         unit: 'ratio',
+        evidenceClass: 'backtested',
+        implementationLocations: [
+            'app/simulator/us-shiller-cape-chain.js:US_SHILLER_CAPE_CHAIN',
+            'app/simulator/simulator-data.js:HISTORICAL_DATA.*.cape'
+        ],
+        source: resolved('Robert J. Shiller, U.S. Stock Markets 1871-Present and CAPE Ratio workbook'),
+        seriesIdentifier: resolved('us_shiller_conventional_cape_decision_signal / UsShillerCapeDecisionChainV1'),
         currency: notApplicable(),
-        transformation: 'Embedded ratio from source year t-1 is used as decision-as-of input for simulation year t.',
-        embeddedValueHash: 'eb5c0407128cad2d7a1cfba745d0330a3bcbbd825fef8a0bb9ab4f37a9ea6db4',
+        yearConvention: resolved('December observation from calendar year t-1 is the decision signal for return year t'),
+        transformation: 'The conventional price CAPE source observation for December t-1 is embedded under return year t and consumed once as the decision-as-of input; no second lag.',
+        license: resolved('Publisher download is public; no explicit open redistribution licence located; publisher/Yale disclaimer applies'),
+        retrievedAt: resolved('2026-08-01'),
+        rawDataHash: resolved('0e3d716f83f51c14f40c5ab5662e767cde4f83fcb7305db24ab003df2c9ee6c5'),
+        embeddedValueHash: 'd1101958fed64dadf8fba76e9e4e92c8d24e86bd3d21accc42cdb60c247a835f',
+        externalValidationStatus: 'not_validated',
         qualitySegments: [
             {
                 startYear: 1925,
-                endYear: 1949,
+                endYear: 1935,
                 evidenceClass: 'estimated',
-                note: 'The early extension is estimated; market region and reconstruction method are unresolved.'
+                note: 'The trailing ten-year earnings basis includes interpolated annual Cowles observations before 1926.'
             },
             {
-                startYear: 1950,
+                startYear: 1936,
                 endYear: 2025,
-                evidenceClass: 'unresolved',
-                note: 'The t-1 consumer convention is known, but external series identity, region and source vintage are not.'
+                evidenceClass: 'backtested',
+                note: 'Publisher-compiled US conventional CAPE after the ten-year window no longer contains the documented pre-1926 interpolation; it is not a global or German valuation ratio.'
             }
         ]
     })
@@ -844,6 +928,30 @@ function validateQualitySegments(series, path) {
     }
 }
 
+function validateDiscontinuities(series, path) {
+    if (!Array.isArray(series.discontinuities)) {
+        inventoryError('SIMULATION_DATA_DISCONTINUITIES_INVALID', `${path}.discontinuities must be an array`, { path });
+    }
+    let previousYear = 1924;
+    for (let index = 0; index < series.discontinuities.length; index++) {
+        const discontinuity = series.discontinuities[index];
+        const discontinuityPath = `${path}.discontinuities[${index}]`;
+        if (!Number.isInteger(discontinuity?.year)
+            || discontinuity.year < 1925
+            || discontinuity.year > 2025
+            || discontinuity.year <= previousYear) {
+            inventoryError('SIMULATION_DATA_DISCONTINUITIES_INVALID', `${discontinuityPath}.year must be unique and ascending within the historical period`, {
+                discontinuityPath,
+                previousYear,
+                discontinuity
+            });
+        }
+        requireNonEmptyString(discontinuity.type, `${discontinuityPath}.type`);
+        requireNonEmptyString(discontinuity.note, `${discontinuityPath}.note`);
+        previousYear = discontinuity.year;
+    }
+}
+
 export function validateSimulationDataInventory(inventory = SIMULATION_DATA_INVENTORY) {
     if (!inventory || typeof inventory !== 'object'
         || inventory.schemaVersion !== SIMULATION_DATA_INVENTORY_SCHEMA_VERSION) {
@@ -866,6 +974,7 @@ export function validateSimulationDataInventory(inventory = SIMULATION_DATA_INVE
             });
         }
         validateQualitySegments(series, `inventory.historicalSeries.${seriesId}`);
+        validateDiscontinuities(series, `inventory.historicalSeries.${seriesId}`);
     }
 
     const staticEntries = Object.values(inventory.staticData || {});

@@ -212,6 +212,31 @@ function validateSegments(segments, path, outerPeriod) {
     }
 }
 
+function validateDiscontinuities(discontinuities, path, outerPeriod) {
+    if (!Array.isArray(discontinuities)) {
+        contractError('HISTORICAL_MANIFEST_INVALID', `${path} must be an array`, { path });
+    }
+    let previousYear = outerPeriod.startYear - 1;
+    for (let index = 0; index < discontinuities.length; index++) {
+        const discontinuity = discontinuities[index];
+        const itemPath = `${path}[${index}]`;
+        if (!Number.isInteger(discontinuity?.year)
+            || discontinuity.year < outerPeriod.startYear
+            || discontinuity.year > outerPeriod.endYear
+            || discontinuity.year <= previousYear) {
+            contractError('HISTORICAL_MANIFEST_INVALID', `${itemPath}.year must be unique and ascending within the series period`, {
+                path: `${itemPath}.year`,
+                previousYear,
+                discontinuity,
+                outerPeriod
+            });
+        }
+        requireNonEmptyString(discontinuity.type, `${itemPath}.type`);
+        requireNonEmptyString(discontinuity.note, `${itemPath}.note`);
+        previousYear = discontinuity.year;
+    }
+}
+
 export function validateHistoricalDataManifest(manifest = HISTORICAL_DATA_MANIFEST) {
     if (!manifest || typeof manifest !== 'object') {
         contractError('HISTORICAL_MANIFEST_INVALID', 'Historical data manifest must be an object');
@@ -262,6 +287,7 @@ export function validateHistoricalDataManifest(manifest = HISTORICAL_DATA_MANIFE
             });
         }
         validateSegments(series.estimatedSegments, `manifest.series.${seriesId}.estimatedSegments`, seriesPeriod);
+        validateDiscontinuities(series.discontinuities, `manifest.series.${seriesId}.discontinuities`, seriesPeriod);
         if (series.missingness?.required !== true || series.missingness.rule !== 'reject_missing_or_non_finite') {
             contractError('HISTORICAL_MANIFEST_INVALID', `Series ${seriesId} must declare the required missingness rule`, {
                 seriesId
@@ -360,13 +386,28 @@ function combineQualityStatuses(...statuses) {
     ), 'present');
 }
 
-function createObservation({ seriesId, value, unit, sourceYear, asOfYear, qualityStatus, derivation, inputs }) {
+function createObservation({
+    seriesId,
+    value,
+    unit,
+    sourceYear,
+    asOfYear,
+    observationYear,
+    observationMonth,
+    decisionYear,
+    qualityStatus,
+    derivation,
+    inputs
+}) {
     return deepFreeze({
         seriesId,
         value,
         unit,
         sourceYear,
         asOfYear,
+        ...(observationYear === undefined ? {} : { observationYear }),
+        ...(observationMonth === undefined ? {} : { observationMonth }),
+        ...(decisionYear === undefined ? {} : { decisionYear }),
         qualityStatus,
         derivation,
         ...(inputs ? { inputs } : {})
@@ -458,12 +499,15 @@ export function buildHistoricalYearRecord({ year, current, previous, manifest = 
         decisionAsOf: {
             capeRatio: createObservation({
                 seriesId: 'cape',
-                value: previous.cape,
+                value: current.cape,
                 unit: series.cape.unit,
                 sourceYear: year - 1,
                 asOfYear: year - 1,
-                qualityStatus: resolveQualityStatus(series.cape, year - 1, previous.cape),
-                derivation: 'last_embedded_value_before_decision_year'
+                observationYear: year - 1,
+                observationMonth: 12,
+                decisionYear: year,
+                qualityStatus: resolveQualityStatus(series.cape, year, current.cape),
+                derivation: 'generated_december_t_minus_1_decision_signal'
             })
         }
     };
@@ -576,11 +620,17 @@ export function validateHistoricalYearRecord(record, manifest = HISTORICAL_DATA_
     const latestDecisionYear = record.simulationYear - 1;
     if (capeObservation.sourceYear !== latestDecisionYear
         || capeObservation.asOfYear !== latestDecisionYear
+        || capeObservation.observationYear !== latestDecisionYear
+        || capeObservation.observationMonth !== 12
+        || capeObservation.decisionYear !== record.simulationYear
         || capeObservation.asOfYear >= record.simulationYear) {
-        contractError('HISTORICAL_TEMPORAL_LOOKAHEAD', 'decisionAsOf.capeRatio must be known before simulation year t', {
+        contractError('HISTORICAL_TEMPORAL_LOOKAHEAD', 'decisionAsOf.capeRatio must expose the December t-1 observation used for decision year t', {
             year: record.year,
             sourceYear: capeObservation.sourceYear,
             asOfYear: capeObservation.asOfYear,
+            observationYear: capeObservation.observationYear,
+            observationMonth: capeObservation.observationMonth,
+            decisionYear: capeObservation.decisionYear,
             latestDecisionYear
         });
     }

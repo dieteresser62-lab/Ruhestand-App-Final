@@ -51,7 +51,9 @@
     "appliesToSnapshotIds": [
       "post-backtest-data-03-v1",
       "post-backtest-data-04-v1",
-      "post-backtest-data-05-v1"
+      "post-backtest-data-05-v1",
+      "post-backtest-data-06-v1",
+      "post-backtest-data-06-v2"
     ],
     "ignoredResultPaths": [
       "contracts.snapshotPolicy.currentReference",

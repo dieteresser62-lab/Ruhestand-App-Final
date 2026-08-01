@@ -15,7 +15,7 @@ const fixturePath = path.join(
     'gold-german-investor-backtest-delta-v2.json'
 );
 const beforePath = path.join(directory, 'fixtures', 'post-backtest-data-04-target-v1.json');
-const afterPath = path.join(directory, 'fixtures', 'simulator-backtest-target-v1.json');
+const afterPath = path.join(directory, 'fixtures', 'post-backtest-data-05-target-v1.json');
 const beforeBytes = fs.readFileSync(beforePath);
 const afterBytes = fs.readFileSync(afterPath);
 const before = JSON.parse(beforeBytes);
@@ -112,7 +112,7 @@ console.log('Test 1: before/after artifacts and the sole intended cause are pinn
 assertEqual(fixture.schemaVersion, 'GoldGermanInvestorBacktestDeltaV2', 'Delta fixture should be versioned');
 assertEqual(fixture.cause, 'gold_german_investor_chain', 'Delta fixture should name the sole intended cause');
 assertEqual(sha256(beforeBytes), fixture.beforeTarget.sha256, 'Post-Slice-04 target should match its pinned hash');
-assertEqual(sha256(afterBytes), fixture.afterTarget.sha256, 'Active target should match its pinned hash');
+assertEqual(sha256(afterBytes), fixture.afterTarget.sha256, 'Post-Slice-05 target should match its pinned hash');
 assertEqual(
     fixture.afterTarget.goldAnnualReturnHash,
     GOLD_GERMAN_INVESTOR_CHAIN.hashes.annualReturnHash,

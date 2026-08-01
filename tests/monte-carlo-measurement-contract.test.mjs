@@ -74,6 +74,11 @@ const postBacktestData05 = readFixtureUnlessWriting(
     'post-backtest-data-05-v1.json',
     'post-backtest-data-05-v1'
 );
+const postBacktestData06V1 = readFixture('post-backtest-data-06-v1.json');
+const postBacktestData06 = readFixtureUnlessWriting(
+    'post-backtest-data-06-v2.json',
+    'post-backtest-data-06-v2'
+);
 const finalCandidate = readFixture('monte-carlo-v1-final.json');
 const benchmarkContract = readFixture('benchmark-contract-v1.json');
 const benchmarkResults = readFixture('benchmark-results-2026-07-22.json');
@@ -97,6 +102,34 @@ function canonicalize(value) {
 
 function assertJsonEqual(actual, expected, message) {
     assertEqual(JSON.stringify(canonicalize(actual)), JSON.stringify(canonicalize(expected)), message);
+}
+
+function collectLeafDiffPaths(before, after, pathName = '$') {
+    if (JSON.stringify(before) === JSON.stringify(after)) return [];
+    const beforeObject = before !== null && typeof before === 'object';
+    const afterObject = after !== null && typeof after === 'object';
+    if (!beforeObject || !afterObject || Array.isArray(before) !== Array.isArray(after)) return [pathName];
+    const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
+    return Array.from(keys).sort().flatMap(key => collectLeafDiffPaths(
+        before[key],
+        after[key],
+        `${pathName}.${key}`
+    ));
+}
+
+function collectNumericLeafDeltas(before, after, pathName = '$') {
+    if (typeof before === 'number' && typeof after === 'number') {
+        return Object.is(before, after) ? [] : [{ path: pathName, before, after }];
+    }
+    const beforeObject = before !== null && typeof before === 'object';
+    const afterObject = after !== null && typeof after === 'object';
+    if (!beforeObject || !afterObject || Array.isArray(before) !== Array.isArray(after)) return [];
+    const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
+    return Array.from(keys).sort().flatMap(key => collectNumericLeafDeltas(
+        before[key],
+        after[key],
+        `${pathName}.${key}`
+    ));
 }
 
 function createWorkerHarness() {
@@ -1106,11 +1139,49 @@ function computeKpiDelta(low, high) {
     }
     assertEqual(backtestData05Entries[0].sourceReference, 'post-backtest-data-04-v1', 'Backtest-Data Slice 05 must retain the Slice 04 source reference');
     assertEqual(backtestData05Entries[0].targetReference, 'post-backtest-data-05-v1', 'Backtest-Data Slice 05 must target its separate pending candidate');
+    assertEqual(backtestData05Entries[0].knownEvidenceDefect.capturedAtUtcStatus, 'invalid_predates_measured_code_state', 'Slice 05 ledger must not present its impossible capture time as valid evidence');
+    assertEqual(backtestData05Entries[0].knownEvidenceDefect.goldRuntimeEffectMeasured, false, 'Slice 05 ledger must not infer a gold runtime effect from gold-free MC cases');
     if (postBacktestData05) {
         assertEqual(postBacktestData05.sourceReference, 'post-backtest-data-04-v1', 'Backtest-Data Slice 05 snapshot must reference the prior data snapshot');
         assertEqual(postBacktestData05.snapshotId, 'post-backtest-data-05-v1', 'The Backtest-Data Slice 05 candidate must retain its original immutable revision');
         assertEqual(postBacktestData05.reviewStatus, 'pending', 'The Backtest-Data Slice 05 candidate must remain pending until external review');
         assertEqual(postBacktestData05.goldenCaseIds.length, goldenFixture.cases.length, 'Backtest-Data Slice 05 snapshot must cover every golden-case family');
+    }
+    const backtestData06Entries = deltaLedger.entries.filter(entry => entry.sliceId === 'BACKTEST-DATA-06');
+    assertEqual(backtestData06Entries.length, 2, 'Backtest-Data Slice 06 must preserve V1 and ledger the corrected V2 measurement separately');
+    for (const entry of backtestData06Entries) {
+        for (const field of deltaLedger.requiredEntryFields) {
+            assert(Object.prototype.hasOwnProperty.call(entry, field), `Backtest-Data Slice 06 delta entry must contain ${field}`);
+        }
+    }
+    assertEqual(backtestData06Entries[0].sourceReference, 'post-backtest-data-05-v1', 'Backtest-Data Slice 06 must retain the Slice 05 source reference');
+    assertEqual(backtestData06Entries[0].targetReference, 'post-backtest-data-06-v1', 'Backtest-Data Slice 06 must preserve its original pending candidate');
+    assertEqual(backtestData06Entries[0].knownEvidenceDefect.numericDeltaCount, 0, 'Slice 06 V1 ledger must disclose that it measured no numeric delta');
+    assertEqual(backtestData06Entries[0].knownEvidenceDefect.capeRuntimeEffectMeasured, false, 'Slice 06 V1 ledger must not claim a CAPE runtime measurement');
+    assertEqual(backtestData06Entries[0].knownEvidenceDefect.wageRuntimeEffectMeasured, false, 'Slice 06 V1 ledger must not claim a wage runtime measurement');
+    assertEqual(backtestData06Entries[1].sourceReference, 'post-backtest-data-06-v1', 'Corrected Slice 06 measurement must retain V1 as its immutable predecessor');
+    assertEqual(backtestData06Entries[1].targetReference, 'post-backtest-data-06-v2', 'Corrected Slice 06 measurement must target the V2 candidate');
+    assertEqual(backtestData06Entries[1].measurementScope.capeSamplingCaseIncluded, false, 'V2 ledger must disclose missing CAPE sampling coverage');
+    assertEqual(backtestData06Entries[1].measurementScope.capeRuntimeEffectMeasured, false, 'V2 ledger must not claim a CAPE runtime effect');
+    assertEqual(backtestData06Entries[1].measurementScope.wageIndexedPensionCaseIncluded, false, 'V2 ledger must disclose missing wage-indexed pension coverage');
+    assertEqual(backtestData06Entries[1].measurementScope.wageRuntimeEffectMeasured, false, 'V2 ledger must not claim a wage runtime effect');
+    assertEqual(backtestData06Entries[1].measurementScope.numericDeltaCount, 0, 'V2 ledger must state the measured zero numeric deltas');
+    assertEqual(postBacktestData06V1.snapshotId, 'post-backtest-data-06-v1', 'Original Slice-06 candidate must remain immutable');
+    if (postBacktestData06) {
+        assertEqual(postBacktestData06.sourceReference, 'post-backtest-data-06-v1', 'Backtest-Data Slice 06 V2 snapshot must reference its immutable predecessor');
+        assertEqual(postBacktestData06.snapshotId, 'post-backtest-data-06-v2', 'The active Backtest-Data Slice 06 candidate must be V2');
+        assertEqual(postBacktestData06.reviewStatus, 'pending', 'The Backtest-Data Slice 06 candidate must remain pending until external review');
+        assertEqual(postBacktestData06.measurementScope.capeRuntimeEffectMeasured, false, 'Slice 06 snapshot must reject a CAPE-effect interpretation');
+        assertEqual(postBacktestData06.measurementScope.wageRuntimeEffectMeasured, false, 'Slice 06 snapshot must reject a wage-effect interpretation');
+        assertEqual(postBacktestData06.measurementScope.derivedRegimeEffectExpected, false, 'Slice 06 snapshot must not claim CAPE/wage regime effects');
+        assertEqual(postBacktestData06.measurementScope.numericDeltaCount, 0, 'Slice 06 snapshot must disclose zero numeric deltas');
+        const capturedAtMs = Date.parse(postBacktestData06.capturedAtUtc);
+        assert(Number.isFinite(capturedAtMs), 'Slice 06 V2 capture timestamp must be valid ISO time');
+        assert(capturedAtMs > Date.parse(postBacktestData06V1.capturedAtUtc), 'Slice 06 V2 capture must postdate its immutable predecessor');
+        assert(capturedAtMs <= Date.now() + 60000, 'Slice 06 V2 capture must not be in the future');
+        const sourceText = fs.readFileSync(fileURLToPath(import.meta.url), 'utf8');
+        assert(!sourceText.includes(postBacktestData06.capturedAtUtc), 'Slice 06 V2 timestamp must not be a test-source literal');
+        assertEqual(postBacktestData06.captureEvidence.measuredHistoricalDataHash, postBacktestData06.metadata.dataVersion.annualDataHash, 'Capture evidence must bind the measured annual-data hash');
     }
     const slice12Entries = deltaLedger.entries.filter(entry => entry.sliceId === '12');
     assertEqual(slice12Entries.length, 1, 'Slice 12 must ledger the integrated final candidate separately');
@@ -1317,12 +1388,63 @@ const actualBacktestData05Snapshot = {
     autoOptimizeResult: actualAutoOptimizeProjection,
     result: actualFinalProjection
 };
+const slice06CaptureTimestamp = UPDATE_REFERENCE_ID === 'post-backtest-data-06-v2'
+    ? new Date().toISOString()
+    : postBacktestData06?.capturedAtUtc;
+if (typeof slice06CaptureTimestamp !== 'string') {
+    throw new Error('Slice-06 V2 capture timestamp is unavailable outside immutable candidate creation');
+}
+const actualBacktestData06Snapshot = {
+    schemaVersion: 'monte-carlo-post-slice-snapshot-v1',
+    snapshotId: 'post-backtest-data-06-v2',
+    sourceReference: 'post-backtest-data-06-v1',
+    sliceId: 'BACKTEST-DATA-06',
+    reviewStatus: 'pending',
+    capturedAtUtc: slice06CaptureTimestamp,
+    goldenCaseIds: ['GC-RISK-01', 'GC-CUT-01', 'GC-CARE-01', 'GC-OUTCOME-01', 'GC-SAMPLING-01', 'GC-CAR-01'],
+    measurementScope: {
+        goldHoldingCaseIncluded: false,
+        goldRuntimeEffectMeasured: false,
+        capeSamplingCaseIncluded: false,
+        capeRuntimeEffectMeasured: false,
+        wageIndexedPensionCaseIncluded: false,
+        wageRuntimeEffectMeasured: false,
+        derivedRegimeEffectExpected: false,
+        numericDeltaCount: 0,
+        sharedAnnualDataFingerprintOnly: true,
+        interpretation: 'The fixed Monte Carlo golden cases request neither CAPE start-year sampling nor wage-indexed pension escalation and hold no gold. Regimes depend only on equity return and inflation. Therefore no numeric result delta is expected or claimed; this candidate fingerprints the changed annual-data hash and provenance only. Runtime CAPE and wage effects are evidenced by separate backtest and CAPE-sampling delta oracles.'
+    },
+    captureEvidence: {
+        clockSource: 'new Date().toISOString() evaluated during immutable candidate creation',
+        creationGuard: 'MC_UPDATE_REFERENCE=post-backtest-data-06-v2 with refuse-overwrite semantics',
+        predecessorSnapshotId: postBacktestData06V1.snapshotId,
+        measuredHistoricalDataHash: actualDataVersion.annualDataHash
+    },
+    metadata: {
+        seed: preHardening.metadata.seed,
+        dataVersion: actualDataVersion,
+        runtime: {
+            kind: 'node',
+            version: process.version,
+            platform: process.platform,
+            architecture: process.arch
+        },
+        numericTolerance: postBacktestData06V1.metadata.numericTolerance
+            ?? postBacktestData05?.metadata.numericTolerance
+            ?? postBacktestData04?.metadata.numericTolerance
+            ?? postBacktestData03.metadata.numericTolerance
+    },
+    carResult: actualSlice07Result,
+    autoOptimizeResult: actualAutoOptimizeProjection,
+    result: actualFinalProjection
+};
 if (UPDATE_REFERENCE_ID) {
     const candidates = new Map([
         [actualBacktestData02Snapshot.snapshotId, actualBacktestData02Snapshot],
         [actualBacktestData03Snapshot.snapshotId, actualBacktestData03Snapshot],
         [actualBacktestData04Snapshot.snapshotId, actualBacktestData04Snapshot],
-        [actualBacktestData05Snapshot.snapshotId, actualBacktestData05Snapshot]
+        [actualBacktestData05Snapshot.snapshotId, actualBacktestData05Snapshot],
+        [actualBacktestData06Snapshot.snapshotId, actualBacktestData06Snapshot]
     ]);
     const candidate = candidates.get(UPDATE_REFERENCE_ID);
     if (!candidate) {
@@ -1343,7 +1465,7 @@ assertJsonEqual(postSlice03.metadata.dataVersion, finalCandidate.metadata.dataVe
 assert(preHardening.result !== null, 'Immutable pre-hardening result must remain captured');
 assertEqual(preHardening.result.bufferBytesPerRun, 63, 'Immutable pre-hardening buffer evidence must remain unchanged');
 assertJsonEqual(preHardening.result.buffers.volatilities, preHardening.result.buffers.maxDrawdowns, 'Immutable baseline must retain the documented pre-fix volatility defect');
-const activeSnapshot = postBacktestData05;
+const activeSnapshot = postBacktestData06;
 const sameRuntime = process.version === activeSnapshot.metadata.runtime.version
     && process.platform === activeSnapshot.metadata.runtime.platform
     && process.arch === activeSnapshot.metadata.runtime.architecture;
@@ -1354,11 +1476,58 @@ assertEqual(postSlice05.result.bufferBytesPerRun, 75, 'Immutable Post-Slice-05 r
 assertJsonEqual(postSlice03.metadata.dataVersion, postSlice06.metadata.dataVersion, 'Post-Slice-06 should retain the immutable prior data version');
 assertEqual(postSlice06.result.bufferBytesPerRun, 75, 'Immutable Post-Slice-06 reference retains its buffer evidence');
 assertJsonEqual(postSlice03.metadata.dataVersion, postSlice07.metadata.dataVersion, 'Post-Slice-07 should retain the immutable prior data version');
-assertJsonEqual(actualDataVersion, activeSnapshot.metadata.dataVersion, 'Backtest-Data Slice 05 data version must match');
+assertJsonEqual(actualDataVersion, activeSnapshot.metadata.dataVersion, 'Backtest-Data Slice 06 data version must match');
+const slice06NumericDeltas = collectNumericLeafDeltas(
+    {
+        carResult: postBacktestData05.carResult,
+        autoOptimizeResult: postBacktestData05.autoOptimizeResult,
+        result: postBacktestData05.result
+    },
+    {
+        carResult: activeSnapshot.carResult,
+        autoOptimizeResult: activeSnapshot.autoOptimizeResult,
+        result: activeSnapshot.result
+    }
+);
+assertEqual(slice06NumericDeltas.length, 0, 'Slice 06 Monte Carlo golden cases must truthfully report zero numeric result deltas');
+assertEqual(activeSnapshot.measurementScope.numericDeltaCount, slice06NumericDeltas.length, 'Slice 06 measurement scope must equal the measured numeric delta count');
+assertEqual(
+    activeSnapshot.metadata.dataVersion.regimeHash,
+    postBacktestData05.metadata.dataVersion.regimeHash,
+    'CAPE and wage replacement must not claim a derived-regime change'
+);
+const slice06ChangedLeafPaths = collectLeafDiffPaths(postBacktestData05, activeSnapshot);
+assertJsonEqual(
+    slice06ChangedLeafPaths,
+    [
+        '$.captureEvidence',
+        '$.capturedAtUtc',
+        '$.measurementScope',
+        '$.metadata.dataVersion.annualDataHash',
+        '$.result.result.samplingDiagnostics.dataVersion.annualDataHash',
+        '$.sliceId',
+        '$.snapshotId',
+        '$.sourceReference'
+    ],
+    'Slice 06 Monte Carlo V2 should have the exact eight-leaf identity/provenance boundary'
+);
+const slice06UnexpectedLeafPaths = slice06ChangedLeafPaths.filter(pathName => ![
+    '$.capturedAtUtc',
+    '$.metadata.dataVersion.annualDataHash',
+    '$.result.result.samplingDiagnostics.dataVersion.annualDataHash',
+    '$.sliceId',
+    '$.snapshotId',
+    '$.sourceReference'
+].includes(pathName)
+    && pathName !== '$.measurementScope'
+    && pathName !== '$.captureEvidence'
+    && !pathName.startsWith('$.measurementScope.')
+    && !pathName.startsWith('$.captureEvidence.'));
+assertJsonEqual(slice06UnexpectedLeafPaths, [], 'Slice 06 Monte Carlo V2 must change only identity, capture, scope and annual-data provenance fields');
 compareSnapshotNode(
     actualSlice07Result,
     activeSnapshot.carResult,
-    'postBacktestData05.carResult',
+    'postBacktestData06.carResult',
     sameRuntime,
     activeSnapshot.metadata.numericTolerance
 );
@@ -1387,14 +1556,14 @@ assertEqual(activeSnapshot.reviewStatus, 'pending', 'The active measurement targ
 compareSnapshotNode(
     actualFinalProjection,
     omitHistoricalFixtureCompatibilityFields(activeSnapshot.result),
-    'postBacktestData05.result',
+    'postBacktestData06.result',
     sameRuntime,
     activeSnapshot.metadata.numericTolerance
 );
 compareSnapshotNode(
     actualAutoOptimizeProjection,
     activeSnapshot.autoOptimizeResult,
-    'postBacktestData05.autoOptimizeResult',
+    'postBacktestData06.autoOptimizeResult',
     sameRuntime,
     activeSnapshot.metadata.numericTolerance
 );

@@ -23,6 +23,10 @@ function clone(value) {
     return JSON.parse(JSON.stringify(value));
 }
 
+function assertJsonEqual(actual, expected, message) {
+    assertEqual(JSON.stringify(actual), JSON.stringify(expected), message);
+}
+
 function captureError(callback) {
     try {
         callback();
@@ -45,7 +49,7 @@ console.log('Test 1: manifest contains all required reproducibility fields');
 validateHistoricalDataManifest(HISTORICAL_DATA_MANIFEST);
 assertEqual(HISTORICAL_DATA_MANIFEST.schemaVersion, 'HistoricalDataManifestV1', 'Manifest schema should be versioned');
 assertEqual(HISTORICAL_DATA_MANIFEST.datasetId, 'ruhestandsapp-historical-data-v1', 'Manifest ID should be stable');
-assertEqual(HISTORICAL_DATA_MANIFEST.revision, '2026-08-01.1', 'Manifest revision should be explicit');
+assertEqual(HISTORICAL_DATA_MANIFEST.revision, '2026-08-01.4', 'Manifest revision should be explicit');
 assertEqual(HISTORICAL_DATA_MANIFEST.period.startYear, 1925, 'Manifest start year should match embedded history');
 assertEqual(HISTORICAL_DATA_MANIFEST.period.endYear, 2025, 'Manifest end year should match embedded history');
 assertEqual(HISTORICAL_DATA_MANIFEST.lookback.backtestYears, 4, 'Backtest lookback should be explicit');
@@ -68,6 +72,7 @@ for (const seriesId of requiredSeries) {
     assert(series.license && typeof series.license.status === 'string', `${seriesId} should declare license/status`);
     assert(series.transformation && typeof series.transformation.status === 'string', `${seriesId} should declare transformation/status`);
     assert(Array.isArray(series.estimatedSegments), `${seriesId} should declare estimated segments`);
+    assert(Array.isArray(series.discontinuities), `${seriesId} should declare discontinuities`);
     assertEqual(series.missingness.required, true, `${seriesId} should be required for V1 records`);
     assertEqual(series.missingness.rule, 'reject_missing_or_non_finite', `${seriesId} should reject missing/non-finite values`);
     assert(Array.isArray(series.missingness.fallbackZeroSegments), `${seriesId} should manifest fallback-zero segments`);
@@ -75,21 +80,7 @@ for (const seriesId of requiredSeries) {
 }
 console.log('✓ required manifest fields OK');
 
-console.log('Test 2: resolved research chains and remaining unresolved claims stay explicit');
-for (const seriesId of requiredSeries.filter(seriesId => (
-    seriesId !== 'global_equity_research_index'
-        && seriesId !== 'inflation_de'
-        && seriesId !== 'zinssatz_de'
-        && seriesId !== 'gold_eur_perf'
-))) {
-    const series = HISTORICAL_DATA_MANIFEST.series[seriesId];
-    assertEqual(series.source.status, 'unresolved', `${seriesId} source must remain unresolved without evidence`);
-    assertEqual(series.source.value, null, `${seriesId} unresolved source must not contain an invented value`);
-    assertEqual(series.license.status, 'unresolved', `${seriesId} license must remain unresolved without evidence`);
-    assertEqual(series.license.value, null, `${seriesId} unresolved license must not contain an invented value`);
-    assertEqual(series.variant.status, 'unresolved', `${seriesId} variant must remain unresolved without evidence`);
-    assertEqual(series.variant.value, null, `${seriesId} unresolved variant must not contain an invented value`);
-}
+console.log('Test 2: all historical research chains expose their resolved identity and evidence boundary');
 const equitySeries = HISTORICAL_DATA_MANIFEST.series.global_equity_research_index;
 assertEqual(equitySeries.source.status, 'known', 'Equity source should be resolved to the open source chain');
 assertEqual(equitySeries.license.status, 'known', 'Equity data license should be explicit');
@@ -135,7 +126,29 @@ assertEqual(
     'literal_value',
     'Gold zeros should be either source-derived literals or covered by the explicit estimated bridge'
 );
-console.log('✓ resolved chains, unresolved claims and zero policy OK');
+const wageSeries = HISTORICAL_DATA_MANIFEST.series.lohn_de;
+assertEqual(wageSeries.source.status, 'known', 'German wage source should be resolved');
+assertEqual(wageSeries.license.status, 'known', 'German wage source licence should be explicit');
+assertEqual(wageSeries.estimatedSegments[0].endYear, 1946, 'Wage JST proxy should stop before the first published annual change');
+assert(wageSeries.transformation.value.includes('not the statutory German pension-adjustment series'), 'Wage proxy must not claim statutory pension-adjustment identity');
+assertJsonEqual(
+    wageSeries.discontinuities.map(({ year, type }) => ({ year, type })),
+    [
+        { year: 1925, type: 'start_boundary' },
+        { year: 1945, type: 'wartime_market_observation_break' },
+        { year: 1947, type: 'source_seam' },
+        { year: 1948, type: 'currency_reform_context' }
+    ],
+    'Wage manifest should expose every early discontinuity'
+);
+const capeSeries = HISTORICAL_DATA_MANIFEST.series.cape;
+assertEqual(capeSeries.source.status, 'known', 'CAPE source should be resolved');
+assertEqual(capeSeries.license.status, 'known', 'CAPE usage boundary should be explicit');
+assertEqual(capeSeries.region.value, 'US stock market', 'CAPE region should be explicit');
+assertEqual(capeSeries.estimatedSegments.length, 1, 'CAPE should expose the interpolation-affected early segment');
+assertEqual(capeSeries.estimatedSegments[0].endYear, 1935, 'CAPE early quality boundary should include the complete trailing ten-year interpolation window');
+assert(capeSeries.transformation.value.includes('no second lag'), 'CAPE mapping should reject a second lag');
+console.log('✓ resolved chains and explicit evidence boundaries OK');
 
 console.log('Test 3: canonical browser-compatible SHA-256 matches Node SHA-256');
 {
@@ -182,6 +195,11 @@ console.log('Test 5: empty or fabricated resolution fields are rejected');
     delete missingStatus.series.cape.license.status;
     const missingStatusError = captureError(() => validateHistoricalDataManifest(missingStatus));
     assertEqual(missingStatusError?.code, 'HISTORICAL_MANIFEST_INVALID', 'Missing license status should be rejected');
+
+    const unorderedSeam = clone(HISTORICAL_DATA_MANIFEST);
+    unorderedSeam.series.lohn_de.discontinuities[1].year = 1925;
+    const unorderedSeamError = captureError(() => validateHistoricalDataManifest(unorderedSeam));
+    assertEqual(unorderedSeamError?.code, 'HISTORICAL_MANIFEST_INVALID', 'Duplicate or unordered wage seams should fail closed');
 }
 console.log('✓ manifest resolution validation OK');
 
@@ -212,7 +230,7 @@ for (const seriesId of requiredSeries) {
     assertEqual(inventorySeries.id, HISTORICAL_DATA_MANIFEST.series[seriesId].id, `${seriesId} inventory identity should match runtime manifest`);
     assertEqual(
         inventorySeries.rawDataHash.status,
-        ['global_equity_research_index', 'inflation_de', 'zinssatz_de', 'gold_eur_perf'].includes(seriesId)
+        requiredSeries.includes(seriesId)
             ? 'known'
             : 'unresolved',
         `${seriesId} should reflect whether an external raw-data hash is available`

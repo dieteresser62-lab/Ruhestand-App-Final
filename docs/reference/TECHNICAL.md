@@ -379,21 +379,28 @@ Diese Grenze ist fachlich gewollt: Balance kennt derzeit keinen belastbaren aktu
   Brueckenjahre bleiben im Legacy-Monte-Carlo-Pool und koennen dessen
   modellierte Goldvolatilitaet druecken.
 * `app/simulator/simulator-data.js` – Historische Datenprojektion mit
-  generiertem `global_equity_research_index`, `inflation_de`, `zinssatz_de`
-  und `gold_eur_perf`, tief eingefrorenes
+  generiertem `global_equity_research_index`, `inflation_de`, `zinssatz_de`,
+  `lohn_de`, `gold_eur_perf` und `cape`, tief eingefrorenes
   `HistoricalDataManifestV1`, Mortalitäts- und Stress-Presets.
-* `app/simulator/historical-backtest-contract.js` – DOM-freier, im Produktbacktest aktivierter Manifest-/SHA-256-/`HistoricalYearRecordV1`-Contract. Validiert das Dataset einmal je Revision/Hash, liefert immutable Records und prueft Einzelpfad- bzw. Cohort-Batch-Perioden vor der Rechenschleife. Die aktive Zeitachse `realized_t_decision_t_minus_1_v1` verwendet realisierte Markt-/Makrowerte aus `t` und CAPE decision-as-of aus `t-1`.
+* `app/simulator/historical-backtest-contract.js` – DOM-freier, im Produktbacktest aktivierter Manifest-/SHA-256-/`HistoricalYearRecordV1`-Contract. Validiert das Dataset einmal je Revision/Hash einschliesslich geordneter, eindeutiger und begrenzter Reihendiskontinuitaeten, liefert immutable Records und prueft Einzelpfad- bzw. Cohort-Batch-Perioden vor der Rechenschleife. Die aktive Zeitachse `realized_t_decision_t_minus_1_v1` verwendet realisierte Markt-/Makrowerte aus `t`; CAPE exportiert die Dezember-Beobachtung `t-1`, den As-of-Stand `t-1` und das Entscheidungsjahr `t` getrennt und wird ohne zweiten Lag konsumiert.
 * `app/simulator/simulation-data-inventory.js` – DOM-freier
   `SimulationDataInventoryV1`-Evidenzvertrag fuer alle sechs historischen
   Reihen sowie Demografie-, Pflege-, Hinterbliebenen-, Steuer-/Tranchen-,
   Renten-/Sozial-, Stress-/Regime- und Default-/Fallbackklassen. Eigene
   Reihen-Segmente und kanonische SHA-256-Wertfingerprints sichern
   Reproduzierbarkeit; Aktienproxy, deutsche VPI-, Geldmarkt- und Goldkette
-  besitzen aufgeloeste Quell-/Lizenz- beziehungsweise Nutzungsketten, bleiben
-  als Ganzes aber `not_validated`; `unresolved`
-  blockiert fuer Lohn- und CAPE-Reihe externe Validierungs- und
-  Datenersatzbehauptungen, ohne deren technisch reproduzierbaren
-  Runtime-Backtest zu blockieren.
+  sowie Lohn- und CAPE-Kette besitzen aufgeloeste Quell-/Lizenz- oder
+  Nutzungsgrenzen, bleiben als Ganzes aber `not_validated`. Der Lohnpfad ist
+  ein explizit qualifizierter und nach JST-/Destatis-, Gebiets-, Praezisions-
+  und Methodensegmenten getrennter Bruttoverdienst-Proxy. Sein Nahtvertrag
+  markiert 1925 als Startnormalisierung, 1945 als geschaetzte
+  Kriegs-/Nachkriegsbruecke ohne Marktlohnbeobachtung, 1947 als
+  JST-/Destatis-Quellennaht und 1948 als Waehrungsreformkontext. CAPE trennt die
+  interpolationsbetroffenen Entscheidungsjahre 1925-1935 als `estimated` von
+  1936-2025 als `backtested` und bleibt eine US-Reihe ohne
+  nachgewiesene offene Redistributionserlaubnis; beide Gates blockieren
+  externe Validierungs- und Datenersatzbehauptungen, nicht den reproduzierbaren
+  Runtime-Backtest.
 
 Browser-Persistenz seit Phase 2:
 
