@@ -47,6 +47,16 @@ assertEqual(
     'identical inputs and check date should produce a deterministic report'
 );
 
+const staleDemographyHash = mutateDocument(documents, EVIDENCE_PATHS.dataSources, content => content.replace(
+    'c9b55d32c1d084ba948e2b77bddb7392c918bce14ec11c908ab38afde8c9a48a',
+    'cf9a310beec3c7d94c65f63f18153eb8718dc5cc87fa21c11eff3e591109a8ee'
+));
+const staleDemographyHashReport = validateEvidenceDocuments(staleDemographyHash, { today: fixedToday, repoRoot });
+assert(
+    errorCodes(staleDemographyHashReport).has('DEMOGRAPHY_HASH_STALE'),
+    'docs:evidence must reject a DATA_SOURCES careObservationHash that differs from the generated contract'
+);
+
 const duplicateMarketId = mutateDocument(documents, EVIDENCE_PATHS.market, content => content.replace(
     '<a id="mkt-bd-01"></a>MKT-BD-01',
     '<a id="mkt-pl-01"></a>MKT-PL-01'

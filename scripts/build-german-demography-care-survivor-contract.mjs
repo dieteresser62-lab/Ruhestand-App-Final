@@ -391,7 +391,7 @@ function buildArtifact() {
         referenceDate: '2023-12-31',
         territory: 'Germany',
         unit: 'percent_of_population_at_reporting_date',
-        runtimeRole: 'validation_only_not_transition_probability',
+        runtimeRole: 'context_only_not_runtime_validation_or_transition_probability',
         prohibitedTransformation: 'Do not divide prevalence by an assumed duration or otherwise treat it as annual incidence.',
         ...careObservation
     };

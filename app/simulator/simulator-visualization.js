@@ -121,10 +121,8 @@ export function renderSensitivityChart(sensitivity, metricKey) {
     if (!sensitivity) return '<p>Keine Sensitivity-Daten verfügbar.</p>';
 
     const paramLabels = {
-        runwayMin: 'Runway Min',
-        runwayTarget: 'Runway Target',
-        targetEq: 'Target Eq',
-        rebalBand: 'Rebal Band',
+        liquidityRunwayYears: 'Liquiditäts-Runway',
+        goldRebalancingBand: 'Gold-Rebal Band',
         maxSkimPct: 'Max Skim %',
         maxBearRefillPct: 'Max Bear Refill %',
         goldTargetPct: 'Gold Target %',

@@ -11,8 +11,8 @@ export const AUTO_OPTIMIZE_PRESETS = {
         objective: { metric: 'SuccessRate', direction: 'max' },
         constraints: { sr99: true, noex: true, ts45: false, dd55: false },
         params: [
-            { key: 'runwayMinM', min: 18, max: 36, step: 2 },
-            { key: 'runwayTargetM', min: 24, max: 48, step: 2 },
+            { key: 'liquidityRunwayYears', min: 2, max: 7, step: 0.5 },
+            { key: 'goldRebalancingBand', min: 10, max: 40, step: 5 },
             { key: 'goldTargetPct', min: 0, max: 10, step: 1 }
         ]
     },
@@ -22,9 +22,9 @@ export const AUTO_OPTIMIZE_PRESETS = {
         objective: { metric: 'SuccessRate', direction: 'max' },
         constraints: { sr99: true, noex: true, ts45: false, dd55: false },
         params: [
-            { key: 'runwayMinM', min: 12, max: 30, step: 2 },
-            { key: 'runwayTargetM', min: 18, max: 42, step: 2 },
-            { key: 'rebalBand', min: 2, max: 10, step: 1 }
+            { key: 'liquidityRunwayYears', min: 1, max: 8, step: 0.5 },
+            { key: 'maxSkimPct', min: 5, max: 30, step: 2.5 },
+            { key: 'goldRebalancingBand', min: 10, max: 40, step: 5 }
         ]
     },
     allocation: {
@@ -34,8 +34,8 @@ export const AUTO_OPTIMIZE_PRESETS = {
         constraints: { sr99: true, noex: false, ts45: false, dd55: false },
         params: [
             { key: 'goldTargetPct', min: 0, max: 15, step: 1 },
-            { key: 'targetEq', min: 40, max: 80, step: 5 },
-            { key: 'rebalBand', min: 2, max: 10, step: 1 }
+            { key: 'maxSkimPct', min: 5, max: 30, step: 2.5 },
+            { key: 'goldRebalancingBand', min: 10, max: 40, step: 5 }
         ]
     },
     conservative: {
@@ -44,7 +44,7 @@ export const AUTO_OPTIMIZE_PRESETS = {
         objective: { metric: 'SuccessRate', direction: 'max' },
         constraints: { sr99: true, noex: true, ts45: true, dd55: true },
         params: [
-            { key: 'runwayTargetM', min: 30, max: 60, step: 3 },
+            { key: 'liquidityRunwayYears', min: 4, max: 9, step: 0.5 },
             { key: 'goldTargetPct', min: 5, max: 15, step: 1 },
             { key: 'maxSkimPct', min: 10, max: 30, step: 2 }
         ]
@@ -55,9 +55,9 @@ export const AUTO_OPTIMIZE_PRESETS = {
         objective: { metric: 'EndWealth_P50', direction: 'max' },
         constraints: { sr99: true, noex: false, ts45: false, dd55: false },
         params: [
-            { key: 'targetEq', min: 60, max: 90, step: 5 },
+            { key: 'goldRebalancingBand', min: 5, max: 30, step: 5 },
             { key: 'maxSkimPct', min: 20, max: 50, step: 5 },
-            { key: 'runwayMinM', min: 12, max: 30, step: 3 }
+            { key: 'liquidityRunwayYears', min: 1, max: 4, step: 0.5 }
         ]
     },
     drawdown: {
@@ -67,8 +67,8 @@ export const AUTO_OPTIMIZE_PRESETS = {
         constraints: { sr99: true, noex: true, ts45: false, dd55: true },
         params: [
             { key: 'goldTargetPct', min: 5, max: 20, step: 2 },
-            { key: 'targetEq', min: 30, max: 60, step: 5 },
-            { key: 'rebalBand', min: 3, max: 8, step: 1 }
+            { key: 'liquidityRunwayYears', min: 4, max: 9, step: 0.5 },
+            { key: 'goldRebalancingBand', min: 10, max: 40, step: 5 }
         ]
     },
     dynamicFlexBalanced: {
@@ -78,7 +78,7 @@ export const AUTO_OPTIMIZE_PRESETS = {
         constraints: { sr99: true, noex: true, ts45: false, dd55: false },
         dynamicFlexMode: 'force_on',
         params: [
-            { key: 'runwayTargetM', min: 30, max: 60, step: 3 },
+            { key: 'liquidityRunwayYears', min: 3, max: 8, step: 0.5 },
             { key: 'goGoMultiplier', min: 1.00, max: 1.20, step: 0.05 }
         ]
     }

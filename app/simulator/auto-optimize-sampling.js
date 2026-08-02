@@ -54,11 +54,9 @@ export function latinHypercubeSample(ranges, n, rand) {
  */
 function getParameterDeltas(key, reduced = false) {
     const deltaMap = {
-        runwayMinM: reduced ? [-2, 2] : [-4, -2, 2, 4],
-        runwayTargetM: reduced ? [-2, 2] : [-4, -2, 2, 4],
+        liquidityRunwayYears: reduced ? [-0.5, 0.5] : [-1, -0.5, 0.5, 1],
         goldTargetPct: reduced ? [-1, 1] : [-2, -1, 1, 2],
-        targetEq: reduced ? [-2, 2] : [-5, -2, 2, 5],
-        rebalBand: reduced ? [-0.5, 0.5] : [-1, -0.5, 0.5, 1],
+        goldRebalancingBand: reduced ? [-2, 2] : [-5, -2, 2, 5],
         maxSkimPct: reduced ? [-2, 2] : [-5, -2, 2, 5],
         maxBearRefillPct: reduced ? [-2, 2] : [-5, -2, 2, 5],
         horizonYears: reduced ? [-2, 2] : [-4, -2, 2, 4],

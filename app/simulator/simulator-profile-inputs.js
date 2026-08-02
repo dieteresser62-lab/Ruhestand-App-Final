@@ -20,6 +20,7 @@ import { LONGEVITY_DEFAULTS, normalizeLongevityMode } from './dynamic-flex-longe
 import { classifyTranche } from '../../types/tranche-contract.js';
 import { normalizeCareCostDriftPercent } from './simulator-input-care.js';
 import { calculateProfileGoldStrategy } from '../profile/profile-asset-values.js';
+import { resolveLiquidityRunwayYears } from '../../types/liquidity-runway-contract.js';
 
 const DYNAMIC_FLEX_DEFAULTS = {
     HORIZON_METHOD: 'survival_quantile',
@@ -380,11 +381,21 @@ export function buildSimulatorInputsFromProfileData(profileData) {
         baseInputs.capeRatio = baseInputs.marketCapeRatio;
     }
 
+    const storedRunway = {};
+    const canonicalRunway = readValue(profileData, simKey('liquidityRunwayYears'));
+    const legacyRunwayTarget = readValue(profileData, simKey('runwayTargetMonths'));
+    const legacyRunwayMinimum = readValue(profileData, simKey('runwayMinMonths'));
+    if (canonicalRunway !== null && canonicalRunway !== undefined && canonicalRunway !== '') {
+        storedRunway.liquidityRunwayYears = canonicalRunway;
+    }
+    if (legacyRunwayTarget !== null && legacyRunwayTarget !== undefined && legacyRunwayTarget !== '') {
+        storedRunway.runwayTargetMonths = legacyRunwayTarget;
+    }
+    if (legacyRunwayMinimum !== null && legacyRunwayMinimum !== undefined && legacyRunwayMinimum !== '') {
+        storedRunway.runwayMinMonths = legacyRunwayMinimum;
+    }
     const strategyInputs = {
-        runwayMinMonths: readInt(profileData, simKey('runwayMinMonths'), 24),
-        runwayTargetMonths: readInt(profileData, simKey('runwayTargetMonths'), 36),
-        targetEq: readInt(profileData, simKey('targetEq'), 60),
-        rebalBand: readInt(profileData, simKey('rebalBand'), 5),
+        liquidityRunwayYears: resolveLiquidityRunwayYears(storedRunway).years,
         maxSkimPctOfEq: readInt(profileData, simKey('maxSkimPctOfEq'), 10),
         maxBearRefillPctOfEq: readInt(profileData, simKey('maxBearRefillPctOfEq'), 5)
     };
@@ -634,8 +645,6 @@ export function combineSimulatorProfiles(profileInputs, primaryProfileId) {
         simulationSourceProfileId: primaryEntry.profileId || 'simulation',
         startSPB: sumNumbers(inputsList, i => i.startSPB || 0),
         kirchensteuerSatz: weightedAverage(inputsList, i => i.kirchensteuerSatz || 0, i => i.startVermoegen || 0, primaryInputs.kirchensteuerSatz || 0),
-        targetEq: Math.round(weightedAverage(inputsList, i => i.targetEq || 0, i => i.startVermoegen || 0, primaryInputs.targetEq || 0)),
-        rebalBand: Math.round(weightedAverage(inputsList, i => i.rebalBand || 0, i => i.startVermoegen || 0, primaryInputs.rebalBand || 0)),
         maxSkimPctOfEq: Math.round(weightedAverage(inputsList, i => i.maxSkimPctOfEq || 0, i => i.startVermoegen || 0, primaryInputs.maxSkimPctOfEq || 0)),
         maxBearRefillPctOfEq: Math.round(weightedAverage(inputsList, i => i.maxBearRefillPctOfEq || 0, i => i.startVermoegen || 0, primaryInputs.maxBearRefillPctOfEq || 0)),
         goldAktiv: goldStrategy.goldAktiv,
@@ -647,8 +656,11 @@ export function combineSimulatorProfiles(profileInputs, primaryProfileId) {
         goldSteuerfrei: goldStrategy.goldSteuerfrei,
         rebalancingBand: goldStrategy.rebalancingBand,
         goldStrategyDiagnostics: goldStrategy.diagnostics,
-        runwayMinMonths: maxNumber(inputsList, i => i.runwayMinMonths || 0, primaryInputs.runwayMinMonths || 0),
-        runwayTargetMonths: maxNumber(inputsList, i => i.runwayTargetMonths || 0, primaryInputs.runwayTargetMonths || 0),
+        liquidityRunwayYears: maxNumber(
+            inputsList,
+            i => resolveLiquidityRunwayYears(i).years,
+            resolveLiquidityRunwayYears(primaryInputs).years
+        ),
         accumulationPhase: {
             enabled: false,
             durationYears: 0,

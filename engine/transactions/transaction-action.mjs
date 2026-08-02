@@ -8,6 +8,10 @@
 import { CONFIG } from '../config.mjs';
 import { buildOpportunisticRefill } from './transaction-opportunistic.mjs';
 import { trySurplusRebalance } from './transaction-surplus.mjs';
+import {
+    deriveLiquidityRunwayPolicy,
+    resolveLiquidityRunwayYears
+} from '../../types/liquidity-runway-contract.js';
 
 export function determineAction(p, helpers) {
     const {
@@ -33,8 +37,7 @@ export function determineAction(p, helpers) {
         blockReason: 'none',
         blockedAmount: 0,
         equityThresholds: {
-            targetAllocationPct: input.targetEq,
-            rebalancingBandPct: input.rebalBand ?? input.rebalancingBand ?? 35,
+            allocationPolicy: 'no_fixed_equity_target',
             maxSkimPctOfEq: input.maxSkimPctOfEq ?? 1.0
         },
         goldThresholds: {
@@ -64,9 +67,8 @@ export function determineAction(p, helpers) {
     // Strukturales Runway-Mindestmaß ableiten: Bevorzugt das Profil-Minimum, fällt sonst auf Input/Strategie zurück.
     // Design-Entscheidung: Die neutrale Notfüllung soll nur bei echter Runway-Unterschreitung auslösen –
     // daher orientieren wir uns an der harten Untergrenze (Profil), nicht an höheren Zielwerten.
-    const runwayMinThresholdMonths = profil?.minRunwayMonths
-        ?? CONFIG.THRESHOLDS.STRATEGY.runwayThinMonths
-        ?? input.runwayMinMonths;
+    const runwayPolicy = deriveLiquidityRunwayPolicy(resolveLiquidityRunwayYears(input).years);
+    const runwayMinThresholdMonths = runwayPolicy.hardMinimumMonths;
 
     const krisenMindestLiquiditaet = (floorBedarfNetto / 12) * runwayMinThresholdMonths;
     // Sicherheits-Puffer: Entweder rechnerischer Bedarf oder absolutes Minimum (für ruhiges Schlafen)

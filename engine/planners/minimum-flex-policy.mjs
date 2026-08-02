@@ -1,3 +1,8 @@
+import {
+    deriveLiquidityRunwayPolicy,
+    resolveLiquidityRunwayYears
+} from '../../types/liquidity-runway-contract.js';
+
 function clampRate(value) {
     const n = Number(value);
     if (!Number.isFinite(n)) return 0;
@@ -11,7 +16,6 @@ function effectiveFlexAmount(flex, rate) {
 function evaluateEmergencyBlock(context, minimumFlexAnnual) {
     const inflatedBedarf = context.inflatedBedarf || {};
     const input = context.input || {};
-    const profil = context.profil || {};
     const alarmStatus = context.alarmStatus || {};
     const floor = Math.max(0, Number(inflatedBedarf.floor) || 0);
     const flex = Math.max(0, Number(inflatedBedarf.flex) || 0);
@@ -19,12 +23,7 @@ function evaluateEmergencyBlock(context, minimumFlexAnnual) {
     const floorPlusMinimumFlex = floor + minimumFlex;
     const totalWealthRaw = Number(context.gesamtwert);
     const totalWealth = Number.isFinite(totalWealthRaw) ? Math.max(0, totalWealthRaw) : Infinity;
-    const minRunwayMonthsRaw = Number.isFinite(profil.minRunwayMonths)
-        ? profil.minRunwayMonths
-        : Number(input.runwayMinMonths);
-    const minRunwayMonths = Number.isFinite(minRunwayMonthsRaw) && minRunwayMonthsRaw > 0
-        ? minRunwayMonthsRaw
-        : 0;
+    const minRunwayMonths = deriveLiquidityRunwayPolicy(resolveLiquidityRunwayYears(input).years).hardMinimumMonths;
     const minRunwayReserve = minRunwayMonths > 0
         ? (floorPlusMinimumFlex / 12) * minRunwayMonths
         : 0;

@@ -9,7 +9,7 @@ console.log('--- VPW Return Policy Tests ---');
 
 const baseContinuous = {
     returnPolicy: 'cape_continuous',
-    targetEq: 60,
+    equityWeightPct: 60,
     goldAktiv: false
 };
 
@@ -87,7 +87,7 @@ const baseContinuous = {
 {
     const result = deriveCAPEContinuousReturn(5, {
         ...baseContinuous,
-        targetEq: 100,
+        equityWeightPct: 100,
         safeRealReturn: 0
     });
 
@@ -111,7 +111,7 @@ const baseContinuous = {
         returnPolicy: 'legacy_step',
         expectedReturnCape: 0.05,
         inflation: 2,
-        targetEq: 60
+        equityWeightPct: 60
     });
 
     assertEqual(continuous.returnPolicy, 'cape_continuous', 'dispatcher should route continuous policy');
@@ -124,7 +124,7 @@ const baseContinuous = {
     const result = deriveCAPELegacyStepReturn({
         expectedReturnCape: 0.05,
         inflation: 2,
-        targetEq: 60,
+        equityWeightPct: 60,
         goldAktiv: false
     });
 
@@ -155,9 +155,9 @@ const baseContinuous = {
 {
     const result = deriveCAPEContinuousReturn(20, {
         ...baseContinuous,
-        targetEq: 50,
+        equityWeightPct: 50,
         goldAktiv: true,
-        goldZielProzent: 20,
+        goldWeightPct: 20,
         goldRealReturn: 0.02
     });
 
@@ -176,9 +176,9 @@ const baseContinuous = {
     const result = deriveCAPELegacyStepReturn({
         expectedReturnCape: 0.05,
         inflation: 2,
-        targetEq: 60,
+        equityWeightPct: 60,
         goldAktiv: true,
-        goldZielProzent: 10
+        goldWeightPct: 10
     }, {
         SPENDING_MODEL: {
             DYNAMIC_FLEX: {
@@ -190,6 +190,38 @@ const baseContinuous = {
     assert(Number.isFinite(result.expectedRealReturnRaw), 'legacy missing gold config should not produce NaN raw return');
     assert(Number.isFinite(result.expectedRealReturn), 'legacy missing gold config should not produce NaN return');
     assertEqual(result.goldRealReturnSource, 'fallback_zero', 'legacy missing gold config should be diagnosed as fallback_zero');
+}
+
+// Target allocation is no longer a return-policy input. Only the actual
+// portfolio weights supplied by the engine may affect VPW.
+{
+    const base = deriveCAPELegacyStepReturn({
+        expectedReturnCape: 0.05,
+        inflation: 2,
+        equityWeightPct: 80,
+        goldAktiv: false,
+        targetEq: 20
+    });
+    const changedLegacyTarget = deriveCAPELegacyStepReturn({
+        expectedReturnCape: 0.05,
+        inflation: 2,
+        equityWeightPct: 80,
+        goldAktiv: false,
+        targetEq: 90
+    });
+    assertClose(base.expectedRealReturn, changedLegacyTarget.expectedRealReturn, 1e-12, 'legacy targetEq must not affect VPW');
+    assertClose(base.equityWeight, 0.8, 1e-12, 'VPW should use the supplied actual equity weight');
+}
+
+// A missing actual-weight diagnostic remains backwards compatible. It must
+// not turn an otherwise valid VPW request into a fictitious 0% equity mix.
+for (const [label, result] of [
+    ['continuous', deriveCAPEContinuousReturn(20, { ...baseContinuous, equityWeightPct: undefined })],
+    ['legacy', deriveCAPELegacyStepReturn({ expectedReturnCape: 0.05, inflation: 2 })]
+]) {
+    assertClose(result.equityWeight, 0.6, 1e-12, `${label} VPW missing-weight fallback must preserve legacy 60% equity`);
+    assertClose(result.equityWeight + result.goldWeight + result.safeWeight, 1, 1e-12,
+        `${label} VPW portfolio weights must remain a complete bounded allocation`);
 }
 
 console.log('--- VPW Return Policy Tests Completed ---');

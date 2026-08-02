@@ -35,10 +35,8 @@ export function initSweepUIControls() {
     // Grid-Size-Counter für Parameter-Sweep
     function updateSweepGridSize() {
         const rangeInputs = {
-            runwayMin: document.getElementById('sweepRunwayMin').value,
-            runwayTarget: document.getElementById('sweepRunwayTarget').value,
-            targetEq: document.getElementById('sweepTargetEq').value,
-            rebalBand: document.getElementById('sweepRebalBand').value,
+            liquidityRunwayYears: document.getElementById('sweepLiquidityRunwayYears').value,
+            goldRebalancingBand: document.getElementById('sweepGoldRebalancingBand').value,
             maxSkimPct: document.getElementById('sweepMaxSkimPct').value,
             maxBearRefillPct: document.getElementById('sweepMaxBearRefillPct').value,
             goldTargetPct: document.getElementById('sweepGoldTargetPct').value,
@@ -84,7 +82,7 @@ export function initSweepUIControls() {
 
     // Add event listeners to all sweep input fields
     const sweepInputIds = [
-        'sweepRunwayMin', 'sweepRunwayTarget', 'sweepTargetEq', 'sweepRebalBand',
+        'sweepLiquidityRunwayYears', 'sweepGoldRebalancingBand',
         'sweepMaxSkimPct', 'sweepMaxBearRefillPct', 'sweepGoldTargetPct',
         'sweepSurvivalQuantile', 'sweepGoGoMultiplier'
     ];

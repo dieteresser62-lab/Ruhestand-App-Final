@@ -16,10 +16,8 @@ const baseInput = {
     goldFloorProzent: 0,
     renteAktiv: false,
     renteMonatlich: 0,
-    runwayTargetMonths: 36,
-    runwayMinMonths: 24,
-    targetEq: 60,
-    rebalBand: 5,
+    liquidityRunwayYears: 3,
+    rebalancingBand: 25,
     maxSkimPctOfEq: 10,
     maxBearRefillPctOfEq: 5,
     risikoprofil: 'sicherheits-dynamisch',
@@ -54,7 +52,7 @@ function vpwRate(r, n) {
     };
     const result = EngineAPI.simulateSingleYear(input, null);
     const vpw = result.ui.vpw;
-    const expectedRealReturn = 0.02; // 60%*(5%-2%) + 40%*0.5%
+    const expectedRealReturn = (100000 / 110000) * 0.03 + (10000 / 110000) * 0.005;
     const expectedRate = vpwRate(expectedRealReturn, 20);
     const expectedTotal = (110000 * expectedRate);
     const expectedFlex = Math.max(0, expectedTotal - 1000);
@@ -83,7 +81,7 @@ function vpwRate(r, n) {
         };
         const result = EngineAPI.simulateSingleYear(input, null);
         const vpw = result.ui.vpw;
-        const expectedRealReturn = 0.041; // 60%*(1/20 + 1.5%) + 40%*0.5%
+        const expectedRealReturn = (100000 / 110000) * 0.065 + (10000 / 110000) * 0.005;
         const expectedRate = vpwRate(expectedRealReturn, 20);
 
         assertEqual(vpw.status, 'active', 'continuous VPW should be active');
@@ -112,7 +110,7 @@ function vpwRate(r, n) {
     };
     const result = EngineAPI.simulateSingleYear(input, null);
     const vpw = result.ui.vpw;
-    const expectedRealReturn = 0.041; // 60%*(1/20 + 1.5%) + 40%*0.5%
+    const expectedRealReturn = (100000 / 110000) * 0.065 + (10000 / 110000) * 0.005;
 
     assertEqual(vpw.status, 'active', 'input-scoped continuous VPW should be active');
     assertEqual(vpw.returnPolicy, 'cape_continuous', 'input returnPolicy should reach VPW policy');
@@ -142,7 +140,6 @@ function vpwRate(r, n) {
         dynamicFlex: true,
         horizonYears: 15,
         marketCapeRatio: 35,
-        targetEq: 90,
         inflation: 50
     };
     const result = EngineAPI.simulateSingleYear(input, null);
@@ -156,7 +153,6 @@ function vpwRate(r, n) {
         dynamicFlex: true,
         horizonYears: 15,
         marketCapeRatio: 15,
-        targetEq: 90,
         inflation: -10
     };
     const result = EngineAPI.simulateSingleYear(input, null);
@@ -170,7 +166,6 @@ function vpwRate(r, n) {
         dynamicFlex: true,
         horizonYears: 20,
         marketCapeRatio: 35, // lower return regime
-        targetEq: 60,
         inflation: 2
     }, null);
     const r1 = year1.ui.vpw.expectedRealReturn;
@@ -180,7 +175,6 @@ function vpwRate(r, n) {
         dynamicFlex: true,
         horizonYears: 19,
         marketCapeRatio: 15, // higher return regime
-        targetEq: 60,
         inflation: 2
     }, year1.newState);
     const r2 = year2.ui.vpw.expectedRealReturn;
@@ -243,21 +237,18 @@ function vpwRate(r, n) {
         dynamicFlex: true,
         horizonYears: 20,
         marketCapeRatio: 35,
-        targetEq: 70
     }, null);
     const y2 = EngineAPI.simulateSingleYear({
         ...baseInput,
         dynamicFlex: true,
         horizonYears: 19,
         marketCapeRatio: 15,
-        targetEq: 70
     }, y1.newState);
     const y3 = EngineAPI.simulateSingleYear({
         ...baseInput,
         dynamicFlex: true,
         horizonYears: 18,
         marketCapeRatio: 15,
-        targetEq: 70
     }, y2.newState);
     assert(y2.ui.vpw.expectedRealReturn > y1.ui.vpw.expectedRealReturn, 'year 2 should move up');
     assert(y3.ui.vpw.expectedRealReturn >= y2.ui.vpw.expectedRealReturn, 'year 3 should continue towards target');

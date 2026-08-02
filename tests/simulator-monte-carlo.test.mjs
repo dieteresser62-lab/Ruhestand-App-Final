@@ -67,9 +67,7 @@ function buildBasicInputs() {
         goldSteuerfrei: false,
         risikoprofil: 'sicherheits-dynamisch',
         rebalancingBand: 20,
-        runwayTargetMonths: 36,
-        runwayMinMonths: 24,
-        targetEq: 60,
+        liquidityRunwayYears: 3,
         maxSkimPctOfEq: 10,
         maxBearRefillPctOfEq: 5,
         marketCapeRatio: 20,
@@ -1265,10 +1263,8 @@ const emptyLists = {
     const sweep = runSweepChunk({
         baseInputs: inputs,
         paramCombinations: [{
-            runwayMin: 18,
-            runwayTarget: 30,
-            targetEq: 60,
-            rebalBand: 5,
+            liquidityRunwayYears: 2.5,
+            goldRebalancingBand: 20,
             maxSkimPct: 10,
             maxBearRefillPct: 5,
             goldTargetPct: 0

@@ -21,6 +21,10 @@ import {
 } from './balance-annual-period.js';
 import { normalizeTrancheCollection } from '../../types/tranche-contract.js';
 import { isValidCumulativeInflationFactor } from '../../types/cumulative-inflation-contract.js';
+import {
+    LIQUIDITY_RUNWAY_CONTRACT_V1,
+    migrateLiquidityRunwayInput
+} from '../../types/liquidity-runway-contract.js';
 
 export const BALANCE_EXPORT_APP_ID = 'ruhe-stand-suite.balance';
 export const BALANCE_EXPORT_SCHEMA = 'balance-state';
@@ -94,11 +98,12 @@ export const BALANCE_IMPORT_INPUT_SCHEMA_V2 = Object.freeze({
     goldCost: numberField({ min: 0 }),
     kirchensteuerSatz: numberField({ min: 0, max: 0.09, enum: Object.freeze([0, 0.08, 0.09]) }),
     sparerPauschbetrag: numberField({ min: 0 }),
-    runwayMinMonths: numberField({ integer: true, min: 12, max: 60 }),
-    runwayTargetMonths: numberField({ integer: true, min: 18, max: 72 }),
+    liquidityRunwayYears: numberField({
+        min: LIQUIDITY_RUNWAY_CONTRACT_V1.minimumYears,
+        max: LIQUIDITY_RUNWAY_CONTRACT_V1.maximumYears,
+        step: LIQUIDITY_RUNWAY_CONTRACT_V1.stepYears
+    }),
     minCashBufferMonths: numberField({ integer: true, min: 0, max: 12 }),
-    targetEq: numberField({ min: 0, max: 90 }),
-    rebalBand: numberField({ min: 0, max: 20 }),
     maxSkimPctOfEq: numberField({ min: 0, max: 50 }),
     maxBearRefillPctOfEq: numberField({ min: 0, max: 70 }),
     marketCapeRatio: numberField({ min: 0, max: 100 }),
@@ -215,6 +220,16 @@ function validateSchemaField(fieldPath, value, descriptor) {
         }
         if (descriptor.max !== null && descriptor.max !== undefined && value > descriptor.max) {
             failImport('invalid_input_bounds', `Das Importfeld „${fieldPath}“ überschreitet die erlaubte Obergrenze ${descriptor.max}.`);
+        }
+        if (descriptor.step) {
+            const stepBase = descriptor.min ?? 0;
+            const steps = (value - stepBase) / descriptor.step;
+            if (Math.abs(steps - Math.round(steps)) >= 1e-9) {
+                failImport(
+                    'invalid_input_bounds',
+                    `Das Importfeld „${fieldPath}“ muss ein Vielfaches von ${descriptor.step} ab ${stepBase} sein.`
+                );
+            }
         }
         if (descriptor.enum && !descriptor.enum.includes(value)) {
             failImport('invalid_input_value', `Das Importfeld „${fieldPath}“ enthält einen nicht unterstützten Zahlenwert.`);
@@ -368,13 +383,6 @@ function validateBalanceInputsAgainstSchema(inputs) {
         inputs.minimumFlexAnnual > inputs.flexBedarf
     ) {
         failImport('invalid_core_value', 'Das Feld „minimumFlexAnnual“ darf den Flex-Bedarf nicht überschreiten. Bitte die Importdatei prüfen.');
-    }
-    if (
-        Number.isFinite(inputs.runwayMinMonths) &&
-        Number.isFinite(inputs.runwayTargetMonths) &&
-        inputs.runwayTargetMonths < inputs.runwayMinMonths
-    ) {
-        failImport('invalid_core_value', 'Das Runway-Ziel darf das Runway-Minimum nicht unterschreiten.');
     }
     if (
         Number.isFinite(inputs.capeRatio) &&
@@ -786,6 +794,8 @@ function migrateLegacyStateV0(payload) {
             migrateLegacyRefillThreshold(inputs.decumulation);
             migrateLegacyRefillThreshold(inputs.decumulation.threeBucket);
         }
+        migrated.inputs = migrateBalanceLiquidityRunwayInput(inputs, { dropTargetEq: true });
+        delete migrated.inputs.rebalBand;
     }
 
     if (!isRecord(migrated.lastState)) return migrated;
@@ -799,6 +809,20 @@ function migrateLegacyStateV0(payload) {
         state.taxState.lossCarry = 0;
     }
     return migrated;
+}
+
+function migrateBalanceLiquidityRunwayInput(inputs, options) {
+    try {
+        return migrateLiquidityRunwayInput(inputs, options);
+    } catch (error) {
+        if (error instanceof RangeError) {
+            failImport(
+                'invalid_input_bounds',
+                `Das Feld „liquidityRunwayYears“ muss zwischen ${LIQUIDITY_RUNWAY_CONTRACT_V1.minimumYears} und ${LIQUIDITY_RUNWAY_CONTRACT_V1.maximumYears} Jahren liegen und ein Vielfaches von ${LIQUIDITY_RUNWAY_CONTRACT_V1.stepYears} Jahren sein.`
+            );
+        }
+        throw error;
+    }
 }
 
 function migrateLegacyPercentRate(inputs, field) {
@@ -947,6 +971,23 @@ function validateBalanceState(payload) {
     return cloneJson(payload);
 }
 
+function migrateCurrentBalanceState(payload, { preserveInvalidRecoveryState = false } = {}) {
+    const migrated = cloneJson(payload);
+    if (isRecord(migrated?.inputs)) {
+        try {
+            migrated.inputs = migrateBalanceLiquidityRunwayInput(migrated.inputs, { dropTargetEq: true });
+            delete migrated.inputs.rebalBand;
+        } catch (error) {
+            if (!(preserveInvalidRecoveryState
+                && error instanceof BalanceImportError
+                && error.code === 'invalid_input_bounds')) {
+                throw error;
+            }
+        }
+    }
+    return migrated;
+}
+
 function cloneBalanceStateForExport(payload) {
     if (!isRecord(payload)) {
         failImport('invalid_payload', 'Der Balance-Inhalt ist kein Objekt und kann nicht exportiert werden.');
@@ -967,7 +1008,10 @@ function cloneBalanceStateForExport(payload) {
 }
 
 export function createBalanceExportDocument(payload) {
-    const exportPayload = cloneBalanceStateForExport(payload);
+    const exportPayload = migrateCurrentBalanceState(
+        cloneBalanceStateForExport(payload),
+        { preserveInvalidRecoveryState: true }
+    );
     const validationWarnings = [];
     try {
         validateBalanceState(exportPayload);
@@ -1038,10 +1082,14 @@ export function normalizeBalanceImportDocument(document) {
                 migrated: true
             };
         }
+        const hadCanonicalRunway = isRecord(document.payload?.inputs)
+            && hasOwn(document.payload.inputs, 'liquidityRunwayYears');
+        const hadRemovedStrategyFields = isRecord(document.payload?.inputs)
+            && ['runwayTargetMonths', 'runwayMinMonths', 'targetEq', 'rebalBand'].some(field => hasOwn(document.payload.inputs, field));
         return {
-            payload: validateBalanceState(document.payload),
+            payload: validateBalanceState(migrateCurrentBalanceState(document.payload)),
             sourceFormat: 'balance-state-v2',
-            migrated: false
+            migrated: !hadCanonicalRunway || hadRemovedStrategyFields
         };
     }
 

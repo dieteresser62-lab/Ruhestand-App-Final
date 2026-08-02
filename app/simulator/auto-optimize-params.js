@@ -11,11 +11,9 @@
  * Whitelist der erlaubten Parameter-Keys
  */
 const ALLOWED_PARAM_KEYS = [
-    'runwayMinM',
-    'runwayTargetM',
+    'liquidityRunwayYears',
     'goldTargetPct',
-    'targetEq',
-    'rebalBand',
+    'goldRebalancingBand',
     'maxSkimPct',
     'maxBearRefillPct',
     'horizonYears',
@@ -31,23 +29,15 @@ const ALLOWED_PARAM_KEYS = [
  */
 function applyParameterMutation(cfg, key, value) {
     switch (key) {
-        case 'runwayMinM':
+        case 'liquidityRunwayYears':
             if (!cfg.runway) cfg.runway = {};
-            cfg.runway.min = Math.round(value);
-            break;
-        case 'runwayTargetM':
-            if (!cfg.runway) cfg.runway = {};
-            cfg.runway.target = Math.round(value);
+            cfg.runway.targetYears = Number(value);
             break;
         case 'goldTargetPct':
             if (!cfg.alloc) cfg.alloc = {};
             cfg.alloc.goldTarget = Number(value);
             break;
-        case 'targetEq':
-            if (!cfg.alloc) cfg.alloc = {};
-            cfg.alloc.targetEq = Number(value);
-            break;
-        case 'rebalBand':
+        case 'goldRebalancingBand':
             if (!cfg.rebal) cfg.rebal = {};
             cfg.rebal.band = Number(value);
             break;
@@ -84,9 +74,8 @@ function applyParameterMutation(cfg, key, value) {
  * @returns {boolean} true wenn valide
  */
 export function isValidCandidate(candidate, goldCap) {
-    // Runway-Invariante: Min <= Target
-    if (candidate.runwayMinM !== undefined && candidate.runwayTargetM !== undefined) {
-        if (candidate.runwayMinM > candidate.runwayTargetM) return false;
+    if (candidate.liquidityRunwayYears !== undefined) {
+        if (candidate.liquidityRunwayYears < 1 || candidate.liquidityRunwayYears > 10) return false;
     }
 
     // Gold-Invariante: 0 <= goldTarget <= goldCap
@@ -94,14 +83,9 @@ export function isValidCandidate(candidate, goldCap) {
         if (candidate.goldTargetPct < 0 || candidate.goldTargetPct > goldCap) return false;
     }
 
-    // Target Eq: 0 <= targetEq <= 100
-    if (candidate.targetEq !== undefined) {
-        if (candidate.targetEq < 0 || candidate.targetEq > 100) return false;
-    }
-
-    // Rebal Band: 0 <= rebalBand <= 50
-    if (candidate.rebalBand !== undefined) {
-        if (candidate.rebalBand < 0 || candidate.rebalBand > 50) return false;
+    // Gold Rebal Band: 0 <= goldRebalancingBand <= 100
+    if (candidate.goldRebalancingBand !== undefined) {
+        if (candidate.goldRebalancingBand < 0 || candidate.goldRebalancingBand > 100) return false;
     }
 
     // Max Skim %: 0 <= maxSkimPct <= 100

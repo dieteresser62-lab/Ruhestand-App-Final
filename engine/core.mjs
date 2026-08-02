@@ -26,6 +26,10 @@ import {
 } from './transactions/three-bucket-logic.mjs';
 import { deriveVpwExpectedRealReturn } from './planners/vpw-return-policy.mjs';
 import { STRATEGY_OPTIONS } from '../types/strategy-options.js';
+import {
+    deriveLiquidityRunwayPolicy,
+    resolveLiquidityRunwayYears
+} from '../types/liquidity-runway-contract.js';
 
 const DYNAMIC_FLEX_ALLOWED_HORIZON_METHODS = new Set(['mean', 'survival_quantile']);
 const LEGACY_STANDARD_MODES = new Set(['dynamic_flex', 'vpw', 'guardrails', 'fixed_real', 'none']);
@@ -47,6 +51,7 @@ function _coalesceCapeRatio(input) {
 
 function _normalizeEngineInput(rawInput) {
     const input = { ...(rawInput || {}) };
+    const liquidityRunwayResolution = resolveLiquidityRunwayYears(rawInput || {});
 
     const normalizeNum = (val, fallback = 0) => {
         const n = Number(val);
@@ -73,10 +78,14 @@ function _normalizeEngineInput(rawInput) {
     input.aktuellesAlter = normalizeNum(input.aktuellesAlter, 65);
     input.startAlter = normalizeNum(input.startAlter, input.aktuellesAlter);
     input.inflation = normalizeNum(input.inflation, 0);
-    input.runwayMinMonths = normalizeNum(input.runwayMinMonths, 24);
-    input.runwayTargetMonths = normalizeNum(input.runwayTargetMonths, 36);
-    input.targetEq = normalizeNum(input.targetEq, 60);
-    input.rebalBand = normalizeNum(input.rebalBand, 5);
+    input.liquidityRunwayYears = liquidityRunwayResolution.years;
+    delete input.runwayMinMonths;
+    delete input.runwayTargetMonths;
+    delete input.targetEq;
+    input.rebalancingBand = input.rebalancingBand == null
+        ? 35
+        : Number(input.rebalancingBand);
+    delete input.rebalBand;
     input.maxSkimPctOfEq = normalizeNum(input.maxSkimPctOfEq, 0);
     input.maxBearRefillPctOfEq = normalizeNum(input.maxBearRefillPctOfEq, 0);
 
@@ -584,6 +593,11 @@ function _internal_calculateModel(input, lastState) {
 
     // Gesamtvermögen = Depot + Liquidität
     const gesamtwert = depotwertGesamt + aktuelleLiquiditaet;
+    const equityValue = normalizedInput.depotwertAlt + normalizedInput.depotwertNeu;
+    const goldValue = normalizedInput.goldAktiv ? normalizedInput.goldWert : 0;
+    const equityWeightPct = gesamtwert > 0 ? (equityValue / gesamtwert) * 100 : 0;
+    const goldWeightPct = gesamtwert > 0 ? (goldValue / gesamtwert) * 100 : 0;
+    const liquidityRunwayPolicy = deriveLiquidityRunwayPolicy(normalizedInput.liquidityRunwayYears);
 
     // 3. Marktanalyse durchführen
     // Bestimmt Marktszenario (Bär, Bulle, Seitwärts, etc.) basierend auf historischen Daten
@@ -635,9 +649,9 @@ function _internal_calculateModel(input, lastState) {
             marketCapeRatio: normalizedInput.marketCapeRatio,
             expectedReturnCape: market.expectedReturnCape,
             inflation: normalizedInput.inflation,
-            targetEq: normalizedInput.targetEq,
+            equityWeightPct,
             goldAktiv: normalizedInput.goldAktiv,
-            goldZielProzent: normalizedInput.goldZielProzent,
+            goldWeightPct,
             lastExpectedRealReturn: vpwExpectedRealReturn
         });
         const expectedRealReturn = vpwReturnPolicy.expectedRealReturn;
@@ -694,6 +708,10 @@ function _internal_calculateModel(input, lastState) {
             safeRealReturnSource: vpwReturnPolicy.safeRealReturnSource,
             goldRealReturn: vpwReturnPolicy.goldRealReturn,
             goldRealReturnSource: vpwReturnPolicy.goldRealReturnSource,
+            portfolioWeightSource: 'actual_engine_portfolio',
+            equityWeight: vpwReturnPolicy.equityWeight,
+            goldWeight: vpwReturnPolicy.goldWeight,
+            safeWeight: vpwReturnPolicy.safeWeight,
             expectedRealReturnRaw: vpwReturnPolicy.expectedRealReturnRaw,
             expectedRealReturnClamped: vpwReturnPolicy.expectedRealReturnClamped,
             expectedRealReturnBeforeSmoothing: vpwReturnPolicy.expectedRealReturnBeforeSmoothing,
@@ -910,7 +928,7 @@ function _internal_calculateModel(input, lastState) {
             entnahmequoteDepot: diagnosis?.keyParams?.entnahmequoteDepot,
             realerDepotDrawdown: diagnosis?.keyParams?.realerDepotDrawdown,
             runwayMonate: runwayMonths,
-            minRunwayMonths: profil?.minRunwayMonths,
+            minRunwayMonths: liquidityRunwayPolicy.hardMinimumMonths,
             kuerzungProzent: spendingResult?.kuerzungProzent,
             safetyStage: vpwEffectiveSettings.stage,
             threeBucketActive: normalizedInput.decumulation?.mode === STRATEGY_OPTIONS.THREE_BUCKET_JILGE
@@ -976,9 +994,9 @@ function _internal_calculateModel(input, lastState) {
     // - 'warn': Runway >= Minimum aber < Ziel (z.B. 24-36 Monate)
     // - 'bad': Runway < Minimum (< 24 Monate) - kritisch!
     let runwayStatus = 'bad';
-    if (runwayMonths >= normalizedInput.runwayTargetMonths) {
+    if (runwayMonths >= liquidityRunwayPolicy.targetMonths) {
         runwayStatus = 'ok';
-    } else if (runwayMonths >= normalizedInput.runwayMinMonths) {
+    } else if (runwayMonths >= liquidityRunwayPolicy.hardMinimumMonths) {
         runwayStatus = 'warn';
     }
 
@@ -989,8 +1007,8 @@ function _internal_calculateModel(input, lastState) {
     diagnosis.general.deckungVorher = deckungVorher;
     diagnosis.general.deckungNachher = deckungNachher;
     const runwayTargetSmoothing = targetLiquidityDetails.runwayTargetDiagnostics || null;
-    const validInputRunwayTarget = (typeof normalizedInput.runwayTargetMonths === 'number' && isFinite(normalizedInput.runwayTargetMonths) && normalizedInput.runwayTargetMonths > 0)
-        ? normalizedInput.runwayTargetMonths
+    const validInputRunwayTarget = (typeof liquidityRunwayPolicy.targetMonths === 'number' && isFinite(liquidityRunwayPolicy.targetMonths) && liquidityRunwayPolicy.targetMonths > 0)
+        ? liquidityRunwayPolicy.targetMonths
         : null;
     const hasValidTarget = (typeof diagnosis.general.runwayTargetMonate === 'number' && isFinite(diagnosis.general.runwayTargetMonate));
     if (runwayTargetSmoothing?.targetMonths) {

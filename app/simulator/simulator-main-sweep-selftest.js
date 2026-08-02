@@ -32,9 +32,9 @@ export async function runSweepSelfTest() {
         logMessages.push('<strong>Test 1: Baseline (P2-Invarianz) - NEUE PRÜFUNG</strong>');
 
         const testCases = [
-            { rebalBand: 5, targetEq: 60 },
-            { rebalBand: 10, targetEq: 60 },
-            { rebalBand: 15, targetEq: 60 }
+            { goldRebalancingBand: 10, liquidityRunwayYears: 3 },
+            { goldRebalancingBand: 25, liquidityRunwayYears: 5 },
+            { goldRebalancingBand: 40, liquidityRunwayYears: 7 }
         ];
 
         const baseInputs = deepClone(getCommonInputs());
@@ -46,23 +46,23 @@ export async function runSweepSelfTest() {
         for (let caseIdx = 0; caseIdx < testCases.length; caseIdx++) {
             const testCase = testCases[caseIdx];
             const inputs = deepClone(baseInputs);
-            inputs.rebalBand = testCase.rebalBand;
-            inputs.targetEq = testCase.targetEq;
+            inputs.rebalancingBand = testCase.goldRebalancingBand;
+            inputs.liquidityRunwayYears = testCase.liquidityRunwayYears;
 
             // NEUE PRÜFUNG: Extrahiere P2-Basis-Parameter (keine Simulation nötig!)
             const p2Inv = extractP2Invariants(inputs);
 
             if (REF_P2_INV === null) {
                 REF_P2_INV = p2Inv;
-                logMessages.push(`&nbsp;&nbsp;✓ Case ${caseIdx + 1}: Referenz gesetzt (rebalBand=${testCase.rebalBand})`);
+                logMessages.push(`&nbsp;&nbsp;✓ Case ${caseIdx + 1}: Referenz gesetzt (Gold-Band=${testCase.goldRebalancingBand}, Runway=${testCase.liquidityRunwayYears} J.)`);
                 logMessages.push(`&nbsp;&nbsp;&nbsp;&nbsp;aktiv=${p2Inv.aktiv}, brutto=${p2Inv.brutto}, rentAdjPct=${p2Inv.rentAdjPct}`);
             } else {
                 if (areP2InvariantsEqual(p2Inv, REF_P2_INV)) {
-                    logMessages.push(`&nbsp;&nbsp;✓ Case ${caseIdx + 1}: P2-Invarianten konstant (rebalBand=${testCase.rebalBand})`);
+                    logMessages.push(`&nbsp;&nbsp;✓ Case ${caseIdx + 1}: P2-Invarianten konstant (Gold-Band=${testCase.goldRebalancingBand}, Runway=${testCase.liquidityRunwayYears} J.)`);
                 } else {
                     test1Passed = false;
                     allTestsPassed = false;
-                    logMessages.push(`&nbsp;&nbsp;<span style="color: red;">✗ Case ${caseIdx + 1}: P2-Invarianten variieren! (rebalBand=${testCase.rebalBand})</span>`);
+                    logMessages.push(`&nbsp;&nbsp;<span style="color: red;">✗ Case ${caseIdx + 1}: P2-Invarianten variieren! (Gold-Band=${testCase.goldRebalancingBand}, Runway=${testCase.liquidityRunwayYears} J.)</span>`);
                     logMessages.push(`&nbsp;&nbsp;&nbsp;&nbsp;Referenz: ${JSON.stringify(REF_P2_INV)}`);
                     logMessages.push(`&nbsp;&nbsp;&nbsp;&nbsp;Aktuell: ${JSON.stringify(p2Inv)}`);
                 }
@@ -97,8 +97,8 @@ export async function runSweepSelfTest() {
 
         // Simuliere zwei Cases, wobei beim zweiten absichtlich partner.brutto geändert wird
         const negTestCases = [
-            { rebalBand: 10, p2Change: false },
-            { rebalBand: 15, p2Change: true } // Hier ändern wir absichtlich partner.brutto
+            { goldRebalancingBand: 10, p2Change: false },
+            { goldRebalancingBand: 40, p2Change: true } // Hier ändern wir absichtlich partner.brutto
         ];
 
         let NEG_REF_P2_INV = null;
@@ -107,7 +107,7 @@ export async function runSweepSelfTest() {
         for (let caseIdx = 0; caseIdx < negTestCases.length; caseIdx++) {
             const testCase = negTestCases[caseIdx];
             const inputs = deepClone(baseInputs);
-            inputs.rebalBand = testCase.rebalBand;
+            inputs.rebalancingBand = testCase.goldRebalancingBand;
 
             // ABSICHTLICH P2 ändern beim zweiten Case (nur für Test!)
             if (testCase.p2Change && inputs.partner && inputs.partner.aktiv) {

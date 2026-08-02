@@ -451,7 +451,8 @@ try {
         isBadYear: true
     });
     assertClose(negativeCashResult.logData.cashInterestEarned, -500, 1e-9, 'Accumulation should retain signed negative cash interest');
-    assertClose(negativeCashResult.logData.liqEnd, 99500, 1e-9, 'Accumulation should apply negative cash interest before savings');
+    assertClose(negativeCashResult.logData.liqEnd, 99500, 1e-9, 'Accumulation liqEnd must preserve its legacy post-interest meaning');
+    assertClose(negativeCashResult.logData.liq_post_accumulation_end_of_year, 111500, 1e-9, 'Accumulation should expose final post-savings liquidity under an explicit field name');
     assertClose(negativeCashResult.newState.accumulationState.sparrateThisYear, 12000, 1e-9, 'Zero wage growth should preserve the annual savings rate');
     assertClose(negativeCashResult.newState.portfolio.liquiditaet, 111500, 1e-9, 'Accumulation should combine negative interest and unchanged savings');
     assertClose(negativeCashResult.logData.portfolio_flow_delta, 0, 1e-9, 'Accumulation signed cash flow should reconcile');
@@ -579,6 +580,8 @@ try {
     assert(result.logData.liq_before_payout === 32000, 'Year result should expose liquidity before payout');
     assert(result.logData.liq_after_payout === 20000, 'Year result should expose liquidity after payout');
     assert(result.logData.liq_after_interest === 20000, 'Year result should expose liquidity after interest');
+    assert(result.logData.liqEnd === 20000, 'Year result liqEnd must preserve its legacy post-interest meaning');
+    assert(result.logData.liq_post_payout_end_of_year === 20000, 'Year result should expose final post-payout liquidity under an explicit field name');
     assert(result.logData.portfolio_total_before_payout === 132000, 'Year result should expose portfolio total before payout');
     assert(result.logData.portfolio_active_end === 120000, 'Year result should expose active portfolio total at year end');
     assert(result.logData.portfolio_flow_delta === 0, 'Year result should expose raw active portfolio flow delta');
@@ -595,6 +598,8 @@ try {
 
     const zeroMetricResult = buildSimulatorYearResult({
         ...yearResultArgs,
+        liquiditaet: 0,
+        zielLiquiditaet: 1000,
         spendingResult: {
             ...yearResultArgs.spendingResult,
             details: {
@@ -607,6 +612,7 @@ try {
             ...yearResultArgs.fullResult,
             ui: {
                 ...yearResultArgs.fullResult.ui,
+                neuerBedarf: 12000,
                 runway: { months: 0 },
                 liquiditaet: { deckungNachher: 0 }
             }
@@ -633,7 +639,22 @@ try {
     });
     assertEqual(missingMetricResult.logData.entscheidung.runwayMonths, null, 'Missing runway should remain missing');
     assertEqual(missingMetricResult.logData.FlexRatePct, null, 'Missing flex rate should remain missing');
-    assertEqual(missingMetricResult.logData.RunwayCoveragePct, null, 'Missing runway coverage should remain missing');
+    assertEqual(missingMetricResult.logData.RunwayCoveragePct, 100, 'Zero configured target with positive cash should expose complete final coverage');
+
+    const zeroNeedAndCashResult = buildSimulatorYearResult({
+        ...yearResultArgs,
+        liquiditaet: 0,
+        zielLiquiditaet: 0,
+        fullResult: {
+            ...yearResultArgs.fullResult,
+            ui: {
+                ...yearResultArgs.fullResult.ui,
+                neuerBedarf: 0
+            }
+        }
+    });
+    assertEqual(zeroNeedAndCashResult.logData.entscheidung.runwayMonths, 0, 'Zero annual need and zero cash must emit a finite zero runway');
+    assertEqual(zeroNeedAndCashResult.logData.RunwayCoveragePct, 0, 'Zero target and zero cash must emit zero coverage');
 
     const invalidInflationResult = buildSimulatorYearResult({
         ...yearResultArgs,

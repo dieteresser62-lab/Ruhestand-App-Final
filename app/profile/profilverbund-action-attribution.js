@@ -8,6 +8,7 @@
 import { settleTaxYear } from '../../engine/tax-settlement.mjs';
 import { classifyTranche } from '../../types/tranche-contract.js';
 import { buildProfileOwnedTranches } from './profilverbund-balance.js';
+import { resolveLiquidityRunwayYears } from '../../types/liquidity-runway-contract.js';
 
 const TOLERANCE_EUR = 0.01;
 const EPSILON = 1e-9;
@@ -413,7 +414,7 @@ function selectTaxOptimizedGross(candidates, grossTarget, selected, rawByProfile
 
 function profileAllocationWeight(profile, mode) {
     const inputs = profile?.inputs || {};
-    if (mode === 'runway_first') return Math.max(0, finiteNumber(inputs.runwayTargetMonths));
+    if (mode === 'runway_first') return Math.max(0, resolveLiquidityRunwayYears(inputs).years);
     return Math.max(0,
         finiteNumber(inputs.depotwertAlt)
         + finiteNumber(inputs.depotwertNeu)

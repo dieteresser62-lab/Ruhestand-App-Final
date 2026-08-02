@@ -465,8 +465,17 @@ async function runBalanceSharedTrancheIds(browser, baseUrl) {
         trancheId: sharedTrancheId,
         name: 'Haushalt A Tranche'
     })]);
+    const balanceStorage = createBalanceStorage(2025);
+    const balanceState = JSON.parse(balanceStorage[BALANCE_STATE_KEY]);
+    balanceState.inputs = {
+        ...balanceState.inputs,
+        floorBedarf: 0,
+        flexBedarf: 0,
+        liquidityRunwayYears: 1
+    };
+    balanceStorage[BALANCE_STATE_KEY] = JSON.stringify(balanceState);
     const storage = {
-        ...createBalanceStorage(2025),
+        ...balanceStorage,
         ...createBrowserProfileStorage({
             'browser-household-a': {
                 name: 'Haushalt A',
@@ -580,6 +589,7 @@ async function runBalanceThreeBucketBear(browser, baseUrl) {
     seededState.inputs = {
         ...seededState.inputs,
         inflation: 0,
+        liquidityRunwayYears: 1,
         endeVJ: 70,
         endeVJ_1: 100,
         endeVJ_2: 100,
@@ -608,6 +618,13 @@ async function runBalanceThreeBucketBear(browser, baseUrl) {
         }, lastState);
         return {
             strategy: inputs.decumulation?.mode,
+            resultKeys: Object.keys(result || {}),
+            resultError: result?.error ? {
+                name: result.error.name,
+                message: result.error.message,
+                code: result.error.code,
+                context: result.error.context
+            } : (result?.errors || null),
             realReturnEq: result.ui?.market?.realReturnEq,
             threeBucket: result.ui?.threeBucket || null
         };
@@ -616,10 +633,65 @@ async function runBalanceThreeBucketBear(browser, baseUrl) {
         diagnosis.strategy === '3_bucket_jilge'
         && diagnosis.realReturnEq < -0.15
         && diagnosis.threeBucket?.isBadYear === true,
-        'Browser 3-Bucket bear diagnosis must use the real engine return'
+        `Browser 3-Bucket bear diagnosis must use the real engine return: ${JSON.stringify(diagnosis)}`
     );
     assert(diagnosis.threeBucket?.is3Bucket === true,
         'Browser 3-Bucket diagnosis must remain attached to the selected strategy');
+    smoke.assertNoErrors();
+    await smoke.close();
+}
+
+async function runBalanceFiveYearRunwayForcedSale(browser, baseUrl) {
+    const smoke = await openSmokePage(browser, baseUrl, 'Balance.html', {
+        storage: createBalanceStorage(2025)
+    });
+    const { page } = smoke;
+    await page.locator('#profilverbund-profile-list input').waitFor({ state: 'visible' });
+    const witness = await page.evaluate(async () => {
+        const { UIReader } = await import('./app/balance/balance-reader.js');
+        const base = UIReader.readAllInputs();
+        const detailledTranches = [{
+            trancheId: 'runway-witness:eq',
+            sourceProfileId: 'runway-witness',
+            marketValue: 500000,
+            costBasis: 250000,
+            shares: 1000,
+            purchasePrice: 250,
+            currentPrice: 500,
+            purchaseDate: '2000-01-01',
+            type: 'aktien_alt',
+            category: 'equity',
+            tqf: 0.3
+        }];
+        const run = liquidityRunwayYears => window.EngineAPI.simulateSingleYear({
+            ...base,
+            floorBedarf: 12000,
+            flexBedarf: 24000,
+            tagesgeld: 100000,
+            geldmarktEtf: 0,
+            aktuelleLiquiditaet: 100000,
+            depotwertAlt: 500000,
+            depotwertNeu: 0,
+            costBasisAlt: 250000,
+            detailledTranches,
+            liquidityRunwayYears
+        }, null);
+        const project = result => ({
+            error: result?.error?.message || null,
+            configuredRunwayYears: result?.input?.liquidityRunwayYears,
+            actionType: result?.ui?.action?.type || 'NONE',
+            grossSale: Array.isArray(result?.ui?.action?.quellen)
+                ? result.ui.action.quellen.reduce((sum, entry) => sum + (Number(entry.brutto) || 0), 0)
+                : 0
+        });
+        return { oneYear: project(run(1)), fiveYears: project(run(5)) };
+    });
+    assert(!witness.oneYear.error && !witness.fiveYears.error,
+        `Runway forced-sale witness must execute without engine errors: ${JSON.stringify(witness)}`);
+    assert(witness.fiveYears.grossSale > witness.oneYear.grossSale,
+        `Five-year default runway must visibly increase the real forced sale versus the one-year control arm: ${JSON.stringify(witness)}`);
+    assert(witness.oneYear.configuredRunwayYears === 1 && witness.fiveYears.configuredRunwayYears === 5,
+        `Forced-sale witness must preserve both configured runway arms end to end: ${JSON.stringify(witness)}`);
     smoke.assertNoErrors();
     await smoke.close();
 }
@@ -1604,10 +1676,8 @@ async function runSimulatorSweepIntegration(browser, baseUrl) {
         setValue('mcBlockSize', 1);
         setValue('mcWorkerCount', 1);
         setValue('mcWorkerBudget', 50);
-        setValue('sweepRunwayMin', 24);
-        setValue('sweepRunwayTarget', 36);
-        setValue('sweepTargetEq', 60);
-        setValue('sweepRebalBand', 5);
+        setValue('sweepLiquidityRunwayYears', 3);
+        setValue('sweepGoldRebalancingBand', 25);
         setValue('sweepMaxSkimPct', 0);
         setValue('sweepMaxBearRefillPct', 5);
         setValue('sweepGoldTargetPct', 0);
@@ -1646,14 +1716,12 @@ async function runSimulatorSweepIntegration(browser, baseUrl) {
         `Browser Sweep integration combination must be valid: ${JSON.stringify(execution)}`);
     assert(JSON.stringify(execution.parameterKeys) === JSON.stringify([
         'goGoMultiplier',
+        'goldRebalancingBand',
         'goldTargetPct',
+        'liquidityRunwayYears',
         'maxBearRefillPct',
         'maxSkimPct',
-        'rebalBand',
-        'runwayMin',
-        'runwayTarget',
-        'survivalQuantile',
-        'targetEq'
+        'survivalQuantile'
     ]), 'Browser Sweep result must expose every interactive parameter and no unsupported direct-horizon field');
     assert(execution.maxBearRefillPct === 5,
         'Browser Sweep must preserve the visible Bear-Refill assumption instead of forcing zero');
@@ -1676,7 +1744,7 @@ async function runSimulatorOptimizerApplyIntegration(browser, baseUrl) {
         ]);
         const evaluateCandidateFn = async candidate => ({
             metricContract: { schemaVersion: 'AutoOptimizeMetricResultV1' },
-            medianEndWealth: 1000000 - Math.pow(Number(candidate.targetEq) - 60, 2),
+            medianEndWealth: 1000000 - Math.pow(Number(candidate.liquidityRunwayYears) - 5, 2),
             successProbFloor: 1,
             depletionRate: 0,
             worst5Drawdown: 0.2,
@@ -1686,7 +1754,7 @@ async function runSimulatorOptimizerApplyIntegration(browser, baseUrl) {
         const objective = { metric: 'EndWealth_P50', direction: 'max', quantile: 50 };
         const result = await runAutoOptimize({
             objective,
-            params: { targetEq: { min: 60, max: 60, step: 1 } },
+            params: { liquidityRunwayYears: { min: 5, max: 5, step: 0.5 } },
             runsPerCandidate: 2,
             seedsTrain: 1,
             seedsTest: 1,
@@ -1704,7 +1772,7 @@ async function runSimulatorOptimizerApplyIntegration(browser, baseUrl) {
             parameterFingerprint: result.parameterFidelity.parameterFingerprint,
             requestFingerprint: result.parameterFidelity.requestFingerprint,
             modelMode: result.modelStatus.evaluationMode,
-            targetEq: result.championCfg.targetEq
+            liquidityRunwayYears: result.championCfg.liquidityRunwayYears
         };
     });
     assert(evaluation.modelMode === 'custom_evaluator',
@@ -1715,11 +1783,11 @@ async function runSimulatorOptimizerApplyIntegration(browser, baseUrl) {
             createAutoOptimizeParameterFingerprint,
             createAutoOptimizeRequestFingerprint
         } = await import('./app/simulator/auto-optimize-param-meta.js');
-        const candidate = { targetEq: Number(document.getElementById('targetEq').value) };
+        const candidate = { liquidityRunwayYears: Number(document.getElementById('liquidityRunwayYears').value) };
         return {
             parameterFingerprint: createAutoOptimizeParameterFingerprint(candidate),
             requestFingerprint: createAutoOptimizeRequestFingerprint(candidate),
-            targetEq: candidate.targetEq,
+            liquidityRunwayYears: candidate.liquidityRunwayYears,
             resultText: document.getElementById('ao_result')?.textContent || ''
         };
     });
@@ -1728,8 +1796,8 @@ async function runSimulatorOptimizerApplyIntegration(browser, baseUrl) {
         && applied.requestFingerprint === evaluation.requestFingerprint,
         'Browser optimizer apply must preserve the evaluated canonical fingerprint'
     );
-    assert(applied.targetEq === evaluation.targetEq,
-        'Browser optimizer apply must write the evaluated target equity value');
+    assert(applied.liquidityRunwayYears === evaluation.liquidityRunwayYears,
+        'Browser optimizer apply must write the evaluated canonical runway');
     assert(applied.resultText.includes('Experimenteller Szenariokandidat')
         && applied.resultText.includes('keine Finanzempfehlung'),
     'Browser optimizer result and apply confirmation must preserve the model-status boundary');
@@ -1766,6 +1834,7 @@ async function main() {
             ['Balance annual preflight', runBalanceAnnualPreflight],
             ['Balance preview lifecycle', runBalancePreviewLifecycle],
             ['Balance 3-Bucket bear', runBalanceThreeBucketBear],
+            ['Balance five-year runway forced sale', runBalanceFiveYearRunwayForcedSale],
             ['Balance corrupt expenses', runBalanceCorruptExpenses],
             ['Simulator.html', runSimulatorSmoke],
             ['Simulator Monte-Carlo E2E', runMonteCarloBrowserRegression],

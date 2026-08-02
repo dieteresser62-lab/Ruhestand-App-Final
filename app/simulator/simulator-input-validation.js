@@ -1,6 +1,11 @@
 "use strict";
 
 import { validateTailRiskHorizonCompatibility } from './tail-risk-contract.js';
+import {
+    LIQUIDITY_RUNWAY_CONTRACT_V1,
+    isValidLiquidityRunwayYears,
+    resolveLiquidityRunwayYears
+} from '../../types/liquidity-runway-contract.js';
 
 export class SimulatorValidationError extends Error {
     constructor(message, errors = []) {
@@ -16,6 +21,7 @@ export function validateSimulatorInputs(inputs = {}) {
     const minimumFlexAnnual = Number.isFinite(minimumFlexAnnualRaw) ? minimumFlexAnnualRaw : 0;
     const startFlexBedarfRaw = Number(inputs.startFlexBedarf);
     const startFlexBedarf = Number.isFinite(startFlexBedarfRaw) ? startFlexBedarfRaw : 0;
+    const liquidityRunwayYears = resolveLiquidityRunwayYears(inputs).years;
 
     if (minimumFlexAnnual < 0) {
         errors.push({ fieldId: 'minimumFlexAnnual', message: 'Mindest-Flex p.a. darf nicht negativ sein.' });
@@ -25,6 +31,17 @@ export function validateSimulatorInputs(inputs = {}) {
             { fieldId: 'minimumFlexAnnual', message: 'Mindest-Flex p.a. darf nicht größer als Flex-Bedarf p.a. sein.' },
             { fieldId: 'startFlexBedarf', message: 'Flex-Bedarf p.a. ist die Obergrenze für Mindest-Flex.' }
         );
+    }
+    if (
+        !Number.isFinite(liquidityRunwayYears)
+        || liquidityRunwayYears < LIQUIDITY_RUNWAY_CONTRACT_V1.minimumYears
+        || liquidityRunwayYears > LIQUIDITY_RUNWAY_CONTRACT_V1.maximumYears
+        || !isValidLiquidityRunwayYears(liquidityRunwayYears)
+    ) {
+        errors.push({
+            fieldId: 'liquidityRunwayYears',
+            message: `Liquiditäts-Runway muss zwischen ${LIQUIDITY_RUNWAY_CONTRACT_V1.minimumYears} und ${LIQUIDITY_RUNWAY_CONTRACT_V1.maximumYears} Jahren in ${LIQUIDITY_RUNWAY_CONTRACT_V1.stepYears}-Jahres-Schritten liegen.`
+        });
     }
 
     const tailRiskValidation = validateTailRiskHorizonCompatibility(inputs, inputs.tailRiskHorizonYears);

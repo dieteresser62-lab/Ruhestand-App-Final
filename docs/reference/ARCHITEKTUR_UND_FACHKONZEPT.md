@@ -2187,26 +2187,30 @@ Prognose, wie lange das Gesamtvermögen oder der Haushalt überlebt. Mindest- un
 Ziel-Runway sind Policy-Schwellen; sie stellen keine separat garantierte
 Reserve dar.
 
-### C.5.1 Dynamisches Runway-Ziel
+### C.5.1 Kanonisches Runway-Ziel
 
-**Regime-abhängige Ziel-Runway** (siehe `config.mjs`):
+`liquidityRunwayYears` ist die einzige aktuelle Nutzereingabe fuer den
+Liquiditaets-Runway. `types/liquidity-runway-contract.js` definiert Default 5,
+den Bereich 1 bis 10 und die Schrittweite 0,5. Das Ziel in Euro ist exakt:
 
-| Regime | Ziel-Runway | Begründung |
-|--------|-------------|------------|
-| `peak` | 48 Monate | 4 Jahre Puffer am ATH |
-| `hot_neutral` | 36 Monate | 3 Jahre Standard |
-| `bear` | 60 Monate | 5 Jahre im Crash |
-| `stagflation` | 60 Monate | 5 Jahre bei Stagflation |
-| `recovery_in_bear` | 48 Monate | 4 Jahre in Rally |
-| `recovery` | 48 Monate | 4 Jahre in Erholung |
+```javascript
+targetMonths = liquidityRunwayYears * 12;
+targetLiquidity = effectiveAnnualNetNeed * targetMonths / 12;
+hardMinimumMonths = Math.min(targetMonths, 24);
+```
 
-Optional kann die TransactionEngine das Runway-Ziel zwischen `hot_neutral` und `bear` interpolieren. Der Default bleibt deaktiviert (`CONFIG.REGIME_SMOOTHING.TARGETS_ENABLED=false`), sodass bestehende Ergebnisse ohne explizite Aktivierung die diskreten Regime-Ziele verwenden. Bei aktivierter Glaettung gilt:
-
-- Drawdown-Severity 0 verwendet das neutrale Ziel, Severity 1 das Stress-Ziel.
-- Werte knapp um 10%, 20% und 30% Drawdown bewegen das Ziel monoton und ohne mehrmonatige Schwelle.
-- Das geglaettete Ziel bleibt zwischen den Profil-Stuetzwerten und unterschreitet die harte Mindest-Runway nicht.
-- Explizite Nutzerziele (`runwayTargetMonths`) umgehen die Zielwert-Glaettung.
-- Diagnose und Logs weisen Rohziel, Effektivziel, Severity-Prozent, Stuetzziele, Fallback und harte Mindestgrenze aus.
+Die harte Mindestgrenze ist abgeleitete Engine-Policy und keine zweite
+Nutzereingabe. Ziel und Jahresend-KPI werden nicht regimeabhaengig geglaettet.
+Legacy-Daten migrieren in der Prioritaet kanonischer Wert,
+`runwayTargetMonths`, `runwayMinMonths`, Default. Ganzzahlige Monatswerte aus
+den alten UI-Domains werden auf das naechste Sechsmonatsraster aufgerundet und
+danach in Jahre umgerechnet; die Migration verkuerzt den Puffer nie. Diagnose und Logs
+weisen Ziel, harte Mindestgrenze sowie Vor-, Zwischen- und finalen
+Post-Payout-Bestand getrennt aus. `runway_post_payout_end_of_year_months` und
+`liq_post_payout_end_of_year` sind die expliziten neuen Jahresendfelder;
+`liq_post_accumulation_end_of_year` ist das entsprechende Ansparfeld. Die
+Bestandsfelder `safety_runway_post_months` und `liqEnd` behalten aus
+Kompatibilitaetsgruenden ihre bisherige Bedeutung.
 
 ### C.5.2 Refill-Trigger
 
@@ -2228,13 +2232,17 @@ if (runwayCoverage < 0.69) {
 }
 ```
 
-3. **Opportunistic Refill** (Im Peak bei Überschuss):
+3. **Opportunistic Refill** (Runway-Luecke mit Markt-Caps):
 ```javascript
-if (scenario.startsWith('peak') && equityOverweight > rebalBand) {
-    reason = 'reinvest';
-    targetRefill = Math.min(excessEquity, maxSkimAmount);
+if (runwayGap > 0) {
+    goldSaleBudget = goldAboveCanonicalBand;
+    equitySaleBudget = Math.min(runwayNeed, athScaledSkimCap);
 }
 ```
+
+Es gibt dabei kein festes Aktienziel. Das einzige Rebalancing-Band ist
+`rebalancingBand` fuer Gold; Aktien dienen nachrangig als Runway-Quelle und
+werden durch Bedarf, Marktstatus sowie Skim-/Bear-Caps begrenzt.
 
 ### C.5.3 Anti-Pseudo-Accuracy
 
@@ -2522,7 +2530,7 @@ und kein Holdout-Nachweis.
 Der **Parameter Sweep** ermöglicht die systematische Untersuchung, wie verschiedene Parameterkombinationen die Simulationsergebnisse beeinflussen.
 
 **Anwendungsfälle:**
-- Sensitivitätsanalyse: "Wie stark beeinflusst Runway-Min die Erfolgsquote?"
+- Sensitivitätsanalyse: "Wie stark beeinflusst der Liquiditaets-Runway die Erfolgsquote?"
 - Trade-off-Analyse: "Wo liegt das Optimum zwischen Erfolgsrate und Endvermögen?"
 - Robustheits-Test: "Ist mein Plan sensitiv gegenüber einzelnen Parametern?"
 
@@ -2532,13 +2540,11 @@ Der **Parameter Sweep** ermöglicht die systematische Untersuchung, wie verschie
 
 | Parameter | Input-ID | Beschreibung | Beispiel-Range |
 |-----------|----------|--------------|----------------|
-| `runwayMin` | `sweepRunwayMin` | Minimale Liquiditäts-Monate | 18:6:36 |
-| `runwayTarget` | `sweepRunwayTarget` | Ziel-Liquiditäts-Monate | 36:6:60 |
-| `targetEq` | `sweepTargetEq` | Ziel-Aktienquote % | 50:5:70 |
-| `rebalBand` | `sweepRebalBand` | Rebalancing-Band % | 3:1:7 |
-| `maxSkimPct` | `sweepMaxSkimPct` | Max. Abschöpfung im Peak % | 15:5:35 |
-| `maxBearRefillPct` | `sweepMaxBearRefillPct` | Max. Nachfüllung im Crash % | 0,2,5 |
-| `goldTargetPct` | `sweepGoldTargetPct` | Gold-Zielallokation % | 0:2:10 |
+| `liquidityRunwayYears` | `sweepLiquidityRunwayYears` | Liquiditaets-Runway in Jahren | 3:1:7 |
+| `goldRebalancingBand` | `sweepGoldRebalancingBand` | Gold-Rebalancing-Band % | 10:5:30 |
+| `maxSkimPct` | `sweepMaxSkimPct` | Max. Aktien-Skim % | 0,2,4 |
+| `maxBearRefillPct` | `sweepMaxBearRefillPct` | Max. Bear-Refill % der Aktien | 0,2,5 |
+| `goldTargetPct` | `sweepGoldTargetPct` | Gold-Zielallokation % | 0,2.5,5,7.5 |
 | `survivalQuantile` | `sweepSurvivalQuantile` | VPW-Survival-Quantil (nur bei passendem Dynamic-Flex-Modus) | 0.80,0.85,0.90 |
 | `goGoMultiplier` | `sweepGoGoMultiplier` | VPW-Go-Go-Multiplikator (nur bei aktivem Go-Go) | 1.0,1.1,1.2 |
 
@@ -2559,14 +2565,14 @@ nicht eigenständig deren KPI-Wirkung.
 
 ```javascript
 export const SWEEP_ALLOWED_KEYS = new Set([
-    'runwayMinMonths',
-    'runwayTargetMonths',
-    'targetEq',
-    'rebalBand',
+    'liquidityRunwayYears',
+    'rebalancingBand',
     'maxSkimPctOfEq',
     'maxBearRefillPctOfEq',
     'goldZielProzent',
-    'goldAktiv'
+    'goldAktiv',
+    'survivalQuantile',
+    'goGoMultiplier'
 ]);
 
 export function isBlockedKey(key) {
@@ -2783,9 +2789,10 @@ export function generateNeighborsReduced(candidate, ranges) {
 // Parameter-spezifische Deltas
 function getParameterDeltas(key, reduced = false) {
     const deltaMap = {
-        runwayMinM: reduced ? [-2, 2] : [-4, -2, 2, 4],
+        liquidityRunwayYears: reduced ? [-0.5, 0.5] : [-1, -0.5, 0.5, 1],
         goldTargetPct: reduced ? [-1, 1] : [-2, -1, 1, 2],
-        targetEq: reduced ? [-2, 2] : [-5, -2, 2, 5]
+        goldRebalancingBand: reduced ? [-2, 2] : [-5, -2, 2, 5],
+        maxSkimPct: reduced ? [-2, 2] : [-5, -2, 2, 5]
     };
     return deltaMap[key] || [-1, 1];
 }

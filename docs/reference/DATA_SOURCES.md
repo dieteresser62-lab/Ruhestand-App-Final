@@ -381,7 +381,8 @@ the complete runtime-table hash is
 
 Care reference data comes from the Destatis care statistics at
 31 December 2023. The contract retains observed stock counts, grade shares and
-age-/sex-specific prevalence for validation only. A prevalence is a reporting-
+age-/sex-specific prevalence as context evidence only; no runtime validation is
+performed against those observations. A prevalence is a reporting-
 date stock ratio and is never divided by an assumed duration or otherwise used
 as an individual annual entry/progression probability. The runtime entry
 hazards for initial grades 1 and 2 and the one-grade progression probabilities
@@ -390,7 +391,7 @@ simulated death; acute duration is a user-range draw with UI defaults 5-10
 years. The care source SHA-256 is
 `a8088d8e95964c5ffade848b9f303d000dc499519512f66f92ee6b8d60aa4280`;
 the observed-reference hash is
-`cf9a310beec3c7d94c65f63f18153eb8718dc5cc87fa21c11eff3e591109a8ee`.
+`c9b55d32c1d084ba948e2b77bddb7392c918bce14ec11c908ab38afde8c9a48a`.
 
 The survivor contract uses the Deutsche Rentenversicherung page
 [Renten an Hinterbliebene](https://www.deutsche-rentenversicherung.de/DRV/DE/Rente/Allgemeine-Informationen/Rentenarten-und-Leistungen/Renten-an-Hinterbliebene/renten-an-hinterbliebene_node.html)

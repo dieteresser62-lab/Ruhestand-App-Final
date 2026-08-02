@@ -371,7 +371,7 @@ export function getSellOrder(tranches, market, input, context, isEmergencySale) 
             (input.goldWert || 0);
         const investiertesKapital = depotwertGesamt + input.tagesgeld + input.geldmarktEtf;
         const goldZielwert = investiertesKapital * (input.goldZielProzent / 100);
-        const goldBandPct = (input.rebalancingBand ?? input.rebalBand ?? 35) / 100;
+        const goldBandPct = (input.rebalancingBand ?? 35) / 100;
         const goldObergrenze = goldZielwert * (1 + goldBandPct);
 
         // Gesamter Gold-Wert berechnen

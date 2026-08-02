@@ -1,0 +1,123 @@
+{
+  "actualSha256": "cc696ef7fc0d60cd921dfeac581664b60ff94d9252d1fe27c039304508429ec7",
+  "capeLegacyStepDelta": {
+    "maxAbsolutePortfolioFlowDelta": {
+      "after": 0,
+      "before": 0,
+      "delta": 0
+    },
+    "maxDrawdownPct": {
+      "after": 6.466125,
+      "before": 6.610345,
+      "delta": -0.14422
+    },
+    "maxReductionStreak": {
+      "after": 8,
+      "before": 8,
+      "delta": 0
+    },
+    "minRunwayCoveragePct": {
+      "after": 30.521727,
+      "before": 20.003839,
+      "delta": 10.517888
+    },
+    "summaryEndWealth": {
+      "after": 2715551.15,
+      "before": 2658845.17,
+      "delta": 56705.98
+    },
+    "totalTax": {
+      "after": 92973.31,
+      "before": 97292.03,
+      "delta": -4318.72
+    },
+    "totalWithdrawal": {
+      "after": 789000,
+      "before": 819000,
+      "delta": -30000
+    },
+    "yearsWithReductionAtLeast10Pct": {
+      "after": 8,
+      "before": 8,
+      "delta": 0
+    }
+  },
+  "caseCount": 11,
+  "caseOracles": [
+    { "id": "completed_2000_2005", "outcomeObservation": "completed", "summaryEndWealth": 1700197.12, "totalWithdrawal": 176400, "totalTax": 195.99, "maxAbsolutePortfolioFlowDelta": 0 },
+    { "id": "gold_holding_2000_2005", "outcomeObservation": "completed", "summaryEndWealth": 1798179.39, "totalWithdrawal": 175200, "totalTax": 0, "maxAbsolutePortfolioFlowDelta": 0 },
+    { "id": "completed_1960_2020", "outcomeObservation": "completed", "summaryEndWealth": 180850356.23, "totalWithdrawal": 4093414.61, "totalTax": 767535.43, "maxAbsolutePortfolioFlowDelta": 0 },
+    { "id": "completed_numeraire_seam_1949_1952", "outcomeObservation": "completed", "summaryEndWealth": 5169014.74, "totalWithdrawal": 121200, "totalTax": 17464.46, "maxAbsolutePortfolioFlowDelta": 0 },
+    { "id": "three_bucket_minimum_flex_2005_2014", "outcomeObservation": "completed", "summaryEndWealth": 394868.29, "totalWithdrawal": 328800, "totalTax": 26167.6, "maxAbsolutePortfolioFlowDelta": 0 },
+    { "id": "capital_poor_ruin_2000_2005", "outcomeObservation": "ruin", "summaryEndWealth": 26793.05, "totalWithdrawal": 90000, "totalTax": 1290.26, "maxAbsolutePortfolioFlowDelta": 0 },
+    { "id": "health_bucket_nested_row_summary_positive", "outcomeObservation": "completed", "summaryEndWealth": 2271456.71, "totalWithdrawal": 60000, "totalTax": 2955.47, "maxAbsolutePortfolioFlowDelta": 0 },
+    { "id": "dynamic_flex_cape_legacy_step_2018_2025", "outcomeObservation": "completed", "summaryEndWealth": 2715551.15, "totalWithdrawal": 789000, "totalTax": 92973.31, "maxAbsolutePortfolioFlowDelta": 0 },
+    { "id": "wage_indexed_pension_source_seam_1944_1950", "outcomeObservation": "completed", "summaryEndWealth": 4008515.14, "totalWithdrawal": 78000, "totalTax": 5389.75, "maxAbsolutePortfolioFlowDelta": 0 },
+    { "id": "wage_indexed_pension_jst_1930_1940", "outcomeObservation": "completed", "summaryEndWealth": 2670022.78, "totalWithdrawal": 92400, "totalTax": 879.27, "maxAbsolutePortfolioFlowDelta": 0 },
+    { "id": "wage_indexed_pension_jst_1935_1946", "outcomeObservation": "completed", "summaryEndWealth": 5091243.1, "totalWithdrawal": 147000, "totalTax": 13086.53, "maxAbsolutePortfolioFlowDelta": 0 }
+  ],
+  "earlyWageDataDeltaOracles": [
+    {
+      "scenarioId": "wage_indexed_pension_jst_1930_1940",
+      "financialMetrics": {
+        "maxAbsolutePortfolioFlowDelta": { "before": 0, "after": 0, "delta": 0 },
+        "maxDrawdownPct": { "before": 48.387551, "after": 48.46002, "delta": 0.072469 },
+        "maxReductionStreak": { "before": 7, "after": 9, "delta": 2 },
+        "minRunwayCoveragePct": { "before": 44.025, "after": 44.025, "delta": 0 },
+        "summaryEndWealth": { "before": 2740858.55, "after": 2670022.78, "delta": -70835.77 },
+        "totalTax": { "before": 0, "after": 879.27, "delta": 879.27 },
+        "totalWithdrawal": { "before": 41400, "after": 92400, "delta": 51000 },
+        "yearsWithReductionAtLeast10Pct": { "before": 7, "after": 9, "delta": 2 }
+      }
+    },
+    {
+      "scenarioId": "wage_indexed_pension_jst_1935_1946",
+      "financialMetrics": {
+        "maxAbsolutePortfolioFlowDelta": { "before": 0, "after": 0, "delta": 0 },
+        "maxDrawdownPct": { "before": 16.763104, "after": 16.813921, "delta": 0.050817 },
+        "maxReductionStreak": { "before": 10, "after": 1, "delta": -9 },
+        "minRunwayCoveragePct": { "before": 56.726913, "after": 47.713319, "delta": -9.013594 },
+        "summaryEndWealth": { "before": 5136609.35, "after": 5091243.1, "delta": -45366.25 },
+        "totalTax": { "before": 9330.81, "after": 13086.53, "delta": 3755.72 },
+        "totalWithdrawal": { "before": 118800, "after": 147000, "delta": 28200 },
+        "yearsWithReductionAtLeast10Pct": { "before": 10, "after": 1, "delta": -9 }
+      }
+    }
+  ],
+  "maxAbsolutePortfolioFlowDelta": 0,
+  "negativeCaseCount": 5,
+  "reviewStatus": "pending",
+  "ruinCaseCount": 1,
+  "schemaVersion": "LiquidityRunwaySlice08MeasurementV1",
+  "slice07To08BacktestDeltaOracle": {
+    "schemaVersion": "Slice07To08LiquidityRunwayBacktestDeltaV1",
+    "sourceReference": "demography-care-survivor-backtest-delta-v1",
+    "targetReference": "post-backtest-data-08-v1",
+    "activeCapeProviderArm": {
+      "capeProviderArm": "after",
+      "financialMetrics": {
+        "summaryEndWealth": { "before": 2764111.02, "after": 2715551.15, "delta": -48559.87 },
+        "totalWithdrawal": { "before": 774000, "after": 789000, "delta": 15000 },
+        "totalTax": { "before": 96130.66, "after": 92973.31, "delta": -3157.35 },
+        "minRunwayCoveragePct": { "before": 68.979716, "after": 30.521727, "delta": -38.457989 },
+        "maxDrawdownPct": { "before": 6.167425, "after": 6.466125, "delta": 0.2987 },
+        "maxAbsolutePortfolioFlowDelta": { "before": 0, "after": 0, "delta": 0 }
+      }
+    },
+    "legacyCapeReferenceArm": {
+      "capeProviderArm": "before",
+      "financialMetrics": {
+        "summaryEndWealth": { "before": 2739627.94, "after": 2658845.17, "delta": -80782.77 },
+        "totalWithdrawal": { "before": 777000, "after": 819000, "delta": 42000 },
+        "totalTax": { "before": 99585.72, "after": 97292.03, "delta": -2293.69 },
+        "minRunwayCoveragePct": { "before": 59.691743, "after": 20.003839, "delta": -39.687904 },
+        "maxDrawdownPct": { "before": 6.183847, "after": 6.610345, "delta": 0.426498 },
+        "maxAbsolutePortfolioFlowDelta": { "before": 0, "after": 0, "delta": 0 }
+      }
+    }
+  },
+  "snapshotId": "post-backtest-data-08-v1",
+  "sourceReference": "demography-care-survivor-backtest-delta-v1",
+  "sourceResultDocument": "docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_07_DEMOGRAFIE_PFLEGE_HINTERBLIEBENE.md",
+  "thresholdChangedYearCount": 21
+}

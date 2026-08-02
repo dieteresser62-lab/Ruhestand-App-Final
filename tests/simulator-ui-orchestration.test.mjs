@@ -166,10 +166,8 @@ function registerElement(documentRef, id, options = {}) {
 
 function registerSweepDom(documentRef) {
     const rangeFields = [
-        ['sweepRunwayMin', '18'],
-        ['sweepRunwayTarget', '24'],
-        ['sweepTargetEq', '60'],
-        ['sweepRebalBand', '5'],
+        ['sweepLiquidityRunwayYears', '3'],
+        ['sweepGoldRebalancingBand', '25'],
         ['sweepMaxSkimPct', '10'],
         ['sweepMaxBearRefillPct', '2'],
         ['sweepGoldTargetPct', '0'],
@@ -178,8 +176,8 @@ function registerSweepDom(documentRef) {
     ];
     [
         ['sweepMetric', 'successProbFloor'],
-        ['sweepAxisX', 'runwayMin'],
-        ['sweepAxisY', 'targetEq'],
+        ['sweepAxisX', 'liquidityRunwayYears'],
+        ['sweepAxisY', 'goldRebalancingBand'],
         ...rangeFields
     ].forEach(([id, value]) => registerElement(documentRef, id, { value }));
     registerElement(documentRef, 'sweepGridSize', { tagName: 'span' });
@@ -357,7 +355,7 @@ async function runSimulatorUiOrchestrationTests() {
         const gridSize = documentRef.getElementById('sweepGridSize');
         assertEqual(gridSize.textContent, 'Grid: 1 Kombis', 'Sweep-Grid zeigt gueltige Kombinationszahl');
 
-        const invalidInput = documentRef.getElementById('sweepRunwayMin');
+        const invalidInput = documentRef.getElementById('sweepLiquidityRunwayYears');
         invalidInput.value = '18:6';
         invalidInput.dispatchEvent({ type: 'input' });
         assertEqual(gridSize.textContent, 'Grid: ? Kombis', 'Ungueltige Sweep-Range wird sichtbar blockiert');
@@ -370,31 +368,25 @@ async function runSimulatorUiOrchestrationTests() {
 
     console.log('Test 6: optimizer applies selected parameters without running Monte-Carlo jobs');
     {
-        registerElement(documentRef, 'runwayMinMonths');
-        registerElement(documentRef, 'runwayTargetMonths');
-        registerElement(documentRef, 'targetEq');
-        registerElement(documentRef, 'rebalBand');
+        registerElement(documentRef, 'liquidityRunwayYears');
+        registerElement(documentRef, 'rebalancingBand');
         registerElement(documentRef, 'maxSkimPctOfEq');
         registerElement(documentRef, 'maxBearRefillPctOfEq');
-        registerElement(documentRef, 'maxSkimPct');
-        registerElement(documentRef, 'maxBearRefillPct');
-        registerElement(documentRef, 'goldZielProzent');
-        registerElement(documentRef, 'goldAktiv', { type: 'checkbox' });
+        registerElement(documentRef, 'goldAllokationProzent');
+        registerElement(documentRef, 'goldAllokationAktiv', { value: 'false' });
 
         optimizerModule.applyParametersToForm({
-            runwayMin: 18,
-            runwayTarget: 30,
-            targetEq: 65,
-            rebalBand: 7,
+            liquidityRunwayYears: 1.5,
+            goldRebalancingBand: 7,
             maxSkimPct: 12,
             maxBearRefillPct: 8,
             goldTargetPct: 5
         });
 
-        assertEqual(documentRef.getElementById('runwayMinMonths').value, 18, 'Optimizer uebernimmt runwayMin');
-        assertEqual(documentRef.getElementById('targetEq').value, 65, 'Optimizer uebernimmt Ziel-Aktienquote');
-        assertEqual(documentRef.getElementById('goldZielProzent').value, 5, 'Optimizer uebernimmt Gold-Zielquote');
-        assertEqual(documentRef.getElementById('goldAktiv').checked, true, 'Gold wird bei Zielquote > 0 aktiviert');
+        assertEqual(documentRef.getElementById('liquidityRunwayYears').value, 1.5, 'Optimizer uebernimmt kanonischen Runway');
+        assertEqual(documentRef.getElementById('rebalancingBand').value, 7, 'Optimizer uebernimmt Gold-Rebalancing-Band');
+        assertEqual(documentRef.getElementById('goldAllokationProzent').value, 5, 'Optimizer uebernimmt Gold-Zielquote');
+        assertEqual(documentRef.getElementById('goldAllokationAktiv').value, 'true', 'Gold wird bei Zielquote > 0 aktiviert');
     }
 
     console.log('Test 7: Monte-Carlo controls expose method semantics and CAPE precedence');

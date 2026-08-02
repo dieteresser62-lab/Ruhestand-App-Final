@@ -1184,9 +1184,10 @@ ohne die vom Nutzer bestaetigte funktionale Rentenfortschreibung zu ersetzen.
 **Umsetzungsstatus:** am 2026-08-01 auf Basis des technisch freigegebenen und
 als Commit `02f39f9` vorliegenden Slice-06-Ergebnisdokuments durch Codex
 technisch umgesetzt und selbstgeprueft. CR06-21 und CR06-22 sind als
-vorgeschaltete Gates geschlossen. Die Blocker CR07-1 bis CR07-3 aus dem ersten
-Claude-Review sind technisch nachgebessert. Erneutes externes Review, Freigabe
-und Commit bleiben ausstehend; Codex nimmt keine Selbstfreigabe vor.
+vorgeschaltete Gates geschlossen. Claude hat die nachgebesserten Blocker
+CR07-1 bis CR07-3 im Zweitreview technisch freigegeben; Slice 07 liegt als
+lokaler Commit `c95e202` vor. CR07-5 und CR07-6 sind ausdrueckliche Auflagen
+vor Slice 08; Codex nimmt keine Selbstfreigabe vor.
 
 **Abhaengigkeit:** Slice 1.
 
@@ -1262,7 +1263,26 @@ amtliche Quellen und die beabsichtigte Simulationssemantik geprüft.
 
 ### Slice 8 - Liquiditaets-Runway und Puffervertrag
 
-**Abhaengigkeiten:** Slices 1 und 4.
+**Slice-Dokument:**
+[`SLICE_BACKTEST_DATENPRUEFUNG_08_LIQUIDITAETS_RUNWAY_PUFFERVERTRAG.md`](SLICE_BACKTEST_DATENPRUEFUNG_08_LIQUIDITAETS_RUNWAY_PUFFERVERTRAG.md)
+
+**Umsetzungsstatus:** am 2026-08-01 auf Basis des freigegebenen und als Commit
+`c95e202` vorliegenden Slice-07-Ergebnisdokuments durch Codex umgesetzt.
+Preflight, Diff-Risiko, Scope und Ergebnisse sind im Slice-Dokument
+dokumentiert. Der Nutzer hat S08-STOP-01 bis S08-STOP-03 mit „Setze ihn genauso
+um“ aufgeloest: `targetEq` entfaellt als Nutzer-, Sweep-, Optimizer- und
+Transaktions-Zielquote; VPW verwendet die tatsaechliche
+Portfoliozusammensetzung. `liquidityRunwayYears` ersetzt die zwei alten
+Nutzereingaben mit Abwaertsmigration. Implementierung und interne technische
+Nachweise sind abgeschlossen. Die von Claude in Reviewrunde 1 dokumentierten
+CR08-1 bis CR08-15 wurden am 2026-08-01 umgesetzt und im Slice-Dokument
+einzeln beantwortet. Der in Claudes Zweitreview verbliebene Blocker CR08-16
+wurde am 2026-08-02 durch eine verlustfreie, sicherheitsorientierte
+Legacy-Migration geschlossen: alte ganzzahlige Monatswerte werden auf das
+naechste Halbjahr aufgerundet. Erneutes externes Review, Freigabe und Commit
+stehen aus.
+
+**Abhaengigkeiten:** Slices 1, 2, 4 und Ergebnisdokument Slice 07.
 
 **Ziel**
 
@@ -1280,9 +1300,31 @@ erzwingen.
 **Abnahmekriterien**
 
 - Null Liquiditaet am Jahresende ergibt null Post-Transaktions-Runway.
-- D-02 ist fuer die Markerjahre 2004, 2005 und 2012 reproduzierbar behoben.
+- D-02 ist verhaltensbasiert fuer finalen Post-Payout-Bestand, eine
+  zwischenzeitliche Notfuellung und Null-Liquiditaet reproduzierbar behoben;
+  das Kriterium haengt nicht von alten Kalenderjahrmarkern ab.
 - Eine steigende Aktienquote durch Pufferverbrauch bleibt zulaessig.
 - UI-, Request-, Engine- und Exportname sind identisch.
+
+**Technisches Ergebnis:** Der neue Contract pinnt Default 5, Domain 1 bis 10,
+Schritt 0,5, Legacy-Prioritaet und die abgeleitete harte Mindest-Policy. Die
+alten UI-Domains 18 bis 72 Zielmonate und 12 bis 60 Mindestmonate bleiben
+migrierbar; Nicht-Halbjahreswerte werden ohne Verkuerzung auf das naechste
+Sechsmonatsraster aufgerundet. Leere
+kanonische Werte sperren die Legacy-Migration nicht; ungueltige Werte und
+Nicht-0,5-Schritte scheitern kontrolliert. Das Goldband ist als
+`rebalancingBand` vereinheitlicht, ohne die bisherigen 35-/`NaN`-Fallbacks zu
+veraendern. Sweep und Auto-Optimize besitzen sieben beziehungsweise sechs
+sichtbare Dimensionen. Die Slice-07-Eingangsfixtures bleiben byteidentisch;
+das Demografie-Gate berechnet den Runtime-Stand live, das Slice-06-zu-07-Orakel
+ist exakt wiederhergestellt und ein isoliertes Slice-07-zu-08-Ledger liegt vor.
+Die Monte-Carlo-Messung vergleicht wieder feldgenau und inventarisiert alle 98
+geaenderten Blattpfade. Beide Slice-08-Messfixtures stehen mit
+`reviewStatus: pending` bereit. Die Gesamtsuite bestand nach der
+Blockerbehebung mit 160 Testdateien und 17.650 Assertions; der Engine-Build war
+erfolgreich. Browser (28/28), Coverage (78,23 Prozent; 17.650 Assertions),
+Demografie-Verifikation und Doku-Evidenz sind ebenfalls gruen. Der
+abschliessende Diff-Check wird im Slice-Dokument protokolliert.
 
 ### Slice 9 - Floor und weicher Mindest-Flex-Stabilisator
 

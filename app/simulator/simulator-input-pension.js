@@ -58,11 +58,11 @@ export function readWidowOptions(doc = globalThis.document) {
     const widowPctRaw = readNumber('widowPensionPct', NaN, doc);
     const widowMarriageOffsetRaw = readInt('widowMarriageOffsetYears', NaN, doc);
     const widowMinMarriageYearsRaw = readInt('widowMinMarriageYears', NaN, doc);
-    const pct = Number.isFinite(widowPctRaw) ? widowPctRaw : 0;
+    const pct = Number.isFinite(widowPctRaw) ? widowPctRaw : 55;
 
     return {
         widowOptions: {
-            mode: readValue('widowPensionMode', 'stop', doc) || 'stop',
+            mode: readValue('widowPensionMode', 'percent', doc) || 'percent',
             percent: Math.max(0, Math.min(100, pct)) / 100,
             marriageOffsetYears: Math.max(0, Number.isFinite(widowMarriageOffsetRaw) ? widowMarriageOffsetRaw : 0),
             minMarriageYears: Math.max(0, Number.isFinite(widowMinMarriageYearsRaw) ? widowMinMarriageYearsRaw : 0)

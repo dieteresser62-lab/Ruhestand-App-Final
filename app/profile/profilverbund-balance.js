@@ -18,6 +18,7 @@ import {
 import { loadTranchesFromStorage } from '../tranches/tranchen-manager-state.js';
 import { classifyTranche } from '../../types/tranche-contract.js';
 import { calculateProfileGoldStrategy } from './profile-asset-values.js';
+import { resolveLiquidityRunwayYears } from '../../types/liquidity-runway-contract.js';
 
 const DEFAULT_TAX_RATE = 0.25 * (1 + 0.055);
 
@@ -73,8 +74,7 @@ function normalizeBalanceInputs(inputs, overrides = {}) {
         rebalancingBand: Number.isFinite(goldRebalBandOverride) ? goldRebalBandOverride : readNumber(inputs.rebalancingBand, 0),
         kirchensteuerSatz: readNumber(inputs.kirchensteuerSatz, 0),
         sparerPauschbetrag: readNumber(inputs.sparerPauschbetrag, 0),
-        runwayMinMonths: readNumber(inputs.runwayMinMonths, 0),
-        runwayTargetMonths: readNumber(inputs.runwayTargetMonths, 0)
+        liquidityRunwayYears: resolveLiquidityRunwayYears(inputs).years
     };
 }
 
@@ -343,8 +343,9 @@ export function aggregateProfilverbundInputs(profileInputs, overrides = {}) {
         acc.totalDepotAlt += inputs.depotwertAlt || 0;
         acc.totalDepotNeu += inputs.depotwertNeu || 0;
         acc.totalGold += inputs.goldWert || 0;
-        acc.runwayMin = acc.runwayMin === null ? inputs.runwayMinMonths || 0 : Math.min(acc.runwayMin, inputs.runwayMinMonths || 0);
-        acc.runwayTarget = acc.runwayTarget === null ? inputs.runwayTargetMonths || 0 : Math.min(acc.runwayTarget, inputs.runwayTargetMonths || 0);
+        acc.liquidityRunwayYears = acc.liquidityRunwayYears === null
+            ? resolveLiquidityRunwayYears(inputs).years
+            : Math.min(acc.liquidityRunwayYears, resolveLiquidityRunwayYears(inputs).years);
         acc.flexBudgetYears = acc.flexBudgetYears === null ? flexBudgetYears : Math.min(acc.flexBudgetYears, flexBudgetYears || acc.flexBudgetYears || 0);
         return acc;
     }, {
@@ -358,8 +359,7 @@ export function aggregateProfilverbundInputs(profileInputs, overrides = {}) {
         totalDepotAlt: 0,
         totalDepotNeu: 0,
         totalGold: 0,
-        runwayMin: null,
-        runwayTarget: null,
+        liquidityRunwayYears: null,
         flexBudgetYears: null
     });
 
@@ -399,8 +399,7 @@ export function aggregateProfilverbundInputs(profileInputs, overrides = {}) {
         totalGeldmarkt: totals.totalGeldmarkt,
         totalLiquid,
         totalAssets,
-        runwayMinMonths: totals.runwayMin ?? 0,
-        runwayTargetMonths: totals.runwayTarget ?? 0
+        liquidityRunwayYears: totals.liquidityRunwayYears ?? 5
     };
 }
 
@@ -490,7 +489,7 @@ export function calculateWithdrawalDistribution(profileInputs, aggregated, mode 
             tranches: Array.isArray(entry.tranches) ? entry.tranches : [],
             taxPerEuro,
             taxRate,
-            runwayTargetMonths: inputs.runwayTargetMonths || 0,
+            liquidityRunwayYears: resolveLiquidityRunwayYears(inputs).years,
             assets: profileAssetTotal(inputs),
             liquidity: profileLiquidity(inputs),
             derivedMoneyMarket,
@@ -517,7 +516,7 @@ export function calculateWithdrawalDistribution(profileInputs, aggregated, mode 
         // Proportional nach Vermögen oder (runway_first) nach Runway-Zielen.
         const weights = entries.map(entry => {
             if (mode === 'runway_first') {
-                return entry.assets > 0 ? Math.max(0, entry.runwayTargetMonths || 0) : 0;
+                return entry.assets > 0 ? Math.max(0, entry.liquidityRunwayYears || 0) : 0;
             }
             return Math.max(0, entry.assets || 0);
         });

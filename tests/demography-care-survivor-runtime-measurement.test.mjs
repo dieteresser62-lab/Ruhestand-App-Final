@@ -50,6 +50,12 @@ const fixturePath = path.join(
     'monte-carlo-measurement',
     'post-backtest-data-07-v1.json'
 );
+const slice08FixturePath = path.join(
+    testDir,
+    'fixtures',
+    'monte-carlo-measurement',
+    'liquidity-runway-slice-08-v1.json'
+);
 
 function runtimeModule(relativePath) {
     return import(pathToFileURL(path.join(runtimeRoot, relativePath)).href);
@@ -106,13 +112,10 @@ const INPUTS = Object.freeze({
     startFlexBedarf: 18000,
     flexBudgetAnnual: 0,
     flexBudgetRecharge: 0,
-    targetEq: 60,
-    rebalBand: 5,
-    rebalancingBand: 5,
+    rebalancingBand: 25,
     maxSkimPctOfEq: 10,
     maxBearRefillPctOfEq: 5,
-    runwayMinMonths: 24,
-    runwayTargetMonths: 36,
+    liquidityRunwayYears: 5,
     goldAktiv: false,
     goldZielProzent: 0,
     goldFloorProzent: 0,
@@ -169,10 +172,8 @@ const MONTE_CARLO_PARAMETERS = Object.freeze({
 });
 const SWEEP_COMBINATIONS = Object.freeze([
     Object.freeze({
-        runwayMin: 24,
-        runwayTarget: 36,
-        targetEq: 50,
-        rebalBand: 5,
+        liquidityRunwayYears: 3,
+        goldRebalancingBand: 25,
         maxSkimPct: 10,
         maxBearRefillPct: 5,
         goldTargetPct: 0,
@@ -181,10 +182,8 @@ const SWEEP_COMBINATIONS = Object.freeze([
         goGoMultiplier: 1.1
     }),
     Object.freeze({
-        runwayMin: 24,
-        runwayTarget: 36,
-        targetEq: 70,
-        rebalBand: 5,
+        liquidityRunwayYears: 5,
+        goldRebalancingBand: 25,
         maxSkimPct: 10,
         maxBearRefillPct: 5,
         goldTargetPct: 0,
@@ -379,17 +378,49 @@ if (captureMode) {
     console.log(JSON.stringify(actualMeasurement, null, 2));
     console.log('__DEMOGRAPHY_MEASUREMENT_END__');
 } else {
-    const fixture = JSON.parse(fs.readFileSync(fixturePath, 'utf8'));
+    const fixtureBytes = fs.readFileSync(fixturePath);
+    assert.equal(
+        crypto.createHash('sha256').update(fixtureBytes).digest('hex'),
+        '1eac45e475fa0029bd41df29099e69f242320443b6f2db8e584303f2e69db7fc',
+        'Archived Slice-07 runtime measurement must remain byte-identical'
+    );
+    const fixture = JSON.parse(fixtureBytes.toString('utf8'));
+    const slice08Fixture = JSON.parse(fs.readFileSync(slice08FixturePath, 'utf8'));
     assert.equal(fixture.schemaVersion, 'DemographyCareSurvivorRuntimeMeasurementV1');
     assert.equal(fixture.snapshotId, 'post-backtest-data-07-v1');
     assert.equal(fixture.sourceReference, 'post-backtest-data-06-v2');
     assert.equal(fixture.reviewStatus, 'pending');
+    assert.equal(slice08Fixture.sourceReference, 'post-backtest-data-07-v1');
+    assert.deepEqual(
+        { ...actualMeasurement, runtime: slice08Fixture.targetMeasurement.runtime },
+        slice08Fixture.targetMeasurement,
+        'Current runtime must reproduce the full Slice-08 demography/Monte-Carlo projection'
+    );
+    assert.deepEqual(
+        {
+            outcomeCounts: actualMeasurement.monteCarlo.outcomeCounts,
+            lifespanYears: actualMeasurement.monteCarlo.lifespanYears,
+            care: {
+                anyCareRunCount: actualMeasurement.monteCarlo.care.anyCareRunCount,
+                p1EntryRunCount: actualMeasurement.monteCarlo.care.p1EntryRunCount,
+                p2EntryRunCount: actualMeasurement.monteCarlo.care.p2EntryRunCount,
+                additionalNeedNominalEur: actualMeasurement.monteCarlo.care.additionalNeedNominalEur
+            }
+        },
+        {
+            outcomeCounts: fixture.targetMeasurement.monteCarlo.outcomeCounts,
+            lifespanYears: fixture.targetMeasurement.monteCarlo.lifespanYears,
+            care: {
+                anyCareRunCount: fixture.targetMeasurement.monteCarlo.care.anyCareRunCount,
+                p1EntryRunCount: fixture.targetMeasurement.monteCarlo.care.p1EntryRunCount,
+                p2EntryRunCount: fixture.targetMeasurement.monteCarlo.care.p2EntryRunCount,
+                additionalNeedNominalEur: fixture.targetMeasurement.monteCarlo.care.additionalNeedNominalEur
+            }
+        },
+        'Slice-07 demography invariants must remain live and exact through Slice 08'
+    );
     assert(Number.isFinite(Date.parse(fixture.capturedAtUtc)), 'Capture timestamp must be valid ISO time');
     assert(Date.parse(fixture.capturedAtUtc) <= Date.now() + 60000, 'Capture timestamp must not be in the future');
-    assert.deepEqual(
-        { ...actualMeasurement, runtime: fixture.targetMeasurement.runtime },
-        fixture.targetMeasurement
-    );
     const changedLeafPaths = collectLeafDiffPaths(
         fixture.sourceMeasurement,
         fixture.targetMeasurement

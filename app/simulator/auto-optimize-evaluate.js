@@ -18,6 +18,7 @@ import {
     createAutoOptimizeRequestFingerprint,
     readAutoOptimizeCandidateFromInputs
 } from './auto-optimize-param-meta.js';
+import { migrateLiquidityRunwayInput } from '../../types/liquidity-runway-contract.js';
 
 const QUANTILE_METHOD = 'linear_interpolation_at_(n_minus_1)_q';
 
@@ -161,15 +162,12 @@ export async function evaluateCandidate(
     evaluationContract = null
 ) {
     // Deep-clone inputs und Override anwenden
-    const inputs = deepClone(baseInputs);
+    const inputs = migrateLiquidityRunwayInput(deepClone(baseInputs), { dropTargetEq: true });
 
     // Null ist ein gueltiger Wert. Nur fehlende Werte erhalten Defaults.
-    inputs.runwayMinMonths ??= 24;
-    inputs.runwayTargetMonths ??= 36;
     inputs.goldZielProzent ??= 0;
     inputs.goldAktiv ??= Number(inputs.goldZielProzent) > 0;
-    inputs.targetEq ??= 60;
-    inputs.rebalBand ??= 5;
+    inputs.rebalancingBand ??= 25;
     inputs.maxSkimPctOfEq ??= 25;
     inputs.maxBearRefillPctOfEq ??= 50;
 

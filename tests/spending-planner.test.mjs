@@ -62,7 +62,7 @@ function getBaseParams() {
         depotwertGesamt: 100000,
         gesamtwert: 110000,
         renteJahr: 20000,
-        input: { inflation: 2.0, runwayTargetMonths: 0 }
+        input: { inflation: 2.0, liquidityRunwayYears: 5 }
     };
 }
 
@@ -212,7 +212,7 @@ function clone(value) {
 
     assert(result.decisionTree === decisionTree, 'Diagnosis should retain the decision tree reference');
     assert(result.general.alarmActive === true, 'Diagnosis should expose alarm state');
-    assert(result.general.runwayTargetQuelle === 'profil:bear', 'Dynamic runway target should use mapped regime');
+    assert(result.general.runwayTargetQuelle === 'input:liquidityRunwayYears', 'Runway target should use the canonical user contract');
     assert(result.guardrails.some(g => g.name === 'Inflations-Cap'), 'Diagnosis should include inflation cap diagnostics');
     assert(result.guardrails.some(g => g.name === 'Budget-Floor Deckung'), 'Diagnosis should include budget floor diagnostics');
     assert(result.keyParams.aktuelleFlexRate === 70, 'Diagnosis should copy final flex rate');
@@ -223,13 +223,13 @@ function clone(value) {
 // --- TEST 2e: Spending diagnosis runway target delegate ---
 {
     const profil = { minRunwayMonths: 6, isDynamic: false };
-    const input = { runwayTargetMonths: 14 };
+    const input = { liquidityRunwayYears: 1.5 };
     const market = { sKey: 'hot_neutral' };
     const direct = resolveRunwayTarget(profil, market, input);
     const delegated = SpendingPlanner._resolveRunwayTarget(profil, market, input);
 
-    assert(direct.targetMonths === 14, 'Static runway target should use input target');
-    assert(direct.source === 'input', 'Static runway target should keep input source');
+    assert(direct.targetMonths === 18, 'Static runway target should use the canonical half-year input target');
+    assert(direct.source === 'input:liquidityRunwayYears', 'Static runway target should name the canonical input source');
     assert(delegated.targetMonths === direct.targetMonths, 'Planner runway target delegate should match diagnosis module');
     assert(delegated.source === direct.source, 'Planner runway source delegate should match diagnosis module');
     console.log('✅ Spending diagnosis runway target delegate works');
@@ -761,8 +761,7 @@ function clone(value) {
         renteJahr: 0,
         input: {
             inflation: 0,
-            runwayTargetMonths: 36,
-            runwayMinMonths: 24,
+            liquidityRunwayYears: 3,
             floorBedarf: 24000,
             flexBedarf: 0
         }
@@ -802,8 +801,7 @@ function clone(value) {
         renteJahr: 0,
         input: {
             inflation: 0,
-            runwayTargetMonths: 36,
-            runwayMinMonths: 24,
+            liquidityRunwayYears: 3,
             floorBedarf: 12000,
             flexBedarf: 12000
         },

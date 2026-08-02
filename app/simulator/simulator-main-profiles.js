@@ -335,14 +335,11 @@ function applyCombinedInputsToUI(combined, selectedCount) {
     setValue('rebalancingBand', combined.rebalancingBand || 0);
     setValue('goldSteuerfrei', combined.goldSteuerfrei ? 'true' : 'false');
 
-    setValue('runwayMinMonths', combined.runwayMinMonths || 0);
-    setValue('runwayTargetMonths', combined.runwayTargetMonths || 0);
+    setValue('liquidityRunwayYears', combined.liquidityRunwayYears || 5);
     setValue('entnahmeStrategie', combined.decumulation?.mode || 'standard');
     setValue('bondTargetFactor', combined.decumulation?.bondTargetFactor ?? '');
     setValue('drawdownTrigger', combined.decumulation?.drawdownTrigger ?? '');
     setValue('bondRefillThreshold', combined.decumulation?.bondRefillThreshold ?? '');
-    setValue('targetEq', combined.targetEq || 0);
-    setValue('rebalBand', combined.rebalBand || 0);
     setValue('maxSkimPctOfEq', combined.maxSkimPctOfEq || 0);
     setValue('maxBearRefillPctOfEq', combined.maxBearRefillPctOfEq || 0);
     // Dynamic-Flex bleibt bewusst bei den aktuell gesetzten Rahmendaten.

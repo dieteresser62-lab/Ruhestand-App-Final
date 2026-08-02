@@ -377,10 +377,8 @@ export function renderSweepHeatmapSVG(sweepResults, metricKey, xParam, yParam, x
         }, options);
 
         const paramLabels = {
-            runwayMin: 'Runway Min',
-            runwayTarget: 'Runway Target',
-            targetEq: 'Target Eq',
-            rebalBand: 'Rebal Band',
+            liquidityRunwayYears: 'Liquiditäts-Runway',
+            goldRebalancingBand: 'Gold-Rebal Band',
             maxSkimPct: 'Max Skim %',
             maxBearRefillPct: 'Max Bear Refill %',
             goldTargetPct: 'Gold Target %',

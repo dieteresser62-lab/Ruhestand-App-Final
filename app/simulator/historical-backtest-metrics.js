@@ -222,7 +222,7 @@ export const HISTORICAL_BACKTEST_METRIC_DESCRIPTORS = freezeDeep([
         fractionDigits: 2,
         missingnessRule: 'null_if_no_finite_RunwayCoveragePct',
         outcomeRule: 'available_for_completed_or_ruin',
-        source: 'rows[*].row.RunwayCoveragePct'
+        source: 'rows[*].row.RunwayCoveragePct (post_payout_end_of_year)'
     }),
     descriptor({
         id: 'runway_stress_years_below_100_pct',
@@ -234,7 +234,7 @@ export const HISTORICAL_BACKTEST_METRIC_DESCRIPTORS = freezeDeep([
         fractionDigits: 0,
         missingnessRule: 'null_if_no_finite_RunwayCoveragePct',
         outcomeRule: 'available_for_completed_or_ruin',
-        source: 'rows[*].row.RunwayCoveragePct'
+        source: 'rows[*].row.RunwayCoveragePct (post_payout_end_of_year)'
     }),
     descriptor({
         id: 'wealth_max_drawdown_nominal_end_series_pct',

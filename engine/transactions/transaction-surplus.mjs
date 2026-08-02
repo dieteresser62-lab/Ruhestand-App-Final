@@ -1,7 +1,8 @@
 /**
  * Module: Transaction Surplus
  * Purpose: Logic for "Surplus Rebalancing".
- *          Invests excess liquidity into underweighted assets (Gold, Equity) when the market is safe.
+ *          Invests excess liquidity while protecting the configured liquidity runway.
+ *          Gold may be filled to its explicit target; all remaining surplus goes to equity.
  * Usage: Called by transaction-action.mjs.
  * Dependencies: config.mjs
  */
@@ -42,76 +43,41 @@ export function trySurplusRebalance({
     const surplusHysteresis = CONFIG.ANTI_PSEUDO_ACCURACY.ENABLED ? minTradeThreshold : 500;
 
     if (surplus > surplusHysteresis && !isRiskyMarket) {
-        // FIX v31.1: Gap-Based Rebalancing
-        // Anstatt den gesamten Surplus blind zu investieren, füllen wir nur die Lücken auf,
-        // um die Ziel-Allokation zu erreichen. Der Rest bleibt Cash (und geht in den Geldmarkt).
-
-        // KORREKTUR: Wir nutzen wieder das VOLLE Vermögen zur Berechnung der Soll-Werte.
-        // Der Puffer wird bereits durch "surplus = aktuelleLiquiditaet - zielLiquiditaet" geschützt.
-        // Wir dürfen totalWealth hier NICHT künstlich klein rechnen, sonst sind die Ziel-Beträge für Aktien/Gold zu niedrig.
+        // Der Liquiditätspuffer ist bereits durch `surplus` geschützt. Es gibt bewusst
+        // kein fixes Aktienziel: Gold hat ein explizites Ziel, Aktien erhalten den Rest.
         const totalWealth = depotwertGesamt + aktuelleLiquiditaet;
-
-        // 1. Zielwerte + Obergrenzen (Rebalancing-Band) berechnen
-        const targetStockVal = totalWealth * (input.targetEq / 100);
         const targetGoldVal = input.goldAktiv ? totalWealth * (input.goldZielProzent / 100) : 0;
-        const equityBandPct = (input.rebalBand ?? input.rebalancingBand ?? 35) / 100;
-        const goldBandPct = (input.rebalancingBand ?? input.rebalBand ?? 35) / 100;
-        const upperStockVal = targetStockVal * (1 + equityBandPct);
-        const upperGoldVal = targetGoldVal * (1 + goldBandPct);
-
-        // 2. Aktuelle Werte ermitteln
-        // FIX: p.aktienWert und p.goldWert existieren nicht als Parameter.
-        // Wir müssen stattdessen die Input-Werte nutzen.
-        const currentStockVal = (input.depotwertAlt || 0) + (input.depotwertNeu || 0);
         const currentGoldVal = input.goldAktiv ? (input.goldWert || 0) : 0;
-
-        // 3. Gaps berechnen (bis zur Obergrenze; wir verkaufen hier nichts, nur Kauf)
-        const gapStock = Math.max(0, upperStockVal - currentStockVal);
-        const gapGold = Math.max(0, upperGoldVal - currentGoldVal);
-        const totalGap = gapStock + gapGold;
-
-        // 4. Investitionsbetrag begrenzen
-        let investAmountRaw = Math.min(surplus, totalGap);
-
-        // Wenn keine Gaps existieren, aber Überschuss hoch ist, erlauben wir
-        // einen begrenzten Cash-Abbau in Aktien (marktabhängig).
-        const equityOverflowCap = ((input.maxSkimPctOfEq ?? 5) / 100) * currentStockVal;
-        if (totalGap <= 0) {
-            investAmountRaw = Math.min(surplus, equityOverflowCap);
-        }
+        const gapGold = Math.max(0, targetGoldVal - currentGoldVal);
+        const currentStockVal = (input.depotwertAlt || 0) + (input.depotwertNeu || 0);
+        const equityOverflowCap = Math.max(0, (input.maxSkimPctOfEq ?? 5) / 100) * currentStockVal;
+        const goldTeilRaw = Math.min(surplus, gapGold);
+        const aktienTeilRaw = Math.min(Math.max(0, surplus - goldTeilRaw), equityOverflowCap);
+        let investAmountRaw = goldTeilRaw + aktienTeilRaw;
 
         if (CONFIG.ANTI_PSEUDO_ACCURACY.ENABLED) {
             investAmountRaw = quantizeAmount(investAmountRaw, 'floor');
         }
 
         if (investAmountRaw > 0) {
-            // 5. Aufteilung proportional zur LÜCKE (nicht zum Ziel)
-            // Wer die größte Lücke hat, kriegt am meisten.
-            const realTotalGap = gapStock + gapGold;
-
-            const shareStock = (realTotalGap > 0) ? gapStock / realTotalGap : 1;
-            const shareGold = (realTotalGap > 0) ? gapGold / realTotalGap : 0;
-
-            const goldTeilRaw = investAmountRaw * shareGold;
-            const aktienTeilRaw = investAmountRaw * shareStock;
+            const scaledGoldRaw = Math.min(goldTeilRaw, investAmountRaw);
+            const scaledEquityRaw = Math.max(0, investAmountRaw - scaledGoldRaw);
 
             // Runden und zurückgeben...
             const goldTeil = CONFIG.ANTI_PSEUDO_ACCURACY.ENABLED
-                ? quantizeAmount(goldTeilRaw, 'floor')
-                : goldTeilRaw;
+                ? quantizeAmount(scaledGoldRaw, 'floor')
+                : scaledGoldRaw;
 
             const aktienTeil = CONFIG.ANTI_PSEUDO_ACCURACY.ENABLED
-                ? quantizeAmount(aktienTeilRaw, 'floor')
-                : aktienTeilRaw;
+                ? quantizeAmount(scaledEquityRaw, 'floor')
+                : scaledEquityRaw;
 
             const investAmount = goldTeil + aktienTeil;
-            const isOverflowInvest = totalGap <= 0;
-
             if (investAmount > 0) {
                 return {
                     type: 'TRANSACTION',
                     anweisungKlasse: 'anweisung-gelb', // Standard yellow for transactions
-                    title: isOverflowInvest ? 'Surplus Rebalancing (Liquiditätsabbau)' : 'Surplus Rebalancing (Opportunistisch)',
+                    title: 'Runway-Überschuss investieren',
                     nettoErlös: investAmount, // Zeigt den investierten Betrag an
                     quellen: [{
                         source: 'Liquidität',
@@ -129,17 +95,20 @@ export function trySurplusRebalance({
                         kaufAkt: aktienTeil,
                         kaufGld: goldTeil,
                         verkaufLiquiditaet: investAmount,
-                        grund: isOverflowInvest ? 'Surplus Rebalancing (Liquiditätsabbau)' : 'Surplus Rebalancing (Opportunistisch)',
+                        grund: 'Runway-Überschuss investieren',
                         source: 'surplus'
                     },
                     zielLiquiditaet, // FIX: Expose target liquidity
                     diagnosisEntries: [{
                         step: 'Surplus Rebalancing',
-                        impact: `Überschuss (${investAmount.toFixed(0)}€ von ${surplus.toFixed(0)}€) investiert (Markt: ${market.sKey}). Aktien: ${aktienTeil.toFixed(0)}€, Gold: ${goldTeil.toFixed(0)}€.`,
+                        impact: `Überschuss (${investAmount.toFixed(0)}€ von ${surplus.toFixed(0)}€) oberhalb des Runway-Ziels investiert (Markt: ${market.sKey}). Aktien: ${aktienTeil.toFixed(0)}€, Gold: ${goldTeil.toFixed(0)}€.`,
                         status: 'active',
                         severity: 'info'
                     }],
-                    transactionDiagnostics
+                    transactionDiagnostics: {
+                        ...transactionDiagnostics,
+                        allocationPolicy: 'gold_target_then_equity'
+                    }
                 };
             }
         }

@@ -1,0 +1,282 @@
+{
+  "schemaVersion": "LiquidityRunwayMonteCarloMeasurementV1",
+  "snapshotId": "post-backtest-data-08-v1",
+  "sourceReference": "post-backtest-data-07-v1",
+  "projectionSourceReference": "post-backtest-data-06-v2",
+  "sourceResultDocument": "docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_07_DEMOGRAFIE_PFLEGE_HINTERBLIEBENE.md",
+  "reviewStatus": "pending",
+  "carResultSha256": "0b146054561cfa97dc2050bf191f8c88712c0169f494cac30c92e69100ea9130",
+  "autoOptimizeResultSha256": "90bdd52006da1f2e2253feb2265691ef104208bf26d230aa6925ce62483e17c4",
+  "finalResultSha256": "521d89845e89941ad211299ee09a7b91b8ddfbbba7a750761cb5743773e5b41f",
+  "changedLeafCount": 98,
+  "changedLeafPaths": [
+    "$.autoOptimizeResult.aggregates.finalOutcomes.distribution.values.0",
+    "$.autoOptimizeResult.aggregates.finalOutcomes.distribution.values.1",
+    "$.autoOptimizeResult.aggregates.finalOutcomes.distribution.values.2",
+    "$.autoOptimizeResult.aggregates.finalOutcomes.distribution.values.3",
+    "$.autoOptimizeResult.aggregates.finalOutcomes.distribution.values.4",
+    "$.autoOptimizeResult.aggregates.finalOutcomes.distribution.values.5",
+    "$.autoOptimizeResult.aggregates.finalOutcomes.distribution.values.6",
+    "$.autoOptimizeResult.aggregates.finalOutcomes.distribution.values.7",
+    "$.autoOptimizeResult.aggregates.finalOutcomes.p10",
+    "$.autoOptimizeResult.aggregates.finalOutcomes.p25",
+    "$.autoOptimizeResult.aggregates.finalOutcomes.p50",
+    "$.autoOptimizeResult.aggregates.finalOutcomes.p50_successful",
+    "$.autoOptimizeResult.aggregates.finalOutcomes.p90",
+    "$.autoOptimizeResult.aggregates.maximumDrawdownPct.distribution.values.0",
+    "$.autoOptimizeResult.aggregates.maximumDrawdownPct.distribution.values.1",
+    "$.autoOptimizeResult.aggregates.maximumDrawdownPct.distribution.values.2",
+    "$.autoOptimizeResult.aggregates.maximumDrawdownPct.distribution.values.3",
+    "$.autoOptimizeResult.aggregates.maximumDrawdownPct.distribution.values.4",
+    "$.autoOptimizeResult.aggregates.maximumDrawdownPct.distribution.values.5",
+    "$.autoOptimizeResult.aggregates.maximumDrawdownPct.distribution.values.6",
+    "$.autoOptimizeResult.aggregates.maximumDrawdownPct.distribution.values.7",
+    "$.autoOptimizeResult.aggregates.maximumDrawdownPct.p50",
+    "$.autoOptimizeResult.aggregates.maximumDrawdownPct.p90",
+    "$.autoOptimizeResult.aggregates.medianWithdrawalRate.medianRatio",
+    "$.autoOptimizeResult.aggregates.medianWithdrawalRate.runMeanRatios.0",
+    "$.autoOptimizeResult.aggregates.medianWithdrawalRate.runMeanRatios.1",
+    "$.autoOptimizeResult.aggregates.medianWithdrawalRate.runMeanRatios.2",
+    "$.autoOptimizeResult.aggregates.medianWithdrawalRate.runMeanRatios.3",
+    "$.autoOptimizeResult.aggregates.medianWithdrawalRate.runMeanRatios.4",
+    "$.autoOptimizeResult.aggregates.medianWithdrawalRate.runMeanRatios.5",
+    "$.autoOptimizeResult.aggregates.medianWithdrawalRate.runMeanRatios.6",
+    "$.autoOptimizeResult.aggregates.medianWithdrawalRate.runMeanRatios.7",
+    "$.autoOptimizeResult.buffers.meanWithdrawalRateRatio.0",
+    "$.autoOptimizeResult.buffers.meanWithdrawalRateRatio.1",
+    "$.autoOptimizeResult.buffers.meanWithdrawalRateRatio.2",
+    "$.autoOptimizeResult.buffers.meanWithdrawalRateRatio.3",
+    "$.autoOptimizeResult.buffers.meanWithdrawalRateRatio.4",
+    "$.autoOptimizeResult.buffers.meanWithdrawalRateRatio.5",
+    "$.autoOptimizeResult.buffers.meanWithdrawalRateRatio.6",
+    "$.autoOptimizeResult.buffers.meanWithdrawalRateRatio.7",
+    "$.autoOptimizeResult.pathSummaries.meanWithdrawalRateRatio.0",
+    "$.autoOptimizeResult.pathSummaries.meanWithdrawalRateRatio.1",
+    "$.autoOptimizeResult.pathSummaries.meanWithdrawalRateRatio.2",
+    "$.autoOptimizeResult.pathSummaries.meanWithdrawalRateRatio.3",
+    "$.autoOptimizeResult.pathSummaries.meanWithdrawalRateRatio.4",
+    "$.autoOptimizeResult.pathSummaries.meanWithdrawalRateRatio.5",
+    "$.autoOptimizeResult.pathSummaries.meanWithdrawalRateRatio.6",
+    "$.autoOptimizeResult.pathSummaries.meanWithdrawalRateRatio.7",
+    "$.carResult.aggregates.realWithdrawalP10.p50RealEur",
+    "$.carResult.aggregates.realWithdrawalP10.realEur",
+    "$.carResult.buffers.realWithdrawalP10RealEur.1",
+    "$.carResult.buffers.realWithdrawalP10RealEur.3",
+    "$.carResult.buffers.realWithdrawalP10RealEur.4",
+    "$.carResult.buffers.realWithdrawalP10RealEur.5",
+    "$.carResult.buffers.realWithdrawalP10RealEur.6",
+    "$.carResult.pathSummaries.realWithdrawalP10RealEur.1",
+    "$.carResult.pathSummaries.realWithdrawalP10RealEur.3",
+    "$.carResult.pathSummaries.realWithdrawalP10RealEur.4",
+    "$.carResult.pathSummaries.realWithdrawalP10RealEur.5",
+    "$.carResult.pathSummaries.realWithdrawalP10RealEur.6",
+    "$.result.result.pathSummaries.cutYearShareRatio.4",
+    "$.result.result.pathSummaries.cutYearShareRatio.5",
+    "$.result.result.pathSummaries.cutYearShareRatio.6",
+    "$.result.result.pathSummaries.maxDrawdownPct.0",
+    "$.result.result.pathSummaries.maxDrawdownPct.1",
+    "$.result.result.pathSummaries.maxDrawdownPct.2",
+    "$.result.result.pathSummaries.maxDrawdownPct.3",
+    "$.result.result.pathSummaries.maxDrawdownPct.4",
+    "$.result.result.pathSummaries.maxDrawdownPct.5",
+    "$.result.result.pathSummaries.maxDrawdownPct.6",
+    "$.result.result.pathSummaries.maxDrawdownPct.7",
+    "$.result.result.pathSummaries.realWithdrawalP10RealEur.1",
+    "$.result.result.pathSummaries.realWithdrawalP10RealEur.3",
+    "$.result.result.pathSummaries.realWithdrawalP10RealEur.4",
+    "$.result.result.pathSummaries.realWithdrawalP10RealEur.5",
+    "$.result.result.pathSummaries.realWithdrawalP10RealEur.6",
+    "$.result.result.pathSummaries.volatilityPct.0",
+    "$.result.result.pathSummaries.volatilityPct.1",
+    "$.result.result.pathSummaries.volatilityPct.2",
+    "$.result.result.pathSummaries.volatilityPct.3",
+    "$.result.result.pathSummaries.volatilityPct.4",
+    "$.result.result.pathSummaries.volatilityPct.5",
+    "$.result.result.pathSummaries.volatilityPct.6",
+    "$.result.result.pathSummaries.volatilityPct.7",
+    "$.result.result.realWithdrawalP10.p50RealEur",
+    "$.result.result.realWithdrawalP10.realEur",
+    "$.result.result.riskKpis.cutYearSharePct.p50",
+    "$.result.result.riskKpis.maximumDrawdownPct.distribution.values.0",
+    "$.result.result.riskKpis.maximumDrawdownPct.distribution.values.1",
+    "$.result.result.riskKpis.maximumDrawdownPct.distribution.values.2",
+    "$.result.result.riskKpis.maximumDrawdownPct.distribution.values.3",
+    "$.result.result.riskKpis.maximumDrawdownPct.distribution.values.4",
+    "$.result.result.riskKpis.maximumDrawdownPct.distribution.values.5",
+    "$.result.result.riskKpis.maximumDrawdownPct.distribution.values.6",
+    "$.result.result.riskKpis.maximumDrawdownPct.distribution.values.7",
+    "$.result.result.riskKpis.maximumDrawdownPct.p50",
+    "$.result.result.riskKpis.maximumDrawdownPct.p90",
+    "$.result.result.riskKpis.volatilityPct.p50"
+  ],
+  "changedLeafPathsSha256": "a94eb9254e09411c28915514b247b1d8cf5418d57ffa7977f1879ac8db917c2b",
+  "numericDeltaCount": 98,
+  "numericDeltasSha256": "802ea8045951def3b454e5615c8d4ef24f91a04486821536e67ba4cc1f8a227e",
+  "targetMeasurement": {
+    "runtime": {
+      "node": "v25.2.1",
+      "platform": "win32",
+      "architecture": "x64"
+    },
+    "profile": {
+      "runs": 2048,
+      "durationYears": 40,
+      "seed": 20260801,
+      "startAgeP1": 65,
+      "startAgeP2": 62,
+      "careActive": true,
+      "partnerActive": true,
+      "widowMode": "percent",
+      "widowPercent": 0.55,
+      "sweepCombinationCount": 2,
+      "inputHash": "387693cd6d59d5f7027459e7d96a84ed85180a65468b95f7540d2c04d56c1bcf"
+    },
+    "monteCarlo": {
+      "outcomeCounts": {
+        "ruin": 2,
+        "allDead": 2045,
+        "horizonExhausted": 1,
+        "technicalError": 0
+      },
+      "lifespanYears": {
+        "p10": 16,
+        "p50": 26,
+        "p90": 32
+      },
+      "finalWealthNominalEur": {
+        "p10": 1469002.67505,
+        "p50": 3414483.034565,
+        "p90": 7871705.711358
+      },
+      "care": {
+        "anyCareRunCount": 1725,
+        "p1EntryRunCount": 1159,
+        "p2EntryRunCount": 1315,
+        "p1CareYearsTotal": 10999,
+        "p2CareYearsTotal": 14577,
+        "bothCareYearsTotal": 3209,
+        "additionalNeedNominalEur": {
+          "p10": 0,
+          "p50": 84193.536697,
+          "p90": 306424.653501
+        }
+      },
+      "modelContract": {
+        "schemaVersion": "DemographyCareSurvivorDiagnosticsV1",
+        "contractSchemaVersion": "GermanDemographyCareSurvivorContractV1",
+        "contractRevision": "2026-08-01.1",
+        "hashes": {
+          "rawDataHash": "a21bab59269970d29f1e15ad49b64e82a74348692cc38759e4339e1be1205fc3",
+          "mortalityTableHash": "88c1000eac950016a65e7408127d5c1256683946933b710a0c28f672fde5f232",
+          "careObservationHash": "c9b55d32c1d084ba948e2b77bddb7392c918bce14ec11c908ab38afde8c9a48a",
+          "careEntryModelHash": "8155dc6bb9a7798bab7ead47fcbb3075baabd00b2d892d90c64e6512fe1280e0",
+          "careProgressionModelHash": "34c6e6fc39b311f911f6c4b7a0d0cb8c2ab248f18802a83ce42bc9b52a56c78d",
+          "careTaxonomyHash": "82e9af7152342ce8db3d6212471fa5107d1f44bc72ae0cf1d9ece5f93bb12885",
+          "survivorRuntimeContractHash": "73e6b04c76698347cfbffeb2e8b3037d04875731850b0fd2e75052df67aacff9"
+        },
+        "mortality": {
+          "tableType": "period",
+          "period": "2023/2025",
+          "cohortProjection": false,
+          "futureMortalityImprovement": false,
+          "officialAgeRange": { "startAge": 0, "endAge": 100 },
+          "runtimeAgeRange": { "startAge": 18, "endAge": 110 },
+          "tailEvidenceClass": "model_assumption"
+        },
+        "care": {
+          "observedPrevalenceRuntimeRole": "context_only_not_runtime_validation_or_transition_probability",
+          "entryEvidenceClass": "model_assumption",
+          "progressionEvidenceClass": "model_assumption",
+          "durationEvidenceClass": "user_input_and_model_assumption"
+        },
+        "survivor": {
+          "evidenceClass": "user_input_with_official_reference",
+          "defaultMode": "percent",
+          "defaultPercent": 55,
+          "interpretation": "Scenario cash-flow assumption only; not a statutory entitlement calculation."
+        }
+      },
+      "pathEvidenceHash": "b4ba1bb52b2fb681bea94cd8302b83da02d5945f14fcd3958c9b2fe874c500e0"
+    },
+    "sweep": [
+      {
+        "comboIdx": 0,
+        "params": {
+          "liquidityRunwayYears": 3,
+          "goldRebalancingBand": 25,
+          "maxSkimPct": 10,
+          "maxBearRefillPct": 5,
+          "goldTargetPct": 0,
+          "horizonYears": 35,
+          "survivalQuantile": 0.85,
+          "goGoMultiplier": 1.1
+        },
+        "metrics": {
+          "successProbFloor": 99.902344,
+          "p10EndWealth": 1469002.67505,
+          "medianEndWealth": 3414483.034565,
+          "worst5Drawdown": 53.944662,
+          "minRunwayObserved": 0
+        },
+        "household": {
+          "p1DeathEvents": 2047,
+          "p2DeathEvents": 2045,
+          "allDeadRuns": 2045,
+          "p1CareActiveYears": 9841,
+          "p2CareActiveYears": 13265,
+          "bothCareActiveYears": 2696,
+          "widowP1ActiveYears": 4310,
+          "widowP2ActiveYears": 15106,
+          "totalCareFloorNominalEur": 256367361.125445,
+          "minimumTemporaryFlexFactor": 0.45
+        },
+        "horizon": {
+          "resolutionCount": 49124,
+          "invalidResolutionCount": 0,
+          "minimumYears": 4,
+          "maximumYears": 33
+        },
+        "evidenceHash": "cfe56dfc901dbf7dc7b64d91f4c849cf6e504491584cded1c39c8477ae866399"
+      },
+      {
+        "comboIdx": 1,
+        "params": {
+          "liquidityRunwayYears": 5,
+          "goldRebalancingBand": 25,
+          "maxSkimPct": 10,
+          "maxBearRefillPct": 5,
+          "goldTargetPct": 0,
+          "horizonYears": 35,
+          "survivalQuantile": 0.85,
+          "goGoMultiplier": 1.1
+        },
+        "metrics": {
+          "successProbFloor": 99.902344,
+          "p10EndWealth": 1520546.388603,
+          "medianEndWealth": 3145748.903002,
+          "worst5Drawdown": 47.962968,
+          "minRunwayObserved": 0
+        },
+        "household": {
+          "p1DeathEvents": 2048,
+          "p2DeathEvents": 2045,
+          "allDeadRuns": 2045,
+          "p1CareActiveYears": 9842,
+          "p2CareActiveYears": 13270,
+          "bothCareActiveYears": 2697,
+          "widowP1ActiveYears": 4310,
+          "widowP2ActiveYears": 15109,
+          "totalCareFloorNominalEur": 256513239.12785,
+          "minimumTemporaryFlexFactor": 0.45
+        },
+        "horizon": {
+          "resolutionCount": 49129,
+          "invalidResolutionCount": 0,
+          "minimumYears": 4,
+          "maximumYears": 33
+        },
+        "evidenceHash": "ee9b97af947feb6ea6a5371b42a97f192c536002999c42a5cb1989cb9fc50ddd"
+      }
+    ]
+  }
+}

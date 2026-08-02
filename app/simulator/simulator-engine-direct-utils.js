@@ -10,6 +10,10 @@
 import { CONFIG } from '../../engine/config.mjs';
 import { MarketAnalyzer } from '../../engine/analyzers/MarketAnalyzer.mjs';
 import TransactionEngine from '../../engine/transactions/TransactionEngine.mjs';
+import {
+    deriveLiquidityRunwayPolicy,
+    resolveLiquidityRunwayYears
+} from '../../types/liquidity-runway-contract.js';
 
 /**
  * Stellt sicher, dass ein Wert eine nicht-negative Zahl ist
@@ -46,10 +50,8 @@ export function computeLiqNeedForFloor(ctx) {
     }
 
     const floorMonthlyNet = euros(Number(floorBasis) / 12);
-    const runwayTargetMonths = Number.isFinite(ctx?.inputs?.runwayTargetMonths) ? ctx.inputs.runwayTargetMonths : 12;
-    const runwayTargetSafe = runwayTargetMonths > 0 ? runwayTargetMonths : 12;
-
-    return euros(runwayTargetSafe * floorMonthlyNet);
+    const runwayPolicy = deriveLiquidityRunwayPolicy(resolveLiquidityRunwayYears(ctx?.inputs || {}).years);
+    return euros(runwayPolicy.targetMonths * floorMonthlyNet);
 }
 
 /**
@@ -107,11 +109,15 @@ export function calculateTargetLiquidityBalanceLike(inputs, marketData, floorBed
 
     const inputForTarget = {
         ...inputs,
+        liquidityRunwayYears: resolveLiquidityRunwayYears(inputs || {}).years,
         floorBedarf,
         flexBedarf,
         renteAktiv: renteJahr > 0,
         renteMonatlich: renteJahr / 12
     };
+    delete inputForTarget.runwayTargetMonths;
+    delete inputForTarget.runwayMinMonths;
+    delete inputForTarget.targetEq;
 
     return TransactionEngine.calculateTargetLiquidity(profil, market, inflatedBedarf, inputForTarget);
 }

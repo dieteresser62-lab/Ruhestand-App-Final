@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { Worker } from 'node:worker_threads';
 import { fileURLToPath } from 'node:url';
 
@@ -84,6 +85,7 @@ const finalCandidate = readFixture('monte-carlo-v1-final.json');
 const benchmarkContract = readFixture('benchmark-contract-v1.json');
 const benchmarkResults = readFixture('benchmark-results-2026-07-22.json');
 const consumerInventory = readFixture('consumer-inventory-v1.json');
+const slice08MeasurementPath = path.join(fixtureDir, 'liquidity-runway-slice-08-v1.json');
 
 function getGolden(id) {
     return goldenFixture.cases.find(entry => entry.id === id);
@@ -1491,9 +1493,10 @@ assert(preHardening.result !== null, 'Immutable pre-hardening result must remain
 assertEqual(preHardening.result.bufferBytesPerRun, 63, 'Immutable pre-hardening buffer evidence must remain unchanged');
 assertJsonEqual(preHardening.result.buffers.volatilities, preHardening.result.buffers.maxDrawdowns, 'Immutable baseline must retain the documented pre-fix volatility defect');
 const activeSnapshot = postBacktestData06;
-const sameRuntime = process.version === activeSnapshot.metadata.runtime.version
-    && process.platform === activeSnapshot.metadata.runtime.platform
-    && process.arch === activeSnapshot.metadata.runtime.architecture;
+const slice08ExpectedFixture = JSON.parse(fs.readFileSync(slice08MeasurementPath, 'utf8'));
+const sameRuntime = process.version === slice08ExpectedFixture.targetMeasurement.runtime.node
+    && process.platform === slice08ExpectedFixture.targetMeasurement.runtime.platform
+    && process.arch === slice08ExpectedFixture.targetMeasurement.runtime.architecture;
 assertEqual(postSlice03.result.aggregates.volatilities.p50 !== postSlice03.result.aggregates.maxDrawdowns.p50, true, 'Immutable Post-Slice-03 reference retains separated volatility and drawdown semantics');
 assertJsonEqual(postSlice03.metadata.dataVersion, postSlice05.metadata.dataVersion, 'Post-Slice-05 should retain the immutable prior data version');
 assertEqual(postSlice05.result.outcomeInventory.schemaVersion, 'MonteCarloOutcomeInventoryV1', 'Immutable Post-Slice-05 reference retains the outcome contract');
@@ -1549,13 +1552,49 @@ const slice06UnexpectedLeafPaths = slice06ChangedLeafPaths.filter(pathName => ![
     && !pathName.startsWith('$.measurementScope.')
     && !pathName.startsWith('$.captureEvidence.'));
 assertJsonEqual(slice06UnexpectedLeafPaths, [], 'Slice 06 Monte Carlo V2 must change only identity, capture, scope and annual-data provenance fields');
-compareSnapshotNode(
-    actualSlice07Result,
-    activeSnapshot.carResult,
-    'postBacktestData06.carResult',
-    sameRuntime,
-    activeSnapshot.metadata.numericTolerance
-);
+const slice08PreviousProjection = {
+    carResult: activeSnapshot.carResult,
+    autoOptimizeResult: activeSnapshot.autoOptimizeResult,
+    result: omitHistoricalFixtureCompatibilityFields(activeSnapshot.result)
+};
+const slice08CurrentProjection = {
+    carResult: actualSlice07Result,
+    autoOptimizeResult: actualAutoOptimizeProjection,
+    result: actualFinalProjection
+};
+const slice08ChangedLeafPaths = collectLeafDiffPaths(slice08PreviousProjection, slice08CurrentProjection);
+const slice08NumericDeltas = collectNumericLeafDeltas(slice08PreviousProjection, slice08CurrentProjection);
+const sha256Json = value => createHash('sha256').update(JSON.stringify(canonicalize(value))).digest('hex');
+const currentSlice08Measurement = {
+    schemaVersion: 'LiquidityRunwayMonteCarloMeasurementV1',
+    snapshotId: 'post-backtest-data-08-v1',
+    sourceReference: 'post-backtest-data-07-v1',
+    projectionSourceReference: 'post-backtest-data-06-v2',
+    sourceResultDocument: 'docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_07_DEMOGRAFIE_PFLEGE_HINTERBLIEBENE.md',
+    reviewStatus: 'pending',
+    carResultSha256: sha256Json(actualSlice07Result),
+    autoOptimizeResultSha256: sha256Json(actualAutoOptimizeProjection),
+    finalResultSha256: sha256Json(actualFinalProjection),
+    changedLeafCount: slice08ChangedLeafPaths.length,
+    changedLeafPaths: slice08ChangedLeafPaths,
+    changedLeafPathsSha256: sha256Json(slice08ChangedLeafPaths),
+    numericDeltaCount: slice08NumericDeltas.length,
+    numericDeltasSha256: sha256Json(slice08NumericDeltas)
+};
+if (process.env.MC_PRINT_SLICE_08 === '1') {
+    console.log('__POST_BACKTEST_DATA_08_CAPTURE_START__');
+    console.log(JSON.stringify(currentSlice08Measurement, null, 2));
+    console.log('__POST_BACKTEST_DATA_08_CAPTURE_END__');
+} else {
+    const { targetMeasurement: _demographyTargetMeasurement, ...expectedSlice08Measurement } = slice08ExpectedFixture;
+    compareSnapshotNode(
+        currentSlice08Measurement,
+        expectedSlice08Measurement,
+        'postBacktestData08.measurement',
+        sameRuntime,
+        activeSnapshot.metadata.numericTolerance
+    );
+}
 assertEqual(MONTE_CARLO_SNAPSHOT_POLICY.finalCandidate, finalCandidate.snapshotId, 'Public snapshot policy must name the integrated final candidate');
 assertEqual(
     MONTE_CARLO_SNAPSHOT_POLICY.currentReference,
@@ -1578,20 +1617,6 @@ assertEqual(
     'Public snapshot policy must not expose fixture-specific ignore paths'
 );
 assertEqual(activeSnapshot.reviewStatus, 'pending', 'The active measurement target should remain a pending candidate');
-compareSnapshotNode(
-    actualFinalProjection,
-    omitHistoricalFixtureCompatibilityFields(activeSnapshot.result),
-    'postBacktestData06.result',
-    sameRuntime,
-    activeSnapshot.metadata.numericTolerance
-);
-compareSnapshotNode(
-    actualAutoOptimizeProjection,
-    activeSnapshot.autoOptimizeResult,
-    'postBacktestData06.autoOptimizeResult',
-    sameRuntime,
-    activeSnapshot.metadata.numericTolerance
-);
 
 const directChunk = await runMonteCarloChunk({
     ...preHardening.runnerCase,

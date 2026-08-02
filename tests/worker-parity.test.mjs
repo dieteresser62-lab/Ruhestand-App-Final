@@ -256,12 +256,10 @@ const baseInputs = {
     zielLiquiditaet: 50000,
     startFloorBedarf: 24000,
     startFlexBedarf: 12000,
-    targetEq: 60,
-    rebalBand: 5,
+    rebalancingBand: 25,
     maxSkimPctOfEq: 10,
     maxBearRefillPctOfEq: 5,
-    runwayMinMonths: 24,
-    runwayTargetMonths: 36,
+    liquidityRunwayYears: 3,
     goldAktiv: false,
     goldZielProzent: 0,
     goldFloorProzent: 0,
@@ -423,9 +421,9 @@ try {
     };
 
     const paramCombinations = [
-        { runwayMin: 18, runwayTarget: 30, targetEq: 60, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0 },
-        { runwayMin: 24, runwayTarget: 36, targetEq: 70, rebalBand: 6, maxSkimPct: 12, maxBearRefillPct: 6, goldTargetPct: 5 },
-        { runwayMin: 30, runwayTarget: 42, targetEq: 50, rebalBand: 4, maxSkimPct: 8, maxBearRefillPct: 4, goldTargetPct: 0 }
+        { liquidityRunwayYears: 2.5, goldRebalancingBand: 25, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0 },
+        { liquidityRunwayYears: 3, goldRebalancingBand: 30, maxSkimPct: 12, maxBearRefillPct: 6, goldTargetPct: 5 },
+        { liquidityRunwayYears: 3.5, goldRebalancingBand: 20, maxSkimPct: 8, maxBearRefillPct: 4, goldTargetPct: 0 }
     ];
 
     const fullSweep = runSweepChunk({
@@ -482,12 +480,12 @@ try {
         rngMode: 'per-run-seed'
     };
     const paramCombinations = [
-        { runwayMin: 18, runwayTarget: 30, targetEq: 60, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0 },
-        { runwayMin: 24, runwayTarget: 36, targetEq: 70, rebalBand: 6, maxSkimPct: 12, maxBearRefillPct: 6, goldTargetPct: 5 },
-        { runwayMin: 42, runwayTarget: 30, targetEq: 55, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0 },
-        { runwayMin: 30, runwayTarget: 42, targetEq: 50, rebalBand: 4, maxSkimPct: 8, maxBearRefillPct: 4, goldTargetPct: 0 },
-        { runwayMin: 24, runwayTarget: 36, targetEq: 65, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 35 },
-        { runwayMin: 12, runwayTarget: 24, targetEq: 80, rebalBand: 8, maxSkimPct: 15, maxBearRefillPct: 8, goldTargetPct: 10 }
+        { liquidityRunwayYears: 2.5, goldRebalancingBand: 25, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0 },
+        { liquidityRunwayYears: 3, goldRebalancingBand: 30, maxSkimPct: 12, maxBearRefillPct: 6, goldTargetPct: 5 },
+        { liquidityRunwayYears: 11, goldRebalancingBand: 25, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0 },
+        { liquidityRunwayYears: 3.5, goldRebalancingBand: 20, maxSkimPct: 8, maxBearRefillPct: 4, goldTargetPct: 0 },
+        { liquidityRunwayYears: 3, goldRebalancingBand: 25, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 35 },
+        { liquidityRunwayYears: 2, goldRebalancingBand: 40, maxSkimPct: 15, maxBearRefillPct: 8, goldTargetPct: 10 }
     ];
     const baseSnapshot = JSON.stringify(baseInputs);
 
@@ -525,7 +523,7 @@ try {
         .filter(item => item.metrics?.invalidCombination)
         .map(item => String(item.metrics.invalidReason || ''));
     assert(invalidReasons.length === 2, 'Uneven Sweep should retain two invalid combinations');
-    assert(invalidReasons.some(reason => reason.includes('runwayMin')), 'Uneven Sweep should retain runway invalid reason');
+    assert(invalidReasons.some(reason => reason.includes('liquidityRunwayYears')), 'Uneven Sweep should retain runway invalid reason');
     assert(invalidReasons.some(reason => reason.includes('goldTargetPct')), 'Uneven Sweep should retain gold target invalid reason');
 
     console.log('✅ Uneven Sweep split parity with invalid combinations passed');
@@ -554,10 +552,10 @@ try {
         rngMode: 'per-run-seed'
     };
     const paramCombinations = [
-        { runwayMin: 18, runwayTarget: 30, targetEq: 60, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0, survivalQuantile: 0.9 },
-        { runwayMin: 18, runwayTarget: 30, targetEq: 60, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0, survivalQuantile: 0.2 },
-        { runwayMin: 18, runwayTarget: 30, targetEq: 60, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0, goGoMultiplier: 1.2 },
-        { runwayMin: 18, runwayTarget: 30, targetEq: 60, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0, horizonYears: 45 }
+        { liquidityRunwayYears: 2.5, goldRebalancingBand: 25, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0, survivalQuantile: 0.9 },
+        { liquidityRunwayYears: 2.5, goldRebalancingBand: 25, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0, survivalQuantile: 0.2 },
+        { liquidityRunwayYears: 2.5, goldRebalancingBand: 25, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0, goGoMultiplier: 1.2 },
+        { liquidityRunwayYears: 2.5, goldRebalancingBand: 25, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0, horizonYears: 45 }
     ];
 
     const fullSweep = runSweepChunk({
@@ -996,9 +994,9 @@ try {
             rngMode: 'per-run-seed'
         };
         const paramCombinations = [
-            { runwayMin: 18, runwayTarget: 30, targetEq: 55, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0, horizonYears: 25 },
-            { runwayMin: 24, runwayTarget: 36, targetEq: 65, rebalBand: 6, maxSkimPct: 12, maxBearRefillPct: 6, goldTargetPct: 0, horizonYears: 30 },
-            { runwayMin: 30, runwayTarget: 42, targetEq: 75, rebalBand: 7, maxSkimPct: 14, maxBearRefillPct: 7, goldTargetPct: 5, horizonYears: 35 }
+            { liquidityRunwayYears: 2.5, goldRebalancingBand: 25, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0, horizonYears: 25 },
+            { liquidityRunwayYears: 3, goldRebalancingBand: 30, maxSkimPct: 12, maxBearRefillPct: 6, goldTargetPct: 0, horizonYears: 30 },
+            { liquidityRunwayYears: 3.5, goldRebalancingBand: 35, maxSkimPct: 14, maxBearRefillPct: 7, goldTargetPct: 5, horizonYears: 35 }
         ];
 
         const fullSweep = runSweepChunk({

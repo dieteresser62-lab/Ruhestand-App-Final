@@ -24,12 +24,10 @@ console.log('--- Auto-Optimize Fidelity Tests ---');
 const baseInputs = {
     dynamicFlex: false,
     horizonMethod: 'survival_quantile',
-    runwayMinMonths: 24,
-    runwayTargetMonths: 36,
+    liquidityRunwayYears: 5,
     goldAktiv: false,
     goldZielProzent: 0,
-    targetEq: 60,
-    rebalBand: 5,
+    rebalancingBand: 25,
     maxSkimPctOfEq: 25,
     maxBearRefillPctOfEq: 50,
     horizonYears: 30,
@@ -54,12 +52,10 @@ function createSimulationInputs() {
         flexBudgetAnnual: 0,
         flexBudgetYears: 0,
         flexBudgetRecharge: 0,
-        targetEq: 60,
-        rebalBand: 5,
+        rebalancingBand: 25,
         maxSkimPctOfEq: 10,
         maxBearRefillPctOfEq: 5,
-        runwayMinMonths: 24,
-        runwayTargetMonths: 36,
+        liquidityRunwayYears: 5,
         goldAktiv: false,
         goldZielProzent: 0,
         goldFloorProzent: 0,
@@ -89,11 +85,9 @@ function createSimulationInputs() {
 console.log('Test 1: every interactive parameter perturbs its canonical request key');
 {
     const fixtures = {
-        runwayMinM: { value: 18, requestKey: 'runwayMinMonths', expected: 18 },
-        runwayTargetM: { value: 42, requestKey: 'runwayTargetMonths', expected: 42 },
+        liquidityRunwayYears: { value: 7, requestKey: 'liquidityRunwayYears', expected: 7 },
         goldTargetPct: { value: 25, requestKey: 'goldZielProzent', expected: 25 },
-        targetEq: { value: 70, requestKey: 'targetEq', expected: 70 },
-        rebalBand: { value: 2.5, requestKey: 'rebalBand', expected: 2.5 },
+        goldRebalancingBand: { value: 40, requestKey: 'rebalancingBand', expected: 40 },
         maxSkimPct: { value: 0, requestKey: 'maxSkimPctOfEq', expected: 0 },
         survivalQuantile: { value: 0.9, requestKey: 'survivalQuantile', expected: 0.9 },
         goGoMultiplier: { value: 1.2, requestKey: 'goGoMultiplier', expected: 1.2 }
@@ -441,16 +435,19 @@ console.log('Test 5: every interactive parameter has a deterministic causal witn
         globalThis.window = { EngineAPI };
         delete globalThis.Worker;
         const monteCarloWitnesses = [
-            { key: 'runwayMinM', lower: 12, upper: 36 },
-            { key: 'runwayTargetM', lower: 24, upper: 72 },
+            { key: 'liquidityRunwayYears', lower: 1, upper: 10 },
             { key: 'goldTargetPct', lower: 0, upper: 25 },
-            { key: 'targetEq', lower: 20, upper: 90 },
             {
-                key: 'rebalBand',
-                lower: 1,
-                upper: 20,
+                key: 'goldRebalancingBand',
+                lower: 0,
+                upper: 100,
                 seed: 1,
-                inputOverrides: { tagesgeld: 300000, zielLiquiditaet: 300000 }
+                inputOverrides: {
+                    tagesgeld: 300000,
+                    zielLiquiditaet: 300000,
+                    goldAktiv: true,
+                    goldZielProzent: 10
+                }
             },
             { key: 'maxSkimPct', lower: 0, upper: 50 },
             {
@@ -563,7 +560,7 @@ console.log('Test 6b: real ruin years remain part of D-14');
             zielLiquiditaet: 20000,
             startFloorBedarf: 34000,
             startFlexBedarf: 0,
-            targetEq: 90
+            liquidityRunwayYears: 1
         },
         widowOptions: {},
         monteCarloParams: {
@@ -600,8 +597,8 @@ console.log('Test 6b: real ruin years remain part of D-14');
 
 console.log('Test 7: registry domains and range preflight match canonical input contracts');
 {
-    assertEqual(AUTO_OPTIMIZE_PARAMETER_REGISTRY.rebalBand.domain.max, 20,
-        'Rebal-Band optimizer domain should match the engine maximum');
+    assertEqual(AUTO_OPTIMIZE_PARAMETER_REGISTRY.goldRebalancingBand.domain.max, 100,
+        'Gold-Rebal-Band optimizer domain should match the engine maximum');
     assertEqual(AUTO_OPTIMIZE_PARAMETER_REGISTRY.survivalQuantile.domain.min, 0.5,
         'survival quantile should cover the full canonical input domain');
     assertEqual(AUTO_OPTIMIZE_PARAMETER_REGISTRY.survivalQuantile.domain.max, 0.99,
@@ -632,8 +629,8 @@ console.log('Test 7: registry domains and range preflight match canonical input 
         'out-of-domain search ranges should fail before candidate generation');
 
     const simulatorHtml = fs.readFileSync(new URL('../Simulator.html', import.meta.url), 'utf8');
-    assert(/id="rebalBand"[^>]*max="20"/.test(simulatorHtml),
-        'Rebal-Band form maximum should match the engine and optimizer domain');
+    assert(/id="rebalancingBand"[^>]*max="100"/.test(simulatorHtml),
+        'Gold-Rebal-Band form maximum should match the engine and optimizer domain');
 }
 
 console.log('Test 8: Slice-15 model matrix and backlog links remain complete');

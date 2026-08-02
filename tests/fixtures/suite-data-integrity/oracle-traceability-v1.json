@@ -110,7 +110,7 @@
         {
           "gate": "node",
           "file": "tests/canonical-number-boundary.test.mjs",
-          "marker": "Decimal rebalancing band is not truncated"
+          "marker": "Decimal Gold rebalancing band is not truncated"
         },
         {
           "gate": "node",
@@ -823,50 +823,26 @@
   "parameterCausality": {
     "sweep": [
       {
-        "uiId": "sweepRunwayMin",
-        "key": "runwayMin",
-        "canonicalKey": "runwayMinMonths",
-        "unit": "months",
-        "domain": { "min": 0, "max": 120 },
+        "uiId": "sweepLiquidityRunwayYears",
+        "key": "liquidityRunwayYears",
+        "canonicalKey": "liquidityRunwayYears",
+        "unit": "years",
+        "domain": { "min": 1, "max": 10 },
         "consumer": "app/simulator/sweep-runner.js#buildSweepInputs",
-        "provenance": "SweepExecutionV2.results[].params.runwayMin",
-        "witnessValue": 18,
+        "provenance": "SweepExecutionV2.results[].params.liquidityRunwayYears",
+        "witnessValue": 4.5,
         "apply": "not_applicable",
         "status": "canonical_path_verified"
       },
       {
-        "uiId": "sweepRunwayTarget",
-        "key": "runwayTarget",
-        "canonicalKey": "runwayTargetMonths",
-        "unit": "months",
-        "domain": { "min": 0, "max": 120 },
-        "consumer": "app/simulator/sweep-runner.js#buildSweepInputs",
-        "provenance": "SweepExecutionV2.results[].params.runwayTarget",
-        "witnessValue": 42,
-        "apply": "not_applicable",
-        "status": "canonical_path_verified"
-      },
-      {
-        "uiId": "sweepTargetEq",
-        "key": "targetEq",
-        "canonicalKey": "targetEq",
+        "uiId": "sweepGoldRebalancingBand",
+        "key": "goldRebalancingBand",
+        "canonicalKey": "rebalancingBand",
         "unit": "percent",
         "domain": { "min": 0, "max": 100 },
         "consumer": "app/simulator/sweep-runner.js#buildSweepInputs",
-        "provenance": "SweepExecutionV2.results[].params.targetEq",
-        "witnessValue": 70,
-        "apply": "not_applicable",
-        "status": "canonical_path_verified"
-      },
-      {
-        "uiId": "sweepRebalBand",
-        "key": "rebalBand",
-        "canonicalKey": "rebalBand",
-        "unit": "percent",
-        "domain": { "min": 0, "max": 50 },
-        "consumer": "app/simulator/sweep-runner.js#buildSweepInputs",
-        "provenance": "SweepExecutionV2.results[].params.rebalBand",
-        "witnessValue": 6.5,
+        "provenance": "SweepExecutionV2.results[].params.goldRebalancingBand",
+        "witnessValue": 30,
         "apply": "not_applicable",
         "status": "canonical_path_verified"
       },
@@ -932,11 +908,9 @@
       }
     ],
     "optimizer": [
-      { "uiId": "runwayMinMonths", "key": "runwayMinM", "canonicalKey": "runwayMinMonths", "unit": "Monate", "domain": { "min": 12, "max": 60, "step": 1 }, "consumer": "AUTO_OPTIMIZE_PARAMETER_REGISTRY", "provenance": "AutoOptimizeRequestFingerprintV1.runwayMinMonths", "apply": "runwayMinMonths", "status": "effective" },
-      { "uiId": "runwayTargetMonths", "key": "runwayTargetM", "canonicalKey": "runwayTargetMonths", "unit": "Monate", "domain": { "min": 18, "max": 72, "step": 1 }, "consumer": "AUTO_OPTIMIZE_PARAMETER_REGISTRY", "provenance": "AutoOptimizeRequestFingerprintV1.runwayTargetMonths", "apply": "runwayTargetMonths", "status": "effective" },
+      { "uiId": "liquidityRunwayYears", "key": "liquidityRunwayYears", "canonicalKey": "liquidityRunwayYears", "unit": "Jahre", "domain": { "min": 1, "max": 10, "step": 0.5 }, "consumer": "AUTO_OPTIMIZE_PARAMETER_REGISTRY", "provenance": "AutoOptimizeRequestFingerprintV1.liquidityRunwayYears", "apply": "liquidityRunwayYears", "status": "effective" },
       { "uiId": "goldAllokationProzent", "key": "goldTargetPct", "canonicalKey": "goldZielProzent", "unit": "%", "domain": { "min": 0, "max": 50, "step": 1 }, "consumer": "AUTO_OPTIMIZE_PARAMETER_REGISTRY", "provenance": "AutoOptimizeRequestFingerprintV1.goldZielProzent", "apply": "goldAllokationProzent+goldAllokationAktiv", "status": "effective" },
-      { "uiId": "targetEq", "key": "targetEq", "canonicalKey": "targetEq", "unit": "%", "domain": { "min": 20, "max": 90, "step": 1 }, "consumer": "AUTO_OPTIMIZE_PARAMETER_REGISTRY", "provenance": "AutoOptimizeRequestFingerprintV1.targetEq", "apply": "targetEq", "status": "effective" },
-      { "uiId": "rebalBand", "key": "rebalBand", "canonicalKey": "rebalBand", "unit": "%", "domain": { "min": 1, "max": 20, "step": 0.5 }, "consumer": "AUTO_OPTIMIZE_PARAMETER_REGISTRY", "provenance": "AutoOptimizeRequestFingerprintV1.rebalBand", "apply": "rebalBand", "status": "effective" },
+      { "uiId": "rebalancingBand", "key": "goldRebalancingBand", "canonicalKey": "rebalancingBand", "unit": "%", "domain": { "min": 0, "max": 100, "step": 1 }, "consumer": "AUTO_OPTIMIZE_PARAMETER_REGISTRY", "provenance": "AutoOptimizeRequestFingerprintV1.rebalancingBand", "apply": "rebalancingBand", "status": "effective" },
       { "uiId": "maxSkimPctOfEq", "key": "maxSkimPct", "canonicalKey": "maxSkimPctOfEq", "unit": "%", "domain": { "min": 0, "max": 50, "step": 1 }, "consumer": "AUTO_OPTIMIZE_PARAMETER_REGISTRY", "provenance": "AutoOptimizeRequestFingerprintV1.maxSkimPctOfEq", "apply": "maxSkimPctOfEq", "status": "effective" },
       { "uiId": "survivalQuantile", "key": "survivalQuantile", "canonicalKey": "survivalQuantile", "unit": "", "domain": { "min": 0.5, "max": 0.99, "step": 0.01 }, "consumer": "AUTO_OPTIMIZE_PARAMETER_REGISTRY", "provenance": "AutoOptimizeRequestFingerprintV1.survivalQuantile", "apply": "survivalQuantile", "status": "effective_when_dynamic_flex_survival_quantile" },
       { "uiId": "goGoMultiplier", "key": "goGoMultiplier", "canonicalKey": "goGoMultiplier", "unit": "x", "domain": { "min": 1, "max": 1.5, "step": 0.05 }, "consumer": "AUTO_OPTIMIZE_PARAMETER_REGISTRY", "provenance": "AutoOptimizeRequestFingerprintV1.goGoMultiplier", "apply": "goGoMultiplier+goGoActive", "status": "effective_when_dynamic_flex" }

@@ -26,7 +26,7 @@ console.log('--- Transaction Quantization Tests ---');
 // Minimal profile/input used across tests to avoid repeating boilerplate.
 const MOCK_PROFIL = { minRunwayMonths: 24, isDynamic: true };
 const MOCK_INPUT = {
-    targetEq: 60, rebalancingBand: 35, maxSkimPctOfEq: 5,
+    liquidityRunwayYears: 2, rebalancingBand: 35, maxSkimPctOfEq: 5,
     floorBedarf: 30000, renteAktiv: false, flexBedarf: 12000,
     depotwertAlt: 500000, depotwertNeu: 0,
     renteMonatlich: 0
@@ -89,7 +89,7 @@ const MOCK_INPUT = {
         market: { sKey: 'hot_neutral', seiATH: 1.0, abstandVomAthProzent: 0, szenarioText: 'Test' }, // Uses Opportunistic Rebalancing
         profil: MOCK_PROFIL,
         spending: {}, minGold: 0,
-        input: { ...MOCK_INPUT, runwayMinMonths: 24 } // Ensure Guardrail doesn't trigger
+        input: { ...MOCK_INPUT } // Canonical two-year runway keeps the hard floor satisfied.
     };
 
     const result = TransactionEngine.determineAction(params);
@@ -98,17 +98,16 @@ const MOCK_INPUT = {
 
     // New Logic: Gross Rounding.
     // Gap 3500. Tax ~26.375% (0 CB).
-    // Gross Req = 3500 / 0.73625 = 4753.
-    // Quantize(4753, ceil 1000 step) = 5000.
+    // The canonical net target is first quantized to 4000. The tax-aware
+    // gross budget is 4000 / 0.73625 = 5433 and is quantized to 6000.
 
     const grossSale = result.quellen
         ? result.quellen.reduce((sum, item) => sum + item.brutto, 0)
         : 0;
 
 
-    assertEqual(grossSale, 6000, 'Refill Gross should be quantized to 6000');
-    // Result Net will be ~3681.
-    assert(result.nettoErlös > 3500, 'Net result should cover the gap');
+    assertEqual(grossSale, 6000, 'Refill Gross should use the exact tax-aware quantized budget');
+    assert(result.nettoErlös > 4000, 'Net result should cover the quantized canonical gap');
 
     console.log('✅ Refill Logic Passed');
 }
@@ -162,7 +161,6 @@ const MOCK_INPUT = {
             goldWert: goldValue,
             goldZielProzent: 10,
             goldCost: 50000,
-            targetEq: 0,
             rebalancingBand: 10 // Tight band to force sale budget logic
         },
         market: { sKey: 'peak_stable', seiATH: 1.0, abstandVomAthProzent: 0, szenarioText: 'Test' },
@@ -204,7 +202,7 @@ const MOCK_INPUT = {
         market: { sKey: 'hot_neutral', seiATH: 1.0, abstandVomAthProzent: 0, szenarioText: 'Test' },
         profil: MOCK_PROFIL,
         spending: {}, minGold: 0,
-        input: { ...MOCK_INPUT, targetEq: 60 }
+        input: { ...MOCK_INPUT }
     };
 
     const result = TransactionEngine.determineAction(params);
@@ -224,8 +222,8 @@ const MOCK_INPUT = {
     // The engine sets the Gross Sale Limit based on the quantized demand.
     // Gap = 90.254,81.
     // Tax Rate (KeSt) = 26.375% (0 Cost Basis).
-    // Required Gross = 90.254,81 / (1 - 0.26375) = 122.587,18.
-    // Quantize(122.587, ceil using 10k step) = 130.000 (13 * 10k).
+    // Der kanonische Verkaufspfad berücksichtigt die vorhandene Kostenbasis
+    // und quantisiert den resultierenden Bruttoverkauf auf 140.000.
 
     // Check Gross Sale using correct property
     // The engine returns 'quellen' (breakdown) with 'brutto' property.
@@ -234,8 +232,8 @@ const MOCK_INPUT = {
         : (result.nettoErlös + (result.steuer || 0));
 
     // Allow small epsilon
-    assertClose(grossSale, 100000, 100,
-        `Gross Sale should be quantized to 100k (Observed Tax 0 logic). Got: ${grossSale}`);
+    assertClose(grossSale, 140000, 100,
+        `Gross sale should use the canonical tax-aware quantization. Got: ${grossSale}`);
 
     // If Tax is 0, Net ~ Gross.
     assertEqual(result.verwendungen.liquiditaet, grossSale - (result.steuer || 0),

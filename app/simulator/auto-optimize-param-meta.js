@@ -77,25 +77,14 @@ function defineParameter({
 }
 
 export const AUTO_OPTIMIZE_PARAMETER_REGISTRY = Object.freeze({
-    runwayMinM: defineParameter({
-        label: 'Runway Min',
-        unit: 'Monate',
-        requestKey: 'runwayMinMonths',
-        formId: 'runwayMinMonths',
-        domain: { min: 12, max: 60, step: 1 },
-        normalize: roundedInteger,
-        readInput: inputs => inputs?.runwayMinMonths,
-        applyInput: (inputs, value) => { inputs.runwayMinMonths = value; }
-    }),
-    runwayTargetM: defineParameter({
-        label: 'Runway Target',
-        unit: 'Monate',
-        requestKey: 'runwayTargetMonths',
-        formId: 'runwayTargetMonths',
-        domain: { min: 18, max: 72, step: 1 },
-        normalize: roundedInteger,
-        readInput: inputs => inputs?.runwayTargetMonths,
-        applyInput: (inputs, value) => { inputs.runwayTargetMonths = value; }
+    liquidityRunwayYears: defineParameter({
+        label: 'Liquiditäts-Runway',
+        unit: 'Jahre',
+        requestKey: 'liquidityRunwayYears',
+        formId: 'liquidityRunwayYears',
+        domain: { min: 1, max: 10, step: 0.5 },
+        readInput: inputs => inputs?.liquidityRunwayYears,
+        applyInput: (inputs, value) => { inputs.liquidityRunwayYears = value; }
     }),
     goldTargetPct: defineParameter({
         label: 'Gold Target',
@@ -123,23 +112,14 @@ export const AUTO_OPTIMIZE_PARAMETER_REGISTRY = Object.freeze({
         ),
         requiredFormIds: ['goldAllokationProzent', 'goldAllokationAktiv']
     }),
-    targetEq: defineParameter({
-        label: 'Target Eq',
+    goldRebalancingBand: defineParameter({
+        label: 'Gold-Rebal Band',
         unit: '%',
-        requestKey: 'targetEq',
-        formId: 'targetEq',
-        domain: { min: 20, max: 90, step: 1 },
-        readInput: inputs => inputs?.targetEq,
-        applyInput: (inputs, value) => { inputs.targetEq = value; }
-    }),
-    rebalBand: defineParameter({
-        label: 'Rebal Band',
-        unit: '%',
-        requestKey: 'rebalBand',
-        formId: 'rebalBand',
-        domain: { min: 1, max: 20, step: 0.5 },
-        readInput: inputs => inputs?.rebalBand,
-        applyInput: (inputs, value) => { inputs.rebalBand = value; }
+        requestKey: 'rebalancingBand',
+        formId: 'rebalancingBand',
+        domain: { min: 0, max: 100, step: 1 },
+        readInput: inputs => inputs?.rebalancingBand,
+        applyInput: (inputs, value) => { inputs.rebalancingBand = value; }
     }),
     maxSkimPct: defineParameter({
         label: 'Max Skim',
@@ -213,11 +193,9 @@ export const AUTO_OPTIMIZE_PARAMETER_REGISTRY = Object.freeze({
 // explicit legacy roundtrips, but is not an optimization dimension because
 // no causal effect on an optimizer KPI can be demonstrated in the runner.
 const INTERACTIVE_PARAMETER_KEYS = Object.freeze([
-    'runwayMinM',
-    'runwayTargetM',
+    'liquidityRunwayYears',
     'goldTargetPct',
-    'targetEq',
-    'rebalBand',
+    'goldRebalancingBand',
     'maxSkimPct',
     'survivalQuantile',
     'goGoMultiplier'
@@ -363,20 +341,6 @@ export function normalizeAutoOptimizeCandidate(candidate, baseInputs, { goldCap 
         normalized[key] = value;
     }
 
-    const effectiveRunwayMin = normalized.runwayMinM
-        ?? AUTO_OPTIMIZE_PARAMETER_REGISTRY.runwayMinM.normalize(baseInputs?.runwayMinMonths);
-    const effectiveRunwayTarget = normalized.runwayTargetM
-        ?? AUTO_OPTIMIZE_PARAMETER_REGISTRY.runwayTargetM.normalize(baseInputs?.runwayTargetMonths);
-    if (
-        effectiveRunwayMin !== null
-        && effectiveRunwayTarget !== null
-        && effectiveRunwayMin > effectiveRunwayTarget
-    ) {
-        throw parameterError(
-            'AUTO_OPTIMIZE_RUNWAY_ORDER_INVALID',
-            'Runway Minimum darf das Runway-Ziel nicht ueberschreiten.'
-        );
-    }
     return normalized;
 }
 

@@ -76,12 +76,10 @@ function buildSamplingTestInputs(overrides = {}) {
         startFlexBedarf: 12000,
         flexBudgetAnnual: 0,
         flexBudgetRecharge: 0,
-        targetEq: 60,
-        rebalBand: 5,
+        rebalancingBand: 25,
         maxSkimPctOfEq: 10,
         maxBearRefillPctOfEq: 5,
-        runwayMinMonths: 24,
-        runwayTargetMonths: 36,
+        liquidityRunwayYears: 5,
         goldAktiv: false,
         goldZielProzent: 0,
         goldFloorProzent: 0,
@@ -111,10 +109,8 @@ function buildSamplingTestInputs(overrides = {}) {
 }
 
 const samplingTestCombination = Object.freeze({
-    runwayMin: 24,
-    runwayTarget: 36,
-    targetEq: 60,
-    rebalBand: 5,
+    liquidityRunwayYears: 5,
+    goldRebalancingBand: 25,
     maxSkimPct: 10,
     maxBearRefillPct: 5,
     goldTargetPct: 0
@@ -268,7 +264,7 @@ console.log('Test 11: isBlockedKey - Partner-Keys');
     assert(isBlockedKey('partner.aktiv'), 'partner.aktiv sollte geblockt sein');
     assert(isBlockedKey('partner.brutto'), 'partner.brutto sollte geblockt sein');
     assert(isBlockedKey('partner'), 'partner sollte geblockt sein');
-    assert(!isBlockedKey('targetEq'), 'targetEq sollte nicht geblockt sein');
+    assert(!isBlockedKey('liquidityRunwayYears'), 'liquidityRunwayYears sollte nicht geblockt sein');
     console.log('✓ isBlockedKey Partner-Keys OK');
 }
 
@@ -279,17 +275,17 @@ console.log('Test 12: isBlockedKey - r2/p2-Keys');
     assert(isBlockedKey('r2StartInJahren'), 'r2StartInJahren sollte geblockt sein');
     assert(isBlockedKey('p2Rente'), 'p2Rente sollte geblockt sein');
     assert(isBlockedKey('p2StartAlter'), 'p2StartAlter sollte geblockt sein');
-    assert(!isBlockedKey('rebalBand'), 'rebalBand sollte nicht geblockt sein');
+    assert(!isBlockedKey('rebalancingBand'), 'rebalancingBand sollte nicht geblockt sein');
     console.log('✓ isBlockedKey r2/p2-Keys OK');
 }
 
 // Test 13: SWEEP_ALLOWED_KEYS - Whitelist-Prüfung
 console.log('Test 13: SWEEP_ALLOWED_KEYS - Whitelist');
 {
-    assert(SWEEP_ALLOWED_KEYS.has('runwayMinMonths'), 'runwayMinMonths sollte erlaubt sein');
-    assert(SWEEP_ALLOWED_KEYS.has('runwayTargetMonths'), 'runwayTargetMonths sollte erlaubt sein');
-    assert(SWEEP_ALLOWED_KEYS.has('targetEq'), 'targetEq sollte erlaubt sein');
-    assert(SWEEP_ALLOWED_KEYS.has('rebalBand'), 'rebalBand sollte erlaubt sein');
+    assert(SWEEP_ALLOWED_KEYS.has('liquidityRunwayYears'), 'liquidityRunwayYears sollte erlaubt sein');
+    assert(!SWEEP_ALLOWED_KEYS.has('runwayTargetMonths'), 'altes Runway-Zielfeld sollte nicht erlaubt sein');
+    assert(!SWEEP_ALLOWED_KEYS.has('targetEq'), 'entfernte Aktien-Zielquote sollte nicht erlaubt sein');
+    assert(SWEEP_ALLOWED_KEYS.has('rebalancingBand'), 'rebalancingBand sollte erlaubt sein');
     assert(SWEEP_ALLOWED_KEYS.has('maxSkimPctOfEq'), 'maxSkimPctOfEq sollte erlaubt sein');
     assert(SWEEP_ALLOWED_KEYS.has('goldZielProzent'), 'goldZielProzent sollte erlaubt sein');
     assert(SWEEP_ALLOWED_KEYS.has('horizonYears'), 'horizonYears sollte erlaubt sein');
@@ -412,10 +408,8 @@ console.log('Test 21: buildSweepInputs - Parameter-Überschreibung');
 {
     const baseInputs = {
         startAlter: 65,
-        runwayMinMonths: 24,
-        runwayTargetMonths: 36,
-        targetEq: 60,
-        rebalBand: 5,
+        liquidityRunwayYears: 5,
+        rebalancingBand: 25,
         maxSkimPctOfEq: 10,
         maxBearRefillPctOfEq: 5,
         goldAktiv: false,
@@ -428,10 +422,8 @@ console.log('Test 21: buildSweepInputs - Parameter-Überschreibung');
     };
 
     const params = {
-        runwayMin: 18,
-        runwayTarget: 30,
-        targetEq: 70,
-        rebalBand: 6,
+        liquidityRunwayYears: 4,
+        goldRebalancingBand: 30,
         maxSkimPct: 12,
         maxBearRefillPct: 8,
         goldTargetPct: 5,
@@ -443,10 +435,10 @@ console.log('Test 21: buildSweepInputs - Parameter-Überschreibung');
     // buildSweepInputs maps sweep params onto engine inputs.
     const result = buildSweepInputs(baseInputs, params);
 
-    assertEqual(result.runwayMinMonths, 18, 'runwayMinMonths sollte überschrieben sein');
-    assertEqual(result.runwayTargetMonths, 30, 'runwayTargetMonths sollte überschrieben sein');
-    assertEqual(result.targetEq, 70, 'targetEq sollte überschrieben sein');
-    assertEqual(result.rebalBand, 6, 'rebalBand sollte überschrieben sein');
+    assertEqual(result.liquidityRunwayYears, 4, 'liquidityRunwayYears sollte überschrieben sein');
+    assertEqual(Object.hasOwn(result, 'runwayTargetMonths'), false, 'altes Runway-Zielfeld sollte entfernt sein');
+    assertEqual(Object.hasOwn(result, 'targetEq'), false, 'entfernte Aktien-Zielquote sollte nicht ausgegeben werden');
+    assertEqual(result.rebalancingBand, 30, 'rebalancingBand sollte überschrieben sein');
     assertEqual(result.maxSkimPctOfEq, 12, 'maxSkimPctOfEq sollte überschrieben sein');
     assertEqual(result.maxBearRefillPctOfEq, 8, 'maxBearRefillPctOfEq sollte überschrieben sein');
     assertEqual(result.goldZielProzent, 5, 'goldZielProzent sollte überschrieben sein');
@@ -474,12 +466,10 @@ console.log('Test 22: runSweepChunk - Basis-Ausführung');
         zielLiquiditaet: 30000,
         startFloorBedarf: 24000,
         startFlexBedarf: 12000,
-        targetEq: 60,
-        rebalBand: 5,
+        rebalancingBand: 25,
         maxSkimPctOfEq: 10,
         maxBearRefillPctOfEq: 5,
-        runwayMinMonths: 24,
-        runwayTargetMonths: 36,
+        liquidityRunwayYears: 5,
         goldAktiv: false,
         goldZielProzent: 0,
         goldFloorProzent: 0,
@@ -499,8 +489,8 @@ console.log('Test 22: runSweepChunk - Basis-Ausführung');
     };
 
     const paramCombinations = [
-        { runwayMin: 18, runwayTarget: 30, targetEq: 60, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0 },
-        { runwayMin: 24, runwayTarget: 36, targetEq: 70, rebalBand: 6, maxSkimPct: 12, maxBearRefillPct: 6, goldTargetPct: 0 }
+        { liquidityRunwayYears: 3, goldRebalancingBand: 25, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0 },
+        { liquidityRunwayYears: 5, goldRebalancingBand: 30, maxSkimPct: 12, maxBearRefillPct: 6, goldTargetPct: 0 }
     ];
 
     const sweepConfig = {
@@ -547,12 +537,10 @@ console.log('Test 23: runSweepChunk - Determinismus');
         zielLiquiditaet: 30000,
         startFloorBedarf: 24000,
         startFlexBedarf: 12000,
-        targetEq: 60,
-        rebalBand: 5,
+        rebalancingBand: 25,
         maxSkimPctOfEq: 10,
         maxBearRefillPctOfEq: 5,
-        runwayMinMonths: 24,
-        runwayTargetMonths: 36,
+        liquidityRunwayYears: 5,
         goldAktiv: false,
         goldZielProzent: 0,
         goldFloorProzent: 0,
@@ -572,7 +560,7 @@ console.log('Test 23: runSweepChunk - Determinismus');
     };
 
     const paramCombinations = [
-        { runwayMin: 24, runwayTarget: 36, targetEq: 60, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0 }
+        { liquidityRunwayYears: 5, goldRebalancingBand: 25, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0 }
     ];
 
     const sweepConfig = {
@@ -604,12 +592,10 @@ console.log('Test 24: runSweepChunk - Invalid Dynamic-Flex Kombination');
         zielLiquiditaet: 30000,
         startFloorBedarf: 24000,
         startFlexBedarf: 12000,
-        targetEq: 60,
-        rebalBand: 5,
+        rebalancingBand: 25,
         maxSkimPctOfEq: 10,
         maxBearRefillPctOfEq: 5,
-        runwayMinMonths: 24,
-        runwayTargetMonths: 36,
+        liquidityRunwayYears: 5,
         goldAktiv: false,
         goldZielProzent: 0,
         goldFloorProzent: 0,
@@ -634,7 +620,7 @@ console.log('Test 24: runSweepChunk - Invalid Dynamic-Flex Kombination');
     };
 
     const paramCombinations = [
-        { runwayMin: 18, runwayTarget: 24, targetEq: 60, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0, survivalQuantile: 0.9 }
+        { liquidityRunwayYears: 3, goldRebalancingBand: 25, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0, survivalQuantile: 0.9 }
     ];
 
     const sweepConfig = {
@@ -670,12 +656,10 @@ console.log('Test 25: runSweepChunk - Invalid Quantile-Bereich');
         zielLiquiditaet: 30000,
         startFloorBedarf: 24000,
         startFlexBedarf: 12000,
-        targetEq: 60,
-        rebalBand: 5,
+        rebalancingBand: 25,
         maxSkimPctOfEq: 10,
         maxBearRefillPctOfEq: 5,
-        runwayMinMonths: 24,
-        runwayTargetMonths: 36,
+        liquidityRunwayYears: 5,
         goldAktiv: false,
         goldZielProzent: 0,
         goldFloorProzent: 0,
@@ -701,7 +685,7 @@ console.log('Test 25: runSweepChunk - Invalid Quantile-Bereich');
     };
 
     const paramCombinations = [
-        { runwayMin: 18, runwayTarget: 24, targetEq: 60, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0, survivalQuantile: 0.2 }
+        { liquidityRunwayYears: 3, goldRebalancingBand: 25, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0, survivalQuantile: 0.2 }
     ];
 
     const sweepConfig = {
@@ -737,12 +721,10 @@ console.log('Test 26: runSweepChunk - Invalid Go-Go Multiplikator wenn Go-Go ina
         zielLiquiditaet: 30000,
         startFloorBedarf: 24000,
         startFlexBedarf: 12000,
-        targetEq: 60,
-        rebalBand: 5,
+        rebalancingBand: 25,
         maxSkimPctOfEq: 10,
         maxBearRefillPctOfEq: 5,
-        runwayMinMonths: 24,
-        runwayTargetMonths: 36,
+        liquidityRunwayYears: 5,
         goldAktiv: false,
         goldZielProzent: 0,
         goldFloorProzent: 0,
@@ -768,7 +750,7 @@ console.log('Test 26: runSweepChunk - Invalid Go-Go Multiplikator wenn Go-Go ina
     };
 
     const paramCombinations = [
-        { runwayMin: 18, runwayTarget: 24, targetEq: 60, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0, goGoMultiplier: 1.2 }
+        { liquidityRunwayYears: 3, goldRebalancingBand: 25, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0, goGoMultiplier: 1.2 }
     ];
 
     const sweepConfig = {
@@ -806,12 +788,10 @@ console.log('Test 27: runSweepChunk - Gueltige Dynamic-Flex Grenzwerte');
         zielLiquiditaet: 30000,
         startFloorBedarf: 24000,
         startFlexBedarf: 12000,
-        targetEq: 60,
-        rebalBand: 5,
+        rebalancingBand: 25,
         maxSkimPctOfEq: 10,
         maxBearRefillPctOfEq: 5,
-        runwayMinMonths: 24,
-        runwayTargetMonths: 36,
+        liquidityRunwayYears: 5,
         goldAktiv: false,
         goldZielProzent: 0,
         goldFloorProzent: 0,
@@ -837,7 +817,7 @@ console.log('Test 27: runSweepChunk - Gueltige Dynamic-Flex Grenzwerte');
     };
 
     const paramCombinations = [
-        { runwayMin: 18, runwayTarget: 24, targetEq: 60, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0, horizonYears: 60, survivalQuantile: 0.99, goGoMultiplier: 1.5 }
+        { liquidityRunwayYears: 3, goldRebalancingBand: 25, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0, horizonYears: 60, survivalQuantile: 0.99, goGoMultiplier: 1.5 }
     ];
 
     const sweepConfig = {
@@ -880,12 +860,10 @@ console.log('Test 28: runSweepChunk - Mindest-Flex wird in Sweep-Laeufen akzepti
         minimumFlexAnnual: 9000,
         flexBudgetAnnual: 0,
         flexBudgetRecharge: 0,
-        targetEq: 60,
-        rebalBand: 5,
+        rebalancingBand: 25,
         maxSkimPctOfEq: 10,
         maxBearRefillPctOfEq: 5,
-        runwayMinMonths: 24,
-        runwayTargetMonths: 36,
+        liquidityRunwayYears: 5,
         goldAktiv: false,
         goldZielProzent: 0,
         goldFloorProzent: 0,
@@ -911,7 +889,7 @@ console.log('Test 28: runSweepChunk - Mindest-Flex wird in Sweep-Laeufen akzepti
     };
 
     const paramCombinations = [
-        { runwayMin: 18, runwayTarget: 24, targetEq: 60, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0 }
+        { liquidityRunwayYears: 3, goldRebalancingBand: 25, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0 }
     ];
 
     const sweepConfig = {
@@ -1944,8 +1922,8 @@ console.log('Test 45: D-07 Common Random Numbers');
     }
 
     const effectfulCombinations = [
-        { ...samplingTestCombination, targetEq: 40 },
-        { ...samplingTestCombination, targetEq: 80 }
+        { ...samplingTestCombination, liquidityRunwayYears: 2 },
+        { ...samplingTestCombination, liquidityRunwayYears: 8 }
     ];
     const effectfulResults = runSweepChunk({
         baseInputs: buildSamplingTestInputs(),

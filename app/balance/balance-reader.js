@@ -20,6 +20,7 @@ import {
     getTranchenStatus
 } from '../tranches/depot-tranchen-status.js';
 import { CONFIG, ValidationError } from './balance-config.js';
+import { LIQUIDITY_RUNWAY_CONTRACT_V1 } from '../../types/liquidity-runway-contract.js';
 import {
     PROFILE_VALUE_KEYS,
     readProfileHealthBucketFromStorage,
@@ -187,10 +188,7 @@ export const UIReader = {
      * @property {number} goldCost - Kostenbasis Gold (€)
      * @property {number} kirchensteuerSatz - Kirchensteuersatz als Dezimalrate (0.08 = 8 %)
      * @property {number} sparerPauschbetrag - Sparerpauschbetrag (€)
-     * @property {number} runwayMinMonths - Minimum Liquiditäts-Runway (Monate)
-     * @property {number} runwayTargetMonths - Ziel Liquiditäts-Runway (Monate)
-     * @property {number} targetEq - Ziel-Aktienquote (%)
-     * @property {number} rebalBand - Rebalancing-Band für Equity (%)
+     * @property {number} liquidityRunwayYears - Ziel-Liquiditäts-Runway (Jahre)
      * @property {number} maxSkimPctOfEq - Max. Skimming-Prozent von Equity (%)
      * @property {number} maxBearRefillPctOfEq - Max. Bear-Refill-Prozent von Equity (%)
      */
@@ -377,11 +375,11 @@ export const UIReader = {
             goldCost: useAggregates ? aggregated.goldCost : num('goldCost'),
             kirchensteuerSatz: parseFloat(val('kirchensteuerSatz')) || 0,
             sparerPauschbetrag: num('sparerPauschbetrag'),
-            runwayMinMonths: finiteNumber('runwayMinMonths', 24, { integer: true }),
-            runwayTargetMonths: finiteNumber('runwayTargetMonths', 36, { integer: true }),
+            liquidityRunwayYears: finiteNumber(
+                'liquidityRunwayYears',
+                LIQUIDITY_RUNWAY_CONTRACT_V1.defaultYears
+            ),
             minCashBufferMonths: finiteNumber('minCashBufferMonths', 2, { integer: true }),
-            targetEq: finiteNumber('targetEq', 60),
-            rebalBand: finiteNumber('rebalBand', 0),
             maxSkimPctOfEq: finiteNumber('maxSkimPctOfEq', 0),
             maxBearRefillPctOfEq: finiteNumber('maxBearRefillPctOfEq', 0),
             marketCapeRatio: capeRatio,

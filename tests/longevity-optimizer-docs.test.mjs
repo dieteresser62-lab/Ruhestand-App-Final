@@ -73,10 +73,8 @@ const LONGEVITY_KEYS = [
     }
 
     const baseInputs = {
-        runwayMinMonths: 24,
-        runwayTargetMonths: 36,
-        targetEq: 60,
-        rebalBand: 5,
+        liquidityRunwayYears: 3,
+        rebalancingBand: 25,
         maxSkimPctOfEq: 10,
         maxBearRefillPctOfEq: 5,
         horizonYears: 30,
@@ -89,10 +87,8 @@ const LONGEVITY_KEYS = [
     };
 
     const result = buildSweepInputs(baseInputs, {
-        runwayMin: 18,
-        runwayTarget: 30,
-        targetEq: 70,
-        rebalBand: 6,
+        liquidityRunwayYears: 1.5,
+        goldRebalancingBand: 6,
         maxSkimPct: 12,
         maxBearRefillPct: 8,
         horizonYears: 35,
@@ -104,7 +100,7 @@ const LONGEVITY_KEYS = [
         longevityRelativePct: 0
     });
 
-    assertEqual(result.runwayMinMonths, 18, 'regular sweep override should still apply');
+    assertEqual(result.liquidityRunwayYears, 1.5, 'canonical runway sweep override should still apply');
     assertEqual(result.horizonYears, 35, 'regular Dynamic-Flex sweep override should still apply');
     assertEqual(result.longevityMode, 'buffer_years', 'sweep should inherit base longevityMode');
     assertEqual(result.longevityBufferYears, 2, 'sweep should not override longevityBufferYears');

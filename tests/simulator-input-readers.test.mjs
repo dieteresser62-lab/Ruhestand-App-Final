@@ -6,7 +6,8 @@ import {
     readAccumulationInputs,
     readBasePortfolioInputs,
     readDecumulationInputs,
-    readDynamicFlexInputs
+    readDynamicFlexInputs,
+    readStrategyInputs
 } from '../app/simulator/simulator-input-strategy.js';
 import { SimulatorValidationError, validateSimulatorInputs } from '../app/simulator/simulator-input-validation.js';
 import { readTrancheInputs, SimulatorTrancheInputError } from '../app/simulator/simulator-input-tranches.js';
@@ -68,6 +69,14 @@ console.log('Test 2: pension readers preserve legacy fallbacks');
     assertEqual(widow.minMarriageYears, 5, 'Widow minimum marriage years should parse');
 }
 console.log('✓ pension legacy fallbacks OK');
+
+console.log('Test 2b: missing widow fields use the documented contract defaults');
+{
+    const widow = readWidowOptions(createDocumentMock()).widowOptions;
+    assertEqual(widow.mode, 'percent', 'Missing widow mode should use the documented percent default');
+    assertEqual(widow.percent, 0.55, 'Missing widow percent should use the documented 55 percent default');
+}
+console.log('✓ widow contract defaults OK');
 
 console.log('Test 3: tranche reader prioritizes profile override');
 {
@@ -147,6 +156,25 @@ console.log('Test 4: strategy readers preserve bounds and normalization');
     assertEqual(accumulation.transitionAge, 67, 'Transition age should add duration to start age');
 }
 console.log('✓ strategy readers OK');
+
+console.log('Test 4b: strategy reader exposes only the canonical runway input');
+{
+    const canonical = readStrategyInputs(createDocumentMock({ liquidityRunwayYears: '6.5' }));
+    assertEqual(canonical.liquidityRunwayYears, 6.5, 'Canonical runway years should be read without unit conversion');
+    assert(!Object.hasOwn(canonical, 'runwayMinMonths'), 'Reader should not emit legacy runway minimum');
+    assert(!Object.hasOwn(canonical, 'runwayTargetMonths'), 'Reader should not emit legacy runway target');
+    assert(!Object.hasOwn(canonical, 'targetEq'), 'Reader should not emit the removed equity target');
+
+    const migrated = readStrategyInputs(createDocumentMock({
+        runwayMinMonths: '24',
+        runwayTargetMonths: '42'
+    }));
+    assertEqual(migrated.liquidityRunwayYears, 3.5, 'Legacy target months should migrate before the legacy minimum');
+
+    const defaults = readStrategyInputs(createDocumentMock());
+    assertEqual(defaults.liquidityRunwayYears, 5, 'Missing strategy runway should use the five-year default');
+}
+console.log('✓ canonical runway reader OK');
 
 console.log('Test 5: care reader tolerates missing DOM fields');
 {

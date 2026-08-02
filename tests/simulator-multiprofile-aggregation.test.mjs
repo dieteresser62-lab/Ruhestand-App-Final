@@ -35,6 +35,14 @@ console.log('--- Simulator Multi-Profile Aggregation ---');
         0,
         'Missing persisted care drift should keep the legacy 0 percent fallback'
     );
+    const migratedLegacyRunway = buildSimulatorInputsFromProfileData({
+        sim_runwayTargetMonths: '25'
+    });
+    assertEqual(
+        migratedLegacyRunway.liquidityRunwayYears,
+        2.5,
+        'A profile created with the old 25-month UI value remains loadable without shortening its runway'
+    );
 }
 
 const profileInputs = [

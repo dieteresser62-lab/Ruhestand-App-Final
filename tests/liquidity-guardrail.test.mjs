@@ -172,9 +172,9 @@ function getBaseParams() {
     params.input.tagesgeld = 40000;
 
     // Let's reduce Min Runway to test Coverage Trigger alone.
-    params.input.runwayMinMonths = 10;
-    params.profil.minRunwayMonths = 10;
-    // Now 14 months > 10 months. Runway OK.
+    params.input.liquidityRunwayYears = 1;
+    params.profil.minRunwayMonths = 12;
+    // Current runway remains above the canonical 12-month hard minimum.
     // But Coverage: 40k / 60k = 66% < 75%.
     // Should trigger.
 

@@ -35,7 +35,7 @@ export const GERMAN_DEMOGRAPHY_CARE_SURVIVOR_CONTRACT = deepFreeze({
   "hashes": {
     "rawDataHash": "a21bab59269970d29f1e15ad49b64e82a74348692cc38759e4339e1be1205fc3",
     "mortalityTableHash": "88c1000eac950016a65e7408127d5c1256683946933b710a0c28f672fde5f232",
-    "careObservationHash": "cf9a310beec3c7d94c65f63f18153eb8718dc5cc87fa21c11eff3e591109a8ee",
+    "careObservationHash": "c9b55d32c1d084ba948e2b77bddb7392c918bce14ec11c908ab38afde8c9a48a",
     "careEntryModelHash": "8155dc6bb9a7798bab7ead47fcbb3075baabd00b2d892d90c64e6512fe1280e0",
     "careProgressionModelHash": "34c6e6fc39b311f911f6c4b7a0d0cb8c2ab248f18802a83ce42bc9b52a56c78d",
     "careTaxonomyHash": "82e9af7152342ce8db3d6212471fa5107d1f44bc72ae0cf1d9ece5f93bb12885",
@@ -388,7 +388,7 @@ export const GERMAN_DEMOGRAPHY_CARE_SURVIVOR_CONTRACT = deepFreeze({
       "referenceDate": "2023-12-31",
       "territory": "Germany",
       "unit": "percent_of_population_at_reporting_date",
-      "runtimeRole": "validation_only_not_transition_probability",
+      "runtimeRole": "context_only_not_runtime_validation_or_transition_probability",
       "prohibitedTransformation": "Do not divide prevalence by an assumed duration or otherwise treat it as annual incidence.",
       "totalCareRecipients": 5688473,
       "countsByGrade": {

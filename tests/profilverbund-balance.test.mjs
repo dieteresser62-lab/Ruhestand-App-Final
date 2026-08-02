@@ -59,8 +59,7 @@ global.localStorage = createLocalStorageMock();
                 depotwertAlt: 200000,
                 depotwertNeu: 100000,
                 goldWert: 0,
-                runwayMinMonths: 24,
-                runwayTargetMonths: 36
+                liquidityRunwayYears: 3
             }
         },
         {
@@ -76,8 +75,7 @@ global.localStorage = createLocalStorageMock();
                 depotwertAlt: 50000,
                 depotwertNeu: 50000,
                 goldWert: 10000,
-                runwayMinMonths: 18,
-                runwayTargetMonths: 24
+                liquidityRunwayYears: 2
             }
         }
     ];
@@ -89,7 +87,7 @@ global.localStorage = createLocalStorageMock();
     assertEqual(aggregated.netWithdrawal, 38000, 'Net withdrawal should be Bedarf - Rente');
     assertEqual(aggregated.totalDepot, 410000, 'Total depot should include alt+neu+gold');
     assertEqual(aggregated.totalLiquid, 25000, 'Total liquid should sum tagesgeld+geldmarkt');
-    assertEqual(aggregated.runwayMinMonths, 18, 'Runway min should be conservative min');
+    assertEqual(aggregated.liquidityRunwayYears, 2, 'Runway target should use the conservative profile minimum');
 }
 
 // --- TEST 2: Tax per Euro ---
@@ -159,12 +157,12 @@ global.localStorage = createLocalStorageMock();
         {
             profileId: 'a',
             name: 'A',
-            inputs: { depotwertAlt: 5000, tagesgeld: 0, geldmarktEtf: 0, runwayTargetMonths: 36 }
+            inputs: { depotwertAlt: 5000, tagesgeld: 0, geldmarktEtf: 0, liquidityRunwayYears: 3 }
         },
         {
             profileId: 'b',
             name: 'B',
-            inputs: { depotwertAlt: 5000, tagesgeld: 0, geldmarktEtf: 0, runwayTargetMonths: 12 }
+            inputs: { depotwertAlt: 5000, tagesgeld: 0, geldmarktEtf: 0, liquidityRunwayYears: 1 }
         }
     ];
     const result = calculateWithdrawalDistribution(profileInputs, aggregated, 'runway_first');
@@ -843,8 +841,8 @@ global.localStorage = createLocalStorageMock();
 {
     console.log('\n📋 Test 11: zero assets fail closed');
     const profiles = [
-        { profileId: 'a', inputs: { depotwertAlt: 0, tagesgeld: 0, runwayTargetMonths: 36 } },
-        { profileId: 'b', inputs: { depotwertAlt: 0, tagesgeld: 0, runwayTargetMonths: 12 } }
+        { profileId: 'a', inputs: { depotwertAlt: 0, tagesgeld: 0, liquidityRunwayYears: 3 } },
+        { profileId: 'b', inputs: { depotwertAlt: 0, tagesgeld: 0, liquidityRunwayYears: 1 } }
     ];
     ['tax_optimized', 'proportional', 'runway_first'].forEach(mode => {
         const result = calculateWithdrawalDistribution(profiles, { netWithdrawal: 1000 }, mode);

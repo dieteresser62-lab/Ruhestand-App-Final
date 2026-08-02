@@ -39,10 +39,8 @@ function createDocumentStub() {
         mcStartYearHalfLife: { value: '15' },
         mcExcludeEstimatedHistory: { checked: true },
         useCapeSampling: { checked: true },
-        runwayMinMonths: { value: '24' },
-        runwayTargetMonths: { value: '36' },
-        targetEq: { value: '60' },
-        rebalBand: { value: '5' },
+        liquidityRunwayYears: { value: '5' },
+        rebalancingBand: { value: '25' },
         maxSkimPctOfEq: { value: '10' },
         maxBearRefillPctOfEq: { value: '5' },
         dynamicFlex: { checked: false },
@@ -182,12 +180,12 @@ try {
         const controls = {
             dynamicFlex: { checked: true },
             horizonMethod: { value: 'survival_quantile' },
-            runwayMinMonths: { value: '', dispatchEvent: (event) => events.push(['runwayMinMonths', event.type]) },
+            liquidityRunwayYears: { value: '', dispatchEvent: (event) => events.push(['liquidityRunwayYears', event.type]) },
             goGoMultiplier: { value: '', dispatchEvent: (event) => events.push(['goGoMultiplier', event.type]) },
             goGoActive: { checked: false, dispatchEvent: (event) => events.push(['goGoActive', event.type]) }
         };
         const doc = { getElementById: (id) => controls[id] || null };
-        const championCfg = { runwayMinM: 24, goGoMultiplier: 1.1 };
+        const championCfg = { liquidityRunwayYears: 5, goGoMultiplier: 1.1 };
         Object.defineProperties(championCfg, {
             __autoOptimizeParameterFingerprint: {
                 value: createAutoOptimizeParameterFingerprint(championCfg),
@@ -207,7 +205,7 @@ try {
                 }
             }
         });
-        assertEqual(controls.runwayMinMonths.value, 24, 'Apply sollte runwayMinM auf Formularfeld schreiben');
+        assertEqual(controls.liquidityRunwayYears.value, 5, 'Apply sollte den kanonischen Runway auf das Formularfeld schreiben');
         assertEqual(controls.goGoActive.checked, true, 'Apply sollte goGoActive bei goGoMultiplier aktivieren');
         assert(events.some(([id]) => id === 'goGoActive'), 'Apply sollte Change-Events dispatchen');
 
@@ -235,7 +233,7 @@ try {
             objective: { metric: 'EndWealth_P50' },
             result: {
                 modelStatus,
-                championCfg: { targetEq: 60 },
+                championCfg: { liquidityRunwayYears: 5 },
                 metricsTest: createVersionedMetricResult(),
                 deltaVsCurrent: {
                     successRate: 0,
@@ -370,10 +368,10 @@ try {
             }
         };
         createAutoOptimizeParameterBlock({ paramId: 1, paramNumber: 1, doc });
-        assertEqual(Number(controls['.ao-param-min'].value), 12,
-            'neuer Parameterblock sollte mit Registry-Minimum statt 0 starten');
-        assertEqual(Number(controls['.ao-param-max'].value), 60,
-            'neuer Parameterblock sollte mit Registry-Maximum statt 100 starten');
+        assertEqual(Number(controls['.ao-param-min'].value), 1,
+            'neuer Parameterblock sollte mit dem kanonischen Runway-Minimum starten');
+        assertEqual(Number(controls['.ao-param-max'].value), 10,
+            'neuer Parameterblock sollte mit dem kanonischen Runway-Maximum starten');
 
         controls['.ao-param-key'].value = 'survivalQuantile';
         controls['.ao-param-key'].dispatch('change');
@@ -393,15 +391,15 @@ try {
     {
         const rand = rng(42);
         const ranges = {
-            targetEq: { min: 20, max: 80, step: 5 }
+            liquidityRunwayYears: { min: 1, max: 10, step: 0.5 }
         };
 
         // Erwartung: LHS liefert gleichmäßig verteilte Samples im Range.
         const samples = latinHypercubeSample(ranges, 10, rand);
 
         assert(samples.length === 10, 'LHS sollte 10 Samples liefern');
-        assert(samples.every(s => typeof s.targetEq === 'number'), 'Alle Samples sollten targetEq haben');
-        assert(samples.every(s => s.targetEq >= 20 && s.targetEq <= 80), 'Alle Werte sollten in Range liegen');
+        assert(samples.every(s => typeof s.liquidityRunwayYears === 'number'), 'Alle Samples sollten den kanonischen Runway haben');
+        assert(samples.every(s => s.liquidityRunwayYears >= 1 && s.liquidityRunwayYears <= 10), 'Alle Werte sollten in Range liegen');
     }
     console.log('✓ LHS Grundfunktionalität OK');
 
@@ -410,15 +408,15 @@ try {
     {
         const rand = rng(123);
         const ranges = {
-            targetEq: { min: 30, max: 70, step: 2 },
-            rebalBand: { min: 2, max: 10, step: 1 },
+            liquidityRunwayYears: { min: 1, max: 10, step: 0.5 },
+            goldRebalancingBand: { min: 10, max: 40, step: 1 },
             goldTargetPct: { min: 0, max: 15, step: 1 }
         };
 
         const samples = latinHypercubeSample(ranges, 20, rand);
 
         assert(samples.length === 20, 'LHS sollte 20 Samples liefern');
-        assert(samples.every(s => 'targetEq' in s && 'rebalBand' in s && 'goldTargetPct' in s),
+        assert(samples.every(s => 'liquidityRunwayYears' in s && 'goldRebalancingBand' in s && 'goldTargetPct' in s),
             'Alle Samples sollten alle Parameter haben');
     }
     console.log('✓ LHS Multi-Parameter OK');
@@ -428,14 +426,14 @@ try {
     {
         const rand = rng(999);
         const ranges = {
-            runwayMinM: { min: 12, max: 48, step: 6 }
+            liquidityRunwayYears: { min: 1, max: 10, step: 0.5 }
         };
 
         // Alle Samples müssen auf dem Step-Grid landen.
         const samples = latinHypercubeSample(ranges, 50, rand);
 
         // Alle Werte sollten durch Step teilbar sein
-        const validSteps = samples.every(s => s.runwayMinM % 6 === 0 || Math.abs(s.runwayMinM % 6) < 0.0001);
+        const validSteps = samples.every(s => Math.abs((s.liquidityRunwayYears - 1) % 0.5) < 0.0001);
         assert(validSteps, 'Alle Werte sollten auf Step-Grid liegen');
     }
     console.log('✓ LHS Step-Rounding OK');
@@ -445,16 +443,16 @@ try {
     // Test 4: generateNeighborsReduced - Basis
     console.log('Test 4: generateNeighborsReduced - Basis');
     {
-        const candidate = { targetEq: 60, rebalBand: 5 };
+        const candidate = { liquidityRunwayYears: 5, goldRebalancingBand: 25 };
         const ranges = {
-            targetEq: { min: 20, max: 80, step: 2 },
-            rebalBand: { min: 1, max: 10, step: 0.5 }
+            liquidityRunwayYears: { min: 1, max: 10, step: 0.5 },
+            goldRebalancingBand: { min: 0, max: 100, step: 1 }
         };
 
         const neighbors = generateNeighborsReduced(candidate, ranges);
 
         assert(neighbors.length > 0, 'Sollte Nachbarn generieren');
-        assert(neighbors.every(n => n.targetEq !== undefined && n.rebalBand !== undefined),
+        assert(neighbors.every(n => n.liquidityRunwayYears !== undefined && n.goldRebalancingBand !== undefined),
             'Alle Nachbarn sollten alle Parameter haben');
     }
     console.log('✓ generateNeighborsReduced Basis OK');
@@ -462,16 +460,16 @@ try {
     // Test 5: generateNeighborsReduced - Respektiert Grenzen
     console.log('Test 5: generateNeighborsReduced - Respektiert Grenzen');
     {
-        const candidate = { targetEq: 20 }; // Am Minimum
+        const candidate = { liquidityRunwayYears: 1 }; // Am Minimum
         const ranges = {
-            targetEq: { min: 20, max: 80, step: 2 }
+            liquidityRunwayYears: { min: 1, max: 10, step: 0.5 }
         };
 
         // Nachbarn dürfen nicht unter das Minimum fallen.
         const neighbors = generateNeighborsReduced(candidate, ranges);
 
         // Kein Nachbar sollte unter 20 sein
-        assert(neighbors.every(n => n.targetEq >= 20), 'Kein Nachbar sollte unter Minimum sein');
+        assert(neighbors.every(n => n.liquidityRunwayYears >= 1), 'Kein Nachbar sollte unter Minimum sein');
     }
     console.log('✓ generateNeighborsReduced Grenzen OK');
 
@@ -481,9 +479,8 @@ try {
     console.log('Test 6: isValidCandidate - Gültiger Kandidat');
     {
         const candidate = {
-            runwayMinM: 24,
-            runwayTargetM: 36,
-            targetEq: 60,
+            liquidityRunwayYears: 5,
+            goldRebalancingBand: 25,
             goldTargetPct: 5
         };
 
@@ -491,21 +488,13 @@ try {
     }
     console.log('✓ isValidCandidate Gültiger Kandidat OK');
 
-    // Test 7: isValidCandidate - Runway-Invariante verletzt
-    console.log('Test 7: isValidCandidate - Runway-Invariante');
+    // Test 7: isValidCandidate - Runway-Domain verletzt
+    console.log('Test 7: isValidCandidate - Runway-Domain');
     {
-        const candidate = {
-            runwayMinM: 48, // Min > Target = ungültig
-            runwayTargetM: 36
-        };
-
-        assert(!isValidCandidate(candidate, 10), 'Kandidat mit runwayMinM > runwayTargetM sollte abgelehnt werden');
-        assert(
-            !isValidCandidate({ runwayMinM: 48 }, 10, { runwayTargetMonths: 36 }),
-            'Ein einzelner Runway-Min-Kandidat sollte gegen das feste Basisziel validiert werden'
-        );
+        assert(!isValidCandidate({ liquidityRunwayYears: 0.5 }, 10), 'Runway unter einem Jahr sollte abgelehnt werden');
+        assert(!isValidCandidate({ liquidityRunwayYears: 10.5 }, 10), 'Runway über zehn Jahren sollte abgelehnt werden');
     }
-    console.log('✓ isValidCandidate Runway-Invariante OK');
+    console.log('✓ isValidCandidate Runway-Domain OK');
 
     // Test 8: isValidCandidate - Gold-Cap überschritten
     console.log('Test 8: isValidCandidate - Gold-Cap');
@@ -520,8 +509,8 @@ try {
     // Test 9: isValidCandidate - Negative Werte
     console.log('Test 9: isValidCandidate - Negative Werte');
     {
-        assert(!isValidCandidate({ targetEq: -10 }, 10), 'Negativer targetEq sollte abgelehnt werden');
-        assert(!isValidCandidate({ rebalBand: -5 }, 10), 'Negativer rebalBand sollte abgelehnt werden');
+        assert(!isValidCandidate({ liquidityRunwayYears: -10 }, 10), 'Negativer Runway sollte abgelehnt werden');
+        assert(!isValidCandidate({ goldRebalancingBand: -5 }, 10), 'Negatives Gold-Rebalancing-Band sollte abgelehnt werden');
         assert(!isValidCandidate({ goldTargetPct: -1 }, 10), 'Negativer goldTargetPct sollte abgelehnt werden');
     }
     console.log('✓ isValidCandidate Negative Werte OK');
@@ -529,8 +518,8 @@ try {
     // Test 10: isValidCandidate - Grenzen überschritten
     console.log('Test 10: isValidCandidate - Grenzen überschritten');
     {
-        assert(!isValidCandidate({ targetEq: 91 }, 10), 'targetEq > 90 sollte abgelehnt werden');
-        assert(!isValidCandidate({ rebalBand: 21 }, 10), 'rebalBand > 20 sollte abgelehnt werden');
+        assert(!isValidCandidate({ liquidityRunwayYears: 11 }, 10), 'Runway > 10 sollte abgelehnt werden');
+        assert(!isValidCandidate({ goldRebalancingBand: 101 }, 10), 'Gold-Rebalancing-Band > 100 sollte abgelehnt werden');
         assert(!isValidCandidate({ maxSkimPct: 51 }, 10), 'maxSkimPct > 50 sollte abgelehnt werden');
         assert(!isValidCandidate({ maxBearRefillPct: 71 }, 10), 'maxBearRefillPct > 70 sollte abgelehnt werden');
     }
@@ -625,7 +614,7 @@ try {
     {
         const cache = new CandidateCache();
 
-        const candidate = { targetEq: 60, rebalBand: 5 };
+        const candidate = { liquidityRunwayYears: 5, goldRebalancingBand: 25 };
         const results = { medianEndWealth: 500000 };
 
         assert(!cache.has(candidate), 'Cache sollte initial leer sein');
@@ -708,10 +697,10 @@ try {
     console.log('Test 23: runAutoOptimize - Champion nahe Optimum');
     {
         const mockEvaluate = async (candidate, baseInputs) => {
-            const targetEq = Number.isFinite(candidate?.targetEq)
-                ? candidate.targetEq
-                : (Number.isFinite(baseInputs?.targetEq) ? baseInputs.targetEq : 60);
-            const score = 1000 - Math.pow(targetEq - 60, 2);
+            const runwayYears = Number.isFinite(candidate?.liquidityRunwayYears)
+                ? candidate.liquidityRunwayYears
+                : (Number.isFinite(baseInputs?.liquidityRunwayYears) ? baseInputs.liquidityRunwayYears : 5);
+            const score = 1000 - Math.pow(runwayYears - 5, 2) * 100;
             return createVersionedMetricResult({
                 medianEndWealth: score,
                 medianWithdrawalRate: 0.03
@@ -721,7 +710,7 @@ try {
         const result = await runAutoOptimize({
             objective: { metric: 'EndWealth_P50', direction: 'max' },
             params: {
-                targetEq: { min: 20, max: 90, step: 2 }
+                liquidityRunwayYears: { min: 1, max: 10, step: 0.5 }
             },
             runsPerCandidate: 20,
             seedsTrain: 2,
@@ -732,9 +721,9 @@ try {
         });
 
         assert(result && result.championCfg, 'Sollte Champion zurückgeben');
-        assert(Number.isFinite(result.championCfg.targetEq), 'Champion sollte targetEq haben');
-        const delta = Math.abs(result.championCfg.targetEq - 60);
-        assert(delta <= 4, `Champion sollte nahe Optimum sein (delta ${delta})`);
+        assert(Number.isFinite(result.championCfg.liquidityRunwayYears), 'Champion sollte den kanonischen Runway haben');
+        const delta = Math.abs(result.championCfg.liquidityRunwayYears - 5);
+        assert(delta <= 1, `Champion sollte nahe Optimum sein (delta ${delta})`);
         assert(result.metricsTest.medianEndWealth > 900, 'Objective sollte nahe Maximum sein');
         const evaluationContract = result.optimizationContext.evaluationContract;
         assertEqual(evaluationContract.monteCarloParameters.methode, 'stationary',
@@ -769,7 +758,7 @@ try {
         let evaluations = 0;
         global.document = {
             getElementById(id) {
-                if (id === 'targetEq') return { value: '91' };
+                if (id === 'liquidityRunwayYears') return { value: '11' };
                 return validDocument.getElementById(id);
             }
         };
@@ -777,7 +766,7 @@ try {
         try {
             await runAutoOptimize({
                 objective: { metric: 'EndWealth_P50', direction: 'max' },
-                params: { targetEq: { min: 20, max: 90, step: 5 } },
+                params: { liquidityRunwayYears: { min: 1, max: 10, step: 0.5 } },
                 runsPerCandidate: 10,
                 seedsTrain: 2,
                 seedsTest: 2,
@@ -806,10 +795,10 @@ try {
     console.log('Test 24: runAutoOptimize - Multi-Parameter');
     {
         const mockEvaluate = async (candidate) => {
-            const eq = candidate.targetEq ?? 60;
-            const band = candidate.rebalBand ?? 5;
-            // Optimum bei targetEq=50, rebalBand=4
-            const score = 1000 - Math.pow(eq - 50, 2) - Math.pow(band - 4, 2) * 10;
+            const runway = candidate.liquidityRunwayYears ?? 5;
+            const band = candidate.goldRebalancingBand ?? 25;
+            // Optimum bei fünf Jahren Runway und 25 Prozent Gold-Band.
+            const score = 1000 - Math.pow(runway - 5, 2) * 100 - Math.pow(band - 25, 2);
             return createVersionedMetricResult({
                 medianEndWealth: Math.max(0, score),
             });
@@ -818,8 +807,8 @@ try {
         const result = await runAutoOptimize({
             objective: { metric: 'EndWealth_P50', direction: 'max' },
             params: {
-                targetEq: { min: 30, max: 70, step: 2 },
-                rebalBand: { min: 2, max: 8, step: 1 }
+                liquidityRunwayYears: { min: 1, max: 10, step: 0.5 },
+                goldRebalancingBand: { min: 10, max: 40, step: 1 }
             },
             runsPerCandidate: 10,
             seedsTrain: 2,
@@ -830,7 +819,7 @@ try {
         });
 
         assert(result && result.championCfg, 'Sollte Champion zurückgeben');
-        assert('targetEq' in result.championCfg && 'rebalBand' in result.championCfg,
+        assert('liquidityRunwayYears' in result.championCfg && 'goldRebalancingBand' in result.championCfg,
             'Champion sollte beide Parameter haben');
         assertEqual(result.modelStatus?.schemaVersion, 'AutoOptimizeModelStatusV1',
             'Auto-Optimize sollte einen versionierten Modellstatus ausgeben');
@@ -862,7 +851,7 @@ try {
 
         const result = await runAutoOptimize({
             objective: { metric: 'EndWealth_P50', direction: 'max' },
-            params: { targetEq: { min: 50, max: 70, step: 5 } },
+            params: { liquidityRunwayYears: { min: 4, max: 6, step: 0.5 } },
             runsPerCandidate: 10,
             seedsTrain: 2,
             seedsTest: 2,
@@ -880,18 +869,18 @@ try {
     console.log('Test 26: runAutoOptimize - Delta vs Current');
     {
         const mockEvaluate = async (candidate) => {
-            const eq = candidate.targetEq ?? 60;
+            const runway = candidate.liquidityRunwayYears ?? 5;
             return createVersionedMetricResult({
-                medianEndWealth: eq * 10000,
-                successProbFloor: 0.95 + eq / 1000,
-                worst5Drawdown: 0.5 - eq / 200,
+                medianEndWealth: runway * 100000,
+                successProbFloor: 0.95 + runway / 1000,
+                worst5Drawdown: 0.5 - runway / 200,
                 timeShareWRgt45: 0.01
             });
         };
 
         const result = await runAutoOptimize({
             objective: { metric: 'EndWealth_P50', direction: 'max' },
-            params: { targetEq: { min: 40, max: 80, step: 5 } },
+            params: { liquidityRunwayYears: { min: 1, max: 10, step: 0.5 } },
             runsPerCandidate: 10,
             seedsTrain: 2,
             seedsTest: 2,
@@ -917,7 +906,7 @@ try {
 
         const resultOn = await runAutoOptimize({
             objective: { metric: 'EndWealth_P50', direction: 'max' },
-            params: { targetEq: { min: 50, max: 70, step: 5 } },
+            params: { liquidityRunwayYears: { min: 4, max: 6, step: 0.5 } },
             runsPerCandidate: 10,
             seedsTrain: 2,
             seedsTest: 2,
@@ -931,7 +920,7 @@ try {
 
         const resultOff = await runAutoOptimize({
             objective: { metric: 'EndWealth_P50', direction: 'max' },
-            params: { targetEq: { min: 50, max: 70, step: 5 } },
+            params: { liquidityRunwayYears: { min: 4, max: 6, step: 0.5 } },
             runsPerCandidate: 10,
             seedsTrain: 2,
             seedsTest: 2,

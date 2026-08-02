@@ -59,11 +59,9 @@
  * @property {number} goldCost
  * @property {number} kirchensteuerSatz
  * @property {number} sparerPauschbetrag
- * @property {number} runwayMinMonths
- * @property {number} runwayTargetMonths
+ * @property {number} liquidityRunwayYears
  * @property {number} minCashBufferMonths
- * @property {number} targetEq
- * @property {number} rebalBand
+ * @property {number} rebalancingBand
  * @property {number} maxSkimPctOfEq
  * @property {number} maxBearRefillPctOfEq
  * @property {string} profilName
@@ -148,10 +146,8 @@
  * @property {string} stressPreset
  * @property {PartnerConfig} partner
  * @property {WidowOptions} widowOptions
- * @property {number} runwayMinMonths
- * @property {number} runwayTargetMonths
- * @property {number} targetEq
- * @property {number} rebalBand
+ * @property {number} liquidityRunwayYears
+ * @property {number} rebalancingBand
  * @property {number} maxSkimPctOfEq
  * @property {number} maxBearRefillPctOfEq
  * @property {AccumulationPhase} accumulationPhase

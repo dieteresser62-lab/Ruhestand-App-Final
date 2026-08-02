@@ -11,10 +11,6 @@ function finiteNumber(value) {
     return typeof value === 'number' && Number.isFinite(value);
 }
 
-function coalesceFinite(...values) {
-    return values.find(finiteNumber);
-}
-
 function normalizeWeightPct(value, fallbackPct) {
     const pct = finiteNumber(value) ? value : fallbackPct;
     return clamp(pct / 100, 0, 1);
@@ -97,9 +93,9 @@ export function deriveCAPEContinuousReturn(cape, options = {}, config = CONFIG) 
         capeCfg.MIN_EQUITY_REAL_RETURN,
         capeCfg.MAX_EQUITY_REAL_RETURN
     );
-    const eqPct = normalizeWeightPct(coalesceFinite(options.targetEq, options.equityWeightPct), 60);
+    const eqPct = normalizeWeightPct(options.equityWeightPct, 60);
     const goldPctRaw = options.goldAktiv === true
-        ? normalizeWeightPct(coalesceFinite(options.goldZielProzent, options.goldWeightPct), 0)
+        ? normalizeWeightPct(options.goldWeightPct, 0)
         : 0;
     const goldPct = clamp(goldPctRaw, 0, Math.max(0, 1 - eqPct));
     const safePct = Math.max(0, 1 - eqPct - goldPct);
@@ -150,8 +146,8 @@ export function deriveCAPELegacyStepReturn(context = {}, config = CONFIG) {
     const equityNominal = finiteNumber(context.expectedReturnCape)
         ? context.expectedReturnCape
         : (cfg.FALLBACK_REAL_RETURN + inflRate);
-    const eqPct = normalizeWeightPct(context.targetEq, 60);
-    const goldPctRaw = context.goldAktiv === true ? normalizeWeightPct(context.goldZielProzent, 0) : 0;
+    const eqPct = normalizeWeightPct(context.equityWeightPct, 60);
+    const goldPctRaw = context.goldAktiv === true ? normalizeWeightPct(context.goldWeightPct, 0) : 0;
     const goldPct = clamp(goldPctRaw, 0, Math.max(0, 1 - eqPct));
     const safePct = Math.max(0, 1 - eqPct - goldPct);
     const { goldRealReturn, goldRealReturnSource } = resolveGoldRealReturn(context, cfg);

@@ -15,6 +15,10 @@ import {
     readValue
 } from './simulator-input-dom.js';
 import { LONGEVITY_DEFAULTS, normalizeLongevityMode } from './dynamic-flex-longevity-contract.js';
+import {
+    LIQUIDITY_RUNWAY_CONTRACT_V1,
+    resolveLiquidityRunwayYears
+} from '../../types/liquidity-runway-contract.js';
 
 export const DEFAULT_RISIKOPROFIL = 'sicherheits-dynamisch';
 
@@ -110,11 +114,23 @@ export function readDecumulationInputs(doc = globalThis.document) {
 }
 
 export function readStrategyInputs(doc = globalThis.document) {
+    const liquidityRunwayResolution = resolveLiquidityRunwayYears({
+        ...(doc?.getElementById?.('liquidityRunwayYears')
+            ? { liquidityRunwayYears: readNumber(
+                'liquidityRunwayYears',
+                LIQUIDITY_RUNWAY_CONTRACT_V1.defaultYears,
+                doc
+            ) }
+            : {}),
+        ...(doc?.getElementById?.('runwayTargetMonths')
+            ? { runwayTargetMonths: readNumber('runwayTargetMonths', NaN, doc) }
+            : {}),
+        ...(doc?.getElementById?.('runwayMinMonths')
+            ? { runwayMinMonths: readNumber('runwayMinMonths', NaN, doc) }
+            : {})
+    });
     return {
-        runwayMinMonths: readInt('runwayMinMonths', 24, doc),
-        runwayTargetMonths: readInt('runwayTargetMonths', 36, doc),
-        targetEq: readNumber('targetEq', 60, doc),
-        rebalBand: readNumber('rebalBand', 5, doc),
+        liquidityRunwayYears: liquidityRunwayResolution.years,
         maxSkimPctOfEq: readNumber('maxSkimPctOfEq', 10, doc),
         maxBearRefillPctOfEq: readNumber('maxBearRefillPctOfEq', 5, doc)
     };

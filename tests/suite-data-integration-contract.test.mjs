@@ -274,10 +274,8 @@ assert(simulatorHtml.includes('id="sweepMaxBearRefillPct"'),
     'Interactive Sweep must retain the visible Bear-Refill base assumption');
 
 const sweepBase = {
-    runwayMinMonths: 24,
-    runwayTargetMonths: 36,
-    targetEq: 60,
-    rebalBand: 5,
+    liquidityRunwayYears: 3,
+    rebalancingBand: 25,
     maxSkimPctOfEq: 10,
     maxBearRefillPctOfEq: 5,
     goldAktiv: false,

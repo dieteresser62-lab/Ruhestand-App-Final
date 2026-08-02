@@ -140,14 +140,18 @@ export function buildSimulatorYearResult({
     const vpw = fullResult.ui.vpw || null;
     const safetyDiagnosis = fullResult.diagnosis?.general || {};
     const keyParams = fullResult.diagnosis?.keyParams || {};
-    const runwayMonths = Number.isFinite(fullResult.ui.runway?.months)
+    const runwayAfterTransactionBeforePayout = Number.isFinite(fullResult.ui.runway?.months)
         ? fullResult.ui.runway.months
         : null;
     const flexRate = Number.isFinite(spendingResult.details?.flexRate)
         ? spendingResult.details.flexRate
         : null;
-    const runwayCoveragePct = Number.isFinite(fullResult.ui.liquiditaet?.deckungNachher)
-        ? fullResult.ui.liquiditaet.deckungNachher
+    const runwayCoveragePct = zielLiquiditaet > 0
+        ? (liquiditaet / zielLiquiditaet) * 100
+        : (liquiditaet > 0 ? 100 : 0);
+    const annualRunwayNeedRaw = Number(fullResult.ui.neuerBedarf);
+    const runwayMonths = Number.isFinite(annualRunwayNeedRaw)
+        ? (annualRunwayNeedRaw > 0 ? liquiditaet / (annualRunwayNeedRaw / 12) : 0)
         : null;
     const withdrawalRateEndPct = Number.isFinite(spendingResult.details?.entnahmequoteDepot)
         ? spendingResult.details.entnahmequoteDepot * 100
@@ -161,13 +165,13 @@ export function buildSimulatorYearResult({
             action: actionResult,
             market: { sKey: spendingNewState.lastMarketSKey, ...yearData },
             vpw,
-            zielLiquiditaet: 0,
+            zielLiquiditaet,
             liquiditaet: {
                 vorher: initialLiqStart,
                 nachher: liquiditaet,
-                deckungNachher: (jahresEntnahmePlan > 0) ? ((liquiditaet / jahresEntnahmePlan) * 100) : 100
+                deckungNachher: runwayCoveragePct
             },
-            runway: { months: 999 }
+            runway: { months: runwayMonths }
         },
         newState: {
             portfolio: nextPortfolio,
@@ -212,6 +216,7 @@ export function buildSimulatorYearResult({
             Regime: spendingNewState.lastMarketSKey || 'unknown',
             QuoteEndPct: withdrawalRateEndPct,
             RunwayCoveragePct: runwayCoveragePct,
+            RunwayMeasurementPhase: 'post_payout_end_of_year',
             RunwayTargetRawMonths: Number.isFinite(safetyDiagnosis.runwayTargetSmoothing?.rawTargetMonths) ? safetyDiagnosis.runwayTargetSmoothing.rawTargetMonths : null,
             RunwayTargetSmoothedMonths: Number.isFinite(safetyDiagnosis.runwayTargetSmoothing?.targetMonths) ? safetyDiagnosis.runwayTargetSmoothing.targetMonths : null,
             RunwayTargetSmoothingApplied: safetyDiagnosis.runwayTargetSmoothing?.smoothingApplied === true,
@@ -234,7 +239,11 @@ export function buildSimulatorYearResult({
             safety_stable_streak: Number.isFinite(safetyDiagnosis.dynamicFlexSafetyStableStreak) ? safetyDiagnosis.dynamicFlexSafetyStableStreak : null,
             safety_transition: safetyDiagnosis.dynamicFlexSafetyTransition || '',
             safety_runway_pre_months: Number.isFinite(safetyDiagnosis.runwayMonateVorTransaktion) ? safetyDiagnosis.runwayMonateVorTransaktion : null,
-            safety_runway_post_months: Number.isFinite(safetyDiagnosis.dynamicFlexSafetyRunwayMonate) ? safetyDiagnosis.dynamicFlexSafetyRunwayMonate : null,
+            safety_runway_after_transaction_before_payout_months: runwayAfterTransactionBeforePayout,
+            safety_runway_post_months: Number.isFinite(safetyDiagnosis.dynamicFlexSafetyRunwayMonate)
+                ? safetyDiagnosis.dynamicFlexSafetyRunwayMonate
+                : null,
+            runway_post_payout_end_of_year_months: runwayMonths,
             safety_real_drawdown_pct: Number.isFinite(keyParams.realerDepotDrawdown) ? keyParams.realerDepotDrawdown * 100 : null,
             liq_before_payout: liqBeforePayout,
             liq_after_payout: liqAfterPayout,
@@ -279,6 +288,7 @@ export function buildSimulatorYearResult({
             liqStart: initialLiqStart,
             cashInterestEarned: cashZinsen,
             liqEnd: liqNachZins,
+            liq_post_payout_end_of_year: liquiditaet,
             zielLiquiditaet: zielLiquiditaet || 0,
             bondBucketAfter,
             bondRefillGross,

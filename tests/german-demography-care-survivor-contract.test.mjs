@@ -80,8 +80,8 @@ console.log('Test 3: care prevalence observations never become transition probab
 const care = GERMAN_DEMOGRAPHY_CARE_SURVIVOR_CONTRACT.care;
 assertEqual(
     care.officialObservation.runtimeRole,
-    'validation_only_not_transition_probability',
-    'Observed care prevalence must be validation-only'
+    'context_only_not_runtime_validation_or_transition_probability',
+    'Observed care prevalence must be honest context evidence only'
 );
 assert(care.officialObservation.prohibitedTransformation.includes('Do not divide prevalence'), 'Prevalence-to-incidence conversion should be prohibited');
 assertEqual(care.officialObservation.observedPrevalencePctBySexAndAgeBand.overall[65], 6.56, 'Age 65-69 prevalence should match Destatis');
@@ -122,7 +122,7 @@ const diagnostics = createDemographyCareSurvivorDiagnosticsV1();
 assertEqual(diagnostics.contractSchemaVersion, GERMAN_DEMOGRAPHY_CARE_SURVIVOR_CONTRACT.schemaVersion, 'Diagnostics should expose contract schema');
 assertEqual(diagnostics.hashes.mortalityTableHash, GERMAN_DEMOGRAPHY_CARE_SURVIVOR_CONTRACT.hashes.mortalityTableHash, 'Diagnostics should expose mortality hash');
 assertEqual(diagnostics.mortality.tableType, 'period', 'Diagnostics should expose period-table semantics');
-assertEqual(diagnostics.care.observedPrevalenceRuntimeRole, 'validation_only_not_transition_probability', 'Diagnostics should expose the prevalence boundary');
+assertEqual(diagnostics.care.observedPrevalenceRuntimeRole, 'context_only_not_runtime_validation_or_transition_probability', 'Diagnostics should expose the prevalence boundary');
 assertEqual(diagnostics.survivor.defaultMode, 'percent', 'Diagnostics should expose survivor default');
 console.log('✓ runtime projection and diagnostics OK');
 

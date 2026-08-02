@@ -75,9 +75,9 @@ export function deepClone(obj) {
  */
 export const SWEEP_ALLOWED_KEYS = new Set([
     // Strategie-Parameter (Liquiditäts-Runway)
-    'runwayMinMonths', 'runwayTargetMonths',
-    // Strategie-Parameter (Portfolio-Allokation)
-    'targetEq', 'rebalBand',
+    'liquidityRunwayYears',
+    // Strategie-Parameter (Gold-Rebalancing)
+    'rebalancingBand',
     // Strategie-Parameter (Skim & Refill)
     'maxSkimPctOfEq', 'maxBearRefillPctOfEq',
     // Strategie-Parameter (Gold-Allokation)
@@ -181,4 +181,3 @@ export function areR2SeriesEqual(series1, series2, tolerance = 1e-6) {
     if (series1.length !== series2.length) return false;
     return series1.every((v, i) => Math.abs(v - series2[i]) < tolerance);
 }
-

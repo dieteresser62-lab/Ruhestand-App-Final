@@ -46,12 +46,10 @@ import {
 } from './simulator-sweep-utils.js';
 
 const SWEEP_LIMITS = {
-    runwayMonthsMin: 0,
-    runwayMonthsMax: 120,
-    targetEqMin: 0,
-    targetEqMax: 100,
-    rebalBandMin: 0,
-    rebalBandMax: 50,
+    liquidityRunwayYearsMin: 1,
+    liquidityRunwayYearsMax: 10,
+    goldRebalancingBandMin: 0,
+    goldRebalancingBandMax: 100,
     skimMin: 0,
     skimMax: 100,
     refillMin: 0,
@@ -434,18 +432,13 @@ function validateSweepCombination(baseInputs, params) {
         return { valid: false, reason: 'fehlende Parameter' };
     }
 
-    if (!isFiniteNumber(params.runwayMin) || !isFiniteNumber(params.runwayTarget)) {
-        return { valid: false, reason: 'Runway-Werte fehlen' };
-    }
-    if (Number(params.runwayMin) > Number(params.runwayTarget)) {
-        return { valid: false, reason: 'runwayMin > runwayTarget' };
+    if (!isFiniteNumber(params.liquidityRunwayYears)) {
+        return { valid: false, reason: 'Liquiditäts-Runway fehlt' };
     }
 
     const numericChecks = [
-        ['runwayMin', SWEEP_LIMITS.runwayMonthsMin, SWEEP_LIMITS.runwayMonthsMax],
-        ['runwayTarget', SWEEP_LIMITS.runwayMonthsMin, SWEEP_LIMITS.runwayMonthsMax],
-        ['targetEq', SWEEP_LIMITS.targetEqMin, SWEEP_LIMITS.targetEqMax],
-        ['rebalBand', SWEEP_LIMITS.rebalBandMin, SWEEP_LIMITS.rebalBandMax],
+        ['liquidityRunwayYears', SWEEP_LIMITS.liquidityRunwayYearsMin, SWEEP_LIMITS.liquidityRunwayYearsMax],
+        ['goldRebalancingBand', SWEEP_LIMITS.goldRebalancingBandMin, SWEEP_LIMITS.goldRebalancingBandMax],
         ['maxSkimPct', SWEEP_LIMITS.skimMin, SWEEP_LIMITS.skimMax],
         ['maxBearRefillPct', SWEEP_LIMITS.refillMin, SWEEP_LIMITS.refillMax],
         ['goldTargetPct', SWEEP_LIMITS.goldTargetMin, SWEEP_LIMITS.goldTargetMax]
@@ -498,16 +491,17 @@ function validateSweepCombination(baseInputs, params) {
 export function buildSweepInputs(baseInputs, params) {
     const inputs = deepClone(baseInputs);
     const caseOverrides = {
-        runwayMinMonths: params.runwayMin,
-        runwayTargetMonths: params.runwayTarget,
-        targetEq: params.targetEq,
-        rebalBand: params.rebalBand,
+        liquidityRunwayYears: params.liquidityRunwayYears,
+        rebalancingBand: params.goldRebalancingBand,
         maxSkimPctOfEq: params.maxSkimPct,
         maxBearRefillPctOfEq: params.maxBearRefillPct,
         horizonYears: params.horizonYears,
         survivalQuantile: params.survivalQuantile,
         goGoMultiplier: params.goGoMultiplier
     };
+    delete inputs.runwayMinMonths;
+    delete inputs.runwayTargetMonths;
+    delete inputs.targetEq;
 
     if (params.goldTargetPct !== undefined) {
         caseOverrides.goldZielProzent = params.goldTargetPct;

@@ -170,13 +170,11 @@ export function shouldMaximizeMetric(metricKey) {
  */
 export function applyParametersToForm(params) {
     const mapping = {
-        runwayMin: 'runwayMinMonths',
-        runwayTarget: 'runwayTargetMonths',
-        targetEq: 'targetEq',
-        rebalBand: 'rebalBand',
-        maxSkimPct: 'maxSkimPct',
-        maxBearRefillPct: 'maxBearRefillPct',
-        goldTargetPct: 'goldZielProzent',
+        liquidityRunwayYears: 'liquidityRunwayYears',
+        goldRebalancingBand: 'rebalancingBand',
+        maxSkimPct: 'maxSkimPctOfEq',
+        maxBearRefillPct: 'maxBearRefillPctOfEq',
+        goldTargetPct: 'goldAllokationProzent',
         horizonYears: 'horizonYears',
         survivalQuantile: 'survivalQuantile',
         goGoMultiplier: 'goGoMultiplier'
@@ -195,9 +193,9 @@ export function applyParametersToForm(params) {
 
     // Spezialbehandlung für Gold
     if (params.goldTargetPct !== undefined) {
-        const goldActivElement = document.getElementById('goldAktiv');
+        const goldActivElement = document.getElementById('goldAllokationAktiv');
         if (goldActivElement) {
-            goldActivElement.checked = params.goldTargetPct > 0;
+            goldActivElement.value = params.goldTargetPct > 0 ? 'true' : 'false';
             goldActivElement.dispatchEvent(new Event('change', { bubbles: true }));
         }
     }
@@ -227,10 +225,8 @@ export function displayBestParameters(bestResult, metricKey) {
     };
 
     const paramLabels = {
-        runwayMin: 'Runway Min',
-        runwayTarget: 'Runway Target',
-        targetEq: 'Target Eq',
-        rebalBand: 'Rebal Band',
+        liquidityRunwayYears: 'Liquiditäts-Runway',
+        goldRebalancingBand: 'Gold-Rebal Band',
         maxSkimPct: 'Max Skim %',
         maxBearRefillPct: 'Max Bear Refill %',
         goldTargetPct: 'Gold Target %',
@@ -529,10 +525,8 @@ export function displayMultiObjectiveOptimization(objectives) {
     };
 
     const paramLabels = {
-        runwayMin: 'Runway Min',
-        runwayTarget: 'Runway Target',
-        targetEq: 'Target Eq',
-        rebalBand: 'Rebal Band',
+        liquidityRunwayYears: 'Liquiditäts-Runway',
+        goldRebalancingBand: 'Gold-Rebal Band',
         maxSkimPct: 'Max Skim %',
         maxBearRefillPct: 'Max Bear Refill %',
         goldTargetPct: 'Gold Target %',
@@ -618,10 +612,8 @@ export function displayConstraintBasedOptimization(objectiveMetricKey, maximize,
     };
 
     const paramLabels = {
-        runwayMin: 'Runway Min',
-        runwayTarget: 'Runway Target',
-        targetEq: 'Target Eq',
-        rebalBand: 'Rebal Band',
+        liquidityRunwayYears: 'Liquiditäts-Runway',
+        goldRebalancingBand: 'Gold-Rebal Band',
         maxSkimPct: 'Max Skim %',
         maxBearRefillPct: 'Max Bear Refill %',
         goldTargetPct: 'Gold Target %',

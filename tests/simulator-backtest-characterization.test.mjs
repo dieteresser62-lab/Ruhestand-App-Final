@@ -16,7 +16,6 @@ import { EngineAPI } from '../engine/index.mjs';
 import { CONFIG } from '../engine/config.mjs';
 import { formatPercentValue } from '../app/simulator/simulator-formatting.js';
 import { formatCurrency } from '../app/simulator/simulator-utils.js';
-import { GERMAN_DEMOGRAPHY_CARE_SURVIVOR_CONTRACT } from '../app/simulator/german-demography-care-survivor-contract.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,10 +23,10 @@ const legacyFixturePath = path.join(__dirname, 'fixtures', 'simulator-backtest-b
 const targetFixturePath = path.join(__dirname, 'fixtures', 'simulator-backtest-target-v1.json');
 const slice06DeltaFixturePath = path.join(__dirname, 'fixtures', 'cape-wage-backtest-delta-v3.json');
 const slice07DeltaFixturePath = path.join(__dirname, 'fixtures', 'demography-care-survivor-backtest-delta-v1.json');
+const slice08MeasurementFixturePath = path.join(__dirname, 'fixtures', 'liquidity-runway-slice-08-measurement-v1.json');
 const backtestSourcePath = path.join(__dirname, '..', 'app', 'simulator', 'simulator-backtest.js');
 const backtestRunnerSourcePath = path.join(__dirname, '..', 'app', 'simulator', 'historical-backtest-runner.js');
 const UPDATE_TARGET = process.env.UPDATE_BACKTEST_TARGET === '1';
-const CREATE_SLICE_07_DELTA = process.env.CREATE_BACKTEST_DATA_07_DELTA === '1';
 
 console.log('--- Simulator Backtest Characterization Tests ---');
 
@@ -304,10 +303,8 @@ const BASE_DOM_VALUES = Object.freeze({
     bondTargetFactor: 2,
     drawdownTrigger: 20,
     bondRefillThreshold: 1.5,
-    runwayMinMonths: 24,
-    runwayTargetMonths: 36,
-    targetEq: 60,
-    rebalBand: 5,
+    liquidityRunwayYears: 3,
+    rebalancingBand: 25,
     maxSkimPctOfEq: 10,
     maxBearRefillPctOfEq: 5,
     stressPreset: 'NONE',
@@ -667,12 +664,11 @@ function buildHealthBucketLogRow() {
         startFlexBedarf: 0,
         goldAktiv: false,
         partner: { aktiv: false },
-        targetEq: 90,
         startSPB: 1000,
         marketCapeRatio: 20,
         risikoprofil: 'sicherheits-dynamisch',
         kirchensteuerSatz: 0,
-        rebalBand: 20,
+        rebalancingBand: 20,
         maxSkimPctOfEq: 10,
         maxBearRefillPctOfEq: 5,
         healthBucketEnabled: true,
@@ -1547,10 +1543,10 @@ try {
         'CAPE-only replacement should be observable when Dynamic Flex is enabled'
     );
     assertEqual(capeLegacyStepDeltaOracle.returnPolicy, 'legacy_step', 'CAPE active delta must measure the released default policy');
-    assertEqual(capeLegacyStepDeltaOracle.financialMetrics.summaryEndWealth.delta, 24483.08, 'Default legacy-step oracle should retain the within-Slice-07 CAPE end-wealth effect');
-    assertEqual(capeLegacyStepDeltaOracle.financialMetrics.totalWithdrawal.delta, -3000, 'Default legacy-step oracle should retain the within-Slice-07 CAPE withdrawal effect');
-    assertEqual(capeLegacyStepDeltaOracle.financialMetrics.totalTax.delta, -3455.06, 'Default legacy-step oracle should retain the within-Slice-07 CAPE tax effect');
-    assertEqual(capeLegacyStepDeltaOracle.financialMetrics.minRunwayCoveragePct.delta, 9.287973, 'Default legacy-step oracle should retain the within-Slice-07 CAPE runway effect');
+    assertEqual(capeLegacyStepDeltaOracle.financialMetrics.summaryEndWealth.delta, 56705.98, 'Slice-08 CAPE end-wealth effect must stay exact');
+    assertEqual(capeLegacyStepDeltaOracle.financialMetrics.totalWithdrawal.delta, -30000, 'Slice-08 CAPE withdrawal effect must stay exact');
+    assertEqual(capeLegacyStepDeltaOracle.financialMetrics.totalTax.delta, -4318.72, 'Slice-08 CAPE tax effect must stay exact');
+    assertEqual(capeLegacyStepDeltaOracle.financialMetrics.minRunwayCoveragePct.delta, 10.517888, 'Slice-08 CAPE runway effect must stay exact');
     assertEqual(capeLegacyStepThresholdOracle.comparisonYearCount, 100, 'Legacy-step threshold oracle should cover every comparable decision year');
     assertEqual(capeLegacyStepThresholdOracle.changedYearCount, 21, 'CAPE replacement should retain the measured 21 legacy-step threshold changes');
     const threshold2023 = capeLegacyStepThresholdOracle.changes.find(entry => entry.returnYear === 2023);
@@ -1565,25 +1561,32 @@ try {
     assertEqual(wageSourceSeam.observedRowCount, 7, '1944-1950 wage source-seam case should emit every requested year');
     assertEqual(wageSourceSeam.outcomeObservation, 'completed', '1944-1950 wage source-seam case should complete');
     const earlyWage1930 = earlyWageDataDeltaOracles.find(entry => entry.scenarioId === 'wage_indexed_pension_jst_1930_1940');
+    if (process.env.PRINT_BACKTEST_DATA_08 === '1') {
+        console.log('__SLICE_08_EARLY_WAGE_ORACLES__');
+        console.log(stableStringify(earlyWageDataDeltaOracles.map(entry => ({
+            scenarioId: entry.scenarioId,
+            financialMetrics: entry.financialMetrics
+        })), 2));
+    }
     assertEqual(earlyWage1930?.outcome.before, 'completed', '1930-1940 baseline should complete');
     assertEqual(earlyWage1930?.outcome.after, 'completed', '1930-1940 JST case should complete');
-    assertEqual(earlyWage1930?.financialMetrics.summaryEndWealth.before, 2735439.56, '1930-1940 constant-wage baseline end wealth should stay exact');
-    assertEqual(earlyWage1930?.financialMetrics.summaryEndWealth.after, 2670178.4, '1930-1940 JST end wealth should stay exact');
-    assertEqual(earlyWage1930?.financialMetrics.summaryEndWealth.delta, -65261.16, '1930-1940 JST end-wealth delta should stay exact');
-    assertEqual(earlyWage1930?.financialMetrics.totalWithdrawal.delta, 51000, '1930-1940 JST withdrawal delta should stay exact');
-    assertEqual(earlyWage1930?.financialMetrics.totalTax.delta, 2408.26, '1930-1940 JST tax delta should stay exact');
-    assertEqual(earlyWage1930?.financialMetrics.yearsWithReductionAtLeast10Pct.before, 7, '1930-1940 constant-wage baseline reduction years should stay exact');
-    assertEqual(earlyWage1930?.financialMetrics.yearsWithReductionAtLeast10Pct.after, 9, '1930-1940 JST reduction years should stay exact');
+    assertEqual(earlyWage1930?.financialMetrics.summaryEndWealth.before, 2740858.55, '1930-1940 constant-wage baseline end wealth must stay exact');
+    assertEqual(earlyWage1930?.financialMetrics.summaryEndWealth.after, 2670022.78, '1930-1940 JST end wealth must stay exact');
+    assertEqual(earlyWage1930?.financialMetrics.summaryEndWealth.delta, -70835.77, '1930-1940 JST end-wealth delta must stay exact');
+    assertEqual(earlyWage1930?.financialMetrics.totalWithdrawal.delta, 51000, '1930-1940 JST withdrawal delta must stay exact');
+    assertEqual(earlyWage1930?.financialMetrics.totalTax.delta, 879.27, '1930-1940 JST tax delta must stay exact');
+    assertEqual(earlyWage1930?.financialMetrics.yearsWithReductionAtLeast10Pct.before, 7, '1930-1940 baseline reduction years must stay exact');
+    assertEqual(earlyWage1930?.financialMetrics.yearsWithReductionAtLeast10Pct.after, 9, '1930-1940 JST reduction years must stay exact');
     const earlyWage1935 = earlyWageDataDeltaOracles.find(entry => entry.scenarioId === 'wage_indexed_pension_jst_1935_1946');
     assertEqual(earlyWage1935?.outcome.before, 'completed', '1935-1946 baseline should complete');
     assertEqual(earlyWage1935?.outcome.after, 'completed', '1935-1946 JST case should complete');
-    assertEqual(earlyWage1935?.financialMetrics.summaryEndWealth.before, 5141746.5, '1935-1946 constant-wage baseline end wealth should stay exact');
-    assertEqual(earlyWage1935?.financialMetrics.summaryEndWealth.after, 5093328.06, '1935-1946 JST end wealth should stay exact');
-    assertEqual(earlyWage1935?.financialMetrics.summaryEndWealth.delta, -48418.44, '1935-1946 JST end-wealth delta should stay exact');
-    assertEqual(earlyWage1935?.financialMetrics.totalWithdrawal.delta, 28200, '1935-1946 JST withdrawal delta should stay exact');
-    assertEqual(earlyWage1935?.financialMetrics.totalTax.delta, 5003.92, '1935-1946 JST tax delta should stay exact');
-    assertEqual(earlyWage1935?.financialMetrics.yearsWithReductionAtLeast10Pct.before, 10, '1935-1946 constant-wage baseline reduction years should stay exact');
-    assertEqual(earlyWage1935?.financialMetrics.yearsWithReductionAtLeast10Pct.after, 1, '1935-1946 JST reduction years should stay exact');
+    assertEqual(earlyWage1935?.financialMetrics.summaryEndWealth.before, 5136609.35, '1935-1946 constant-wage baseline end wealth must stay exact');
+    assertEqual(earlyWage1935?.financialMetrics.summaryEndWealth.after, 5091243.1, '1935-1946 JST end wealth must stay exact');
+    assertEqual(earlyWage1935?.financialMetrics.summaryEndWealth.delta, -45366.25, '1935-1946 JST end-wealth delta must stay exact');
+    assertEqual(earlyWage1935?.financialMetrics.totalWithdrawal.delta, 28200, '1935-1946 JST withdrawal delta must stay exact');
+    assertEqual(earlyWage1935?.financialMetrics.totalTax.delta, 3755.72, '1935-1946 JST tax delta must stay exact');
+    assertEqual(earlyWage1935?.financialMetrics.yearsWithReductionAtLeast10Pct.before, 10, '1935-1946 baseline reduction years must stay exact');
+    assertEqual(earlyWage1935?.financialMetrics.yearsWithReductionAtLeast10Pct.after, 1, '1935-1946 JST reduction years must stay exact');
     for (const deltaOracle of [
         capeDisabledDeltaOracle,
         capeLegacyStepDeltaOracle,
@@ -1634,127 +1637,119 @@ try {
         'D-01 target should not silently change characterized ruin frequency'
     );
 
-    if (UPDATE_TARGET) {
-        fs.mkdirSync(path.dirname(targetFixturePath), { recursive: true });
-        fs.writeFileSync(targetFixturePath, `${stableStringify(actual, 2)}\n`, 'utf8');
-        console.log(`Updated ${path.relative(path.join(__dirname, '..'), targetFixturePath)}`);
-    } else {
-        const expected = JSON.parse(fs.readFileSync(targetFixturePath, 'utf8'));
-        const unexpected = collectDiffs(expected, actual);
-        if (unexpected.length > 0) {
-            console.error('Unexpected backtest target deltas:');
-            console.error(stableStringify(unexpected.slice(0, 20), 2));
-        }
-        assertEqual(unexpected.length, 0, 'target delta reporter should find no unexpected deltas');
-    }
-
+    assert(UPDATE_TARGET === false, 'The immutable Slice-07 target must never be overwritten by Slice 08');
+    const archivedTargetBytes = fs.readFileSync(targetFixturePath);
+    assertEqual(
+        createHash('sha256').update(archivedTargetBytes).digest('hex'),
+        'cdf879d5dde9d9318d46d2fb13749078a97c1ee579dc8a7267dc687296a05cf9',
+        'Immutable Slice-07 backtest target should remain byte-identical'
+    );
     const archivedSlice06Bytes = fs.readFileSync(slice06DeltaFixturePath);
     assertEqual(
         createHash('sha256').update(archivedSlice06Bytes).digest('hex'),
         '71bad07c8f09b4a41829a315055ee54bcbdf3f6d74c2f943ac50469bc92f8097',
-        'Immutable Slice-06 CAPE/wage evidence should retain its reviewed byte hash'
+        'Immutable Slice-06 CAPE/wage evidence must remain byte-identical'
     );
-    const archivedSlice06Evidence = JSON.parse(archivedSlice06Bytes.toString('utf8'));
+    const archivedSlice07Bytes = fs.readFileSync(slice07DeltaFixturePath);
     assertEqual(
-        archivedSlice06Evidence.schemaVersion,
-        'CapeWageBacktestDeltaEvidenceV3',
-        'Archived Slice-06 evidence should retain its schema identity'
+        createHash('sha256').update(archivedSlice07Bytes).digest('hex'),
+        '956a353927d36f256649350777bff7455458b64c6b89476c717a508f29825ba3',
+        'Immutable Slice-07 delta evidence must remain byte-identical'
     );
+    const archivedSlice07Evidence = JSON.parse(archivedSlice07Bytes.toString('utf8'));
+    const slice06To07 = archivedSlice07Evidence.slice06To07BacktestDeltaOracle;
+    assertEqual(slice06To07.activeCapeProviderArm.financialMetrics.summaryEndWealth.delta, -19225.84, 'Archived Slice 06 to 07 active-arm end wealth must stay exact');
+    assertEqual(slice06To07.activeCapeProviderArm.financialMetrics.totalWithdrawal.delta, 3000, 'Archived Slice 06 to 07 active-arm withdrawal must stay exact');
+    assertEqual(slice06To07.activeCapeProviderArm.financialMetrics.totalTax.delta, 1124.01, 'Archived Slice 06 to 07 active-arm tax must stay exact');
+    assertEqual(slice06To07.activeCapeProviderArm.financialMetrics.minRunwayCoveragePct.delta, -3.740149, 'Archived Slice 06 to 07 active-arm runway must stay exact');
+    assertEqual(slice06To07.legacyCapeReferenceArm.financialMetrics.summaryEndWealth.delta, 12940.41, 'Archived Slice 06 to 07 reference-arm end wealth must stay exact');
+    assertEqual(slice06To07.legacyCapeReferenceArm.financialMetrics.totalWithdrawal.delta, -24000, 'Archived Slice 06 to 07 reference-arm withdrawal must stay exact');
+    assertEqual(slice06To07.legacyCapeReferenceArm.financialMetrics.totalTax.delta, 4458.88, 'Archived Slice 06 to 07 reference-arm tax must stay exact');
+    assertEqual(slice06To07.legacyCapeReferenceArm.financialMetrics.minRunwayCoveragePct.delta, -2.543821, 'Archived Slice 06 to 07 reference-arm runway must stay exact');
+    assertEqual(slice06To07.activeCapeProviderArm.financialMetrics.maxAbsolutePortfolioFlowDelta.delta, 0, 'Archived Slice 06 to 07 active-arm FlowDelta must stay zero');
+    assertEqual(slice06To07.legacyCapeReferenceArm.financialMetrics.maxAbsolutePortfolioFlowDelta.delta, 0, 'Archived Slice 06 to 07 reference-arm FlowDelta must stay zero');
+
     const crossSliceMetricKeys = [
         'summaryEndWealth',
         'totalWithdrawal',
         'totalTax',
         'minRunwayCoveragePct',
+        'maxDrawdownPct',
         'maxAbsolutePortfolioFlowDelta'
     ];
-    const buildCrossSliceArm = ({ arm, id }) => ({
-        id,
+    const buildSlice07To08Arm = arm => ({
         capeProviderArm: arm,
-        outcome: {
-            before: archivedSlice06Evidence.capeLegacyStepDeltaOracle.outcome[arm],
-            after: capeLegacyStepDeltaOracle.outcome[arm]
-        },
-        canonicalRowsHash: {
-            before: archivedSlice06Evidence.capeLegacyStepDeltaOracle.canonicalRowsHash[arm],
-            after: capeLegacyStepDeltaOracle.canonicalRowsHash[arm],
-            changed: archivedSlice06Evidence.capeLegacyStepDeltaOracle.canonicalRowsHash[arm]
-                !== capeLegacyStepDeltaOracle.canonicalRowsHash[arm]
-        },
         financialMetrics: Object.fromEntries(crossSliceMetricKeys.map(metricKey => {
-            const before = archivedSlice06Evidence.capeLegacyStepDeltaOracle.financialMetrics[metricKey][arm];
+            const before = archivedSlice07Evidence.capeLegacyStepDeltaOracle.financialMetrics[metricKey][arm];
             const after = capeLegacyStepDeltaOracle.financialMetrics[metricKey][arm];
             return [metricKey, { before, after, delta: round(after - before, 6) }];
         }))
     });
-    const slice06To07BacktestDeltaOracle = {
-        schemaVersion: 'Slice06To07MortalityBacktestDeltaV1',
-        sourceFixture: 'tests/fixtures/cape-wage-backtest-delta-v3.json',
-        targetFixture: 'tests/fixtures/demography-care-survivor-backtest-delta-v1.json',
-        cause: 'mortality_table_replacement_in_survival_quantile_dynamic_flex_horizon',
-        activeCapeProviderArm: buildCrossSliceArm({
-            arm: 'after',
-            id: 'dynamic_flex_cape_legacy_step_2018_2025'
-        }),
-        legacyCapeReferenceArm: buildCrossSliceArm({
-            arm: 'before',
-            id: 'dynamic_flex_cape_legacy_step_2018_2025_slice_05_cape_reference'
-        })
+    const slice07To08BacktestDeltaOracle = {
+        schemaVersion: 'Slice07To08LiquidityRunwayBacktestDeltaV1',
+        sourceReference: 'demography-care-survivor-backtest-delta-v1',
+        targetReference: 'post-backtest-data-08-v1',
+        activeCapeProviderArm: buildSlice07To08Arm('after'),
+        legacyCapeReferenceArm: buildSlice07To08Arm('before')
     };
-    assertEqual(slice06To07BacktestDeltaOracle.activeCapeProviderArm.financialMetrics.summaryEndWealth.delta, -19225.84, 'Slice 06 to 07 end-wealth effect must use the same active CAPE arm');
-    assertEqual(slice06To07BacktestDeltaOracle.activeCapeProviderArm.financialMetrics.totalWithdrawal.delta, 3000, 'Slice 06 to 07 withdrawal effect must use the same active CAPE arm');
-    assertEqual(slice06To07BacktestDeltaOracle.activeCapeProviderArm.financialMetrics.totalTax.delta, 1124.01, 'Slice 06 to 07 tax effect must use the same active CAPE arm');
-    assertEqual(slice06To07BacktestDeltaOracle.activeCapeProviderArm.financialMetrics.minRunwayCoveragePct.delta, -3.740149, 'Slice 06 to 07 runway effect must use the same active CAPE arm');
-    assertEqual(slice06To07BacktestDeltaOracle.legacyCapeReferenceArm.financialMetrics.summaryEndWealth.delta, 12940.41, 'Slice 06 to 07 reference-arm end-wealth effect must stay explicit');
-    assertEqual(slice06To07BacktestDeltaOracle.legacyCapeReferenceArm.financialMetrics.totalWithdrawal.delta, -24000, 'Slice 06 to 07 reference-arm withdrawal effect must stay explicit');
-    assertEqual(slice06To07BacktestDeltaOracle.legacyCapeReferenceArm.financialMetrics.totalTax.delta, 4458.88, 'Slice 06 to 07 reference-arm tax effect must stay explicit');
-    assertEqual(slice06To07BacktestDeltaOracle.legacyCapeReferenceArm.financialMetrics.minRunwayCoveragePct.delta, -2.543821, 'Slice 06 to 07 reference-arm runway effect must stay explicit');
-    assertEqual(slice06To07BacktestDeltaOracle.activeCapeProviderArm.financialMetrics.maxAbsolutePortfolioFlowDelta.delta, 0, 'Slice 06 to 07 active arm must retain zero FlowDelta change');
-    assertEqual(slice06To07BacktestDeltaOracle.legacyCapeReferenceArm.financialMetrics.maxAbsolutePortfolioFlowDelta.delta, 0, 'Slice 06 to 07 reference arm must retain zero FlowDelta change');
+    assertEqual(slice07To08BacktestDeltaOracle.activeCapeProviderArm.financialMetrics.summaryEndWealth.delta, -48559.87, 'Slice 07 to 08 active-arm end wealth must stay exact');
+    assertEqual(slice07To08BacktestDeltaOracle.activeCapeProviderArm.financialMetrics.totalWithdrawal.delta, 15000, 'Slice 07 to 08 active-arm withdrawal must stay exact');
+    assertEqual(slice07To08BacktestDeltaOracle.activeCapeProviderArm.financialMetrics.totalTax.delta, -3157.35, 'Slice 07 to 08 active-arm tax must stay exact');
+    assertEqual(slice07To08BacktestDeltaOracle.activeCapeProviderArm.financialMetrics.minRunwayCoveragePct.delta, -38.457989, 'Slice 07 to 08 active-arm runway must stay exact');
+    assertEqual(slice07To08BacktestDeltaOracle.activeCapeProviderArm.financialMetrics.maxDrawdownPct.delta, 0.2987, 'Slice 07 to 08 active-arm drawdown must stay exact');
+    assertEqual(slice07To08BacktestDeltaOracle.legacyCapeReferenceArm.financialMetrics.summaryEndWealth.delta, -80782.77, 'Slice 07 to 08 reference-arm end wealth must stay exact');
+    assertEqual(slice07To08BacktestDeltaOracle.legacyCapeReferenceArm.financialMetrics.totalWithdrawal.delta, 42000, 'Slice 07 to 08 reference-arm withdrawal must stay exact');
+    assertEqual(slice07To08BacktestDeltaOracle.legacyCapeReferenceArm.financialMetrics.totalTax.delta, -2293.69, 'Slice 07 to 08 reference-arm tax must stay exact');
+    assertEqual(slice07To08BacktestDeltaOracle.legacyCapeReferenceArm.financialMetrics.minRunwayCoveragePct.delta, -39.687904, 'Slice 07 to 08 reference-arm runway must stay exact');
+    assertEqual(slice07To08BacktestDeltaOracle.legacyCapeReferenceArm.financialMetrics.maxDrawdownPct.delta, 0.426498, 'Slice 07 to 08 reference-arm drawdown must stay exact');
+    assertEqual(slice07To08BacktestDeltaOracle.activeCapeProviderArm.financialMetrics.maxAbsolutePortfolioFlowDelta.delta, 0, 'Slice 07 to 08 active-arm FlowDelta must stay zero');
+    assertEqual(slice07To08BacktestDeltaOracle.legacyCapeReferenceArm.financialMetrics.maxAbsolutePortfolioFlowDelta.delta, 0, 'Slice 07 to 08 reference-arm FlowDelta must stay zero');
 
-    const slice07DeltaEvidence = {
-        schemaVersion: 'DemographyCareSurvivorBacktestDeltaEvidenceV1',
-        baselineCommit: '02f39f93946234ef000acb7ba9e66f7e912092ca',
-        inputEvidence: {
-            slice06Result: 'docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_06_CAPE_LOHN_RENTENFORTSCHREIBUNG.md',
-            archivedSlice06Fixture: 'tests/fixtures/cape-wage-backtest-delta-v3.json',
-            archivedSlice06FixtureSha256: '71bad07c8f09b4a41829a315055ee54bcbdf3f6d74c2f943ac50469bc92f8097'
-        },
-        dataContract: {
-            schemaVersion: GERMAN_DEMOGRAPHY_CARE_SURVIVOR_CONTRACT.schemaVersion,
-            revision: GERMAN_DEMOGRAPHY_CARE_SURVIVOR_CONTRACT.revision,
-            hashes: GERMAN_DEMOGRAPHY_CARE_SURVIVOR_CONTRACT.hashes
-        },
-        targetManifestRevision: HISTORICAL_DATA_MANIFEST.revision,
-        targetHistoricalDataHash: HISTORICAL_DATA_MANIFEST.contentHash.value,
-        targetFixture: 'tests/fixtures/simulator-backtest-target-v1.json',
-        expectedEffectBoundary: {
-            mortality: 'Changes survival-quantile Dynamic-Flex horizons and therefore the active CAPE golden-case financial metrics.',
-            care: 'No stochastic care entry is drawn in the deterministic historical backtest; care model changes are inactive here.',
-            survivor: 'No stochastic partner death is drawn in the deterministic historical backtest; survivor defaults are inactive here.',
-            capeThresholds: 'CAPE threshold classifications remain unchanged; only the mortality-derived horizon changes.'
-        },
-        slice06To07BacktestDeltaOracle,
-        capeDisabledDeltaOracle,
-        capeLegacyStepThresholdOracle,
-        capeLegacyStepDeltaOracle,
-        wageDataDeltaOracle,
-        earlyWageDataDeltaOracles,
-        wageSourceSeamGoldenCase: wageSourceSeam
+    const slice08Measurement = {
+        schemaVersion: 'LiquidityRunwaySlice08MeasurementV1',
+        snapshotId: 'post-backtest-data-08-v1',
+        sourceReference: 'demography-care-survivor-backtest-delta-v1',
+        sourceResultDocument: 'docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_07_DEMOGRAFIE_PFLEGE_HINTERBLIEBENE.md',
+        reviewStatus: 'pending',
+        actualSha256: createHash('sha256').update(stableStringify(actual)).digest('hex'),
+        caseCount: actual.cases.length,
+        negativeCaseCount: actual.negativeCases.length,
+        ruinCaseCount: actual.cases.filter(entry => entry.outcomeObservation === 'ruin').length,
+        maxAbsolutePortfolioFlowDelta: round(Math.max(...actual.cases.map(entry => entry.values.maxAbsolutePortfolioFlowDelta)), 6),
+        capeLegacyStepDelta: capeLegacyStepDeltaOracle.financialMetrics,
+        slice07To08BacktestDeltaOracle,
+        earlyWageDataDeltaOracles: earlyWageDataDeltaOracles.map(entry => ({
+            scenarioId: entry.scenarioId,
+            financialMetrics: entry.financialMetrics
+        })),
+        caseOracles: actual.cases.map(entry => ({
+            id: entry.id,
+            outcomeObservation: entry.outcomeObservation,
+            summaryEndWealth: entry.values.summaryEndWealth,
+            totalWithdrawal: entry.values.totalWithdrawal,
+            totalTax: entry.values.totalTax,
+            maxAbsolutePortfolioFlowDelta: entry.values.maxAbsolutePortfolioFlowDelta
+        })),
+        thresholdChangedYearCount: capeLegacyStepThresholdOracle.changedYearCount
     };
-    if (CREATE_SLICE_07_DELTA) {
-        if (fs.existsSync(slice07DeltaFixturePath)) {
-            throw new Error('Refusing to overwrite immutable Slice-07 demography/care/survivor backtest delta evidence');
-        }
-        fs.writeFileSync(slice07DeltaFixturePath, `${stableStringify(slice07DeltaEvidence, 2)}\n`, 'utf8');
-        console.log(`Created ${path.relative(path.join(__dirname, '..'), slice07DeltaFixturePath)}`);
+    if (process.env.PRINT_BACKTEST_DATA_08 === '1') {
+        console.log('__BACKTEST_DATA_08_MEASUREMENT_START__');
+        console.log(stableStringify(slice08Measurement, 2));
+        console.log('__BACKTEST_DATA_08_MEASUREMENT_END__');
     } else {
-        const expectedDeltaEvidence = JSON.parse(fs.readFileSync(slice07DeltaFixturePath, 'utf8'));
-        assertEqual(
-            stableStringify(slice07DeltaEvidence),
-            stableStringify(expectedDeltaEvidence),
-            'Separate Slice-07 demography/care/survivor delta evidence should reproduce exactly'
-        );
+        const expectedSlice08Measurement = JSON.parse(fs.readFileSync(slice08MeasurementFixturePath, 'utf8'));
+        const unexpected = collectDiffs(expectedSlice08Measurement, slice08Measurement);
+        if (unexpected.length > 0) {
+            console.error('Unexpected Slice-08 backtest measurement deltas:');
+            console.error(stableStringify(unexpected.slice(0, 20), 2));
+        }
+        assertEqual(unexpected.length, 0, 'Slice-08 backtest measurement should reproduce exactly with field-level diagnostics');
     }
+    assertEqual(
+        archivedSlice07Evidence.schemaVersion,
+        'DemographyCareSurvivorBacktestDeltaEvidenceV1',
+        'Archived Slice-07 delta evidence should retain its schema identity'
+    );
 
     console.log('✅ Simulator backtest characterization tests passed');
 } finally {

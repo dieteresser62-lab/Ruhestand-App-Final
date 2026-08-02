@@ -356,18 +356,12 @@
                     </fieldset>
                     <fieldset>
                         <legend>Runway-Steuerung</legend>
-                        <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div class="form-grid" style="grid-template-columns: 1fr; gap: 15px;">
                             <div class="form-group">
-                                <label for="runwayMinMonths">Runway Minimum (Monate)</label>
-                                <input id="runwayMinMonths" type="number" min="12" max="60" step="1"
-                                    title="Das absolute Minimum an Liquiditätsreichweite, das nicht unterschritten werden soll. Löst im Bärenmarkt ggf. Not-Auffüllungen aus."
-                                    value="24">
-                            </div>
-                            <div class="form-group">
-                                <label for="runwayTargetMonths">Runway Ziel (Monate)</label>
-                                <input id="runwayTargetMonths" type="number" min="18" max="72" step="1"
-                                    title="Die angestrebte, komfortable Liquiditätsreichweite. Wird in guten Marktphasen proaktiv aufgefüllt (Skim & Fill)."
-                                    value="36">
+                                <label for="liquidityRunwayYears">Liquiditäts-Runway (Jahre)</label>
+                                <input id="liquidityRunwayYears" type="number" min="1" max="10" step="0.5"
+                                    title="Zielreichweite der operativen Liquidität. Die Engine leitet daraus intern eine harte Sicherheitsuntergrenze ab."
+                                    value="5">
                             </div>
                         </div>
                         <div class="form-group" style="margin-top: 10px;">
@@ -378,19 +372,13 @@
                         </div>
                     </fieldset>
                     <fieldset>
-                        <legend>Rebalancing-Strategie</legend>
+                        <legend>Gold- und Transaktionsstrategie</legend>
                         <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 15px 20px;">
                             <div class="form-group">
-                                <label for="targetEq">Aktien-Zielquote (%)</label>
-                                <input id="targetEq" type="number" min="20" max="90" step="1"
-                                    title="Die angestrebte prozentuale Allokation in Aktien. Dient als Anker für das Rebalancing."
-                                    value="60">
-                            </div>
-                            <div class="form-group">
-                                <label for="rebalBand">Rebalancing-Band (±%)</label>
-                                <input id="rebalBand" type="number" min="1" max="20" step="0.5"
-                                    title="Die prozentuale Toleranz um die Zielquote, bevor ein Rebalancing ausgelöst wird."
-                                    value="5">
+                                <label for="rebalancingBand">Gold-Rebalancing-Band (±%)</label>
+                                <input id="rebalancingBand" type="number" min="0" max="100" step="1"
+                                    title="Die prozentuale Toleranz um das Goldziel, bevor Gold-Rebalancing ausgelöst wird."
+                                    value="25">
                             </div>
                             <div class="form-group">
                                 <label for="maxSkimPctOfEq">Max. Abschöpfen p.a. (%)</label>

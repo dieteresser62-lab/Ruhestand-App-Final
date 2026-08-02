@@ -1,5 +1,6 @@
 import { buildInputsCtxFromPortfolio } from './simulator-portfolio.js';
 import { buildDetailedTranchesFromPortfolio } from './simulator-engine-direct-utils.js';
+import { resolveLiquidityRunwayYears } from '../../types/liquidity-runway-contract.js';
 
 export function buildSimulatorEngineInput({
     inputs,
@@ -45,12 +46,10 @@ export function buildSimulatorEngineInput({
         marketCapeRatio: resolvedCapeRatio,
 
         rebalancingBand: inputs.rebalancingBand ?? 35,
-        targetEq: inputs.targetEq ?? 60,
         goldZielProzent: inputs.goldAktiv ? (inputs.goldZielProzent ?? 10) : 0,
         maxSkimPctOfEq: inputs.maxSkimPctOfEq ?? 5,
         maxBearRefillPctOfEq: inputs.maxBearRefillPctOfEq ?? 5,
-        runwayTargetMonths: inputs.runwayTargetMonths ?? 36,
-        runwayMinMonths: inputs.runwayMinMonths ?? 12,
+        liquidityRunwayYears: resolveLiquidityRunwayYears(inputs).years,
 
         endeVJ: marketDataCurrentYear.endeVJ || 0,
         endeVJ_1: marketDataCurrentYear.endeVJ_1 || 0,

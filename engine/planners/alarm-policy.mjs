@@ -1,5 +1,9 @@
 import { CONFIG } from '../config.mjs';
 import { calculateWealthAdjustedReductionFactor } from './wealth-reduction.mjs';
+import {
+    deriveLiquidityRunwayPolicy,
+    resolveLiquidityRunwayYears
+} from '../../types/liquidity-runway-contract.js';
 
 export function shouldDeescalateInPeak(alarmWarAktiv, state, params) {
     const { market } = params;
@@ -15,9 +19,10 @@ export function shouldDeescalateInRecovery(alarmWarAktiv, state, params) {
     if (!alarmWarAktiv || params.market.sKey !== 'recovery_in_bear') {
         return false;
     }
-    const { runwayMonate, profil, input } = params;
+    const { runwayMonate, input } = params;
     const { entnahmequoteDepot, realerDepotDrawdown } = state.keyParams;
-    const okRunway = runwayMonate >= (profil.minRunwayMonths + 6);
+    const hardMinimumMonths = deriveLiquidityRunwayPolicy(resolveLiquidityRunwayYears(input || {}).years).hardMinimumMonths;
+    const okRunway = runwayMonate >= (hardMinimumMonths + 6);
     const okDrawdnRecovery = realerDepotDrawdown <= (CONFIG.THRESHOLDS.ALARM.realDrawdown - 0.05);
     const noNewLowerYearlyCloses = input.endeVJ > Math.min(input.endeVJ_1, input.endeVJ_2);
 

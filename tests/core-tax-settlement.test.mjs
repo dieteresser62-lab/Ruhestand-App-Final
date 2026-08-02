@@ -16,12 +16,10 @@ const baseInput = {
     goldAktiv: false,
     risikoprofil: 'sicherheits-dynamisch',
     goldFloorProzent: 0,
-    runwayTargetMonths: 36,
-    runwayMinMonths: 24,
+    liquidityRunwayYears: 3,
     renteAktiv: false,
     marketCapeRatio: 20,
-    targetEq: 60,
-    rebalBand: 5,
+    rebalancingBand: 25,
     maxSkimPctOfEq: 10,
     maxBearRefillPctOfEq: 20,
     endeVJ: 100,
@@ -149,7 +147,7 @@ function assertSaleContract(action, messagePrefix) {
 
 {
     const result = EngineAPI.simulateSingleYear(
-        { ...baseInput, tagesgeld: 133100 },
+        { ...baseInput, tagesgeld: 138000 },
         {}
     );
     assert(!result.error, 'Core no-transaction run should succeed');

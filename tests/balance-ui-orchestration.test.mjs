@@ -703,6 +703,8 @@ async function runBalanceUiOrchestrationTests() {
                     ...validState.inputs,
                     aktuellesAlter: 0,
                     targetEq: 0,
+                    runwayTargetMonths: 42,
+                    runwayMinMonths: 24,
                     rebalBand: 0,
                     tqfAlt: 30,
                     kirchensteuerSatz: 0.08
@@ -713,23 +715,41 @@ async function runBalanceUiOrchestrationTests() {
         assertEqual(normalizedVersionOne.sourceFormat, 'balance-state-v1',
             'Bestehende Version-1-Sicherungen laufen über den benannten Aufwärtsmigrator');
         assertEqual(normalizedVersionOne.migrated, true, 'Version-1-Sicherungen werden sichtbar als migriert markiert');
-        assertEqual(normalizedVersionOne.payload.inputs.targetEq, 0,
-            'Der Version-1-Migrator erhält die in Slice 03 entschiedene Aktienquote 0');
-        assertEqual(normalizedVersionOne.payload.inputs.rebalBand, 0,
-            'Der Version-1-Migrator erhält den Reader-Fallback 0 für das Rebalancing-Band');
+        assertEqual(normalizedVersionOne.payload.inputs.liquidityRunwayYears, 3.5,
+            'Der Version-1-Migrator übernimmt das frühere Runway-Ziel in Jahre');
+        assertEqual(Object.hasOwn(normalizedVersionOne.payload.inputs, 'targetEq'), false,
+            'Der Version-1-Migrator entfernt die nicht mehr wirksame Aktien-Zielquote');
+        assertEqual(Object.hasOwn(normalizedVersionOne.payload.inputs, 'runwayTargetMonths'), false,
+            'Der Version-1-Migrator emittiert kein altes Runway-Zielfeld');
+        assertEqual(Object.hasOwn(normalizedVersionOne.payload.inputs, 'rebalBand'), false,
+            'Der Version-1-Migrator entfernt das mehrdeutige alte Aktien-Rebalancing-Band');
         assertEqual(normalizedVersionOne.payload.inputs.tqfAlt, 0.3,
             'Eindeutige historische Prozentschreibweise wird symmetrisch in die Dezimalrate migriert');
         assertEqual(normalizedVersionOne.payload.inputs.kirchensteuerSatz, 0.08,
             'Der bereits versionierte Kirchensteuer-Enum bleibt ohne unbelegte Prozentheuristik erhalten');
+        const normalizedOffGridVersionOne = normalizeBalanceImportDocument({
+            ...versionOneDocument,
+            payload: {
+                ...versionOneDocument.payload,
+                inputs: {
+                    ...versionOneDocument.payload.inputs,
+                    runwayTargetMonths: 25
+                }
+            }
+        });
+        assertEqual(normalizedOffGridVersionOne.payload.inputs.liquidityRunwayYears, 2.5,
+            'Ein alter 25-Monats-Wert bleibt importierbar und wird sicherheitsorientiert auf das naechste Halbjahr aufgerundet');
 
         [
-            { field: 'rebalBand', value: 0, expectsWarning: false },
+            { field: 'rebalancingBand', value: 0, expectsWarning: false },
             { field: 'aktuellesAlter', value: 0, expectsWarning: false },
             { field: 'inflation', value: 60, expectsWarning: true },
             { field: 'horizonYears', value: 30.5, expectsWarning: true },
             { field: 'profilName', value: 'P'.repeat(250), expectsWarning: true },
             { field: 'flexBudgetYears', value: 12, expectsWarning: true },
-            { field: 'tqfAlt', value: 30, expectsWarning: true }
+            { field: 'tqfAlt', value: 30, expectsWarning: true },
+            { field: 'liquidityRunwayYears', value: 5000, expectsWarning: true },
+            { field: 'liquidityRunwayYears', value: 1.25, expectsWarning: true }
         ].forEach(({ field, value, expectsWarning }) => {
             const exportWithReachableValue = createBalanceExportDocument({
                 ...validState,
@@ -746,13 +766,17 @@ async function runBalanceUiOrchestrationTests() {
         });
         const zeroBoundaryDocument = createBalanceExportDocument({
             ...validState,
-            inputs: { ...validState.inputs, targetEq: 0, rebalBand: 0 }
+            inputs: { ...validState.inputs, targetEq: 0, rebalBand: 0, rebalancingBand: 0 }
         });
         const normalizedZeroBoundary = normalizeBalanceImportDocument(zeroBoundaryDocument);
-        assertEqual(normalizedZeroBoundary.payload.inputs.targetEq, 0,
-            'Aktueller Export-/Import-Roundtrip erhält targetEq=0 ohne Legacy-Fallback');
-        assertEqual(normalizedZeroBoundary.payload.inputs.rebalBand, 0,
-            'Aktueller Export-/Import-Roundtrip erhält rebalBand=0 ohne Legacy-Fallback');
+        assertEqual(Object.hasOwn(normalizedZeroBoundary.payload.inputs, 'targetEq'), false,
+            'Aktueller Export-/Import-Roundtrip entfernt die wirkungslose Aktien-Zielquote');
+        assertEqual(normalizedZeroBoundary.payload.inputs.liquidityRunwayYears, 5,
+            'Aktueller Export-/Import-Roundtrip materialisiert den kanonischen Runway-Default');
+        assertEqual(Object.hasOwn(normalizedZeroBoundary.payload.inputs, 'rebalBand'), false,
+            'Aktueller Export-/Import-Roundtrip entfernt das alte Rebalancing-Feld');
+        assertEqual(normalizedZeroBoundary.payload.inputs.rebalancingBand, 0,
+            'Aktueller Export-/Import-Roundtrip erhält das kanonische Gold-Rebalancing-Band 0');
         for (const inflationBoundary of [-10, 50]) {
             const boundaryDocument = createBalanceExportDocument({
                 ...validState,
@@ -873,7 +897,7 @@ async function runBalanceUiOrchestrationTests() {
             },
             {
                 label: 'Bereichsverletzungen',
-                overrides: { targetEq: 5000 },
+                overrides: { liquidityRunwayYears: 5000 },
                 code: 'invalid_input_bounds'
             },
             {
@@ -1592,8 +1616,7 @@ async function runBalanceUiOrchestrationTests() {
             goldWert: 0,
             goldFloorProzent: 0,
             goldZielProzent: 0,
-            runwayTargetMonths: 36,
-            runwayMinMonths: 24,
+            liquidityRunwayYears: 3,
             risikoprofil: 'sicherheits-dynamisch',
             endeVJ: 70,
             endeVJ_1: 100,

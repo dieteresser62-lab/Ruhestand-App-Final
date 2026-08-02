@@ -107,10 +107,7 @@ try {
         goldFloorProzent: 0,
         rebalancingBand: 20,
         goldSteuerfrei: 'false',
-        runwayMinMonths: 24,
-        runwayTargetMonths: 36,
-        targetEq: 60,
-        rebalBand: 5,
+        liquidityRunwayYears: 3,
         maxSkimPctOfEq: 10,
         maxBearRefillPctOfEq: 5
     };
@@ -402,7 +399,10 @@ try {
         assertEqual(window.globalBacktestData?.decumulationMode, '3_bucket_jilge', 'Backtest should run in 3-Bucket mode');
         assertEqual(window.globalBacktestData?.minimumFlexProfiles?.length, 2, 'Backtest should retain profile-level minimum-flex split');
         assertEqual(window.globalBacktestData?.minimumFlexProfiles?.[1]?.minimumFlexAnnual, 9000, 'Backtest should expose profile B minimum flex');
-        assert(rows.some(r => r.row?.minimumFlexStatus === 'applied'), '3-Bucket log should expose applied minimum-flex status');
+        assert(rows.every(r => typeof r.row?.minimumFlexStatus === 'string'),
+            '3-Bucket log should expose the minimum-flex decision status in every year');
+        assert(rows.some(r => r.row?.minimumFlexStatus === 'blocked_emergency'),
+            '3-Bucket log should visibly block minimum flex during the measured liquidity emergency');
         assert(rows.every(r => Math.abs(Number(r.row?.portfolio_flow_delta) || 0) < 1), '3-Bucket FlowDelta should remain near zero with minimum flex');
     }
 

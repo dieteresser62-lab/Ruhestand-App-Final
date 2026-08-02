@@ -111,12 +111,10 @@ function createInputs() {
         zielLiquiditaet: 45000,
         startFloorBedarf: 24000,
         startFlexBedarf: 12000,
-        targetEq: 60,
-        rebalBand: 5,
+        rebalancingBand: 25,
         maxSkimPctOfEq: 10,
         maxBearRefillPctOfEq: 5,
-        runwayMinMonths: 24,
-        runwayTargetMonths: 36,
+        liquidityRunwayYears: 3,
         goldAktiv: false,
         goldZielProzent: 0,
         goldFloorProzent: 0,
@@ -537,10 +535,8 @@ console.log('Test 9: versioned Sweep request worker parity');
         prepareHistoricalDataOnce();
         const baseInputs = createInputs();
         const paramCombinations = [{
-            runwayMin: 24,
-            runwayTarget: 36,
-            targetEq: 60,
-            rebalBand: 5,
+            liquidityRunwayYears: 3,
+            goldRebalancingBand: 25,
             maxSkimPct: 10,
             maxBearRefillPct: 5,
             goldTargetPct: 0

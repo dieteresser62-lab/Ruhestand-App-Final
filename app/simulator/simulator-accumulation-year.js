@@ -106,26 +106,23 @@ export function simulateAccumulationYear({
     let kaufGldTotal = 0;
 
     if (ueberschuss > 500) {
-        const targetEq = inputs.targetEq || 60;
         const goldZielProzent = inputs.goldAktiv ? (inputs.goldZielProzent || 0) : 0;
-        const aktienAnteil = targetEq / 100;
-        const goldAnteil = goldZielProzent / 100;
-        const gesamtAnteil = aktienAnteil + goldAnteil;
+        const equityValue = sumDepot({ depotTranchesAktien: portfolio.depotTranchesAktien });
+        const goldValue = sumDepot({ depotTranchesGold: portfolio.depotTranchesGold });
+        const totalWealth = equityValue + goldValue + liquiditaet;
+        const goldTarget = totalWealth * (goldZielProzent / 100);
+        const goldBetrag = inputs.goldAktiv ? Math.min(ueberschuss, Math.max(0, goldTarget - goldValue)) : 0;
+        const aktienBetrag = Math.max(0, ueberschuss - goldBetrag);
 
-        if (gesamtAnteil > 0) {
-            const aktienBetrag = ueberschuss * (aktienAnteil / gesamtAnteil);
-            const goldBetrag = ueberschuss * (goldAnteil / gesamtAnteil);
-
-            if (aktienBetrag > 0) {
-                buyStocksNeu(portfolio, aktienBetrag);
-                liquiditaet -= aktienBetrag;
-                kaufAktTotal = aktienBetrag;
-            }
-            if (goldBetrag > 0 && inputs.goldAktiv) {
-                buyGold(portfolio, goldBetrag);
-                liquiditaet -= goldBetrag;
-                kaufGldTotal = goldBetrag;
-            }
+        if (goldBetrag > 0) {
+            buyGold(portfolio, goldBetrag);
+            liquiditaet -= goldBetrag;
+            kaufGldTotal = goldBetrag;
+        }
+        if (aktienBetrag > 0) {
+            buyStocksNeu(portfolio, aktienBetrag);
+            liquiditaet -= aktienBetrag;
+            kaufAktTotal = aktienBetrag;
         }
     }
 
@@ -181,14 +178,17 @@ export function simulateAccumulationYear({
                 jahresEntnahme: 0,
                 kuerzungQuelle: 'none',
                 flexRate: 1.0,
-                runwayMonths: Infinity
+                runwayMonths: 0
             },
             FlexRatePct: 1.0,
             CutReason: 'none',
             Alarm: false,
             Regime: 'accumulation',
             QuoteEndPct: 0,
-            RunwayCoveragePct: (zielLiquiditaet > 0 ? (portfolio.liquiditaet / zielLiquiditaet) * 100 : Infinity),
+            RunwayCoveragePct: (zielLiquiditaet > 0
+                ? (portfolio.liquiditaet / zielLiquiditaet) * 100
+                : (portfolio.liquiditaet > 0 ? 100 : 0)),
+            RunwayMeasurementPhase: 'post_accumulation_end_of_year',
             RealReturnEquityPct: ((1 + rA) / (1 + yearData.inflation / 100) - 1),
             RealReturnGoldPct: ((1 + rG) / (1 + yearData.inflation / 100) - 1),
             entnahmequote: 0,
@@ -202,6 +202,7 @@ export function simulateAccumulationYear({
             liqStart: euros(initialLiqStart),
             cashInterestEarned: signedEuros(cashZinsen),
             liqEnd: euros(liqNachZins),
+            liq_post_accumulation_end_of_year: euros(portfolio.liquiditaet),
             portfolio_total_before_accumulation: portfolioActiveBeforeFlows,
             portfolio_active_end: portfolioActiveEnd,
             portfolio_flow_delta: portfolioFlowDelta,

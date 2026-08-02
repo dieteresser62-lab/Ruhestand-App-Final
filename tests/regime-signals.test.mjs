@@ -199,7 +199,7 @@ console.log('--- Regime Signals Contract Tests ---');
     };
     const inflatedBedarf = { floor: 12000, flex: 0 };
     const input = {
-        runwayMinMonths: 24,
+        liquidityRunwayYears: 2,
         floorBedarf: 12000,
         flexBedarf: 0
     };
@@ -207,21 +207,21 @@ console.log('--- Regime Signals Contract Tests ---');
     try {
         CONFIG.REGIME_SMOOTHING.TARGETS_ENABLED = false;
         const legacyTarget = TransactionEngine.calculateTargetLiquidity(profil, market, inflatedBedarf, input);
-        assertClose(legacyTarget, 60000, 1e-12, 'Default disabled target smoothing preserves discrete bear target');
+        assertClose(legacyTarget, 24000, 1e-12, 'Canonical user runway determines the target independent of market regime');
 
         CONFIG.REGIME_SMOOTHING.TARGETS_ENABLED = true;
         const smoothedTarget = TransactionEngine.calculateTargetLiquidity(profil, market, inflatedBedarf, input);
-        assertClose(smoothedTarget, 48000, 1e-12, 'Enabled target smoothing changes target liquidity gradually');
+        assertClose(smoothedTarget, 24000, 1e-12, 'Legacy smoothing flag cannot override the canonical user runway');
         const smoothedDetails = TransactionEngine.calculateTargetLiquidityDetails(profil, market, inflatedBedarf, input);
-        assertClose(smoothedDetails.runwayTargetDiagnostics.targetMonths, 48, 1e-12, 'Target-liquidity details expose smoothed target months');
-        assert(smoothedDetails.runwayTargetDiagnostics.smoothingActive === true, 'Target-liquidity details expose active smoothing');
-        assert(smoothedDetails.runwayTargetDiagnostics.smoothingApplied === true, 'Target-liquidity details expose applied smoothing');
-        assert(smoothedDetails.runwayTargetDiagnostics.severityPct === 50, 'Target-liquidity details expose severity percent');
+        assertClose(smoothedDetails.runwayTargetDiagnostics.targetMonths, 24, 1e-12, 'Target-liquidity details expose the configured target months');
+        assert(smoothedDetails.runwayTargetDiagnostics.smoothingActive === false, 'Target-liquidity details keep smoothing inactive');
+        assert(smoothedDetails.runwayTargetDiagnostics.smoothingApplied === false, 'Target-liquidity details report no smoothing');
+        assert(smoothedDetails.runwayTargetDiagnostics.severityPct === 0, 'Target-liquidity details do not mix market severity into the target');
         assert(smoothedDetails.runwayTargetDiagnostics.hardMinimumMonths === 24, 'Target-liquidity details expose hard minimum runway');
 
         const explicitTarget = TransactionEngine.calculateTargetLiquidity(profil, market, inflatedBedarf, {
             ...input,
-            runwayTargetMonths: 60
+            liquidityRunwayYears: 5
         });
         assertClose(explicitTarget, 60000, 1e-12, 'Explicit user target bypasses target smoothing');
 
@@ -231,8 +231,8 @@ console.log('--- Regime Signals Contract Tests ---');
             inflatedBedarf,
             input
         );
-        assert(fallbackDetails.runwayTargetDiagnostics.smoothingFallback === true, 'Incomplete support targets are visible as smoothing fallback');
-        assert(fallbackDetails.runwayTargetDiagnostics.fallbackReason === 'incomplete_support_targets', 'Smoothing fallback reason is exposed');
+        assert(fallbackDetails.runwayTargetDiagnostics.smoothingFallback === false, 'Profile target gaps do not affect the canonical runway contract');
+        assert(fallbackDetails.runwayTargetDiagnostics.fallbackReason === null, 'Canonical runway needs no profile-target fallback');
     } finally {
         CONFIG.REGIME_SMOOTHING.TARGETS_ENABLED = originalEnabled;
     }
@@ -251,7 +251,7 @@ console.log('--- Regime Signals Contract Tests ---');
     };
     const inflatedBedarf = { floor: 12000, flex: 0 };
     const input = {
-        runwayMinMonths: 24,
+        liquidityRunwayYears: 2,
         floorBedarf: 12000,
         flexBedarf: 0
     };
@@ -276,21 +276,13 @@ console.log('--- Regime Signals Contract Tests ---');
         CONFIG.REGIME_SMOOTHING.TARGETS_ENABLED = true;
 
         const lowerBoundary = [9.9, 10.0, 10.1].map(targetMonthsForDrawdown);
-        assertClose(lowerBoundary[0], 36, 1e-12, 'Drawdown just below 10% keeps neutral runway target');
-        assertClose(lowerBoundary[1], 36, 1e-12, 'Drawdown exactly at 10% keeps neutral runway target');
-        assert(lowerBoundary[2] > lowerBoundary[1], 'Drawdown just above 10% starts increasing target gradually');
-        assert(lowerBoundary[2] - lowerBoundary[1] < 3, '10% boundary delta stays below 3 months');
+        lowerBoundary.forEach(value => assertClose(value, 24, 1e-12, '10% drawdown boundary keeps the configured runway target'));
 
         const bearBoundary = [19.9, 20.0, 20.1].map(targetMonthsForDrawdown);
-        assert(bearBoundary[0] < bearBoundary[1], 'Runway target remains monotonic before 20% drawdown');
-        assert(bearBoundary[1] < bearBoundary[2], 'Runway target remains monotonic after 20% drawdown');
-        assert(bearBoundary[2] - bearBoundary[0] < 3, '20% boundary delta stays below 3 months');
+        bearBoundary.forEach(value => assertClose(value, 24, 1e-12, '20% drawdown boundary keeps the configured runway target'));
 
         const upperBoundary = [29.9, 30.0, 30.1].map(targetMonthsForDrawdown);
-        assert(upperBoundary[0] < upperBoundary[1], 'Runway target approaches stress target before 30% drawdown');
-        assertClose(upperBoundary[1], 60, 1e-12, 'Drawdown exactly at 30% reaches stress runway target');
-        assertClose(upperBoundary[2], 60, 1e-12, 'Drawdown above 30% remains clamped to stress runway target');
-        assert(upperBoundary[2] - upperBoundary[0] < 3, '30% boundary delta stays below 3 months');
+        upperBoundary.forEach(value => assertClose(value, 24, 1e-12, '30% drawdown boundary keeps the configured runway target'));
 
         const hardMinimum = calculateSmoothedRunwayTargetMonths({
             enabled: true,

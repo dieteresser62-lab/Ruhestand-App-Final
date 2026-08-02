@@ -50,7 +50,7 @@ export function buildOpportunisticRefill({
     // Gold-Rebalancing prüfen
     if (input.goldAktiv && input.goldZielProzent > 0) {
         const goldZielwert = investiertesKapital * (input.goldZielProzent / 100);
-        const goldBandPct = (input.rebalancingBand ?? input.rebalBand ?? 35) / 100;
+        const goldBandPct = (input.rebalancingBand ?? 35) / 100;
         const goldUntergrenze = goldZielwert * (1 - goldBandPct);
         const goldObergrenze = goldZielwert * (1 + goldBandPct);
 
@@ -169,8 +169,7 @@ export function buildOpportunisticRefill({
     if (effectiveTotalerBedarf >= appliedMinTradeGate) {
         // Gold-Verkaufsbudget berechnen
         let maxSellableFromGold = 0;
-        const goldBandPct = (input.rebalancingBand ?? input.rebalBand ?? 35) / 100;
-        const equityBandPct = (input.rebalBand ?? input.rebalancingBand ?? 35) / 100;
+        const goldBandPct = (input.rebalancingBand ?? 35) / 100;
 
         if (input.goldAktiv && input.goldZielProzent > 0) {
             const goldZielwert = investiertesKapital * (input.goldZielProzent / 100);
@@ -204,22 +203,32 @@ export function buildOpportunisticRefill({
             });
         }
 
-        // Aktien-Verkaufsbudget berechnen
-        const aktienZielwert = investiertesKapital * (input.targetEq / 100);
-        const aktienObergrenze = aktienZielwert * (1 + equityBandPct);
-        let aktienUeberschuss = (aktienwert > aktienObergrenze)
-            ? (aktienwert - aktienZielwert)
+        // Aktien dienen ohne fixes Aktienziel als nachrangige Runway-Quelle. Der
+        // Verkaufskorridor ist ein Brutto-Budget, der Bedarf dagegen netto. Statt
+        // eines pauschalen Aufschlags wird deshalb nur die maximal mögliche
+        // Kapitalertragsteuer als Headroom berücksichtigt. calculateSaleAndTax
+        // bestimmt innerhalb dieses Budgets weiterhin den exakten Verkauf.
+        const capitalGainsTaxRate = Math.min(
+            0.99,
+            0.25 * (1 + 0.055 + Math.max(0, Number(input.kirchensteuerSatz) || 0))
+        );
+        const grossEquityBudgetForNeed = effectiveTotalerBedarf > 0
+            ? quantizeAmount(effectiveTotalerBedarf / (1 - capitalGainsTaxRate), 'ceil')
             : 0;
+        let aktienVerkaufsbedarf = Math.min(
+            aktienwert,
+            grossEquityBudgetForNeed
+        );
 
         // FIX: Priorisierung von Gold-Verkäufen.
         // Wenn Gold massiv verkauft wird (> 150% des Bedarfs), deckt dies die Liquidität sicher ab.
         // Wir verzichten dann auf Aktien-Verkauf (Skimming), auch im Notfall (belowAbsoluteFloor),
         // da der Gold-Erlös ausreicht.
         if (goldVerkaufBedarf > 1.5 * effectiveLiquiditätsBedarf) {
-            aktienUeberschuss = 0;
+            aktienVerkaufsbedarf = 0;
         } else if (goldVerkaufBedarf >= effectiveLiquiditätsBedarf && !isCriticalLiquidity && !belowAbsoluteFloor) {
             // Fallback für normale Fälle: Wenn Gold reicht und keine Not ist -> Aktien sparen.
-            aktienUeberschuss = 0;
+            aktienVerkaufsbedarf = 0;
         }
 
         // Fix: Bei Unterschreitung des absoluten Limits (10k) müssen wir Verkauf erlauben,
@@ -227,15 +236,15 @@ export function buildOpportunisticRefill({
         const estimatedNetGold = goldVerkaufBedarf * 0.8;
         const isGoldInsufficient = estimatedNetGold < effectiveLiquiditätsBedarf;
 
-        if (belowAbsoluteFloor && aktienUeberschuss < effectiveLiquiditätsBedarf && isGoldInsufficient) {
-            aktienUeberschuss = Math.min(effectiveLiquiditätsBedarf, aktienwert);
+        if (belowAbsoluteFloor && aktienVerkaufsbedarf < effectiveLiquiditätsBedarf && isGoldInsufficient) {
+            aktienVerkaufsbedarf = Math.min(grossEquityBudgetForNeed, aktienwert);
         }
 
         // Bei kritischer Liquidität: Verkauf auch unter Obergrenze/Zielwert erlauben
         // um RUIN durch Liquiditätsmangel zu verhindern. Auch hier: Prüfe ob Gold reicht.
-        if (isCriticalLiquidity && aktienUeberschuss < effectiveLiquiditätsBedarf && isGoldInsufficient) {
+        if (isCriticalLiquidity && aktienVerkaufsbedarf < effectiveLiquiditätsBedarf && isGoldInsufficient) {
             // Erlaube Verkauf bis zum Liquiditätsbedarf, begrenzt durch verfügbare Aktien
-            aktienUeberschuss = Math.min(effectiveLiquiditätsBedarf, aktienwert);
+            aktienVerkaufsbedarf = Math.min(grossEquityBudgetForNeed, aktienwert);
         }
 
         // ATH-skaliertes Cap: Bei -20% ATH-Abstand kein Rebalancing mehr
@@ -246,10 +255,10 @@ export function buildOpportunisticRefill({
         const isEmergencyRefill = isCriticalLiquidity || belowAbsoluteFloor || (minTradeResultOverride === 0);
 
         const effectiveSkimCap = isEmergencyRefill
-            ? Math.max(athScaledSkimCap, effectiveLiquiditätsBedarf * 1.2)
+            ? Math.max(athScaledSkimCap, grossEquityBudgetForNeed)
             : athScaledSkimCap;
 
-        const maxSellableFromEquity = Math.min(aktienUeberschuss, effectiveSkimCap);
+        const maxSellableFromEquity = Math.min(aktienVerkaufsbedarf, effectiveSkimCap);
 
         const totalEquityValue = input.depotwertAlt + input.depotwertNeu;
         if (totalEquityValue > 0) {
@@ -257,7 +266,8 @@ export function buildOpportunisticRefill({
         }
         transactionDiagnostics.equityThresholds = {
             ...transactionDiagnostics.equityThresholds,
-            saleBudgetEquityTotal: maxSellableFromEquity || 0
+            saleBudgetEquityTotal: maxSellableFromEquity || 0,
+            allocationPolicy: 'runway_need_without_fixed_equity_target'
         };
 
         // ANTI-PSEUDO-ACCURACY: Liquiditätsbedarf kaufmännisch runden (Ceil)
@@ -301,22 +311,11 @@ export function buildOpportunisticRefill({
         const availableForLiq = Math.max(0, effectiveTotalerBedarf - verwendungen.gold);
         verwendungen.liquiditaet = Math.min(availableForLiq, effectiveLiquiditätsBedarf);
 
-        // Falls Gold verkauft wird (Rebalancing), Erlös in Aktien stecken (wenn Platz)
+        // Falls Gold verkauft wird, geht der nach dem Runway verbleibende Erlös
+        // ohne fixes Aktienziel in Aktien.
         if (goldVerkaufBedarf > 0) {
-            // Prüfen wie viel Platz im Aktien-Bucket ist (bis Zielwert)
-            const aktienZielwert = investiertesKapital * (input.targetEq / 100);
-            const aktienCurrent = input.depotwertAlt + input.depotwertNeu;
-            const aktienGap = Math.max(0, aktienZielwert - aktienCurrent);
-
-            // Alles was nicht für Liquidität nötig war, kann in Aktien gehen
             const remainingForEq = Math.max(0, availableForLiq - verwendungen.liquiditaet);
-            verwendungen.aktien = Math.min(remainingForEq, aktienGap);
-
-            // Wenn noch was übrig ist (weil Aktien voll), geht der Rest implizit in Liquidität
-            // indem er nicht ausgegeben wird -> Cash erhöht sich.
-            // Hier explizit als Liquiditätsverwendung erfassen, damit die Rechnung aufgeht?
-            // Nein, die Engine bucht (NettoErlös - Reinvest).
-            // Wenn wir verwendungen.aktien begrenzen, bleibt der Rest Cash. Korrekt.
+            verwendungen.aktien = remainingForEq;
         }
     }
 

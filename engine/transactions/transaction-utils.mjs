@@ -6,97 +6,38 @@
  * Dependencies: config.mjs
  */
 import { CONFIG } from '../config.mjs';
-import { calculateSmoothedRunwayTargetMonths } from '../analyzers/regime-signals.mjs';
+import {
+    deriveLiquidityRunwayPolicy,
+    resolveLiquidityRunwayYears
+} from '../../types/liquidity-runway-contract.js';
 
 /**
  * Berechnet Ziel-Liquidität und Diagnose-Metadaten basierend auf Profil und Markt.
  */
 export function calculateTargetLiquidityDetails(profil, market, inflatedBedarf, input = null) {
-    // 1. Runway-Logik (Netto-Bedarf, falls man so will, aber hier wird oft Brutto verwendet)
-    // Die aktuelle Implementierung nutzt Full Flex oder 50% Flex je nach Regime für die Ziel-Berechnung.
-    // Das ist okay als "Runway"-Ziel.
-
-    let calculatedTarget = 0;
-    let runwayTargetDiagnostics = null;
-
-    if (!profil.isDynamic) {
-        calculatedTarget = (inflatedBedarf.floor + inflatedBedarf.flex) * 2;
-        runwayTargetDiagnostics = {
-            smoothingEnabled: false,
-            smoothingActive: false,
-            smoothingApplied: false,
-            smoothingFallback: false,
-            fallbackReason: 'static_profile',
-            rawTargetMonths: null,
-            targetMonths: null,
-            lowerTargetMonths: null,
-            upperTargetMonths: null,
-            severity: 0,
-            severityPct: 0,
-            minRunwayMonths: input?.runwayMinMonths || profil.minRunwayMonths || null,
-            hardMinimumMonths: input?.runwayMinMonths || profil.minRunwayMonths || null,
-            source: 'input'
-        };
-    } else {
-        const regime = CONFIG.TEXTS.REGIME_MAP[market.sKey];
-        const profilMax = profil.runway[regime]?.total || profil.runway.hot_neutral.total;
-        const minMonths = input?.runwayMinMonths || profil.minRunwayMonths;
-        const hasExplicitRunwayTarget = Number.isFinite(input?.runwayTargetMonths) && input.runwayTargetMonths > 0;
-        const smoothingConfig = CONFIG.REGIME_SMOOTHING || {};
-        const runwaySmoothingConfig = smoothingConfig.RUNWAY_TARGETS || {};
-        const smoothedTarget = calculateSmoothedRunwayTargetMonths({
-            enabled: Boolean(smoothingConfig.TARGETS_ENABLED) && !hasExplicitRunwayTarget,
-            profil,
-            discreteTargetMonths: profilMax,
-            minRunwayMonths: minMonths,
-            severity: market?.regimeSignalSeverities?.drawdownSeverity,
-            neutralRegime: runwaySmoothingConfig.NEUTRAL_REGIME,
-            stressRegime: runwaySmoothingConfig.STRESS_REGIME
-        });
-        const effectiveProfilMax = smoothedTarget.targetMonths;
-        const userTarget = hasExplicitRunwayTarget ? input.runwayTargetMonths : effectiveProfilMax;
-        const smoothingEnabled = Boolean(smoothingConfig.TARGETS_ENABLED) && !hasExplicitRunwayTarget;
-        const smoothingFallback = smoothingEnabled && !smoothedTarget.smoothingActive;
-        runwayTargetDiagnostics = {
-            smoothingEnabled,
-            smoothingActive: Boolean(smoothedTarget.smoothingActive),
-            smoothingApplied: Boolean(smoothedTarget.smoothingApplied),
-            smoothingFallback,
-            fallbackReason: smoothedTarget.fallbackReason || null,
-            rawTargetMonths: Number.isFinite(smoothedTarget.rawTargetMonths) ? smoothedTarget.rawTargetMonths : null,
-            targetMonths: Number.isFinite(userTarget) ? userTarget : null,
-            lowerTargetMonths: Number.isFinite(smoothedTarget.lowerTargetMonths) ? smoothedTarget.lowerTargetMonths : null,
-            upperTargetMonths: Number.isFinite(smoothedTarget.upperTargetMonths) ? smoothedTarget.upperTargetMonths : null,
-            severity: Number.isFinite(smoothedTarget.severity) ? smoothedTarget.severity : 0,
-            severityPct: Number.isFinite(smoothedTarget.severity) ? Math.round(smoothedTarget.severity * 100) : 0,
-            minRunwayMonths: Number.isFinite(minMonths) ? minMonths : null,
-            hardMinimumMonths: Number.isFinite(minMonths) ? minMonths : null,
-            source: hasExplicitRunwayTarget
-                ? 'input'
-                : (smoothedTarget.smoothingActive ? 'profil:smoothed' : `profil:${regime}`)
-        };
-
-        // Bidirektionale ATH-Skalierung:
-        // Über ATH -> mehr Puffer; unter ATH -> Puffer schrittweise reduzieren.
-        const seiATH = market.seiATH || 1;
-        let zielMonate;
-        if (seiATH >= 1) {
-            const aboveAthFactor = Math.min((seiATH - 1) * 5, 1);
-            zielMonate = userTarget + aboveAthFactor * (effectiveProfilMax - userTarget);
-        } else {
-            const belowAthFactor = Math.min((1 - seiATH) * 2.5, 1);
-            zielMonate = userTarget - belowAthFactor * (userTarget - minMonths);
-        }
-
-        // In Peak/Hot: voller Flex-Bedarf für den Ziel-Runway.
-        // In schwierigeren Regimen: nur 50% Flex, um Ziel realistischer zu halten.
-        const useFullFlex = (regime === 'peak' || regime === 'hot_neutral');
-        const anpassbarerBedarf = useFullFlex
-            ? (inflatedBedarf.floor + inflatedBedarf.flex)
-            : (inflatedBedarf.floor + 0.5 * inflatedBedarf.flex);
-
-        calculatedTarget = (Math.max(1, anpassbarerBedarf) / 12) * zielMonate;
-    }
+    const runwayPolicy = deriveLiquidityRunwayPolicy(resolveLiquidityRunwayYears(input || {}).years);
+    const annualNeed = Math.max(0, Number(inflatedBedarf?.floor) || 0)
+        + Math.max(0, Number(inflatedBedarf?.flex) || 0);
+    let calculatedTarget = (annualNeed / 12) * runwayPolicy.targetMonths;
+    const runwayTargetDiagnostics = {
+        contractVersion: 'LiquidityRunwayContractV1',
+        targetYears: runwayPolicy.targetYears,
+        smoothingEnabled: false,
+        smoothingActive: false,
+        smoothingApplied: false,
+        smoothingFallback: false,
+        fallbackReason: null,
+        rawTargetMonths: runwayPolicy.targetMonths,
+        targetMonths: runwayPolicy.targetMonths,
+        lowerTargetMonths: null,
+        upperTargetMonths: null,
+        severity: 0,
+        severityPct: 0,
+        minRunwayMonths: runwayPolicy.hardMinimumMonths,
+        hardMinimumMonths: runwayPolicy.hardMinimumMonths,
+        hardMinimumSource: runwayPolicy.hardMinimumSource,
+        source: 'input:liquidityRunwayYears'
+    };
 
     // 2. Mindest-Puffer (Brutto)
     // "sicherheitsPuffer" im Sinne von: Waschmaschine muss bezahlbar sein.

@@ -5,6 +5,7 @@
  * Dependencies: None
  */
 import { CONFIG } from '../config.mjs';
+import { isValidLiquidityRunwayYears } from '../../types/liquidity-runway-contract.js';
 
 const InputValidator = {
     /**
@@ -135,38 +136,25 @@ const InputValidator = {
         );
     }
 
-    // 5. Runway-Validierung (Liquiditäts-Reichweite)
-    // Minimum: 12-60 Monate (1-5 Jahre)
-    // Ziel: 18-72 Monate (1.5-6 Jahre)
-    // Ziel muss >= Minimum sein
+    // 5. Kanonische Runway-Validierung (Liquiditäts-Reichweite in Jahren)
     checkFiniteRange(
-        input.runwayMinMonths, 12, 60,
-        'runwayMinMonths',
-        'Runway Minimum muss zwischen 12 und 60 Monaten liegen.'
+        input.liquidityRunwayYears, 1, 10,
+        'liquidityRunwayYears',
+        'Liquiditäts-Runway muss zwischen 1 und 10 Jahren liegen.'
     );
-    checkFiniteRange(
-        input.runwayTargetMonths, 18, 72,
-        'runwayTargetMonths',
-        'Runway Ziel muss zwischen 18 und 72 Monaten liegen.'
-    );
-    check(
-        input.runwayTargetMonths < input.runwayMinMonths,
-        'runwayTargetMonths',
-        'Runway Ziel darf nicht kleiner als das Minimum sein.'
-    );
-
-    // Aktien-Zielquote
-    checkFiniteRange(
-        input.targetEq, 20, 90,
-        'targetEq',
-        'Aktien-Zielquote muss zwischen 20% und 90% liegen.'
-    );
+    if (Number.isFinite(input.liquidityRunwayYears)) {
+        check(
+            !isValidLiquidityRunwayYears(input.liquidityRunwayYears),
+            'liquidityRunwayYears',
+            'Liquiditäts-Runway muss in 0,5-Jahres-Schritten angegeben werden.'
+        );
+    }
 
     // Rebalancing-Band
     checkFiniteRange(
-        input.rebalBand, 1, 20,
-        'rebalBand',
-        'Rebalancing-Band muss zwischen 1% und 20% liegen.'
+        input.rebalancingBand, 0, 100,
+        'rebalancingBand',
+        'Gold-Rebalancing-Band muss zwischen 0% und 100% liegen.'
     );
 
     if (Number.isFinite(input.flexBudgetYears)) {

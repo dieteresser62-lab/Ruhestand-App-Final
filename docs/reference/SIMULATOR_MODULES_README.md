@@ -226,9 +226,9 @@ Sweep-spezifische Logik mit Guardrails für Partner:innen-Felder und Heatmap-Aus
 
 **Dependencies:** `monte-carlo-runner.js` (Mini-Läufe), `simulator-heatmap.js`, `simulator-results.js`, `simulator-sweep-utils.js`, `simulator-utils.js`, `simulator-data.js`.
 
-**Interaktiver Parametervertrag:** Die Browseroberflaeche bietet genau die neun
-Dimensionen mit geprueftem kanonischem Datenpfad `sweepRunwayMin`,
-`sweepRunwayTarget`, `sweepTargetEq`, `sweepRebalBand`, `sweepMaxSkimPct`,
+**Interaktiver Parametervertrag:** Die Browseroberflaeche bietet genau sieben
+Dimensionen mit geprueftem kanonischem Datenpfad
+`sweepLiquidityRunwayYears`, `sweepRebalancingBand`, `sweepMaxSkimPct`,
 `sweepMaxBearRefillPct`, `sweepGoldTargetPct`, `sweepSurvivalQuantile` und
 `sweepGoGoMultiplier`. Nur `horizonYears` bleibt fuer explizite
 programmatische `SweepRequestV1`-Aufrufe verfuegbar, ist aber keine
@@ -633,7 +633,8 @@ Pflegebeobachtungen/-modellannahmen und Hinterbliebenengrenzen.
   ungewichtete Mittelwert und keine amtliche dritte Tabelle.
 - Destatis-Pflegestatistik 2023: Bestandszahlen, Pflegegradanteile und
   alters-/geschlechtsspezifische Pflegequoten nur als
-  `validation_only_not_transition_probability`.
+  `context_only_not_runtime_validation_or_transition_probability`; es findet
+  keine Laufzeitvalidierung gegen diese Praevalenzen statt.
 - Pflegeeintritt Grad 1/2, Progression und Dauer sind getrennte
   Modellannahmen. Die fruehere unbelegte Praevalenz-durch-vier-Herleitung ist
   entfernt.
@@ -1188,8 +1189,11 @@ app/simulator/simulator-main.js
 2. `simulator-sweep.js`: Iteriert über Whitelist-Parameter, nutzt Worker-Jobs (Fallback seriell).
 3. `simulator-heatmap.js`: `renderHeatmapSVG()` visualisiert Ergebnisse und
    kennzeichnet Quantilrankings als experimentelle Punktschaetzer.
-4. Der Abschlussvertrag ordnet alle neun sichtbaren Parameter ihrem
-   kanonischen Request-Key, Consumer, Wertebereich und Provenienz-Witness zu.
+4. Der Abschlussvertrag ordnet alle sieben sichtbaren Parameter ihrem
+   kanonischen Request-Key, Consumer, Wertebereich und Provenienz-Witness zu:
+   `liquidityRunwayYears`, `goldRebalancingBand`, `maxSkimPct`,
+   `maxBearRefillPct`, `goldTargetPct`, `survivalQuantile` und
+   `goGoMultiplier`.
    Dieser Datenpfadnachweis ist kein eigenstaendiger KPI-Wirkungsnachweis.
    Der Browser-Smoke prueft `SweepRequestV1`, `SweepExecutionV2`,
    `SweepMetricsV3` und die Parameterprovenienz eines echten Ein-Zellen-Laufs.
@@ -1208,6 +1212,30 @@ app/simulator/simulator-main.js
 3. Der Champion ist der beste gefundene Szenariokandidat im untersuchten
    Suchraum. Er ist weder ein globales Optimum noch eine fachlich validierte
    Strategie oder Finanzempfehlung.
+4. Die interaktive Suche besitzt sechs Dimensionen: Liquiditaets-Runway,
+   Goldziel, Gold-Rebalancing-Band, maximale Skim-Quote, Survival-Quantil und
+   Go-Go-Multiplikator. `maxBearRefillPct` bleibt eine Sweep-Dimension;
+   `targetEq`, `runwayTargetMonths`, `runwayMinMonths` und `rebalBand` sind
+   keine aktuellen Optimizerparameter.
+
+### Liquiditaets-Runway
+
+`types/liquidity-runway-contract.js` ist die gemeinsame Quelle fuer Default,
+Bereich, Schrittweite, Migration und abgeleitete Policy. UI, Profile, Sweep,
+Optimizer und Engine verwenden `liquidityRunwayYears`; Legacy-Daten werden in
+der Reihenfolge kanonischer Wert, `runwayTargetMonths`,
+`runwayMinMonths`, Default 5 migriert. Dabei werden ganzzahlige Altwerte
+der frueheren UI-Domains zuerst auf das naechste Sechsmonatsraster aufgerundet,
+sodass kein gespeicherter Puffer verkuerzt wird. Das Liquiditaetsziel ist exakt der
+effektive Nettojahresbedarf mal Zielmonate. Jahreslogs und Backtest-KPI messen
+den finalen Bestand nach Transaktionen und Auszahlung; null Liquiditaet ergibt
+null Runway-Monate und null Zieldeckung. Die Felder
+`runway_post_payout_end_of_year_months` und `liq_post_payout_end_of_year`
+benennen diese Phase explizit; `safety_runway_post_months` und `liqEnd`
+behalten ihre alte Bedeutung. Ueberschuesse bedienen das separate
+Goldziel und danach Aktien nur bis zum expliziten Skim-Budget, ohne eine feste
+Aktienquote wiederherzustellen. VPW gewichtet die tatsaechliche Aktien-, Gold-
+und Liquiditaetszusammensetzung.
 
 ### Profilverbund und Demografie
 

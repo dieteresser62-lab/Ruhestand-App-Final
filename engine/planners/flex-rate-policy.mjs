@@ -1,6 +1,10 @@
 import { CONFIG } from '../config.mjs';
 import { calcFlexShare } from './spending-policy-helpers.mjs';
 import { calculateWealthAdjustedReductionFactor } from './wealth-reduction.mjs';
+import {
+    deriveLiquidityRunwayPolicy,
+    resolveLiquidityRunwayYears
+} from '../../types/liquidity-runway-contract.js';
 
 export function applyFlexShareCurve(flexRate, inflatedBedarf, addDecision, wealthFactor = 1) {
     const curve = CONFIG.SPENDING_MODEL?.FLEX_SHARE_S_CURVE;
@@ -55,9 +59,10 @@ export function calculateFlexRate(state, alarmStatus, params, addDecision) {
         let geglätteteFlexRate = state.flexRate;
 
         if (alarmStatus.newlyTriggered) {
+            const hardMinimumMonths = deriveLiquidityRunwayPolicy(resolveLiquidityRunwayYears(p.input || {}).years).hardMinimumMonths;
             const shortfallRatio = Math.max(
                 0,
-                (p.profil.minRunwayMonths - p.runwayMonate) / p.profil.minRunwayMonths
+                (hardMinimumMonths - p.runwayMonate) / hardMinimumMonths
             );
             const zielCut = Math.min(10, Math.round(10 + 20 * shortfallRatio));
             const zielCutScaled = zielCut * wealthFactor;
@@ -193,7 +198,7 @@ export function calculateFlexRate(state, alarmStatus, params, addDecision) {
     }
 
     if (hardCaps?.RUNWAY_COVERAGE_CAPS?.length) {
-        const targetMonths = p.profil?.minRunwayMonths || p.input?.runwayMinMonths || 0;
+        const targetMonths = deriveLiquidityRunwayPolicy(resolveLiquidityRunwayYears(p.input || {}).years).hardMinimumMonths;
         if (targetMonths > 0) {
             const coverage = p.runwayMonate / targetMonths;
             const rules = hardCaps.RUNWAY_COVERAGE_CAPS

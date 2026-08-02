@@ -1,5 +1,9 @@
 import { CONFIG } from '../config.mjs';
 import { calculateWealthAdjustedReductionFactor } from './wealth-reduction.mjs';
+import {
+    deriveLiquidityRunwayPolicy,
+    resolveLiquidityRunwayYears
+} from '../../types/liquidity-runway-contract.js';
 
 /**
  * Mutates state.keyParams with wealthReductionFactor and entnahmequoteUsed in recovery contexts.
@@ -7,7 +11,7 @@ import { calculateWealthAdjustedReductionFactor } from './wealth-reduction.mjs';
 export function applyGuardrails(rate, state, params, addDecision) {
     const {
         market, inflatedBedarf, renteJahr, input,
-        runwayMonate, profil, kuerzungQuelle: initialSource
+        runwayMonate, kuerzungQuelle: initialSource
     } = params;
     const { entnahmequoteDepot } = state.keyParams;
 
@@ -107,9 +111,10 @@ export function applyGuardrails(rate, state, params, addDecision) {
         : 1;
     const minBudgetWithWealth = aktuellesGesamtbudget + (angepasstesMinBudget - aktuellesGesamtbudget) * wealthFactor;
     const noNewLowerYearlyCloses = input.endeVJ > Math.min(input.endeVJ_1, input.endeVJ_2);
+    const hardMinimumMonths = deriveLiquidityRunwayPolicy(resolveLiquidityRunwayYears(input || {}).years).hardMinimumMonths;
     const budgetFloorErlaubt = !['bear_deep', 'recovery_in_bear'].includes(market.sKey) ||
         ((market.abstandVomAthProzent || 0) <= 10 && noNewLowerYearlyCloses &&
-            runwayMonate >= Math.max(30, profil.minRunwayMonths + 6));
+            runwayMonate >= Math.max(30, hardMinimumMonths + 6));
 
     if (budgetFloorErlaubt) {
         diagnostics.budgetFloor = {

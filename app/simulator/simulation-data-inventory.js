@@ -597,11 +597,11 @@ const STATIC_DATA = {
         source: resolved('Destatis Pflegestatistik 2023, Tabellen 22421-01 und 22421-02'),
         seriesIdentifier: resolved('GermanDemographyCareSurvivorContractV1.care.officialObservation'),
         yearConvention: resolved('observed_stock_and_prevalence_at_2023_12_31'),
-        transformation: resolved('Validation reference only; explicitly prohibited as an annual entry or progression probability.'),
+        transformation: resolved('Context evidence only; no runtime validation is performed and use as an annual entry or progression probability is explicitly prohibited.'),
         license: resolved('Data Licence Germany - attribution - version 2.0'),
         retrievedAt: resolved('2026-08-01'),
         contractValue: {
-            runtimeRole: 'validation_only_not_transition_probability',
+            runtimeRole: 'context_only_not_runtime_validation_or_transition_probability',
             referenceDate: '2023-12-31'
         },
         externalValidationStatus: 'not_validated'

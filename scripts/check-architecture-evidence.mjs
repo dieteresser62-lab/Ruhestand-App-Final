@@ -9,7 +9,9 @@ export const REPO_ROOT = path.resolve(__dirname, '..');
 export const EVIDENCE_PATHS = Object.freeze({
     market: 'docs/reference/MARKTVERGLEICH_EVIDENZREGISTER.md',
     research: 'docs/reference/FORSCHUNGSABGLEICH_EVIDENZREGISTER.md',
-    main: 'docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md'
+    main: 'docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md',
+    dataSources: 'docs/reference/DATA_SOURCES.md',
+    demographyContract: 'app/simulator/german-demography-care-survivor-contract.js'
 });
 
 const RECORD_SPECS = Object.freeze({
@@ -543,6 +545,21 @@ export function validateEvidenceDocuments(
 
     const marketFile = EVIDENCE_PATHS.market;
     const researchFile = EVIDENCE_PATHS.research;
+    const contractHashMatch = documents[EVIDENCE_PATHS.demographyContract]
+        .match(/"careObservationHash":\s*"([a-f0-9]{64})"/);
+    if (!contractHashMatch) {
+        errors.push(createError(
+            'DEMOGRAPHY_HASH_MISSING',
+            'Generated demography contract has no careObservationHash.',
+            EVIDENCE_PATHS.demographyContract
+        ));
+    } else if (!documents[EVIDENCE_PATHS.dataSources].includes(contractHashMatch[1])) {
+        errors.push(createError(
+            'DEMOGRAPHY_HASH_STALE',
+            `DATA_SOURCES.md does not contain generated careObservationHash ${contractHashMatch[1]}.`,
+            EVIDENCE_PATHS.dataSources
+        ));
+    }
     const market = validateRecords({
         content: documents[marketFile],
         file: marketFile,

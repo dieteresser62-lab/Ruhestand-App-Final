@@ -44,12 +44,13 @@ export function initSweepDefaultsWithLocalStorageFallback() {
     // The direct horizon is no longer an interactive Sweep dimension. Remove
     // its stale UI-only value so a future field cannot silently revive it.
     persistenceStorage.removeItem('sim.sweep.horizonYears');
+    persistenceStorage.removeItem('sim.sweep.runwayMin');
+    persistenceStorage.removeItem('sim.sweep.runwayTarget');
+    persistenceStorage.removeItem('sim.sweep.targetEq');
 
     const map = [
-        ['sweepRunwayMin', 'sim.sweep.runwayMin'],
-        ['sweepRunwayTarget', 'sim.sweep.runwayTarget'],
-        ['sweepTargetEq', 'sim.sweep.targetEq'],
-        ['sweepRebalBand', 'sim.sweep.rebalBand'],
+        ['sweepLiquidityRunwayYears', 'sim.sweep.liquidityRunwayYears'],
+        ['sweepGoldRebalancingBand', 'sim.sweep.goldRebalancingBand'],
         ['sweepMaxSkimPct', 'sim.sweep.maxSkimPct'],
         ['sweepMaxBearRefillPct', 'sim.sweep.maxBearRefillPct'],
         ['sweepGoldTargetPct', 'sim.sweep.goldTarget'],
@@ -248,10 +249,8 @@ export async function runParameterSweep() {
 
         // ========= Parameter-Parsing (mit frühzeitigen, konkreten Alerts) =========
         const rangeInputs = {
-            runwayMin: document.getElementById('sweepRunwayMin').value,
-            runwayTarget: document.getElementById('sweepRunwayTarget').value,
-            targetEq: document.getElementById('sweepTargetEq').value,
-            rebalBand: document.getElementById('sweepRebalBand').value,
+            liquidityRunwayYears: document.getElementById('sweepLiquidityRunwayYears').value,
+            goldRebalancingBand: document.getElementById('sweepGoldRebalancingBand').value,
             maxSkimPct: document.getElementById('sweepMaxSkimPct').value,
             maxBearRefillPct: document.getElementById('sweepMaxBearRefillPct').value,
             goldTargetPct: document.getElementById('sweepGoldTargetPct').value,
@@ -260,10 +259,8 @@ export async function runParameterSweep() {
         };
 
         const paramLabels = {
-            runwayMin: 'Runway Min',
-            runwayTarget: 'Runway Target',
-            targetEq: 'Target Eq',
-            rebalBand: 'Rebal Band',
+            liquidityRunwayYears: 'Liquiditäts-Runway',
+            goldRebalancingBand: 'Gold-Rebal Band',
             maxSkimPct: 'Max Skim %',
             maxBearRefillPct: 'Max Bear Refill %',
             goldTargetPct: 'Gold Target %',

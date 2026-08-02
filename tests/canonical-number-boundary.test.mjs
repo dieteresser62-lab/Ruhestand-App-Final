@@ -14,6 +14,7 @@ import {
     SimulatorPortfolioInputError
 } from '../app/simulator/simulator-portfolio-init.js';
 import {
+    readBasePortfolioInputs,
     readStrategyInputs
 } from '../app/simulator/simulator-input-strategy.js';
 import { runSweepChunk } from '../app/simulator/sweep-runner.js';
@@ -61,12 +62,10 @@ function simulationInputs(lotOverrides = {}) {
         flexBudgetAnnual: 0,
         flexBudgetYears: 0,
         flexBudgetRecharge: 0,
-        targetEq: 60,
-        rebalBand: 5,
+        rebalancingBand: 25,
         maxSkimPctOfEq: 10,
         maxBearRefillPctOfEq: 5,
-        runwayMinMonths: 24,
-        runwayTargetMonths: 36,
+        liquidityRunwayYears: 5,
         goldAktiv: false,
         goldZielProzent: 0,
         goldFloorProzent: 0,
@@ -151,52 +150,58 @@ console.log('Test 3: ambiguous legacy strings fail at the canonical tranche boun
 
 console.log('Test 4: strategy reader preserves zero and decimal values');
 {
-    const inputs = readStrategyInputs(createDocumentMock({
-        runwayMinMonths: '24',
-        runwayTargetMonths: '36',
-        targetEq: '0',
-        rebalBand: '2.5',
+    const doc = createDocumentMock({
+        liquidityRunwayYears: '1',
+        goldAllokationAktiv: 'true',
+        rebalancingBand: '2.5',
         maxSkimPctOfEq: '0',
         maxBearRefillPctOfEq: '0'
-    }));
-    assertEqual(inputs.targetEq, 0, 'targetEq=0 reaches the engine validation boundary unchanged');
-    assertClose(inputs.rebalBand, 2.5, 1e-12, 'Decimal rebalancing band is not truncated');
+    });
+    const inputs = readStrategyInputs(doc);
+    const portfolioInputs = readBasePortfolioInputs(doc);
+    assertEqual(inputs.liquidityRunwayYears, 1, 'Canonical one-year runway remains unchanged');
+    assertClose(portfolioInputs.rebalancingBand, 2.5, 1e-12, 'Decimal Gold rebalancing band is not truncated');
     assertEqual(inputs.maxSkimPctOfEq, 0, 'maxSkimPctOfEq=0 remains disabled');
     assertEqual(inputs.maxBearRefillPctOfEq, 0, 'maxBearRefillPctOfEq=0 remains disabled');
 
-    const defaults = readStrategyInputs(createDocumentMock());
-    assertEqual(defaults.targetEq, 60, 'Missing targetEq uses its documented default');
-    assertEqual(defaults.rebalBand, 5, 'Missing rebalBand uses its documented default');
+    const defaultDoc = createDocumentMock();
+    const defaults = readStrategyInputs(defaultDoc);
+    const portfolioDefaults = readBasePortfolioInputs(defaultDoc);
+    assertEqual(defaults.liquidityRunwayYears, 5, 'Missing runway uses its documented default');
+    assertEqual(portfolioDefaults.rebalancingBand, 25, 'Missing Gold rebalancing band uses its documented default');
     assertEqual(defaults.maxSkimPctOfEq, 10, 'Missing maxSkimPctOfEq uses its documented default');
     assertEqual(defaults.maxBearRefillPctOfEq, 5,
         'Missing maxBearRefillPctOfEq uses its documented default');
 
-    const invalid = readStrategyInputs(createDocumentMock({
-        targetEq: '12abc',
-        rebalBand: 'Infinity',
+    const invalidDoc = createDocumentMock({
+        liquidityRunwayYears: '12abc',
+        goldAllokationAktiv: 'true',
+        rebalancingBand: 'Infinity',
         maxSkimPctOfEq: '',
         maxBearRefillPctOfEq: 'not-a-number'
-    }));
-    assertEqual(invalid.targetEq, 60, 'Invalid targetEq is distinct from canonical zero');
-    assertEqual(invalid.rebalBand, 5, 'Non-finite rebalBand is distinct from a valid decimal');
+    });
+    const invalid = readStrategyInputs(invalidDoc);
+    const invalidPortfolio = readBasePortfolioInputs(invalidDoc);
+    assertEqual(invalid.liquidityRunwayYears, 5, 'Invalid runway uses the documented default');
+    assert(Number.isNaN(invalidPortfolio.rebalancingBand), 'Non-finite active Gold band must remain invalid for fail-closed validation');
     assertEqual(invalid.maxSkimPctOfEq, 10, 'Empty maxSkim uses the documented missing default');
     assertEqual(invalid.maxBearRefillPctOfEq, 5, 'Invalid maxBear uses the documented default');
 }
 
-console.log('Test 5: targetEq zero is preserved, then visibly rejected by the engine contract');
+console.log('Test 5: canonical runway and Gold-band boundaries are visible in the engine contract');
 {
     const result = InputValidator.validate({
         floorBedarf: 0,
         flexBedarf: 0,
-        runwayMinMonths: 24,
-        runwayTargetMonths: 36,
-        targetEq: 0,
-        rebalBand: 2.5,
+        liquidityRunwayYears: 0.5,
+        rebalancingBand: 0,
         maxSkimPctOfEq: 0,
         maxBearRefillPctOfEq: 0
     });
-    assert(result.errors.some(error => error.fieldId === 'targetEq'),
-        'Engine validation visibly rejects targetEq outside 20..90');
+    assert(result.errors.some(error => error.fieldId === 'liquidityRunwayYears'),
+        'Engine validation visibly rejects runway below one year');
+    assert(!result.errors.some(error => error.fieldId === 'rebalancingBand'),
+        'Engine validation accepts a zero Gold rebalancing band');
     assert(!result.errors.some(error => error.fieldId === 'maxSkimPctOfEq'),
         'Engine validation accepts maxSkimPctOfEq=0');
     assert(!result.errors.some(error => error.fieldId === 'maxBearRefillPctOfEq'),
@@ -216,11 +221,15 @@ console.log('Test 6: Simulator HTML exposes the existing engine bounds');
         return match?.[1] ?? null;
     };
 
-    const targetEq = inputTag('targetEq');
+    const runway = inputTag('liquidityRunwayYears');
+    const goldBand = inputTag('rebalancingBand');
     const maxSkim = inputTag('maxSkimPctOfEq');
     const maxBear = inputTag('maxBearRefillPctOfEq');
-    assertEqual(attribute(targetEq, 'min'), '20', 'Simulator targetEq minimum matches the engine');
-    assertEqual(attribute(targetEq, 'max'), '90', 'Simulator targetEq maximum matches the engine');
+    assertEqual(attribute(runway, 'min'), '1', 'Simulator runway minimum matches the engine');
+    assertEqual(attribute(runway, 'max'), '10', 'Simulator runway maximum matches the engine');
+    assertEqual(attribute(runway, 'step'), '0.5', 'Simulator runway step matches the engine');
+    assertEqual(attribute(goldBand, 'min'), '0', 'Simulator Gold-band minimum matches the engine');
+    assertEqual(attribute(goldBand, 'max'), '100', 'Simulator Gold-band maximum matches the engine');
     assertEqual(attribute(maxSkim, 'min'), '0', 'Simulator maxSkim minimum preserves the zero boundary');
     assertEqual(attribute(maxSkim, 'max'), '50', 'Simulator maxSkim maximum matches the engine');
     assertEqual(attribute(maxBear, 'min'), '0', 'Simulator maxBear minimum preserves the zero boundary');
@@ -264,10 +273,8 @@ console.log('Test 7: MC, Sweep and Optimizer share the canonical fractional-lot 
         'Monte Carlo treats derived and explicit O-05 lot values identically');
 
     const params = {
-        runwayMin: 24,
-        runwayTarget: 36,
-        targetEq: 60,
-        rebalBand: 5,
+        liquidityRunwayYears: 5,
+        goldRebalancingBand: 25,
         maxSkimPct: 10,
         maxBearRefillPct: 5,
         goldTargetPct: 0
