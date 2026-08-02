@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "MinimumFlexMonteCarloSweepMeasurementV1",
+  "snapshotId": "post-backtest-data-09-v1",
+  "sourceReference": "post-backtest-data-08-v1",
+  "sourceFixtureSha256": "fd546d32f8e9cc0774a78bfae76d5ca5754774cadd2409e7ab202ff7b30ad4bd",
+  "sourceResultDocument": "docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_08_LIQUIDITAETS_RUNWAY_PUFFERVERTRAG.md",
+  "targetResultDocument": "docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_09_FLOOR_MINDEST_FLEX_STABILISATOR.md",
+  "reviewStatus": "pending",
+  "measurementScope": {
+    "monteCarloAggregateProjectionMeasured": true,
+    "sweepAggregateProjectionMeasured": true,
+    "minimumFlexRowDiagnosticsMeasuredHere": false,
+    "minimumFlexRowDiagnosticsEvidence": "tests/worker-parity.test.mjs and tests/simulator-backtest-characterization.test.mjs"
+  },
+  "sourceProjectionHashes": {
+    "carResultSha256": "0b146054561cfa97dc2050bf191f8c88712c0169f494cac30c92e69100ea9130",
+    "autoOptimizeResultSha256": "90bdd52006da1f2e2253feb2265691ef104208bf26d230aa6925ce62483e17c4",
+    "finalResultSha256": "521d89845e89941ad211299ee09a7b91b8ddfbbba7a750761cb5743773e5b41f"
+  },
+  "targetProjectionHashes": {
+    "carResultSha256": "0b146054561cfa97dc2050bf191f8c88712c0169f494cac30c92e69100ea9130",
+    "autoOptimizeResultSha256": "90bdd52006da1f2e2253feb2265691ef104208bf26d230aa6925ce62483e17c4",
+    "finalResultSha256": "521d89845e89941ad211299ee09a7b91b8ddfbbba7a750761cb5743773e5b41f"
+  },
+  "changedProjectionCount": 0,
+  "economicAggregateDeltaExpected": false
+}

@@ -297,7 +297,7 @@ initiale Vierjahres-Markthistorie aus dem Contract und gibt bei einer Luecke
 `incomplete` zurueck, bevor die Jahresschleife beginnt. Request und Ergebnis
 tragen Dataset-, Manifest-, Temporal-, Engine-Build- und Config-Provenienz.
 
-`BacktestRunResultV1` ist tief eingefroren und enthaelt `BacktestRequestV1`, diskriminiertes Outcome, Warnungen/sichere Fehlerdaten, unverkuerzte `rows`, `requestedYears`, wirtschaftlich erfolgreiche `completedYears`, erste/letzte Laufjahre, kanonische Start-/Endportfolio-Snapshots, Historical-Year-Records, `HistoricalBacktestMetricsV1`, Summary sowie die Legacy-Aliase. Caller-Inputs, Partner-/Tranchenobjekte und historische Records werden vor dem Lauf in eigene Kopien ueberfuehrt; `undefined`, `Date`, `RegExp`, Prototypen und zyklische Referenzen bleiben dabei runnerintern erhalten.
+`BacktestRunResultV1` ist tief eingefroren und enthaelt `BacktestRequestV1`, diskriminiertes Outcome, Warnungen/sichere Fehlerdaten, unverkuerzte `rows`, `requestedYears`, wirtschaftlich erfolgreiche `completedYears`, erste/letzte Laufjahre, kanonische Start-/Endportfolio-Snapshots, Historical-Year-Records, `HistoricalBacktestMetricsV2`, Summary sowie die Legacy-Aliase. Caller-Inputs, Partner-/Tranchenobjekte und historische Records werden vor dem Lauf in eigene Kopien ueberfuehrt; `undefined`, `Date`, `RegExp`, Prototypen und zyklische Referenzen bleiben dabei runnerintern erhalten.
 
 ### `historical-backtest-metrics.js`
 
@@ -305,8 +305,8 @@ DOM-freies Metrikwoerterbuch und reine Ableitung fuer das kanonische
 `BacktestRunResultV1`.
 
 **Hauptfunktionen / Exporte:**
-- `HISTORICAL_BACKTEST_METRIC_DESCRIPTORS` – versionierte Definitionen fuer 24 Metriken mit Einheit, nominal/real-Basis, Aggregation, Nenner, Rundung, Missingness, Outcome-Regel und Rohquelle.
-- `deriveHistoricalBacktestMetrics()` – leitet das unverkuerzte `HistoricalBacktestMetricsV1` aus Jahreszeilen und Outcome ab; Summary und Export konsumieren dieselben Werte ohne zweite Berechnung.
+- `HISTORICAL_BACKTEST_METRIC_DESCRIPTORS` – versionierte Definitionen fuer 29 Metriken mit Einheit, nominal/real-Basis, Aggregation, Nenner, Rundung, Missingness, Outcome-Regel und Rohquelle. V2 trennt Haushalts-Flexbedarf, Rentenueberschuss, Depot-Flex und erfuellten Haushalts-Flex und zaehlt finale Mindest-Flex-Fehlbetraege.
+- `deriveHistoricalBacktestMetrics()` – leitet das unverkuerzte `HistoricalBacktestMetricsV2` aus Jahreszeilen und Outcome ab; Summary und Export konsumieren dieselben Werte ohne zweite Berechnung. Fuer historische Rohzeilen bleibt `entscheidung.kuerzungProzent` ein expliziter Fallback, falls die neue Haushalts-Kuerzungsquote fehlt.
 - `FLEX_REDUCTION_THRESHOLD_PCT` / `FLEX_REDUCTION_OPERATOR` – gemeinsamer inklusiver `>= 10 %`-Vertrag fuer ID, Label, UI und Export.
 
 ### `historical-backtest-cohorts.js`
@@ -350,7 +350,7 @@ UI-Adapter, Rendering und expliziter Download fuer historische Backtests.
 - `initializeBacktestUI()` – verdrahtet Start-, Detail-, Cohort- und Downloadcontrols genau einmal und persistiert nur die bestehende Detailstufe.
 - `runBacktest()` – liest und validiert DOM-Inputs, delegiert an `runHistoricalBacktest()` und optional `runHistoricalBacktestCohorts()` und legt das immutable `BacktestRunResultV1` gemeinsam mit derselben Row-Referenz im `backtest_ui_state_v1` ab. Injektionsoptionen dienen deterministischen Browser-Gates; der Standardpfad nutzt die produktiven Dependencies.
 - `renderBacktestLog()` / `exportBacktestLogData()` – lokalisierte semantische Tabelle beziehungsweise JSON-/CSV-Download ueber den Raw-Serializer; JSON erhaelt bei aktivierter Diagnose exakt das angezeigte Cohort-Inventar.
-- Backtest-Logs zeigen Mindest-Flex-Betrag und Status; im Detailmodus zusaetzlich Blockgrund und effektiven Mindest-Flex-Wert nach der Policy.
+- Backtest-Logs zeigen Haushalts-Flex, finale Haushaltskuerzung, Mindest-Flex-Ziel, final wirksamen Betrag, Fehlbetrag und Status; die Raw-CSV trennt Haushalts-, Renten- und Depotbasis.
 
 **Einbindung:** Wird in `initializeUI()` importiert und bindet den Startbutton ohne Inline-Handler an die Backtest-Controls. Nutzt `historical-backtest-runner.js` fuer die DOM-freie Jahresschleife, `historical-backtest-ui.js` fuer UI/A11y, `historical-backtest-export.js` fuer Raw-Downloads und `simulator-main-helpers.js` nur fuer die Displayprojektion.
 
@@ -417,7 +417,7 @@ Kernlogik für Jahr-für-Jahr-Simulation (Direct Engine).
 - `simulator-year-portfolio.js` – DOM-freie Markt-/Portfoliofortschreibung, Renditen und Marktfenster.
 - `simulator-household-pension.js` – DOM-freie Renten-/Haushaltsberechnung inklusive Witwenrente.
 - `simulator-engine-input.js` – DOM-freies Mapping von Simulator-Jahreswerten auf den `EngineAPI.simulateSingleYear()`-Input.
-- `minimumFlexAnnual` wird wie `startFlexBedarf` als nominal fortgeschriebener Jahreswert in den Engine-Input gemappt und im Jahresstate inflationiert.
+- `minimumFlexAnnual` wird wie `startFlexBedarf` als nominal fortgeschriebener Jahreswert in den Engine-Input gemappt und im Jahresstate inflationiert. Die Policy laeuft nach Guardrails und vor Flex-Budget und finaler Glaettung; sie rechnet den Rentenueberschuss nach Floor-Deckung auf das Haushaltsziel an. Erst nach der finalen Monatsquantisierung werden `minimumFlexEffectiveFinal` als Rentenueberschuss plus Depotflex, `minimumFlexShortfallAnnual` und `minimumFlexFulfilled` festgeschrieben.
 - `simulator-accumulation-year.js` – DOM-freier frueher Rueckgabepfad fuer Ansparjahre inklusive Sparrate, Cash-Zins, Anspar-Rebalancing, Logdaten und Fortschreibung des kumulierten Inflationsfaktors trotz Entnahme null.
 - `simulator-tax-recompute.js` – DOM-freie Normalisierung von Tax-Rohaggregaten und finales Settlement-Recompute nach Simulator-Zusatzverkaeufen. Skaliert die regulaere Cash-Reserve konsistent, kumuliert Forced-Sale-Reserven und liefert die genau einmal cashwirksame Differenz zur finalen Jahressteuer; Reserveunterdeckungen unter -0,01 EUR sind Contract-Fehler.
 - `simulator-forced-sale.js` – DOM-freie Forced-Sale-Liquiditaetsdeckung vor/nach Auszahlung inklusive Forced-Sale-Scale, skalierter Plansteuerreserve ohne erneuten SPB, Bond-Verkaufsdelta, Payout-Fallback und FIFO-Fallback.
@@ -443,7 +443,7 @@ Aggregation der Monte-Carlo-Ausgabe, Orchestrierung von KPI-Berechnung und Rende
 - Dropdown fuer bis zu 31 Szenario-Logs (bis zu 16 charakteristische + 15 zufaellige)
 - Checkboxen für Pflege-Details und detailliertes Log
 - Detailspalten fuer Entnahme-/Payout-/VPW-Transparenz (`EntPlan`, `EntEff`, `VPW€`, `VPWFlex`, `StatFlex`, `Liq>P`, `Liq<P`, `Liq>Z`, `Port>P`, `PortEnd`)
-- Mindest-Flex-Spalten: `MinFlex€`, `MinFSt` sowie im Detailmodus `MinFBlock` und `MinFEff`
+- Mindest-Flex-Spalten: `MinFlex€`, `MinFIst€`, `MinFGap€`, `MinFSt` sowie im Detailmodus `MinFBlock` und der Policy-Zwischenwert `MinFEff`
 - JSON/CSV-Export für ausgewählte Szenarien
 - Pflege-KPI-Dashboard mit getrennten P1-/P2-Verteilungen, Stichprobengroessen, nullable bedingten Kennzahlen und realen Haushalts-Mehrbedarfen
 - enthält zusätzlich Metriken für `taxSavedByLossCarry` aus Sweep/MC-Ergebnissen
@@ -894,7 +894,7 @@ Aggregiert Profildaten zu Simulator-Inputs für Multi-Profil-Setups.
 - Hybridprovenienz: Existiert eine Detailrepraesentation, blockiert ein weiteres Profil mit positiven Depot-/Geldmarkt-Aggregaten ohne Details mit `SIMULATOR_PROFILE_ASSET_PROVENANCE_MISSING`. Reines Tagesgeld bleibt als separat provenienzfaehige Liquiditaet zulaessig; Aggregate-only Haushalte bleiben kompatibel.
 - Pflegebucket: liest `profile_health_bucket`, normalisiert die Definition und nutzt bei Multi-Profil-Setups das Primary-Profil als Haushaltsdefinition. Abweichende sekundäre Definitionen werden als Warnung transportiert.
 - Fallback-Logik: Nutzt Balance-Werte wenn Simulator-Felder leer sind
-- Mindest-Flex bleibt profilbezogen: `minimumFlexAnnual` wird aus Profil-Simulatorwerten oder Balance-Fallbacks gelesen, im kombinierten Haushaltslauf addiert und als `minimumFlexProfiles` nachvollziehbar transportiert.
+- Mindest-Flex bleibt profilbezogen: `minimumFlexAnnual` wird aus Profil-Simulatorwerten oder Balance-Fallbacks gelesen, im kombinierten Haushaltslauf addiert und als `minimumFlexProfiles` nachvollziehbar transportiert. Jeder Profilwert muss endlich, nicht-negativ und hoechstens so gross wie der jeweilige Profil-Flexbedarf sein; die Summe darf den aggregierten Haushalts-Flexbedarf nicht uebersteigen. Verletzungen blockieren den Lauf fail-closed statt Werte zu kappen oder aus dem Primary-Profil zu uebernehmen.
 - Gewichtete Mittelung bleibt fuer Steuersaetze und Aktienquote bestehen; das Gold-Rebalancing-Band wird zielbetragsgewichtet aus den aktiven Goldprofilen abgeleitet.
 
 **Dependencies:** `simulator-data.js`, `balance-config.js`, `app/profile/profile-asset-values.js`

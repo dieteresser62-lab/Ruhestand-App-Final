@@ -131,6 +131,45 @@ const profileInputs = [
 }
 
 {
+    console.log('\n📋 Test 1b: Household minimum flex is additive and fails closed above household flex');
+    const invalidHouseholdMinimumFlex = profileInputs.map((entry, index) => ({
+        ...entry,
+        inputs: {
+            ...entry.inputs,
+            startFlexBedarf: 30000,
+            minimumFlexAnnual: index === 0 ? 36000 : 30000
+        }
+    }));
+    const individualViolation = combineSimulatorProfiles(invalidHouseholdMinimumFlex, 'a');
+    assertEqual(individualViolation.combined, null,
+        'A profile minimum above its own flex need must fail closed at the aggregation boundary');
+    assertEqual(individualViolation.errorCode, 'SIMULATOR_PROFILE_MINIMUM_FLEX_INVALID',
+        'The individual profile violation exposes a stable field-specific error code');
+
+    const additiveHouseholdViolation = profileInputs.map((entry, index) => ({
+        ...entry,
+        inputs: {
+            ...entry.inputs,
+            startFlexBedarf: 30000,
+            minimumFlexAnnual: 30000
+        }
+    }));
+    const householdResult = combineSimulatorProfiles(additiveHouseholdViolation, 'a');
+    assert(householdResult.combined,
+        'The additive household contract accepts a sum equal to the aggregated household flex need');
+    assertClose(householdResult.combined.minimumFlexAnnual, 60000, 0.0001,
+        'The accepted household minimum remains the exact additive profile sum');
+
+    additiveHouseholdViolation[0].inputs.minimumFlexAnnual = 30000.009;
+    additiveHouseholdViolation[1].inputs.minimumFlexAnnual = 30000.009;
+    const householdOverflow = combineSimulatorProfiles(additiveHouseholdViolation, 'a');
+    assertEqual(householdOverflow.combined, null,
+        'An additive household minimum above aggregated household flex must fail closed without fallback');
+    assertEqual(householdOverflow.errorCode, 'SIMULATOR_HOUSEHOLD_MINIMUM_FLEX_INVALID',
+        'The household overflow exposes a stable fail-closed error code');
+}
+
+{
     console.log('\n📋 Test 2: Health bucket remains primary household setting');
     const withHealthBucketDiffs = [
         {

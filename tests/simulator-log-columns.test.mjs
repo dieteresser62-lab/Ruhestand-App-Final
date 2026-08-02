@@ -52,6 +52,9 @@ const hasHeader = (cols, header) => cols.some(col => col?.header === header);
     assert(hasHeader(normalCols, 'MinFSt'), 'Backtest normal should include minimum flex status');
     assert(hasHeader(detailedCols, 'MinFBlock'), 'Backtest detailed should include minimum flex block reason');
     assert(hasHeader(detailedCols, 'MinFEff'), 'Backtest detailed should include minimum flex effect amount');
+    const backtestRunwayColumn = normalCols.find(col => col?.header === 'Runway%');
+    assert(backtestRunwayColumn.valueFormatter(null) === '', 'Backtest runway column renders non-applicable coverage as empty');
+    assert(backtestRunwayColumn.valueFormatter(0) === '0%', 'Backtest runway column preserves an applicable zero');
 
     const noGoldNormalCols = buildBacktestColumnDefinitions('normal', { goldAktiv: false });
     const noGoldDetailedCols = buildBacktestColumnDefinitions('detailed', { goldAktiv: false });
@@ -109,6 +112,9 @@ const hasHeader = (cols, header) => cols.some(col => col?.header === header);
     assert(hasHeader(normalCols, 'MinFSt'), 'Worst-run normal should include minimum flex status');
     assert(hasHeader(detailedCols, 'MinFBlock'), 'Worst-run detailed should include minimum flex block reason');
     assert(hasHeader(detailedCols, 'MinFEff'), 'Worst-run detailed should include minimum flex effect amount');
+    const worstRunwayColumn = normalCols.find(col => col?.header === 'Runway%');
+    assert(worstRunwayColumn.fmt(null) === '', 'Worst-run runway column renders non-applicable coverage as empty');
+    assert(worstRunwayColumn.fmt(0) === '0%', 'Worst-run runway column preserves an applicable zero');
 
     const noGoldNormalCols = getWorstRunColumnDefinitions({ logDetailLevel: 'normal', goldAktiv: false });
     const noGoldDetailedCols = getWorstRunColumnDefinitions({ logDetailLevel: 'detailed', goldAktiv: false });

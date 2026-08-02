@@ -202,7 +202,7 @@ const integrated = runHistoricalBacktestCohorts({
 assertEqual(integrated.inventory.eligible, 2, 'production contract provider yields both eligible windows');
 assertEqual(integrated.inventory.completed, 2, 'real single-path runner completes every prepared window');
 assertEqual(integrated.inventory.excluded, 1, 'integrated boundary excludes the final short window');
-assert(integrated.cohorts.every(entry => entry.runResult?.metrics?.schemaVersion === 'HistoricalBacktestMetricsV1'), 'integrated cohorts retain canonical single-path metrics');
+assert(integrated.cohorts.every(entry => entry.runResult?.metrics?.schemaVersion === 'HistoricalBacktestMetricsV2'), 'integrated cohorts retain canonical single-path metrics');
 assert(integrated.cohorts.every(entry => entry.runResult?.requestedYears === 2), 'integrated cohorts retain identical requested horizon length');
 
 console.log('✅ Historical backtest cohorts tests passed');

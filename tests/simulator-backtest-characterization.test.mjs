@@ -24,6 +24,7 @@ const targetFixturePath = path.join(__dirname, 'fixtures', 'simulator-backtest-t
 const slice06DeltaFixturePath = path.join(__dirname, 'fixtures', 'cape-wage-backtest-delta-v3.json');
 const slice07DeltaFixturePath = path.join(__dirname, 'fixtures', 'demography-care-survivor-backtest-delta-v1.json');
 const slice08MeasurementFixturePath = path.join(__dirname, 'fixtures', 'liquidity-runway-slice-08-measurement-v1.json');
+const slice09MeasurementFixturePath = path.join(__dirname, 'fixtures', 'minimum-flex-slice-09-measurement-v1.json');
 const backtestSourcePath = path.join(__dirname, '..', 'app', 'simulator', 'simulator-backtest.js');
 const backtestRunnerSourcePath = path.join(__dirname, '..', 'app', 'simulator', 'historical-backtest-runner.js');
 const UPDATE_TARGET = process.env.UPDATE_BACKTEST_TARGET === '1';
@@ -483,7 +484,14 @@ function projectRow(entry) {
             healthBucketEnabled: row.health_bucket_enabled ?? null,
             healthBucketEnd: round(row.health_bucket_end),
             healthBucketCoveragePct: round(row.health_bucket_real_coverage_pct, 6),
-            healthBucketTargetGap: round(row.health_bucket_target_gap)
+            healthBucketTargetGap: round(row.health_bucket_target_gap),
+            minimumFlexAnnual: round(row.minimumFlexAnnual),
+            minimumFlexStatus: row.minimumFlexStatus ?? null,
+            minimumFlexEffectiveFinal: round(row.minimumFlexEffectiveFinal),
+            minimumFlexShortfallAnnual: round(row.minimumFlexShortfallAnnual),
+            householdFlexRequired: round(row.flex_brutto_haushalt),
+            householdFlexFulfilled: round(row.flex_haushalt_erfuellt),
+            householdFlexReductionPct: round(row.flex_haushalt_kuerzung_pct, 6)
         }
     };
 }
@@ -520,8 +528,8 @@ function projectScenario({ id, oracleClass = 'target_expected', inputs, data, al
         .map(entry => (Number(entry?.wertAktien) || 0) + (Number(entry?.wertGold) || 0) + (Number(entry?.liquiditaet) || 0))
         .filter(Number.isFinite);
     const finiteRunwayCoverage = rows
-        .map(entry => Number(entry?.row?.RunwayCoveragePct))
-        .filter(Number.isFinite);
+        .map(entry => entry?.row?.RunwayCoveragePct)
+        .filter(value => typeof value === 'number' && Number.isFinite(value));
     let runningPeak = Number(normalizedInputs.startVermoegen) || 0;
     let maxDrawdownPct = 0;
     for (const wrapperTotal of wrapperTotals) {
@@ -565,6 +573,17 @@ function projectScenario({ id, oracleClass = 'target_expected', inputs, data, al
                 : null,
             maxAbsolutePortfolioFlowDelta: round(Math.max(0, ...finiteFlowDeltas), 6)
         },
+        minimumFlexWitness: Object.fromEntries(
+            [2001, 2005, 2009, 2010]
+                .map(year => rows.find(entry => entry?.jahr === year))
+                .filter(Boolean)
+                .map(entry => [entry.jahr, {
+                    minimumFlexAnnual: round(entry.row?.minimumFlexAnnual),
+                    status: entry.row?.minimumFlexStatus ?? null,
+                    effectiveFinal: round(entry.row?.minimumFlexEffectiveFinal),
+                    shortfallAnnual: round(entry.row?.minimumFlexShortfallAnnual)
+                }])
+        ),
         summaryText: summaryText(summaryHtml),
         rowSamples: rows.length <= 4
             ? rows.map(projectRow)
@@ -1329,6 +1348,26 @@ try {
         expectedRowCount: 10,
         notes: ['Three-bucket accounting and minimum-flex characterization.']
     });
+    const minimumFlexD17 = runScenario({
+        id: 'minimum_flex_d17_2000_2010',
+        values: {
+            simStartJahr: 2000,
+            simEndJahr: 2010,
+            simStartVermoegen: 2000000,
+            depotwertAlt: 1800000,
+            einstandAlt: 1400000,
+            tagesgeld: 200000,
+            geldmarktEtf: 0,
+            startFloorBedarf: 24000,
+            startFlexBedarf: 12000,
+            minimumFlexAnnual: 9000,
+            flexBudgetAnnual: 6000,
+            flexBudgetYears: 5,
+            flexBudgetRecharge: 0
+        },
+        expectedRowCount: 11,
+        notes: ['Slice-09 D-17 witness for 2001, 2005, 2009 and 2010.']
+    });
     const ruin = runScenario({
         id: 'capital_poor_ruin_2000_2005',
         values: {
@@ -1493,6 +1532,7 @@ try {
             completedLong,
             completedNumeraireSeam,
             threeBucketMinimumFlex,
+            minimumFlexD17,
             ruin,
             healthBucketProjection,
             dynamicFlexCape,
@@ -1508,7 +1548,7 @@ try {
         ].map(entry => ({ ...entry, oracleClass: 'target_expected' }))
     };
 
-    assertEqual(actual.cases.length, 11, 'eleven runtime characterization cases should be present');
+    assertEqual(actual.cases.length, 12, 'twelve runtime characterization cases including the Slice-09 D-17 witness should be present');
     assertEqual(goldHoldingBefore.inputHash, goldHoldingAfter.inputHash, 'Gold before/after runs should use identical inputs and period');
     assertEqual(goldHoldingAfter.inputs.goldAktiv, true, 'Gold reference should activate the real gold path');
     assertEqual(goldHoldingBefore.observedRowCount, 6, 'Gold before reference should complete six years');
@@ -1624,6 +1664,15 @@ try {
     assert(healthBucketProjection.rowSamples.at(-1).row.healthBucketEnabled === true, 'health projection fixture retains nested bucket values');
     assert(healthBucketProjection.summaryText.includes('Pflegebucket'), 'health projection fixture retains the bucket summary contract');
     assert(nonFiniteReturn.outcomeObservation === 'completed', 'provider snapshot keeps the caller-side non-finite mutation outside the prepared run');
+    assertEqual(Object.keys(minimumFlexD17.minimumFlexWitness).length, 4,
+        'D-17 witness must contain all four reported historical years');
+    for (const year of [2001, 2005, 2009, 2010]) {
+        const witness = minimumFlexD17.minimumFlexWitness[year];
+        assert(witness.minimumFlexAnnual > 0, `D-17 ${year} must retain the active nominal minimum-flex target`);
+        assert(witness.status && witness.status !== 'inactive_zero', `D-17 ${year} must retain an active minimum-flex status`);
+        assert(Number.isFinite(witness.effectiveFinal), `D-17 ${year} must export final effective minimum flex`);
+        assert(Number.isFinite(witness.shortfallAnnual), `D-17 ${year} must export the nominal minimum-flex shortfall`);
+    }
 
     const legacyExpected = JSON.parse(fs.readFileSync(legacyFixturePath, 'utf8'));
     actual.deltaReport = buildTargetDeltaReport(legacyExpected, actual);
@@ -1705,45 +1754,58 @@ try {
     assertEqual(slice07To08BacktestDeltaOracle.activeCapeProviderArm.financialMetrics.maxAbsolutePortfolioFlowDelta.delta, 0, 'Slice 07 to 08 active-arm FlowDelta must stay zero');
     assertEqual(slice07To08BacktestDeltaOracle.legacyCapeReferenceArm.financialMetrics.maxAbsolutePortfolioFlowDelta.delta, 0, 'Slice 07 to 08 reference-arm FlowDelta must stay zero');
 
-    const slice08Measurement = {
-        schemaVersion: 'LiquidityRunwaySlice08MeasurementV1',
-        snapshotId: 'post-backtest-data-08-v1',
-        sourceReference: 'demography-care-survivor-backtest-delta-v1',
-        sourceResultDocument: 'docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_07_DEMOGRAFIE_PFLEGE_HINTERBLIEBENE.md',
+    const archivedSlice08Bytes = fs.readFileSync(slice08MeasurementFixturePath);
+    const archivedSlice08Sha256 = createHash('sha256').update(archivedSlice08Bytes).digest('hex');
+    assertEqual(
+        archivedSlice08Sha256,
+        '6642194525836a0c886d091001131d994625040159984618a95cace4d4279b49',
+        'Immutable Slice-08 measurement must remain byte-identical as the Slice-09 input'
+    );
+    const archivedSlice08Measurement = JSON.parse(archivedSlice08Bytes.toString('utf8'));
+    const archivedCaseOracles = new Map(archivedSlice08Measurement.caseOracles.map(entry => [entry.id, entry]));
+    const existingCaseFinancialDeltas = actual.cases
+        .filter(entry => archivedCaseOracles.has(entry.id))
+        .map(entry => {
+            const before = archivedCaseOracles.get(entry.id);
+            return {
+                id: entry.id,
+                outcomeChanged: before.outcomeObservation !== entry.outcomeObservation,
+                summaryEndWealthDelta: round(entry.values.summaryEndWealth - before.summaryEndWealth),
+                totalWithdrawalDelta: round(entry.values.totalWithdrawal - before.totalWithdrawal),
+                totalTaxDelta: round(entry.values.totalTax - before.totalTax),
+                maxAbsolutePortfolioFlowDeltaDelta: round(
+                    entry.values.maxAbsolutePortfolioFlowDelta - before.maxAbsolutePortfolioFlowDelta,
+                    6
+                )
+            };
+        });
+    const slice09Measurement = {
+        schemaVersion: 'MinimumFlexSlice09BacktestMeasurementV1',
+        snapshotId: 'post-backtest-data-09-v1',
+        sourceReference: archivedSlice08Measurement.snapshotId,
+        sourceFixtureSha256: archivedSlice08Sha256,
+        sourceActualSha256: archivedSlice08Measurement.actualSha256,
         reviewStatus: 'pending',
-        actualSha256: createHash('sha256').update(stableStringify(actual)).digest('hex'),
+        targetActualSha256: createHash('sha256').update(stableStringify(actual)).digest('hex'),
         caseCount: actual.cases.length,
         negativeCaseCount: actual.negativeCases.length,
         ruinCaseCount: actual.cases.filter(entry => entry.outcomeObservation === 'ruin').length,
         maxAbsolutePortfolioFlowDelta: round(Math.max(...actual.cases.map(entry => entry.values.maxAbsolutePortfolioFlowDelta)), 6),
-        capeLegacyStepDelta: capeLegacyStepDeltaOracle.financialMetrics,
-        slice07To08BacktestDeltaOracle,
-        earlyWageDataDeltaOracles: earlyWageDataDeltaOracles.map(entry => ({
-            scenarioId: entry.scenarioId,
-            financialMetrics: entry.financialMetrics
-        })),
-        caseOracles: actual.cases.map(entry => ({
-            id: entry.id,
-            outcomeObservation: entry.outcomeObservation,
-            summaryEndWealth: entry.values.summaryEndWealth,
-            totalWithdrawal: entry.values.totalWithdrawal,
-            totalTax: entry.values.totalTax,
-            maxAbsolutePortfolioFlowDelta: entry.values.maxAbsolutePortfolioFlowDelta
-        })),
-        thresholdChangedYearCount: capeLegacyStepThresholdOracle.changedYearCount
+        existingCaseFinancialDeltas,
+        d17Witness: minimumFlexD17.minimumFlexWitness
     };
-    if (process.env.PRINT_BACKTEST_DATA_08 === '1') {
-        console.log('__BACKTEST_DATA_08_MEASUREMENT_START__');
-        console.log(stableStringify(slice08Measurement, 2));
-        console.log('__BACKTEST_DATA_08_MEASUREMENT_END__');
+    if (process.env.PRINT_BACKTEST_DATA_09 === '1') {
+        console.log('__BACKTEST_DATA_09_MEASUREMENT_START__');
+        console.log(stableStringify(slice09Measurement, 2));
+        console.log('__BACKTEST_DATA_09_MEASUREMENT_END__');
     } else {
-        const expectedSlice08Measurement = JSON.parse(fs.readFileSync(slice08MeasurementFixturePath, 'utf8'));
-        const unexpected = collectDiffs(expectedSlice08Measurement, slice08Measurement);
+        const expectedSlice09Measurement = JSON.parse(fs.readFileSync(slice09MeasurementFixturePath, 'utf8'));
+        const unexpected = collectDiffs(expectedSlice09Measurement, slice09Measurement);
         if (unexpected.length > 0) {
-            console.error('Unexpected Slice-08 backtest measurement deltas:');
+            console.error('Unexpected Slice-09 backtest measurement deltas:');
             console.error(stableStringify(unexpected.slice(0, 20), 2));
         }
-        assertEqual(unexpected.length, 0, 'Slice-08 backtest measurement should reproduce exactly with field-level diagnostics');
+        assertEqual(unexpected.length, 0, 'Slice-09 backtest measurement should reproduce exactly with field-level diagnostics');
     }
     assertEqual(
         archivedSlice07Evidence.schemaVersion,

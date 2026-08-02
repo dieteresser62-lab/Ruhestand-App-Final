@@ -594,7 +594,37 @@ export function combineSimulatorProfiles(profileInputs, primaryProfileId) {
     const sumEinstandAlt = sumNumbers(assetRecords, record => record.einstandAlt);
     const sumFloor = sumNumbers(inputsList, i => i.startFloorBedarf || 0);
     const sumFlex = sumNumbers(inputsList, i => i.startFlexBedarf || 0);
+    const invalidMinimumFlexEntry = profileInputs.find(entry => {
+        const minimumFlexAnnual = Number(entry?.inputs?.minimumFlexAnnual ?? 0);
+        const flexAnnual = Number(entry?.inputs?.startFlexBedarf ?? 0);
+        return !Number.isFinite(minimumFlexAnnual)
+            || minimumFlexAnnual < 0
+            || !Number.isFinite(flexAnnual)
+            || flexAnnual < 0
+            || minimumFlexAnnual > flexAnnual + 0.01;
+    });
+    if (invalidMinimumFlexEntry) {
+        const profileName = invalidMinimumFlexEntry.name
+            || invalidMinimumFlexEntry.profileId
+            || 'unbekannt';
+        return {
+            combined: null,
+            errorCode: 'SIMULATOR_PROFILE_MINIMUM_FLEX_INVALID',
+            warnings: [
+                `minimumFlexAnnual fuer Profil ${profileName} muss eine nicht-negative Zahl sein und darf startFlexBedarf nicht ueberschreiten.`
+            ]
+        };
+    }
     const sumMinimumFlex = sumNumbers(inputsList, i => i.minimumFlexAnnual || 0);
+    if (sumMinimumFlex > sumFlex + 0.01) {
+        return {
+            combined: null,
+            errorCode: 'SIMULATOR_HOUSEHOLD_MINIMUM_FLEX_INVALID',
+            warnings: [
+                `Die Summe minimumFlexAnnual (${sumMinimumFlex.toFixed(2)} EUR) darf den aggregierten startFlexBedarf (${sumFlex.toFixed(2)} EUR) nicht ueberschreiten.`
+            ]
+        };
+    }
     const sumFlexBudgetAnnual = sumNumbers(inputsList, i => i.flexBudgetAnnual || 0);
     const sumFlexBudgetRecharge = sumNumbers(inputsList, i => i.flexBudgetRecharge || 0);
     const minFlexBudgetYears = inputsList.reduce((minVal, i) => {

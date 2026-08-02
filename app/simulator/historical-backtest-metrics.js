@@ -1,6 +1,6 @@
 "use strict";
 
-export const HISTORICAL_BACKTEST_METRICS_SCHEMA_VERSION = 'HistoricalBacktestMetricsV1';
+export const HISTORICAL_BACKTEST_METRICS_SCHEMA_VERSION = 'HistoricalBacktestMetricsV2';
 export const FLEX_REDUCTION_THRESHOLD_PCT = 10;
 export const FLEX_REDUCTION_OPERATOR = 'gte';
 
@@ -177,40 +177,103 @@ export const HISTORICAL_BACKTEST_METRIC_DESCRIPTORS = freezeDeep([
         source: 'rows[*].row.floor_shortfall_nominal_or_floor_aus_depot_minus_entnahme_effektiv'
     }),
     descriptor({
+        id: 'flex_required_total_nominal_eur',
+        label: 'Kumulierter Haushalts-Flexbedarf',
+        unit: 'EUR',
+        priceBasis: 'nominal',
+        sign: 'neutral',
+        aggregationRule: 'sum',
+        denominator: 'decumulation_years',
+        fractionDigits: 2,
+        missingnessRule: 'null_if_any_decumulation_row_lacks_flex_brutto_haushalt',
+        outcomeRule: 'available_for_completed_or_ruin',
+        source: 'rows[*].row.flex_brutto_haushalt'
+    }),
+    descriptor({
+        id: 'flex_fulfilled_total_nominal_eur',
+        label: 'Kumulierter erfuellter Haushalts-Flex',
+        unit: 'EUR',
+        priceBasis: 'nominal',
+        sign: 'higher_is_better',
+        aggregationRule: 'sum',
+        denominator: 'decumulation_years',
+        fractionDigits: 2,
+        missingnessRule: 'null_if_any_decumulation_row_lacks_flex_haushalt_erfuellt',
+        outcomeRule: 'available_for_completed_or_ruin',
+        source: 'rows[*].row.flex_haushalt_erfuellt'
+    }),
+    descriptor({
+        id: 'flex_fulfillment_total_pct',
+        label: 'Erfuellungsquote Haushalts-Flex',
+        unit: 'percent',
+        sign: 'higher_is_better',
+        aggregationRule: 'sum_fulfilled_div_sum_required_times_100',
+        denominator: 'summed_household_flex_requirement',
+        fractionDigits: 2,
+        missingnessRule: 'null_if_flex_series_missing_or_total_requirement_not_positive',
+        outcomeRule: 'available_for_completed_or_ruin',
+        source: 'rows[*].row.flex_haushalt_erfuellt / rows[*].row.flex_brutto_haushalt'
+    }),
+    descriptor({
         id: 'flex_reduction_years_gte_10_pct',
-        label: 'Jahre mit Flex-Kuerzung (≥ 10 %)',
+        label: 'Jahre mit Haushalts-Flex-Kuerzung (≥ 10 %)',
         unit: 'years',
         sign: 'lower_is_better',
         aggregationRule: 'count_value_greater_than_or_equal_10_pct',
-        denominator: 'completed_years',
+        denominator: 'decumulation_years',
         fractionDigits: 0,
-        missingnessRule: 'null_if_any_completed_row_lacks_kuerzungProzent',
+        missingnessRule: 'null_if_any_decumulation_row_lacks_household_or_legacy_reduction_pct',
         outcomeRule: 'available_for_completed_or_ruin',
-        source: 'rows[*].entscheidung.kuerzungProzent'
+        source: 'rows[*].row.flex_haushalt_kuerzung_pct ?? rows[*].entscheidung.kuerzungProzent'
     }),
     descriptor({
         id: 'flex_reduction_max_pct',
-        label: 'Tiefste Flex-Kuerzung',
+        label: 'Tiefste Haushalts-Flex-Kuerzung',
         unit: 'percent',
         sign: 'lower_is_better',
         aggregationRule: 'maximum',
-        denominator: 'completed_years',
+        denominator: 'decumulation_years',
         fractionDigits: 2,
-        missingnessRule: 'null_if_no_completed_reduction_values',
+        missingnessRule: 'null_if_no_decumulation_reduction_values',
         outcomeRule: 'available_for_completed_or_ruin',
-        source: 'rows[*].entscheidung.kuerzungProzent'
+        source: 'rows[*].row.flex_haushalt_kuerzung_pct ?? rows[*].entscheidung.kuerzungProzent'
     }),
     descriptor({
         id: 'flex_reduction_longest_streak_gte_10_pct',
-        label: 'Laengste Flex-Kuerzungsserie (≥ 10 %)',
+        label: 'Laengste Haushalts-Flex-Kuerzungsserie (≥ 10 %)',
         unit: 'years',
         sign: 'lower_is_better',
         aggregationRule: 'longest_consecutive_value_greater_than_or_equal_10_pct',
-        denominator: 'completed_years',
+        denominator: 'decumulation_years',
         fractionDigits: 0,
-        missingnessRule: 'null_if_any_completed_row_lacks_kuerzungProzent',
+        missingnessRule: 'null_if_any_decumulation_row_lacks_household_or_legacy_reduction_pct',
         outcomeRule: 'available_for_completed_or_ruin',
-        source: 'rows[*].entscheidung.kuerzungProzent'
+        source: 'rows[*].row.flex_haushalt_kuerzung_pct ?? rows[*].entscheidung.kuerzungProzent'
+    }),
+    descriptor({
+        id: 'minimum_flex_shortfall_years',
+        label: 'Jahre mit Mindest-Flex-Fehlbetrag',
+        unit: 'years',
+        sign: 'lower_is_better',
+        aggregationRule: 'count_positive',
+        denominator: 'minimum_flex_applicable_years',
+        fractionDigits: 0,
+        missingnessRule: 'null_if_any_applicable_row_lacks_minimumFlexShortfallAnnual',
+        outcomeRule: 'available_for_completed_or_ruin',
+        source: 'rows[*].row.minimumFlexShortfallAnnual'
+    }),
+    descriptor({
+        id: 'minimum_flex_shortfall_total_nominal_eur',
+        label: 'Kumulierter Mindest-Flex-Fehlbetrag',
+        unit: 'EUR',
+        priceBasis: 'nominal',
+        sign: 'lower_is_better',
+        aggregationRule: 'sum',
+        denominator: 'minimum_flex_applicable_years',
+        fractionDigits: 2,
+        missingnessRule: 'null_if_any_applicable_row_lacks_minimumFlexShortfallAnnual',
+        outcomeRule: 'available_for_completed_or_ruin',
+        source: 'rows[*].row.minimumFlexShortfallAnnual'
     }),
     descriptor({
         id: 'runway_min_coverage_pct',
@@ -411,9 +474,25 @@ export function deriveHistoricalBacktestMetrics(result) {
         ? completeFiniteSeries(rows, entry => finiteOrNull(entry?.entscheidung?.jahresEntnahme))
         : null;
     const shortfallSeries = isFinancialOutcome ? completeFiniteSeries(rows, rowFloorShortfall) : null;
-    const reductionRows = rows.filter(entry => entry?.row?.Regime !== 'BANKRUPT');
+    const decumulationRows = rows.filter(entry => (
+        entry?.row?.Regime !== 'BANKRUPT'
+        && entry?.row?.Regime !== 'accumulation'
+    ));
+    const flexRequiredSeries = isFinancialOutcome
+        ? completeFiniteSeries(decumulationRows, entry => finiteOrNull(entry?.row?.flex_brutto_haushalt))
+        : null;
+    const flexFulfilledSeries = isFinancialOutcome
+        ? completeFiniteSeries(decumulationRows, entry => finiteOrNull(entry?.row?.flex_haushalt_erfuellt))
+        : null;
     const reductionSeries = isFinancialOutcome
-        ? completeFiniteSeries(reductionRows, entry => finiteOrNull(entry?.entscheidung?.kuerzungProzent))
+        ? completeFiniteSeries(decumulationRows, entry => finiteOrNull(
+            entry?.row?.flex_haushalt_kuerzung_pct
+            ?? entry?.entscheidung?.kuerzungProzent
+        ))
+        : null;
+    const minimumFlexApplicableRows = decumulationRows.filter(entry => entry?.row?.minimumFlexApplicable === true);
+    const minimumFlexShortfallSeries = isFinancialOutcome
+        ? completeFiniteSeries(minimumFlexApplicableRows, entry => finiteOrNull(entry?.row?.minimumFlexShortfallAnnual))
         : null;
     const runwaySeries = isFinancialOutcome
         ? rows.map(entry => finiteOrNull(entry?.row?.RunwayCoveragePct)).filter(value => value !== null)
@@ -428,6 +507,12 @@ export function deriveHistoricalBacktestMetrics(result) {
     const realShortfalls = shortfallSeries && inflation
         ? shortfallSeries.map((value, index) => value / inflation.atYearStart[index])
         : null;
+    const flexRequiredTotal = flexRequiredSeries
+        ? flexRequiredSeries.reduce((sum, value) => sum + value, 0)
+        : null;
+    const flexFulfilledTotal = flexFulfilledSeries
+        ? flexFulfilledSeries.reduce((sum, value) => sum + value, 0)
+        : null;
 
     const values = {
         wealth_start_nominal_eur: startWealth,
@@ -440,12 +525,23 @@ export function deriveHistoricalBacktestMetrics(result) {
         floor_shortfall_total_real_eur: realShortfalls ? realShortfalls.reduce((sum, value) => sum + value, 0) : null,
         floor_shortfall_max_real_eur: realShortfalls ? Math.max(0, ...realShortfalls) : null,
         floor_shortfall_longest_streak_years: shortfallSeries ? longestPositiveStreak(shortfallSeries) : null,
+        flex_required_total_nominal_eur: flexRequiredTotal,
+        flex_fulfilled_total_nominal_eur: flexFulfilledTotal,
+        flex_fulfillment_total_pct: flexRequiredTotal !== null && flexRequiredTotal > 0 && flexFulfilledTotal !== null
+            ? (flexFulfilledTotal / flexRequiredTotal) * 100
+            : null,
         flex_reduction_years_gte_10_pct: reductionSeries
             ? reductionSeries.filter(value => value >= FLEX_REDUCTION_THRESHOLD_PCT).length
             : null,
         flex_reduction_max_pct: reductionSeries && reductionSeries.length > 0 ? Math.max(...reductionSeries) : null,
         flex_reduction_longest_streak_gte_10_pct: reductionSeries
             ? longestPositiveStreak(reductionSeries, value => value >= FLEX_REDUCTION_THRESHOLD_PCT)
+            : null,
+        minimum_flex_shortfall_years: minimumFlexShortfallSeries
+            ? minimumFlexShortfallSeries.filter(value => value > 0.01).length
+            : null,
+        minimum_flex_shortfall_total_nominal_eur: minimumFlexShortfallSeries
+            ? minimumFlexShortfallSeries.reduce((sum, value) => sum + value, 0)
             : null,
         runway_min_coverage_pct: runwaySeries.length > 0 ? Math.min(...runwaySeries) : null,
         runway_stress_years_below_100_pct: runwaySeries.length > 0

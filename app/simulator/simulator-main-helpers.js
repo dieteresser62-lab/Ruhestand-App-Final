@@ -269,8 +269,12 @@ export function buildBacktestColumnDefinitions(detailLevel = 'normal', options =
         { header: 'MinF%', width: 5, key: 'row.MinFlexRatePct', valueFormatter: v => formatPercentInt(v), align: 'right' },
         { header: 'WRed%', width: 5, key: 'row.WealthRedF', valueFormatter: v => formatPercentInt(v), align: 'right' },
         { header: 'WQ%', width: 4, key: 'row.WealthQuoteUsedPct', valueFormatter: v => formatPercentInt(v), align: 'right' },
-        { header: 'Flex€', width: 7, key: 'row.flex_erfuellt_nominal', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+        { header: 'FlexDep€', width: 8, key: 'row.flex_erfuellt_nominal', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+        { header: 'FlexHH€', width: 8, key: 'row.flex_haushalt_erfuellt', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+        { header: 'FlexHH%', width: 7, key: 'row.flex_haushalt_kuerzung_pct', valueFormatter: v => formatPercentInt(v), align: 'right' },
         { header: 'MinFlex€', width: 8, key: 'row.minimumFlexAnnual', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+        { header: 'MinFIst€', width: 8, key: 'row.minimumFlexEffectiveFinal', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+        { header: 'MinFGap€', width: 8, key: 'row.minimumFlexShortfallAnnual', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
         { header: 'MinFSt', width: 10, key: 'row.minimumFlexStatus', valueFormatter: v => (v || '').substring(0, 10), align: 'left' }
     );
 
@@ -420,7 +424,7 @@ export function buildBacktestColumnDefinitions(detailLevel = 'normal', options =
         { header: 'Cut', width: 12, key: 'row.CutReason', valueFormatter: v => (v || '').substring(0, 12), align: 'left' },
         { header: 'Alarm', width: 6, key: 'row.Alarm', valueFormatter: v => (v ? 'AKTIV' : ''), align: 'left' },
         { header: 'Quote%', width: 6, key: 'row.QuoteEndPct', valueFormatter: v => formatPercent(v), align: 'right' },
-        { header: 'Runway%', width: 7, key: 'row.RunwayCoveragePct', valueFormatter: v => formatPercentInt(v), align: 'right' },
+        { header: 'Runway%', width: 7, key: 'row.RunwayCoveragePct', valueFormatter: v => (Number.isFinite(v) ? formatPercentInt(v) : ''), align: 'right' },
         { header: 'RunZiel', width: 7, key: 'row.RunwayTargetSmoothedMonths', valueFormatter: v => (Number.isFinite(v) ? `${Number(v).toFixed(0)}M` : ''), align: 'right' },
         { header: 'RunSev', width: 6, key: 'row.RunwayTargetSeverityPct', valueFormatter: v => (Number.isFinite(v) ? `${Math.round(v)}%` : ''), align: 'right' },
         { header: 'Pf.Akt%', width: 8, extractor: row => formatPercentRatio(row.row?.NominalReturnEquityPct || 0, { fractionDigits: 1, invalid: '0.0%' }), valueFormatter: v => v, align: 'right' },

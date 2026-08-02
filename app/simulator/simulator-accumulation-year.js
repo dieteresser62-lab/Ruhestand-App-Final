@@ -178,16 +178,16 @@ export function simulateAccumulationYear({
                 jahresEntnahme: 0,
                 kuerzungQuelle: 'none',
                 flexRate: 1.0,
-                runwayMonths: 0
+                runwayMonths: null
             },
             FlexRatePct: 1.0,
             CutReason: 'none',
             Alarm: false,
             Regime: 'accumulation',
             QuoteEndPct: 0,
-            RunwayCoveragePct: (zielLiquiditaet > 0
+            RunwayCoveragePct: zielLiquiditaet > 0
                 ? (portfolio.liquiditaet / zielLiquiditaet) * 100
-                : (portfolio.liquiditaet > 0 ? 100 : 0)),
+                : null,
             RunwayMeasurementPhase: 'post_accumulation_end_of_year',
             RealReturnEquityPct: ((1 + rA) / (1 + yearData.inflation / 100) - 1),
             RealReturnGoldPct: ((1 + rG) / (1 + yearData.inflation / 100) - 1),

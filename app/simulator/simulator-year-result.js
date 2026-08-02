@@ -148,11 +148,50 @@ export function buildSimulatorYearResult({
         : null;
     const runwayCoveragePct = zielLiquiditaet > 0
         ? (liquiditaet / zielLiquiditaet) * 100
-        : (liquiditaet > 0 ? 100 : 0);
+        : null;
     const annualRunwayNeedRaw = Number(fullResult.ui.neuerBedarf);
     const runwayMonths = Number.isFinite(annualRunwayNeedRaw)
-        ? (annualRunwayNeedRaw > 0 ? liquiditaet / (annualRunwayNeedRaw / 12) : 0)
+        ? (annualRunwayNeedRaw > 0 ? liquiditaet / (annualRunwayNeedRaw / 12) : null)
         : null;
+    const grossHouseholdFlex = Number.isFinite(fullResult.input?.flexBedarf)
+        ? Math.max(0, fullResult.input.flexBedarf)
+        : Math.max(0, inflatedFlex);
+    const pensionFlexContribution = Math.min(
+        grossHouseholdFlex,
+        Math.max(0, pensionAnnual - effectiveBaseFloor)
+    );
+    const fulfilledFlexFromPortfolio = jahresEntnahmeEffektiv > inflatedFloor
+        ? jahresEntnahmeEffektiv - inflatedFloor
+        : 0;
+    const fulfilledHouseholdFlex = Math.min(
+        grossHouseholdFlex,
+        pensionFlexContribution + fulfilledFlexFromPortfolio
+    );
+    const householdFlexReductionPct = grossHouseholdFlex > 0
+        ? Math.max(0, (1 - (fulfilledHouseholdFlex / grossHouseholdFlex)) * 100)
+        : null;
+    const minimumFlexAnnual = Number.isFinite(keyParams.minimumFlexAnnual)
+        ? Math.max(0, keyParams.minimumFlexAnnual)
+        : 0;
+    const minimumFlexApplicable = keyParams.minimumFlexApplicable === true;
+    const plannedMinimumFlexEffective = Number.isFinite(keyParams.minimumFlexEffectiveFinal)
+        ? Math.max(0, keyParams.minimumFlexEffectiveFinal)
+        : minimumFlexAnnual;
+    const minimumFlexEffectiveFinal = minimumFlexApplicable
+        ? Math.min(minimumFlexAnnual, fulfilledHouseholdFlex)
+        : (Number.isFinite(keyParams.minimumFlexEffectiveFinal) ? keyParams.minimumFlexEffectiveFinal : null);
+    const minimumFlexShortfallAnnual = minimumFlexApplicable
+        ? Math.max(0, minimumFlexAnnual - minimumFlexEffectiveFinal)
+        : (Number.isFinite(keyParams.minimumFlexShortfallAnnual) ? keyParams.minimumFlexShortfallAnnual : null);
+    const minimumFlexFulfilled = minimumFlexApplicable
+        ? minimumFlexShortfallAnnual <= 0.01
+        : keyParams.minimumFlexFulfilled === true;
+    const minimumFlexLimitedByActualPayout = minimumFlexApplicable
+        && minimumFlexShortfallAnnual > 0.01
+        && minimumFlexEffectiveFinal + 0.01 < plannedMinimumFlexEffective;
+    const minimumFlexStatus = minimumFlexLimitedByActualPayout
+        ? 'limited_by_actual_payout'
+        : (keyParams.minimumFlexStatus || 'inactive_zero');
     const withdrawalRateEndPct = Number.isFinite(spendingResult.details?.entnahmequoteDepot)
         ? spendingResult.details.entnahmequoteDepot * 100
         : null;
@@ -199,12 +238,16 @@ export function buildSimulatorYearResult({
             },
             FlexRatePct: flexRate,
             MinFlexRatePct: spendingResult.details?.minFlexRatePct ?? null,
-            minimumFlexAnnual: Number.isFinite(keyParams.minimumFlexAnnual) ? keyParams.minimumFlexAnnual : 0,
-            minimumFlexStatus: keyParams.minimumFlexStatus || 'inactive_zero',
+            minimumFlexAnnual,
+            minimumFlexStatus,
             minimumFlexBlockReason: keyParams.minimumFlexBlockReason || '',
             minimumFlexRequiredRate: Number.isFinite(keyParams.minimumFlexRequiredRate) ? keyParams.minimumFlexRequiredRate : null,
             minimumFlexEffectiveBefore: Number.isFinite(keyParams.minimumFlexEffectiveBefore) ? keyParams.minimumFlexEffectiveBefore : null,
             minimumFlexEffectiveAfter: Number.isFinite(keyParams.minimumFlexEffectiveAfter) ? keyParams.minimumFlexEffectiveAfter : null,
+            minimumFlexApplicable,
+            minimumFlexEffectiveFinal,
+            minimumFlexShortfallAnnual,
+            minimumFlexFulfilled,
             WealthRedF: Number.isFinite(spendingResult.details?.wealthReductionFactor)
                 ? spendingResult.details.wealthReductionFactor * 100
                 : null,
@@ -304,7 +347,13 @@ export function buildSimulatorYearResult({
             renteSum,
             floor_aus_depot: inflatedFloor,
             flex_brutto: inflatedFlex,
-            flex_erfuellt_nominal: jahresEntnahmeEffektiv > inflatedFloor ? jahresEntnahmeEffektiv - inflatedFloor : 0,
+            flex_erfuellt_nominal: fulfilledFlexFromPortfolio,
+            flex_brutto_haushalt: grossHouseholdFlex,
+            flex_rentenueberschuss: pensionFlexContribution,
+            flex_aus_depot_bedarf: inflatedFlex,
+            flex_aus_depot_erfuellt: fulfilledFlexFromPortfolio,
+            flex_haushalt_erfuellt: fulfilledHouseholdFlex,
+            flex_haushalt_kuerzung_pct: householdFlexReductionPct,
             inflation_factor_cum: cumulativeInflationFactor,
             jahresentnahme_real: jahresEntnahmeEffektiv / cumulativeInflationFactor,
             pflege_aktiv: pflegeMeta?.active ?? false,

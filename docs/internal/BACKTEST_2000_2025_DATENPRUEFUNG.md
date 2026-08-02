@@ -62,21 +62,21 @@ Schweregrade: **S** blockierend fuer die Verwendung der Zahlen,
 | --- | --- | --- | --- | --- |
 | D-01 | S | Aktienquote 89,9 bis 100 Prozent bei `targetEq` 60 | `engine/transactions/transaction-surplus.mjs:76` | Keine feste Zielquote; Runway-Puffer ist beabsichtigt. Irrefuehrende Zielquoten-Semantik in Slice 8 bereinigen |
 | D-02 | S | `runway_min_coverage_pct` misst eine 10.000-EUR-Konstante | `engine/config.mjs:62` | Post-Transaktions-Runway wird kanonisch; Slice 8 |
-| D-03 | S | Mindest-Flex wird vor der letzten Kuerzungsstufe geprueft | Zeilen 2004 und 2009 des Exports | Floor hart, Mindest-Flex weicher Stabilisator; Slice 9 |
+| D-03 | S | Mindest-Flex wird vor der letzten Kuerzungsstufe geprueft | Zeilen 2004 und 2009 des Exports | Slice 9 technisch umgesetzt: weicher Stabilisator mit finalem Soll/Ist/Fehlbetrag; externes Review ausstehend |
 | D-04 | S | Aktienreihe ist ein Kursindex ohne Dividenden | `app/simulator/simulator-data.js:247` | Globale Net-Total-Return-Kette; Slice 2 |
 | D-05 | M | CAPE-Spalte um ein Jahr gegen die uebrigen Spalten versetzt | `app/simulator/simulator-data.js:346` | CAPE bleibt `t-1`; Quelldaten und Versatz werden in Slice 6 belegt |
 | D-06 | M | Zinsertraege sind vollstaendig steuerfrei | Zeile 2000 des Exports | Heutige Steuerlogik einschliesslich Zinsen; Slice 10 |
 | D-07 | M | `tqf` 0,30 pauschal auf allen acht Tranchen | `request.inputs.detailledTranches` | Explizite Anlageklasse und TQF je Tranche; Slice 10 |
 | D-08 | M | Drei von vier Altbestandspositionen sind kein Altbestand | `request.inputs.detailledTranches` | Heutiger Steuerzustand je Tranche, keine Namensableitung; Slice 10 |
-| D-09 | M | `flex_reduction_max_pct` ueberzeichnet die tatsaechliche Einbusse | Nachrechnung ueber 26 Jahre | Metrikvertrag zusammen mit Mindest-Flex und Export korrigieren; Slices 9 und 11 |
+| D-09 | M | `flex_reduction_max_pct` ueberzeichnet die tatsaechliche Einbusse | Nachrechnung ueber 26 Jahre | Haushaltsbasis in `HistoricalBacktestMetricsV2` durch Slice 9 technisch korrigiert; weiterer Exportabschluss in Slice 11 |
 | D-10 | M | Pflegelogik, Sterblichkeit und Sicherheitsstufen feuern nie | alle 26 Zeilen | 26-Jahres-Beispiellauf akzeptiert; Daten-/Markerpruefung in Slice 7 |
-| D-11 | M | Widerspruch beim Mindest-Flex zwischen Register und Effektivwert | `app/simulator/simulator-profile-inputs.js:586` | Haushalts-/Profilaggregation bleibt als Vertragsdetail fuer Slice 9 offen |
+| D-11 | M | Widerspruch beim Mindest-Flex zwischen Register und Effektivwert | `app/simulator/simulator-profile-inputs.js:586` | Nutzerentscheidung und Slice 9: additive Profilwerte, fail-closed oberhalb des Haushalts-Flexbedarfs; externes Review ausstehend |
 | D-12 | L | Namens- und Redundanzfallen in den Eingaben | `request.inputs` | Replay-Teil widerlegt; verbleibende Namensfallen in Slice 11 |
 | D-13 | L | Quantisierung steckt unsichtbar in den Kennzahlen | `engine/config.mjs:213` | Quantisierung im Exportvertrag offenlegen; Slice 11 |
 | D-14 | L | Zinsreihe ohne einheitliche Stichtagskonvention | `app/simulator/simulator-data.js:361` | Investierbare Geldmarkt-Jahresrendite; Slice 4 |
 | D-15 | S | Aktienrendite 2024 weicht auch vom offiziellen MSCI-Price-Index massiv ab | MSCI-Factsheets und isolierter Replay | Vollstaendige Jahrespruefung und Ersatz; Slice 2 |
 | D-16 | M | End-Snapshot mischt kanonische Endwerte mit unveraenderten Startfeldern | `result.portfolioSnapshots.end` | Snapshot bewusst nicht restartfaehig; Exportgrenze in Slice 11 |
-| D-17 | M | Mindest-Flex-Jahresbetrag wird in vier aktiven Diagnosezeilen als 0 exportiert | Zeilen 2001, 2005, 2009 und 2010 | Diagnose-/Exportkorrektur; Slice 9 |
+| D-17 | M | Mindest-Flex-Jahresbetrag wird in vier aktiven Diagnosezeilen als 0 exportiert | Zeilen 2001, 2005, 2009 und 2010 | Slice-09-Diagnose-/Exportkorrektur technisch umgesetzt und durch eigenen Vierjahreszeugen gepinnt; externes Review ausstehend |
 | D-18 | M | Alle Aktienpositionen erhalten dieselbe Proxy-Rendite | `app/simulator/simulator-year-portfolio.js:22` | Als bewusstes globales Proxy-Modell akzeptiert; kein positionsspezifischer Ausbau |
 | D-19 | L | Engine-Provenienz identifiziert den Quellstand nicht eindeutig | `engine/config.mjs:11` und `request.engine` | Source-Commit und Datenrevision; Slice 11 |
 | D-20 | M | Inflations- und Lohnreihe mischen beziehungsweise verfehlen offizielle Vergleichsreihen | Destatis-/DRV-Abgleich | VPI in Slice 3; Lohnidentitaet bei gleicher Funktionsverwendung in Slice 6 |
@@ -754,17 +754,15 @@ reine Stressparameter duerfen im Manifest nicht dieselbe Evidenzklasse tragen.
 
 ### Arbeitsstatus und Branch-Regel
 
-- Status: Slice 01 ist als lokaler Commit `16f5c83` vorhanden. Slice 02 ist
-  nach Claude-Zweitreview Runde 2 freigegeben und als Commit `289471b`
-  vorhanden. Die Auflagen CR02-13 bis CR02-16 sind als vorgeschaltetes
-  Slice-03-Gate technisch nachgezogen. Slice 03 ist auf demselben Branch
-  umgesetzt, technisch validiert und in Claudes Drittreview technisch
-  freigegeben. Die Auflagen CR03-15 und CR03-16 wurden als vorgeschaltetes
-  Slice-04-Gate geschlossen. S03-STOP-01 wurde nach ausdruecklicher
-  Nutzerfreigabe durch die gezielte Erweiterung der Engine-Untergrenze von
-  `-10` auf `-15` Prozent aufgeloest. Claude hat Slice 04 mit CR04-1 bis
-  CR04-9 blockiert. Codex hat die Findings technisch nachgebessert; erneutes
-  externes Review und Freigabe bleiben ausstehend.
+- Status: Die Slices 01 bis 08 liegen auf
+  `codex/suite-datenintegritaet-hardening` als lokale Commits vor. Slice 08
+  ist durch Claudes Reviewrunde 3 technisch freigegeben und als Commit
+  `ad08236` vorhanden. Slice 09 ist auf diesem Stand mit dem vollstaendigen
+  Slice-08-Ergebnisdokument als Eingangsgrenze im durch zwei
+  Nutzerentscheidungen freigegebenen Scope von zwoelf produktiven Dateien
+  technisch umgesetzt und mit allen Pflichtgates validiert. Profilwerte werden
+  addiert; eine Summe oberhalb des aggregierten Haushalts-Flexbedarfs scheitert
+  fail-closed. Externes Review, Freigabe und lokaler Commit stehen aus.
 - Dokumentierter Ausgangsstand der Nachrechnung: `ca982cf`.
 - Nutzerentscheidung vom 2026-07-29: Die Umsetzung bleibt ausdruecklich auf
   dem vorhandenen Branch `codex/suite-datenintegritaet-hardening`; es wird
@@ -1279,8 +1277,9 @@ CR08-1 bis CR08-15 wurden am 2026-08-01 umgesetzt und im Slice-Dokument
 einzeln beantwortet. Der in Claudes Zweitreview verbliebene Blocker CR08-16
 wurde am 2026-08-02 durch eine verlustfreie, sicherheitsorientierte
 Legacy-Migration geschlossen: alte ganzzahlige Monatswerte werden auf das
-naechste Halbjahr aufgerundet. Erneutes externes Review, Freigabe und Commit
-stehen aus.
+naechste Halbjahr aufgerundet. Claude hat Slice 08 in Reviewrunde 3 technisch
+freigegeben; der Slice liegt als lokaler Commit `ad08236` vor. CR08-18 und
+CR08-20 sind ausdrueckliche Auflagen vor Slice 09.
 
 **Abhaengigkeiten:** Slices 1, 2, 4 und Ergebnisdokument Slice 07.
 
@@ -1328,7 +1327,57 @@ abschliessende Diff-Check wird im Slice-Dokument protokolliert.
 
 ### Slice 9 - Floor und weicher Mindest-Flex-Stabilisator
 
-**Abhaengigkeit:** Slice 8.
+**Slice-Dokument:**
+[`SLICE_BACKTEST_DATENPRUEFUNG_09_FLOOR_MINDEST_FLEX_STABILISATOR.md`](SLICE_BACKTEST_DATENPRUEFUNG_09_FLOOR_MINDEST_FLEX_STABILISATOR.md)
+
+**Umsetzungsstatus:** am 2026-08-02 auf Basis des technisch freigegebenen und
+als Commit `ad08236` vorliegenden Slice-08-Ergebnisdokuments technisch
+umgesetzt. Die drei Blocker CR09-1 bis CR09-3 aus Claude-Review Runde 1 sind
+nachgebessert und selbstgeprueft; externes Re-Review und Freigabe stehen aus.
+Preflight, fokussierte Baseline, CR08-18/CR08-20 als Vorgates und die
+bestehende Policy-/Profilaggregation sind im Slice-Dokument inventarisiert.
+Der Nutzer hat S09-STOP-01 am 2026-08-02 zugunsten additiver Profilwerte mit
+fail-closed Ablehnung oberhalb des aggregierten Haushalts-Flexbedarfs
+entschieden. Der exakte Zehn-Dateien-Scope wurde vor Coding festgeschrieben.
+Beim Implementierungsabgleich wurde S09-STOP-02 ausgeloest: Fuer den
+vollstaendigen Vertrag ohne stille `minimumFlexAnnual`-Null-Fallbacks muessen
+zusaetzlich `engine/core.mjs` und `app/simulator/simulator-input-validation.js`
+geaendert werden. Der Nutzer hat die exakte Erweiterung von zehn auf zwoelf
+produktive Dateien am 2026-08-02 freigegeben; S09-STOP-02 ist geschlossen.
+Die fortgeschriebene Nutzerfreigabe zur Scope-Erweiterung deckt fuer die
+Blockernachbesserung zusaetzlich `simulator-results.js`, `sweep-runner.js` und
+`sweep-metrics-contract.js`; der produktive Scope umfasst damit fuenfzehn
+Dateien.
+
+Die finale Diagnose reconciliert Mindest-Flex nach Budget, Glaettung und
+Monatsquantisierung als Soll, Ist, Fehlbetrag und Status. Profilwerte werden
+addiert; Einzelprofil und Haushalt scheitern oberhalb ihrer Flexbasis
+fail-closed. Rentenueberschuss nach Floor-Deckung wird genau einmal auf das
+Haushalts-Soll angerechnet; nur der offene Rest steuert die Depot-Flex-Rate.
+`HistoricalBacktestMetricsV2` und der Raw-Export trennen
+Haushalts-, Renten- und Depot-Flex. CR08-18 verwendet fuer bedarfsfreie Jahre
+nullable Runwaywerte; CR08-20 pinnt im Browser 50.000/90.000 EUR und entfernt
+die Debugprojektion.
+
+Nach Claude-Review Runde 1 reconciliert die Mindest-Flex-Diagnose zusaetzlich
+gegen die Ist-Auszahlung und markiert Auszahlungsluecken mit
+`limited_by_actual_payout`. `SpendingPolicyOrderV1` bindet die komplette
+Policy-Reihenfolge durch einen zur Laufzeit geprueften Trace. Die
+Runway-Nichtanwendbarkeit bleibt nun auch in Ansparpfad, Sweep-Aggregation,
+kanonischem Metrikleser und Texttabellen `null` beziehungsweise leer; ein
+anwendbarer Nullwert bleibt 0.
+
+Die nach CR09-1 aktualisierte Backtestfixture bindet die byteidentische Slice-08-Eingangsfixture und
+weist fuer alle elf bestehenden positiven Faelle null Endvermoegens-,
+Entnahme-, Steuer-, Outcome- und FlowDelta-Deltas aus. Der eigene D-17-Zeuge
+deckt 2001, 2005, 2009 und 2010 ab. Die getrennte MC-/Sweep-Fixture bindet ihre
+Slice-08-Quelle per SHA-256 und weist drei hashgleiche Aggregatprojektionen
+beziehungsweise null Projektdeltas aus. Gesamtsuite nach Blockernachbesserung:
+160 Dateien und 17.980/17.980 Assertions; Coverage 78,31 Prozent, Browser 28/28,
+Doku-Evidenz und Engine-Build gruen. Codex markiert die Umsetzung nicht selbst
+als freigegeben und erstellt vor externem Review keinen Commit.
+
+**Abhaengigkeit:** Slice 8 und dessen vollstaendiges Ergebnisdokument.
 
 **Ziel**
 
@@ -1600,6 +1649,12 @@ Slices:
 
 Beide Faelle erfordern eine andere Prioritaetsordnung der Policy-Stufen und
 andere Abnahmekriterien. Slice 9 ist bis zur Klaerung nicht implementierbar.
+
+**Aufloesung 2026-08-02:** Der Nutzer hat additive Profilwerte mit
+fail-closed Ablehnung oberhalb des aggregierten Haushalts-Flexbedarfs
+festgelegt. S09-STOP-01 ist geschlossen; Slice 09 ist technisch umgesetzt und
+wartet auf externes Review. Der vorstehende Blocker bleibt als historischer
+Planreviewbefund erhalten.
 
 ### P-02 (Blocker) Der Verbleib von `targetEq` ist nicht entschieden
 

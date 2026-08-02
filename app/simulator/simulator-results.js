@@ -410,7 +410,7 @@ export function getWorstRunColumnDefinitions(opts = {}) {
         { key: 'CutReason', header: 'Cut', width: 12, fmt: v => (v || '').substring(0, 12) },
         { key: 'Alarm', header: 'Alarm', width: 6, fmt: v => (v ? 'AKTIV' : '') },
         { key: 'QuoteEndPct', header: 'Quote%', width: 6, fmt: v => formatPercent(v, 1) },
-        { key: 'RunwayCoveragePct', header: 'Runway%', width: 7, fmt: v => formatPercentValue(v || 0, { fractionDigits: 0, invalid: '0%' }) },
+        { key: 'RunwayCoveragePct', header: 'Runway%', width: 7, fmt: v => formatPercentValue(v, { fractionDigits: 0, invalid: '' }) },
         { key: 'RunwayTargetSmoothedMonths', header: 'RunZiel', width: 7, fmt: v => Number.isFinite(v) ? `${Number(v).toFixed(0)}M` : '' },
         { key: 'RunwayTargetSeverityPct', header: 'RunSev', width: 6, fmt: v => Number.isFinite(v) ? `${Math.round(v)}%` : '' },
         { key: 'NominalReturnEquityPct', header: 'Pf.Akt%', width: 8, fmt: v => formatPercentFromRatio(v, 1) },
@@ -689,7 +689,7 @@ export function aggregateSweepMetrics(runOutcomes, options = {}) {
             meanEndWealth: 0,
             maxEndWealth: 0,
             worst5Drawdown: 0,
-            minRunwayObserved: 0
+            minRunwayObserved: null
         }, 0, options);
     }
 
@@ -723,10 +723,10 @@ export function aggregateSweepMetrics(runOutcomes, options = {}) {
     });
     const worst5Drawdown = quantile(drawdowns, 0.95);
 
-    const runways = outcomes.map(r => Number.isFinite(Number(r?.minRunway))
-        ? Number(r.minRunway)
-        : 0);
-    const minRunwayObserved = Math.min(...runways);
+    const runways = outcomes
+        .map(r => r?.minRunway)
+        .filter(value => typeof value === 'number' && Number.isFinite(value));
+    const minRunwayObserved = runways.length > 0 ? Math.min(...runways) : null;
 
     return buildSweepMetricsEnvelope(outcomes, {
         successProbFloor,

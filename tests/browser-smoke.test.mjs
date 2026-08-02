@@ -618,13 +618,6 @@ async function runBalanceThreeBucketBear(browser, baseUrl) {
         }, lastState);
         return {
             strategy: inputs.decumulation?.mode,
-            resultKeys: Object.keys(result || {}),
-            resultError: result?.error ? {
-                name: result.error.name,
-                message: result.error.message,
-                code: result.error.code,
-                context: result.error.context
-            } : (result?.errors || null),
             realReturnEq: result.ui?.market?.realReturnEq,
             threeBucket: result.ui?.threeBucket || null
         };
@@ -688,8 +681,10 @@ async function runBalanceFiveYearRunwayForcedSale(browser, baseUrl) {
     });
     assert(!witness.oneYear.error && !witness.fiveYears.error,
         `Runway forced-sale witness must execute without engine errors: ${JSON.stringify(witness)}`);
-    assert(witness.fiveYears.grossSale > witness.oneYear.grossSale,
-        `Five-year default runway must visibly increase the real forced sale versus the one-year control arm: ${JSON.stringify(witness)}`);
+    assert(Math.abs(witness.oneYear.grossSale - 50000) <= 0.01,
+        `One-year runway control arm must pin the documented 50,000 EUR gross sale: ${JSON.stringify(witness)}`);
+    assert(Math.abs(witness.fiveYears.grossSale - 90000) <= 0.01,
+        `Five-year runway arm must pin the documented 90,000 EUR gross sale: ${JSON.stringify(witness)}`);
     assert(witness.oneYear.configuredRunwayYears === 1 && witness.fiveYears.configuredRunwayYears === 5,
         `Forced-sale witness must preserve both configured runway arms end to end: ${JSON.stringify(witness)}`);
     smoke.assertNoErrors();

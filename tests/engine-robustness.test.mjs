@@ -248,23 +248,22 @@ function assertFiniteNumber(value, label) {
     assertFiniteNumber(result.ui?.spending?.monatlicheEntnahme, 'monatlicheEntnahme (zero wealth)');
 }
 
-// --- TEST 13: minimumFlexAnnual missing/zero/invalid keeps current behavior ---
+// --- TEST 13: minimumFlexAnnual missing/zero stays neutral; invalid is rejected ---
 {
     const withoutMinimumFlex = EngineAPI.simulateSingleYear({ ...baseInput }, null);
     const zeroMinimumFlex = EngineAPI.simulateSingleYear({ ...baseInput, minimumFlexAnnual: 0 }, null);
     const invalidMinimumFlex = EngineAPI.simulateSingleYear({ ...baseInput, minimumFlexAnnual: 'abc' }, null);
     assert(!withoutMinimumFlex.error, 'Missing minimumFlexAnnual should be accepted');
     assert(!zeroMinimumFlex.error, 'minimumFlexAnnual=0 should be accepted');
-    assert(!invalidMinimumFlex.error, 'Invalid minimumFlexAnnual should fall back to 0');
+    assert(invalidMinimumFlex.error instanceof ValidationError, 'Invalid minimumFlexAnnual should return ValidationError');
     assertEqual(
         zeroMinimumFlex.ui?.spending?.jahresEntnahme,
         withoutMinimumFlex.ui?.spending?.jahresEntnahme,
         'minimumFlexAnnual=0 should not change annual spending'
     );
-    assertEqual(
-        invalidMinimumFlex.ui?.spending?.jahresEntnahme,
-        withoutMinimumFlex.ui?.spending?.jahresEntnahme,
-        'Invalid minimumFlexAnnual should behave like 0'
+    assert(
+        invalidMinimumFlex.error.errors?.some(e => e.fieldId === 'minimumFlexAnnual'),
+        'Invalid minimumFlexAnnual error should identify the field'
     );
 }
 

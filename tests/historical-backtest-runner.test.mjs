@@ -316,7 +316,7 @@ assertEqual(completed.legacyMetrics.totalTaxes, 3, 'runner retains total taxes')
 assertEqual(completed.legacyMetrics.reductionYears, 1, 'exactly ten percent retains the legacy reduction counter');
 assertEqual(completed.legacyMetrics.maxReductionStreak, 1, 'runner retains the legacy reduction streak');
 assertEqual(completed.summary.reductionDenominator, 2, 'summary denominator uses completed years');
-assertEqual(completed.metrics.schemaVersion, 'HistoricalBacktestMetricsV1', 'runner exposes the canonical metric bundle');
+assertEqual(completed.metrics.schemaVersion, 'HistoricalBacktestMetricsV2', 'runner exposes the canonical metric bundle');
 assertEqual(completed.metrics.reductionContract.metricId, 'flex_reduction_years_gte_10_pct', 'runner exposes the inclusive ten-percent metric contract');
 assertEqual(completed.metrics.values.flex_reduction_years_gte_10_pct, 1, 'canonical reduction metric includes exactly ten percent');
 assertEqual(completed.summary.metrics.flex_reduction_years_gte_10_pct, completed.metrics.values.flex_reduction_years_gte_10_pct, 'summary projects the same canonical metric id and raw value');

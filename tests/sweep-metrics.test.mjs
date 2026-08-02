@@ -6,6 +6,7 @@ import {
     SWEEP_METRICS_VERSION
 } from '../app/simulator/simulator-results.js';
 import { readSweepMetricValue } from '../app/simulator/sweep-metrics-contract.js';
+import { mergeApplicableRunwayMinimum } from '../app/simulator/sweep-runner.js';
 
 console.log('--- Sweep Metrics Contract Tests ---');
 
@@ -132,6 +133,35 @@ console.log('--- Sweep Metrics Contract Tests ---');
         }, 'worst5Drawdown'),
         null,
         'Canonical metric reader rejects non-finite values'
+    );
+}
+
+{
+    assertEqual(mergeApplicableRunwayMinimum(null, null), null, 'Sweep runner preserves missing runway coverage');
+    assertEqual(mergeApplicableRunwayMinimum(null, 24), 24, 'Sweep runner initializes the first applicable runway');
+    assertEqual(mergeApplicableRunwayMinimum(24, 0), 0, 'Sweep runner preserves an applicable zero runway');
+    assertEqual(mergeApplicableRunwayMinimum(12, 24), 12, 'Sweep runner retains the lower applicable runway');
+
+    const mixedApplicability = aggregateSweepMetrics([
+        { finalVermoegen: 100, maxDrawdown: 10, minRunway: null, failed: false },
+        { finalVermoegen: 100, maxDrawdown: 10, minRunway: 24, failed: false },
+        { finalVermoegen: 100, maxDrawdown: 10, minRunway: 12, failed: false }
+    ]);
+    assertEqual(mixedApplicability.minRunwayObserved, 12, 'Sweep aggregation ignores non-applicable runway years');
+
+    const noApplicableRunway = aggregateSweepMetrics([
+        { finalVermoegen: 100, maxDrawdown: 10, minRunway: null, failed: false }
+    ]);
+    assertEqual(noApplicableRunway.minRunwayObserved, null, 'All-non-applicable sweep runway remains null');
+    assertEqual(
+        readSweepMetricValue({ metrics: noApplicableRunway }, 'minRunwayObserved'),
+        null,
+        'Canonical metric reader must not coerce a null runway metric to zero'
+    );
+    assertEqual(
+        aggregateSweepMetrics([]).minRunwayObserved,
+        null,
+        'An empty sweep has no observed runway minimum'
     );
 }
 

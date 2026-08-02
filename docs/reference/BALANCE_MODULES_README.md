@@ -165,7 +165,7 @@ Renderlogik für KPIs, Guardrails, Diagnose, Toasts und Theme-Umschaltung.
 - `balance-diagnosis-transaction.js` – Transaktionsdiagnostik (Status, Schwellen, `Warum kein Goldkauf?`)
 - `balance-diagnosis-keyparams.js` – Schlüsselkennzahlen, inklusive VPW-Trennung in Rahmen, freigegebenen Flex und nicht genutzten Spielraum
   - ergänzt Pflegebucket-Diagnose und weist `diagnostic_only` aus, wenn keine automatische Freigabe erfolgt
-  - zeigt Mindest-Flex-Betrag, Status, Blockiergrund, erforderliche Rate und Effekt vor/nach dem Policy-Schritt
+  - zeigt Mindest-Flex-Betrag, Status, Blockiergrund, erforderliche Rate, Policy-Effekt und den finalen Betrag samt Fehlbetrag nach Budget, Glaettung und Monatsquantisierung
 
 ---
 

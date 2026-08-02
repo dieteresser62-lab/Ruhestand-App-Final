@@ -17,16 +17,26 @@ export class SimulatorValidationError extends Error {
 
 export function validateSimulatorInputs(inputs = {}) {
     const errors = [];
-    const minimumFlexAnnualRaw = Number(inputs.minimumFlexAnnual);
-    const minimumFlexAnnual = Number.isFinite(minimumFlexAnnualRaw) ? minimumFlexAnnualRaw : 0;
+    const minimumFlexAnnualInput = inputs.minimumFlexAnnual;
+    const minimumFlexAnnualMissing = minimumFlexAnnualInput == null || minimumFlexAnnualInput === '';
+    let minimumFlexAnnual = 0;
+    if (!minimumFlexAnnualMissing) {
+        try {
+            minimumFlexAnnual = Number(minimumFlexAnnualInput);
+        } catch {
+            minimumFlexAnnual = Number.NaN;
+        }
+    }
     const startFlexBedarfRaw = Number(inputs.startFlexBedarf);
     const startFlexBedarf = Number.isFinite(startFlexBedarfRaw) ? startFlexBedarfRaw : 0;
     const liquidityRunwayYears = resolveLiquidityRunwayYears(inputs).years;
 
-    if (minimumFlexAnnual < 0) {
+    if (!Number.isFinite(minimumFlexAnnual)) {
+        errors.push({ fieldId: 'minimumFlexAnnual', message: 'Mindest-Flex p.a. muss eine gueltige Zahl sein.' });
+    } else if (minimumFlexAnnual < 0) {
         errors.push({ fieldId: 'minimumFlexAnnual', message: 'Mindest-Flex p.a. darf nicht negativ sein.' });
     }
-    if (minimumFlexAnnual > startFlexBedarf) {
+    if (Number.isFinite(minimumFlexAnnual) && minimumFlexAnnual > startFlexBedarf) {
         errors.push(
             { fieldId: 'minimumFlexAnnual', message: 'Mindest-Flex p.a. darf nicht größer als Flex-Bedarf p.a. sein.' },
             { fieldId: 'startFlexBedarf', message: 'Flex-Bedarf p.a. ist die Obergrenze für Mindest-Flex.' }

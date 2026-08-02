@@ -112,8 +112,20 @@ function _normalizeEngineInput(rawInput) {
     if (!Number.isFinite(input.goGoMultiplier)) {
         input.goGoMultiplier = 1.0;
     }
-    const minimumFlexAnnual = Number(input.minimumFlexAnnual);
-    input.minimumFlexAnnual = Number.isFinite(minimumFlexAnnual) ? minimumFlexAnnual : 0;
+    const minimumFlexAnnualRaw = input.minimumFlexAnnual;
+    if (minimumFlexAnnualRaw == null || minimumFlexAnnualRaw === '') {
+        input.minimumFlexAnnual = 0;
+    } else {
+        let minimumFlexAnnual = Number.NaN;
+        try {
+            minimumFlexAnnual = Number(minimumFlexAnnualRaw);
+        } catch {
+            // Preserve the invalid value so InputValidator can reject it with field context.
+        }
+        input.minimumFlexAnnual = Number.isFinite(minimumFlexAnnual)
+            ? minimumFlexAnnual
+            : minimumFlexAnnualRaw;
+    }
 
     const decumulationRaw = (input.decumulation && typeof input.decumulation === 'object')
         ? input.decumulation

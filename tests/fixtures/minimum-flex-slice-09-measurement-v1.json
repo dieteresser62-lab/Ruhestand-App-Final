@@ -1,0 +1,129 @@
+{
+  "caseCount": 12,
+  "d17Witness": {
+    "2001": {
+      "effectiveFinal": 9117,
+      "minimumFlexAnnual": 9117,
+      "shortfallAnnual": 0,
+      "status": "not_needed"
+    },
+    "2005": {
+      "effectiveFinal": 8996.78,
+      "minimumFlexAnnual": 9676.21,
+      "shortfallAnnual": 679.43,
+      "status": "limited_by_final_quantization"
+    },
+    "2009": {
+      "effectiveFinal": 10443.4,
+      "minimumFlexAnnual": 10483.72,
+      "shortfallAnnual": 40.32,
+      "status": "limited_by_final_quantization"
+    },
+    "2010": {
+      "effectiveFinal": 10515.18,
+      "minimumFlexAnnual": 10515.18,
+      "shortfallAnnual": 0,
+      "status": "not_needed"
+    }
+  },
+  "existingCaseFinancialDeltas": [
+    {
+      "id": "completed_2000_2005",
+      "maxAbsolutePortfolioFlowDeltaDelta": 0,
+      "outcomeChanged": false,
+      "summaryEndWealthDelta": 0,
+      "totalTaxDelta": 0,
+      "totalWithdrawalDelta": 0
+    },
+    {
+      "id": "gold_holding_2000_2005",
+      "maxAbsolutePortfolioFlowDeltaDelta": 0,
+      "outcomeChanged": false,
+      "summaryEndWealthDelta": 0,
+      "totalTaxDelta": 0,
+      "totalWithdrawalDelta": 0
+    },
+    {
+      "id": "completed_1960_2020",
+      "maxAbsolutePortfolioFlowDeltaDelta": 0,
+      "outcomeChanged": false,
+      "summaryEndWealthDelta": 0,
+      "totalTaxDelta": 0,
+      "totalWithdrawalDelta": 0
+    },
+    {
+      "id": "completed_numeraire_seam_1949_1952",
+      "maxAbsolutePortfolioFlowDeltaDelta": 0,
+      "outcomeChanged": false,
+      "summaryEndWealthDelta": 0,
+      "totalTaxDelta": 0,
+      "totalWithdrawalDelta": 0
+    },
+    {
+      "id": "three_bucket_minimum_flex_2005_2014",
+      "maxAbsolutePortfolioFlowDeltaDelta": 0,
+      "outcomeChanged": false,
+      "summaryEndWealthDelta": 0,
+      "totalTaxDelta": 0,
+      "totalWithdrawalDelta": 0
+    },
+    {
+      "id": "capital_poor_ruin_2000_2005",
+      "maxAbsolutePortfolioFlowDeltaDelta": 0,
+      "outcomeChanged": false,
+      "summaryEndWealthDelta": 0,
+      "totalTaxDelta": 0,
+      "totalWithdrawalDelta": 0
+    },
+    {
+      "id": "health_bucket_nested_row_summary_positive",
+      "maxAbsolutePortfolioFlowDeltaDelta": 0,
+      "outcomeChanged": false,
+      "summaryEndWealthDelta": 0,
+      "totalTaxDelta": 0,
+      "totalWithdrawalDelta": 0
+    },
+    {
+      "id": "dynamic_flex_cape_legacy_step_2018_2025",
+      "maxAbsolutePortfolioFlowDeltaDelta": 0,
+      "outcomeChanged": false,
+      "summaryEndWealthDelta": 0,
+      "totalTaxDelta": 0,
+      "totalWithdrawalDelta": 0
+    },
+    {
+      "id": "wage_indexed_pension_source_seam_1944_1950",
+      "maxAbsolutePortfolioFlowDeltaDelta": 0,
+      "outcomeChanged": false,
+      "summaryEndWealthDelta": 0,
+      "totalTaxDelta": 0,
+      "totalWithdrawalDelta": 0
+    },
+    {
+      "id": "wage_indexed_pension_jst_1930_1940",
+      "maxAbsolutePortfolioFlowDeltaDelta": 0,
+      "outcomeChanged": false,
+      "summaryEndWealthDelta": 0,
+      "totalTaxDelta": 0,
+      "totalWithdrawalDelta": 0
+    },
+    {
+      "id": "wage_indexed_pension_jst_1935_1946",
+      "maxAbsolutePortfolioFlowDeltaDelta": 0,
+      "outcomeChanged": false,
+      "summaryEndWealthDelta": 0,
+      "totalTaxDelta": 0,
+      "totalWithdrawalDelta": 0
+    }
+  ],
+  "maxAbsolutePortfolioFlowDelta": 0,
+  "negativeCaseCount": 5,
+  "reviewStatus": "pending",
+  "ruinCaseCount": 1,
+  "schemaVersion": "MinimumFlexSlice09BacktestMeasurementV1",
+  "snapshotId": "post-backtest-data-09-v1",
+  "sourceActualSha256": "cc696ef7fc0d60cd921dfeac581664b60ff94d9252d1fe27c039304508429ec7",
+  "sourceFixtureSha256": "6642194525836a0c886d091001131d994625040159984618a95cace4d4279b49",
+  "sourceReference": "post-backtest-data-08-v1",
+  "targetActualSha256": "6303a479fda3eb2802cdc2657f191ac46101eb242732ef8d9b17f8572449cd13"
+}

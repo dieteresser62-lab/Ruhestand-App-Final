@@ -22,6 +22,8 @@ function row({
     taxSaved,
     lossCarry
 }) {
+    const flexRequired = 100;
+    const flexFulfilled = flexRequired * (1 - reductionPct / 100);
     return {
         jahr: year,
         inflationVJ: inflationPct,
@@ -36,6 +38,12 @@ function row({
             portfolio_total_end: endWealth,
             floor_aus_depot: floorRequired,
             entnahme_effektiv: floorPaid,
+            Regime: 'hot_neutral',
+            flex_brutto_haushalt: flexRequired,
+            flex_haushalt_erfuellt: flexFulfilled,
+            flex_haushalt_kuerzung_pct: reductionPct,
+            minimumFlexApplicable: year !== 2000,
+            minimumFlexShortfallAnnual: year === 2001 ? 25 : (year === 2002 ? 75 : 0),
             ...(explicitShortfall === undefined ? {} : { floor_shortfall_nominal: explicitShortfall }),
             RunwayCoveragePct: runwayPct,
             steuern_gesamt: taxes,
@@ -59,7 +67,7 @@ const goldenResult = {
             inflationPct: 10,
             withdrawal: 10,
             reductionPct: 9.99,
-            runwayPct: 120,
+            runwayPct: null,
             floorRequired: 50,
             floorPaid: 50,
             taxes: 1,
@@ -118,11 +126,17 @@ assertEqual(values.floor_shortfall_total_nominal_eur, 50, 'nominal shortfall sum
 assertClose(values.floor_shortfall_total_real_eur, 50 / 1.1, 1e-12, 'real shortfall uses the inflation factor at each year start');
 assertClose(values.floor_shortfall_max_real_eur, 30 / 1.1, 1e-12, 'maximum real shortfall remains unrounded');
 assertEqual(values.floor_shortfall_longest_streak_years, 2, 'longest floor-shortfall streak is reconciled');
+assertEqual(values.flex_required_total_nominal_eur, 300, 'gross household flex sums the explicit yearly basis');
+assertClose(values.flex_fulfilled_total_nominal_eur, 255.01, 1e-12, 'fulfilled household flex includes the yearly pension/depot reconciliation');
+assertClose(values.flex_fulfillment_total_pct, (255.01 / 300) * 100, 1e-12, 'household flex fulfillment uses summed fulfilled over summed required');
 assertEqual(values.flex_reduction_years_gte_10_pct, 2, 'exactly ten and values above ten are counted');
 assertEqual(values.flex_reduction_max_pct, 25, 'maximum reduction depth is retained');
 assertEqual(values.flex_reduction_longest_streak_gte_10_pct, 2, 'inclusive reduction streak is reconciled');
+assertEqual(values.minimum_flex_shortfall_years, 2, 'minimum-flex shortfall years count only applicable years');
+assertEqual(values.minimum_flex_shortfall_total_nominal_eur, 100, 'minimum-flex nominal shortfalls reconcile to applicable rows');
 assertEqual(values.runway_min_coverage_pct, 50, 'minimum runway coverage is derived');
 assertEqual(values.runway_stress_years_below_100_pct, 2, 'runway stress years use the documented strict below-100 operator');
+assertEqual(metrics.availability.runway_min_coverage_pct, 'available', 'a not-applicable runway row does not hide finite runway observations');
 assertClose(values.wealth_max_drawdown_nominal_end_series_pct, (500 / 1200) * 100, 1e-12, 'drawdown uses nominal year-end wealth including the start snapshot');
 assertEqual(values.tax_total_nominal_eur, 6, 'tax total reconciles to raw rows');
 assertEqual(values.tax_saved_by_loss_carry_total_nominal_eur, 9, 'loss-carry tax savings reconcile to raw rows');
@@ -163,5 +177,35 @@ assertEqual(incomplete.values.wealth_end_nominal_eur, null, 'incomplete run has 
 assertEqual(incomplete.values.floor_shortfall_years, null, 'incomplete run has no invented shortfall denominator');
 assertEqual(incomplete.values.outcome_is_incomplete, true, 'incomplete outcome remains explicit');
 assertEqual(incomplete.availability.wealth_end_nominal_eur, 'missing', 'missing financial values are machine readable');
+
+const zeroRunwayNeed = deriveHistoricalBacktestMetrics({
+    ...goldenResult,
+    rows: [
+        {
+            ...goldenResult.rows[0],
+            row: { ...goldenResult.rows[0].row, RunwayCoveragePct: null }
+        }
+    ],
+    portfolioEnd: 1200
+});
+assertEqual(zeroRunwayNeed.values.runway_min_coverage_pct, null,
+    'A run containing only not-applicable runway rows has no invented zero coverage');
+assertEqual(zeroRunwayNeed.values.runway_stress_years_below_100_pct, null,
+    'A run containing only not-applicable runway rows has no invented stress year');
+
+const positiveNeedWithoutCoverage = deriveHistoricalBacktestMetrics({
+    ...goldenResult,
+    rows: [
+        {
+            ...goldenResult.rows[0],
+            row: { ...goldenResult.rows[0].row, RunwayCoveragePct: 0 }
+        }
+    ],
+    portfolioEnd: 1200
+});
+assertEqual(positiveNeedWithoutCoverage.values.runway_min_coverage_pct, 0,
+    'A real zero-coverage year with positive need remains a finite crisis value');
+assertEqual(positiveNeedWithoutCoverage.values.runway_stress_years_below_100_pct, 1,
+    'A real zero-coverage year remains counted as runway stress');
 
 console.log('✅ Historical backtest metrics tests passed');

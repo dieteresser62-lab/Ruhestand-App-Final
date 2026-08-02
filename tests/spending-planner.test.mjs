@@ -8,10 +8,16 @@ import {
 import { applyFinalRateLimits } from '../engine/planners/final-rate-policy.mjs';
 import { applyFlexBudgetCap } from '../engine/planners/flex-budget-policy.mjs';
 import { applyFlexShareCurve, calculateFlexRate } from '../engine/planners/flex-rate-policy.mjs';
-import { applyMinimumFlexFloor } from '../engine/planners/minimum-flex-policy.mjs';
+import {
+    applyMinimumFlexFloor,
+    finalizeMinimumFlexDiagnostics
+} from '../engine/planners/minimum-flex-policy.mjs';
 import { buildSpendingDiagnosis, resolveRunwayTarget } from '../engine/planners/spending-diagnosis.mjs';
 import { applyGuardrails } from '../engine/planners/spending-guardrails.mjs';
-import { applySpendingPolicyPipeline } from '../engine/planners/spending-policy-pipeline.mjs';
+import {
+    applySpendingPolicyPipeline,
+    SPENDING_POLICY_ORDER_CONTRACT
+} from '../engine/planners/spending-policy-pipeline.mjs';
 import { calculateFinalWithdrawal } from '../engine/planners/spending-policy-helpers.mjs';
 import { calculateWealthAdjustedReductionFactor } from '../engine/planners/wealth-reduction.mjs';
 import { CONFIG } from '../engine/config.mjs';
@@ -569,6 +575,7 @@ function clone(value) {
     assertClose(result.requiredRate, 50, 0.0001, 'Minimum flex should calculate required rate from inflated flex');
     assertClose(result.rate, 50, 0.0001, 'Minimum flex should lift rate to required rate');
     assert(result.status === 'applied', 'Minimum flex should report applied status');
+    assertEqual(result.minimumFlexAnnual, 10000, 'Applied minimum flex must retain the nominal annual target');
     assert(decisions.some(d => d.step === 'Mindest-Flex'), 'Minimum flex should be logged');
     assert(JSON.stringify(inflatedBedarf) === beforeBedarf, 'Minimum flex must not mutate inflatedBedarf');
     assert(JSON.stringify(input) === beforeInput, 'Minimum flex must not mutate input');
@@ -578,7 +585,33 @@ function clone(value) {
     assert(zero.status === 'inactive_zero' && zero.rate === 20, 'Minimum flex zero should leave rate unchanged');
 
     const noFlex = applyMinimumFlexFloor(20, { inflatedBedarf: { floor: 24000, flex: 0 }, input, alarmStatus: { active: false } }, () => {});
-    assert(noFlex.status === 'not_needed' && noFlex.rate === 20, 'Minimum flex should not divide by zero when flex need is zero');
+    assert(noFlex.status === 'limited_by_available_flex' && noFlex.rate === 20,
+        'A positive minimum-flex target without available household flex must remain visibly unfulfilled');
+
+    const pensionCovered = applyMinimumFlexFloor(20, {
+        inflatedBedarf: { floor: 0, flex: 0 },
+        input: { floorBedarf: 24000, flexBedarf: 12000, minimumFlexAnnual: 10000 },
+        renteJahr: 40000,
+        alarmStatus: { active: false }
+    }, () => {});
+    assertEqual(pensionCovered.status, 'not_needed',
+        'Pension surplus alone may satisfy the household minimum-flex target');
+    assertClose(pensionCovered.effectiveFlexBefore, 12000, 0.0001,
+        'Pension surplus is capped at gross household flex and counted in effective minimum flex');
+
+    const pensionAssisted = applyMinimumFlexFloor(20, {
+        inflatedBedarf: { floor: 0, flex: 14000 },
+        input: { floorBedarf: 24000, flexBedarf: 20000, minimumFlexAnnual: 10000 },
+        renteJahr: 30000,
+        alarmStatus: { active: false },
+        gesamtwert: 200000
+    }, () => {});
+    assertClose(pensionAssisted.minimumFlexDepotAnnual, 4000, 0.0001,
+        'Only the household minimum not covered by pension surplus is financed from the portfolio');
+    assertClose(pensionAssisted.requiredRate, (4000 / 14000) * 100, 0.0001,
+        'Required depot flex rate uses the pension-reconciled household target');
+    assertClose(pensionAssisted.effectiveFlexAfter, 10000, 0.0001,
+        'Effective minimum flex after policy combines pension surplus and depot flex');
 
     const alarm = applyMinimumFlexFloor(20, { inflatedBedarf, input, alarmStatus: { active: true } }, () => {});
     assert(alarm.status === 'blocked_emergency' && alarm.rate === 20, 'Minimum flex should not lift during alarm mode');
@@ -625,6 +658,62 @@ function clone(value) {
     );
     assert(floorEmergency.status === 'blocked_emergency', 'Minimum flex should block when floor plus minimum flex is not covered');
     assert(floorEmergency.blockReason === 'floor_minimum_flex_not_covered', 'Floor emergency should expose block reason');
+
+    let invalidMinimumFlexRejected = false;
+    try {
+        applyMinimumFlexFloor(20, {
+            inflatedBedarf,
+            input: { minimumFlexAnnual: -1 },
+            alarmStatus: { active: false }
+        });
+    } catch (error) {
+        invalidMinimumFlexRejected = error instanceof RangeError
+            && String(error.message).includes('minimumFlexAnnual');
+    }
+    assert(invalidMinimumFlexRejected, 'Minimum flex policy must reject a negative target instead of silently clamping it');
+
+    const unattainable = applyMinimumFlexFloor(20, {
+        inflatedBedarf: { floor: 24000, flex: 8000 },
+        input: { minimumFlexAnnual: 10000 },
+        alarmStatus: { active: false },
+        gesamtwert: 200000
+    });
+    assertEqual(unattainable.minimumFlexAnnual, 10000,
+        'A target above open flex must remain visible and must not be silently limited to available flex');
+    assertClose(unattainable.requiredRateUnbounded, 125, 0.0001,
+        'The unbounded required rate exposes why the target cannot be reached at full flex');
+    assertEqual(unattainable.targetUnattainableAtFullFlex, true,
+        'The policy marks an unattainable target explicitly');
+
+    const quantizedState = {
+        keyParams: {
+            minimumFlexApplicable: true,
+            minimumFlexAnnual: 10000,
+            minimumFlexStatus: 'applied'
+        }
+    };
+    finalizeMinimumFlexDiagnostics(quantizedState, 9600);
+    assertClose(quantizedState.keyParams.minimumFlexEffectiveFinal, 9600, 0.0001,
+        'Final minimum-flex diagnostics use the actually quantized flex amount');
+    assertClose(quantizedState.keyParams.minimumFlexShortfallAnnual, 400, 0.0001,
+        'Final minimum-flex diagnostics expose the nominal shortfall');
+    assertEqual(quantizedState.keyParams.minimumFlexStatus, 'limited_by_final_quantization',
+        'A quantization shortfall must replace a false applied status');
+
+    const pensionQuantizedState = {
+        keyParams: {
+            minimumFlexApplicable: true,
+            minimumFlexAnnual: 10000,
+            minimumFlexPensionContributionAnnual: 3000,
+            minimumFlexHouseholdFlexAnnual: 15000,
+            minimumFlexStatus: 'applied'
+        }
+    };
+    finalizeMinimumFlexDiagnostics(pensionQuantizedState, 6000);
+    assertClose(pensionQuantizedState.keyParams.minimumFlexEffectiveFinal, 9000, 0.0001,
+        'Final minimum-flex diagnostics combine pension surplus and quantized depot flex');
+    assertClose(pensionQuantizedState.keyParams.minimumFlexShortfallAnnual, 1000, 0.0001,
+        'Household minimum-flex shortfall is measured after pension reconciliation');
 
     console.log('✅ Minimum-flex policy helper works');
 }
@@ -925,6 +1014,36 @@ function clone(value) {
     assert(Number.isFinite(state.flexBudgetBalanceYears), 'Policy pipeline should update flex-budget state');
     assert(decisions.some(d => String(d.step).includes('Flex-Budget')), 'Policy pipeline should log flex-budget decision');
     assertClose(delegated.flexRate, result.flexRate, 0.0001, 'Planner policy-pipeline delegate should match module');
+    assertEqual(SPENDING_POLICY_ORDER_CONTRACT.schemaVersion, 'SpendingPolicyOrderV1', 'Policy order contract is versioned');
+    assertEqual(
+        JSON.stringify(SPENDING_POLICY_ORDER_CONTRACT.steps),
+        JSON.stringify(['alarm', 'guardrails', 'minimum_flex', 'flex_budget', 'final_smoothing']),
+        'Policy order contract fixes the complete stage sequence'
+    );
+    assertEqual(
+        JSON.stringify(result.policyOrder.executedSteps),
+        JSON.stringify(SPENDING_POLICY_ORDER_CONTRACT.steps),
+        'Executed policy stages match the versioned order contract'
+    );
+    assertEqual(
+        result.policyOrder.schemaVersion,
+        SPENDING_POLICY_ORDER_CONTRACT.schemaVersion,
+        'Policy diagnostics expose the executed contract version'
+    );
+
+    const alarmState = clone(state);
+    const alarmResult = applySpendingPolicyPipeline(
+        alarmState,
+        { active: true, newlyTriggered: false },
+        params,
+        () => {},
+        initialPolicyResult
+    );
+    assertEqual(
+        JSON.stringify(alarmResult.policyOrder.executedSteps),
+        JSON.stringify(SPENDING_POLICY_ORDER_CONTRACT.steps),
+        'Active alarm still records the guardrail stage at its contractual position when its rule body is skipped'
+    );
     console.log('✅ Spending policy pipeline delegate works');
 }
 
@@ -996,6 +1115,24 @@ function clone(value) {
     assert(
         smoothState.keyParams.minimumFlexStatus === 'applied_limited_by_final_smoothing',
         'Minimum flex should report final smoothing limitation'
+    );
+
+    const alreadySatisfiedState = clone(params.lastState);
+    alreadySatisfiedState.flexRate = 20;
+    alreadySatisfiedState.keyParams.entnahmequoteDepot = CONFIG.THRESHOLDS.CAUTION.withdrawalRate;
+    const alreadySatisfiedResult = applySpendingPolicyPipeline(
+        alreadySatisfiedState,
+        { active: false, newlyTriggered: false },
+        params,
+        () => {},
+        { geglätteteFlexRate: 60, kuerzungQuelle: 'Profil' }
+    );
+    assert(alreadySatisfiedResult.flexRate < 50,
+        'Final smoothing witness must cut a previously satisfied minimum-flex rate below its target');
+    assertEqual(
+        alreadySatisfiedState.keyParams.minimumFlexStatus,
+        'applied_limited_by_final_smoothing',
+        'Final smoothing must not leave a false not_needed status when the final rate violates minimum flex'
     );
 
     console.log('✅ Spending policy pipeline minimum-flex ordering works');

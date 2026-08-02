@@ -199,7 +199,7 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 - **Flex-Rate Smoothing:** Validiert den Glättungsalgorithmus für Flex-Anteile
 - **Budget Floor Protection:** Stellt sicher dass Mindest-Entnahmen geschützt sind
 - **Guardrail-Integration:** Tests für Ceiling/Floor-Mechanismen
-- **Mindest-Flex:** Prüft Contract, Notfall-/Runway-Blockaden, Pipeline-Ordering vor Flex-Budget/Final-Limits sowie die Interaktion mit niedrigem Dynamic-Flex-Stage-2-Safety-Flex.
+- **Mindest-Flex:** Prüft Contract, haushaltsweite Anrechnung des Rentenueberschusses, Notfall-/Runway-Blockaden, Pipeline-Ordering vor Flex-Budget/Final-Limits, finale Quantisierung und die Interaktion mit niedrigem Dynamic-Flex-Stage-2-Safety-Flex. Nicht-finite vorhandene Eingaben werden an Engine- und Simulatorgrenze abgelehnt statt auf null ersetzt.
 
 #### `spending-quantization.test.mjs`
 **Zweck:** Testet die Anti-Pseudo-Accuracy-Rundungslogik für Entnahmen.
@@ -363,6 +363,18 @@ Inventar liegen bewusst in den jeweiligen Fachtests.
   Die grossen Slice-07-Eingangsfixtures bleiben byte-identisch und werden per
   SHA-256 geschuetzt; die neuen Fixtures sind technische Messbelege und keine
   externe Modellfreigabe.
+- **Slice-09-Messung:**
+  `fixtures/minimum-flex-slice-09-measurement-v1.json` konsumiert die
+  bytegeschuetzte Slice-08-Messung als Eingangsreferenz, ergaenzt den
+  historischen D-17-Zeugen fuer 2001/2005/2009/2010 und weist fuer alle elf
+  bestehenden positiven Faelle exakt null Endvermoegens-, Entnahme-, Steuer-,
+  Outcome- und FlowDelta-Deltas aus. Der Kandidat bleibt bis zum externen
+  Review `pending`; die Slice-08-Fixture wird nicht ueberschrieben.
+  `fixtures/monte-carlo-measurement/minimum-flex-slice-09-v1.json` bindet
+  ebenso die byteidentische Slice-08-Monte-Carlo-Fixture und weist fuer die
+  gemessenen MC-/Sweep-Aggregatprojektionen drei unveraenderte Hashes und null
+  Projektdeltas aus. Aktive Soll/Ist/Fehlbetrag-Rowparitaet wird getrennt im
+  Worker-Vertrag belegt und nicht als Aggregatmessung ausgegeben.
 - **Historische Fixture-Kompatibilitaet:** Vergleichsausnahmen fuer
   unveraenderliche Pending-Fixtures stehen ausschliesslich in
   `snapshot-policy-v1.json`. Der produktive Runtime-Vertrag enthaelt weder
@@ -906,9 +918,9 @@ die stabilen Slice-07-Demografieinvarianten; Runtime, Hashkette und aktive
 Pflege-/Todes-/Hinterbliebenenpfade werden getrennt geprueft.
 
 #### `historical-backtest-metrics.test.mjs`
-**Zweck:** Testet das vollstaendige `HistoricalBacktestMetricsV1`-Woerterbuch und die reine Ableitung aus kanonischen Rohzeilen.
-- **Definitionen:** Eindeutige IDs, Einheiten, nominal/real-Basis, Nenner, Rundung, Missingness, Outcome-Regel und Rohquellen fuer alle 24 Metriken.
-- **Reconciliation:** Start-/Endvermoegen, reale Werte, Entnahmen, Floor-Shortfall, inklusive `>= 10 %`-Flexgrenze, Runway, Drawdown, Steuern, Verlusttopf, Pflegebucket und Outcome-Indikatoren.
+**Zweck:** Testet das vollstaendige `HistoricalBacktestMetricsV2`-Woerterbuch und die reine Ableitung aus kanonischen Rohzeilen.
+- **Definitionen:** Eindeutige IDs, Einheiten, nominal/real-Basis, Nenner, Rundung, Missingness, Outcome-Regel und Rohquellen fuer alle 29 Metriken.
+- **Reconciliation:** Start-/Endvermoegen, reale Werte, Entnahmen, Floor-Shortfall, Haushalts-Flexbedarf/-Erfuellung, inklusive `>= 10 %`-Haushalts-Flexgrenze, finaler Mindest-Flex-Fehlbetrag, nullable Runway, Drawdown, Steuern, Verlusttopf, Pflegebucket und Outcome-Indikatoren. Historische Rohzeilen ohne Haushaltsquote nutzen kontrolliert den Legacy-Kuerzungswert.
 - **Fehlerpfade:** `incomplete`/`technical_error` erhalten keine erfundenen Finanzmetriken; Ruin behaelt additive Floor-Deckungsdiagnostik.
 
 #### `historical-backtest-cohorts.test.mjs`
@@ -921,15 +933,15 @@ Pflege-/Todes-/Hinterbliebenenpfade werden getrennt geprueft.
 **Zweck:** Testet versioniertes Raw-JSON und die feste technische CSV-Projektion.
 - **Reproduktion:** Request-/Result-Fingerprint, Dataset-/Manifest-/Temporal-/Engineprovenienz, Portfolio-Snapshots, Records, Rows, Metriken und optionales Cohort-Inventar.
 - **Stabilitaet:** Exportzeitpunkt und Detailtoggle aendern den Result-Fingerprint nicht; JSON-Roundtrip behaelt Zahltypen.
-- **CSV/Sicherheit:** 25 feste Spalten, Punktdezimalen, LF, leere Missingness, keine HTML-/Displayformatter und Schutz gegen Formel-, Quote-, Delimiter- und Zeilenumbruchinjektion.
+- **CSV/Sicherheit:** 33 feste Spalten, getrennte Haushalts-/Renten-/Depot-Flexbasis, finaler Mindest-Flex samt Fehlbetrag, Punktdezimalen, LF, leere Missingness, keine HTML-/Displayformatter und Schutz gegen Formel-, Quote-, Delimiter- und Zeilenumbruchinjektion.
 
 #### `simulator-backtest-characterization.test.mjs`
 **Zweck:** Vergleicht die unveraenderte Slice-01-Baseline `legacy_observed` mit dem separaten D-01-Zieloracle `target_expected`.
-- **Golden Cases:** kurzer und langer Completed-Pfad, 3-Bucket/Mindest-Flex, Ruin, Pflegebucket-Projektionsluecke, Dynamic-Flex/CAPE, zwei lohnindexierte JST-Fenster 1930-1940 und 1935-1946 sowie der Lohnquellen-Nahtzeuge 1944-1950.
+- **Golden Cases:** kurzer und langer Completed-Pfad, 3-Bucket/Mindest-Flex, der eigene D-17-Zeuge 2000-2010 mit Einzeljahren 2001/2005/2009/2010, Ruin, Pflegebucket-Projektionsluecke, Dynamic-Flex/CAPE, zwei lohnindexierte JST-Fenster 1930-1940 und 1935-1946 sowie der Lohnquellen-Nahtzeuge 1944-1950.
 - **Negative Cases:** Einjahreslauf, NaN-/rueckwaertige Periode, mittlere Datenluecke und nicht-finite Goldrendite.
 - **Messvertrag:** kanonische Input- und Row-Hashes, Non-Mutation, Metrikwoerterbuch, 2000/2001-Alignment sowie kontrollierte Abloesung von `legacy_schema_v0` durch `backtest_ui_state_v1`; Detailtoggle-Paritaet bleibt erhalten.
 - **Delta-Gate:** `BacktestTemporalDeltaReportV1` benennt jede geaenderte Metrik samt Ursache und berichtet Endvermoegens-, Ruinfall- sowie Downstream-Consumer-Auswirkungen; nicht gespeicherte Zieldeltas schlagen fehl. `CapeWageBacktestDeltaEvidenceV3` bleibt als bytegehashtes Slice-06-Archiv erhalten. `DemographyCareSurvivorBacktestDeltaEvidenceV1` bindet den neuen Sterbetafelhash, den Lohnnahtzeugen und fuer aktiven sowie CAPE-inaktiven Arm den direkten Slice-06-zu-Slice-07-Vergleich mit zehn exakten Kennzahlen. `Slice07To08LiquidityRunwayBacktestDeltaV1` misst davon getrennt die echte Runway-Slice-Wirkung; der CAPE-an/aus-Effekt innerhalb des aktuellen Laufs bleibt ein drittes separates Orakel. Pflege/Hinterbliebene sind im deterministischen Backtest inaktiv.
-- **Fixtures:** `fixtures/simulator-backtest-baseline-v1.json` und die bytegehashte Slice-06-V3-Evidenz bleiben read-only; `fixtures/simulator-backtest-target-v1.json` darf kontrolliert mit `UPDATE_BACKTEST_TARGET=1 node tests/run-single.mjs tests/simulator-backtest-characterization.test.mjs` erzeugt werden. Die Slice-07-Evidenz wird einmalig mit `CREATE_BACKTEST_DATA_07_DELTA=1` angelegt und danach nicht ueberschrieben. `fixtures/liquidity-runway-slice-08-measurement-v1.json` speichert das Slice-07-zu-08-Ledger, die fruehen Lohnorakel und feldgenaue Fallzusammenfassungen.
+- **Fixtures:** `fixtures/simulator-backtest-baseline-v1.json` und die bytegehashte Slice-06-V3-Evidenz bleiben read-only; `fixtures/simulator-backtest-target-v1.json` darf kontrolliert mit `UPDATE_BACKTEST_TARGET=1 node tests/run-single.mjs tests/simulator-backtest-characterization.test.mjs` erzeugt werden. Die Slice-07-Evidenz wird einmalig mit `CREATE_BACKTEST_DATA_07_DELTA=1` angelegt und danach nicht ueberschrieben. `fixtures/liquidity-runway-slice-08-measurement-v1.json` bleibt der unveraenderliche Slice-09-Eingang; `fixtures/minimum-flex-slice-09-measurement-v1.json` speichert getrennt das Slice-08-zu-09-Ledger und den D-17-Zeugen.
 
 #### `simulator-real-withdrawal-contract.test.mjs`
 **Zweck:** Testet den Simulatorvertrag für echte Realentnahmen.

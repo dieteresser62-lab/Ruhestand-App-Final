@@ -92,15 +92,14 @@ function createDocumentMock(values = {}) {
     }
 }
 
-// --- TEST 2: existing legacy loading path for invalid minimumFlexAnnual stays non-crashing ---
+// --- TEST 2: invalid legacy minimumFlexAnnual is rejected instead of replaced with zero ---
 {
-    const result = EngineAPI.simulateSingleYear(
+    const result = withMutedValidationLog(() => EngineAPI.simulateSingleYear(
         { ...baseEngineInput, minimumFlexAnnual: 'legacy-invalid' },
         null
-    );
-    assert(!result.error, 'Legacy invalid minimumFlexAnnual should not crash the engine path');
-    assertEqual(result.input.minimumFlexAnnual, 0, 'Legacy invalid minimumFlexAnnual should normalize to existing zero fallback');
-    assert(Number.isFinite(result.ui?.spending?.monatlicheEntnahme), 'Legacy invalid minimumFlexAnnual should still produce finite spending');
+    ));
+    assert(result.error instanceof ValidationError, 'Invalid legacy minimumFlexAnnual should return ValidationError');
+    assertValidationField(result.error, 'minimumFlexAnnual', 'invalid legacy minimum flex');
 }
 
 // --- TEST 3: UI reader and simulator validator use the same public field name ---
@@ -123,7 +122,9 @@ function createDocumentMock(values = {}) {
 
     for (const testCase of [
         { label: 'negative simulator minimum flex', inputs: { startFlexBedarf: 12000, minimumFlexAnnual: -1 } },
-        { label: 'above-flex simulator minimum flex', inputs: { startFlexBedarf: 12000, minimumFlexAnnual: 12001 } }
+        { label: 'above-flex simulator minimum flex', inputs: { startFlexBedarf: 12000, minimumFlexAnnual: 12001 } },
+        { label: 'non-numeric simulator minimum flex', inputs: { startFlexBedarf: 12000, minimumFlexAnnual: 'invalid' } },
+        { label: 'non-finite simulator minimum flex', inputs: { startFlexBedarf: 12000, minimumFlexAnnual: Number.POSITIVE_INFINITY } }
     ]) {
         let thrown = null;
         try {

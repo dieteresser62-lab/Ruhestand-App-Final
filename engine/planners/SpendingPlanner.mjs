@@ -10,7 +10,7 @@ import { evaluateAlarmConditions, shouldDeescalateInPeak, shouldDeescalateInReco
 import { applyFinalRateLimits } from './final-rate-policy.mjs';
 import { applyFlexBudgetCap } from './flex-budget-policy.mjs';
 import { applyFlexShareCurve, calculateFlexRate } from './flex-rate-policy.mjs';
-import { applyMinimumFlexFloor } from './minimum-flex-policy.mjs';
+import { applyMinimumFlexFloor, finalizeMinimumFlexDiagnostics } from './minimum-flex-policy.mjs';
 import { buildSpendingDiagnosis, resolveRunwayTarget } from './spending-diagnosis.mjs';
 import { applyGuardrails } from './spending-guardrails.mjs';
 import { applySpendingPolicyPipeline } from './spending-policy-pipeline.mjs';
@@ -103,6 +103,10 @@ export const SpendingPlanner = {
         const { endgueltigeEntnahme, flexRate } = this._calculateFinalWithdrawal(
             inflatedBedarf,
             policyResult.flexRate
+        );
+        finalizeMinimumFlexDiagnostics(
+            state,
+            Math.max(0, endgueltigeEntnahme - inflatedBedarf.floor)
         );
 
         // 6. Ergebnisobjekte aufbauen.

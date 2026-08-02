@@ -142,6 +142,8 @@ export function buildKeyParams(params = {}) {
             not_needed: 'Nicht benötigt',
             applied: 'Angewandt',
             applied_limited_by_final_smoothing: 'Geglättet angewandt',
+            limited_by_final_quantization: 'Durch Endrundung begrenzt',
+            limited_by_available_flex: 'Durch verfügbaren Flex begrenzt',
             blocked_emergency: 'Blockiert',
             limited_by_flex_budget: 'Durch Flex-Budget begrenzt'
         };
@@ -153,7 +155,9 @@ export function buildKeyParams(params = {}) {
         };
         const status = params.minimumFlexStatus || 'inactive_zero';
         const blockReason = params.minimumFlexBlockReason || null;
-        const trend = status === 'blocked_emergency' ? 'down'
+        const hasShortfall = Number.isFinite(params.minimumFlexShortfallAnnual)
+            && params.minimumFlexShortfallAnnual > 0.01;
+        const trend = status === 'blocked_emergency' || hasShortfall ? 'down'
             : (status === 'applied' ? 'up' : 'neutral');
         pushMetric({
             label: 'Mindest-Flex p.a.',
@@ -180,6 +184,18 @@ export function buildKeyParams(params = {}) {
                 value: `${UIUtils.formatCurrency(params.minimumFlexEffectiveBefore)} -> ${UIUtils.formatCurrency(params.minimumFlexEffectiveAfter)}`,
                 meta: 'Effektiver Flex vor/nach Mindest-Flex-Schritt',
                 trend
+            });
+        }
+        if (
+            typeof params.minimumFlexEffectiveFinal === 'number' && isFinite(params.minimumFlexEffectiveFinal) &&
+            typeof params.minimumFlexShortfallAnnual === 'number' && isFinite(params.minimumFlexShortfallAnnual) &&
+            params.minimumFlexApplicable === true
+        ) {
+            pushMetric({
+                label: 'Mindest-Flex final',
+                value: `${UIUtils.formatCurrency(params.minimumFlexEffectiveFinal)} / ${UIUtils.formatCurrency(params.minimumFlexAnnual)}`,
+                meta: `Nominaler Fehlbetrag: ${UIUtils.formatCurrency(params.minimumFlexShortfallAnnual)}`,
+                trend: hasShortfall ? 'down' : 'up'
             });
         }
     }

@@ -345,7 +345,7 @@ try {
         depotTranchesGold: [],
         liquiditaet: 1000
     };
-    const result = simulateAccumulationYear({
+    const accumulationArgs = {
         currentState: {
             portfolio,
             currentAnnualPension: 12000,
@@ -390,7 +390,8 @@ try {
         currentAnnualPension2: 6000,
         householdCtx: { p1Alive: true, p2Alive: true },
         isBadYear: false
-    });
+    };
+    const result = simulateAccumulationYear(accumulationArgs);
     assertClose(result.newState.portfolio.liquiditaet, 2246, 1e-9, 'Accumulation should add cash interest and indexed savings');
     assertClose(result.newState.accumulationState.sparrateThisYear, 1236, 1e-9, 'Accumulation should index savings by inflation');
     assertClose(result.newState.accumulationState.totalContributed, 3636, 1e-9, 'Accumulation should track total contributions');
@@ -398,6 +399,40 @@ try {
     assertClose(result.newState.currentAnnualPension, 12240, 1e-9, 'Accumulation should index shadow pension P1');
     assert(result.logData.Regime === 'accumulation', 'Accumulation log should use accumulation regime');
     assert(result.logData.GuardNote === 'accumulation_phase', 'Accumulation log should mark guard note');
+
+    const zeroTargetPortfolio = {
+        depotTranchesAktien: [],
+        depotTranchesGold: [],
+        liquiditaet: 0
+    };
+    const zeroTargetAccumulationResult = simulateAccumulationYear({
+        ...accumulationArgs,
+        currentState: {
+            ...accumulationArgs.currentState,
+            portfolio: zeroTargetPortfolio,
+            currentAnnualPension: 0,
+            currentAnnualPension2: 0
+        },
+        inputs: {
+            ...accumulationArgs.inputs,
+            accumulationPhase: {
+                ...accumulationArgs.inputs.accumulationPhase,
+                sparrate: 0
+            }
+        },
+        portfolio: zeroTargetPortfolio,
+        liquiditaet: 0,
+        initialLiqStart: 0,
+        baseFloor: 0,
+        effectiveBaseFloor: 0,
+        currentAnnualPension: 0,
+        currentAnnualPension2: 0
+    });
+    assertEqual(
+        zeroTargetAccumulationResult.logData.RunwayCoveragePct,
+        null,
+        'Accumulation year with zero runway target emits not-applicable coverage'
+    );
 
     const negativeCashPortfolio = {
         depotTranchesAktien: [],
@@ -639,7 +674,7 @@ try {
     });
     assertEqual(missingMetricResult.logData.entscheidung.runwayMonths, null, 'Missing runway should remain missing');
     assertEqual(missingMetricResult.logData.FlexRatePct, null, 'Missing flex rate should remain missing');
-    assertEqual(missingMetricResult.logData.RunwayCoveragePct, 100, 'Zero configured target with positive cash should expose complete final coverage');
+    assertEqual(missingMetricResult.logData.RunwayCoveragePct, null, 'Zero configured target with positive cash is not an applicable coverage ratio');
 
     const zeroNeedAndCashResult = buildSimulatorYearResult({
         ...yearResultArgs,
@@ -653,8 +688,35 @@ try {
             }
         }
     });
-    assertEqual(zeroNeedAndCashResult.logData.entscheidung.runwayMonths, 0, 'Zero annual need and zero cash must emit a finite zero runway');
-    assertEqual(zeroNeedAndCashResult.logData.RunwayCoveragePct, 0, 'Zero target and zero cash must emit zero coverage');
+    assertEqual(zeroNeedAndCashResult.logData.entscheidung.runwayMonths, null, 'Zero annual need and zero cash must emit a not-applicable runway');
+    assertEqual(zeroNeedAndCashResult.logData.RunwayCoveragePct, null, 'Zero target and zero cash must emit not-applicable coverage');
+
+    const payoutLimitedMinimumFlexResult = buildSimulatorYearResult({
+        ...yearResultArgs,
+        jahresEntnahmePlan: 30000,
+        jahresEntnahmeEffektiv: 26000,
+        fullResult: {
+            ...yearResultArgs.fullResult,
+            input: { flexBedarf: 6000 },
+            diagnosis: {
+                ...yearResultArgs.fullResult.diagnosis,
+                keyParams: {
+                    minimumFlexAnnual: 6000,
+                    minimumFlexStatus: 'applied',
+                    minimumFlexApplicable: true,
+                    minimumFlexEffectiveFinal: 6000,
+                    minimumFlexShortfallAnnual: 0,
+                    minimumFlexFulfilled: true
+                }
+            }
+        }
+    });
+    assertEqual(payoutLimitedMinimumFlexResult.logData.flex_haushalt_erfuellt, 2000, 'Payout witness realizes only household flex paid above floor');
+    assertClose(payoutLimitedMinimumFlexResult.logData.flex_haushalt_kuerzung_pct, 66.6666666667, 1e-6, 'Payout witness reconciles household flex reduction');
+    assertEqual(payoutLimitedMinimumFlexResult.logData.minimumFlexEffectiveFinal, 2000, 'Final minimum flex uses actual payout');
+    assertEqual(payoutLimitedMinimumFlexResult.logData.minimumFlexShortfallAnnual, 4000, 'Final minimum flex exposes actual payout shortfall');
+    assertEqual(payoutLimitedMinimumFlexResult.logData.minimumFlexFulfilled, false, 'Actual payout shortfall cannot report fulfilled minimum flex');
+    assertEqual(payoutLimitedMinimumFlexResult.logData.minimumFlexStatus, 'limited_by_actual_payout', 'Actual payout limitation has an explicit status');
 
     const invalidInflationResult = buildSimulatorYearResult({
         ...yearResultArgs,

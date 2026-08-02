@@ -1127,7 +1127,7 @@ Folgezustand persistiert wird.
 | **Rohinput** | `_normalizeEngineInput()` übernimmt kompatible Aliasfelder und definierte Defaults. Numerische Legacy-Vermögensfelder mit `NaN`/`Infinity` werden nach dem bestehenden Kompatibilitätsvertrag auf null normalisiert; daraus folgt keine allgemeine Erlaubnis für beliebige Strings an strikten Feldern. |
 | **Validierung** | `InputValidator.validate()` prüft Pflichtfelder, endliche Werte, Bereiche und fachliche Beziehungen vor der Modellrechnung. Fehler besitzen `fieldId` und `message`. |
 | **Aktuelle Liquidität** | `aktuelleLiquiditaet` ist optional. Fehlt sie, gilt `tagesgeld + geldmarktEtf`; ist sie vorhanden, muss sie eine endliche, nichtnegative Zahl sein. Lokalisierte Zahlstrings gehören in den UI-Parser, nicht in diesen Engine-Vertrag. |
-| **Mindest-Flex** | Ein endlicher numerischer Wert wird als Eingabe validiert: negativ oder größer als `flexBedarf` führt zum Feldfehler, nicht zu einem stillen Clamp. Ein nichtnumerischer Legacy-Wert folgt weiterhin dem ausdrücklich getesteten Kompatibilitätsfallback auf null. |
+| **Mindest-Flex** | Fehlend oder leer bedeutet `0`. Ein vorhandener Wert muss numerisch, endlich, nichtnegativ und hoechstens so gross wie `flexBedarf` sein; andernfalls folgt ein Feldfehler statt stillem Clamp oder Null-Fallback. |
 | **Detailtranchen** | `detailledTranches` müssen vor Verkauf als kanonische, eindeutig klassifizierte Lots mit stabiler ID, Cost Basis, TQF und gegebenenfalls `sourceProfileId` vorliegen. Ungültige Lots dürfen nicht als aggregierter Ersatzverkauf kaschiert werden. |
 | **Vorzustand** | `lastState` enthält Guardrail-/VPW-Historie und optional `taxState.lossCarry`. Ein fehlender Zustand wird initialisiert; ein Verlustvortrag wird als nichtnegative endliche Größe gelesen. Der Rückgabewert `newState` ist der alleinige Nachfolger für den nächsten Jahresaufruf. |
 
@@ -1270,7 +1270,7 @@ Der SpendingPlanner führt mehrere Policy-Module in stabiler Reihenfolge aus, wo
 
 Dynamic Flex ist ein vorgeschalteter VPW-Pfad. Bei aktivem `dynamicFlex` berechnet die Engine aus Gesamtvermögen, Resthorizont, CAPE-basierter erwarteter Realrendite, Gold-/Safe-Asset-Anteil und optionalem Go-Go-Multiplikator einen dynamischen Flex-Bedarf. Die VPW-Renditeherleitung ist in `engine/planners/vpw-return-policy.mjs` gekapselt: `legacy_step` bleibt Default, `cape_continuous` ist ein expliziter Config-Modus mit robuster CAPE-Normalisierung und separaten Aktien-/Portfolio-Clamps. Der Resthorizont kann optional durch Longevity-Modi konservativer gemacht werden: `none` bleibt Default, `quantile_shift`, `relative_horizon_buffer` und `buffer_years` sind explizite Sicherheitsannahmen. Der Floor bleibt geschützt; VPW ersetzt nur den flexiblen Teil. Eine Sicherheitsstufe kann Go-Go deaktivieren oder Dynamic Flex temporär auf statischen Flex zurücksetzen, wenn Alarm-, Runway- oder Drawdown-Signale zu stark werden.
 
-Der optionale `minimumFlexAnnual` ist kein zweiter Floor und mutiert den Bedarf nicht. Er wird nach den Guardrails als Mindest-Effektivbetrag für den Flex-Anteil interpretiert: Wenn die berechnete Flex-Rate weniger als diesen Betrag freigeben würde, hebt `applyMinimumFlexFloor()` die Rate bis zur erforderlichen Mindest-Flex-Rate an. Danach dürfen Flex-Budget-Cap und finale Rate-Limits die Anhebung weiterhin begrenzen. Notfallbedingungen blockieren die Anhebung bei aktivem Alarm, fehlender Gesamtvermögensdeckung für Floor plus Mindest-Flex oder wenn der Mindest-Runway nach dem Proxy nicht wiederherstellbar wäre.
+Der optionale `minimumFlexAnnual` ist kein zweiter Floor und mutiert den Bedarf nicht. Er wird nach den Guardrails als haushaltsweiter Mindest-Effektivbetrag für den Flex-Anteil interpretiert: Der nach Floor-Deckung verbleibende Rentenueberschuss wird zuerst angerechnet; wenn die berechnete Depot-Flex-Rate den offenen Rest nicht freigeben würde, hebt `applyMinimumFlexFloor()` die Rate bis zur erforderlichen Mindest-Flex-Rate an. Danach dürfen Flex-Budget-Cap und finale Rate-Limits die Anhebung weiterhin begrenzen. Notfallbedingungen blockieren die Anhebung bei aktivem Alarm, fehlender Gesamtvermögensdeckung für Netto-Floor plus offenen Depotanteil oder wenn der Mindest-Runway nach dem Proxy nicht wiederherstellbar wäre. Nach allen Policy-Stufen und der Monatsquantisierung werden Rentenueberschuss plus final wirksamer Depotflex, nominaler Fehlbetrag und Erfuellungsstatus neu bestimmt; der Status benennt deshalb auch Budget-, Glaettungs-, Gesamt-Flex- und Quantisierungslimits.
 
 Die wichtigsten fachlichen Bremsen sind:
 
@@ -1482,8 +1482,9 @@ Eine vollständige Rentenbesteuerung wird nicht modelliert.
    berechneten Rahmen nicht zur Konsumpflicht.
 4. Guardrails und Alarm bestimmen zunächst die Flex-Rate. Mindest-Flex darf sie
    nur ohne Safety-Blocker anheben; Budget-Caps und finale Glättung bleiben
-   nachgelagert wirksam. `minimumFlexAnnual` wird validiert und nicht still auf
-   einen zulässigen Wert begrenzt.
+   nachgelagert wirksam. Nach der Monatsquantisierung werden Ist, Fehlbetrag und
+   Status finalisiert. `minimumFlexAnnual` wird an Engine-, Simulator- und
+   Profilgrenzen validiert und weder still begrenzt noch auf null ersetzt.
 5. Der Pflegebucket wird vor VPW-, Runway- und Entnahmeberechnung aus dem
    aktiven Vermögen entfernt und bei seiner Verwendung nicht nochmals als
    normaler Verkauf gezählt.
@@ -1657,17 +1658,29 @@ function shouldDeactivateAlarm(context, alarmHistory) {
 Eigenschaften:
 
 - Der Wert wird in Balance und Simulator als Jahresbetrag gepflegt und gegen den jeweiligen Flex-Bedarf validiert (`minimumFlexAnnual <= flexBedarf` bzw. `<= startFlexBedarf`).
-- Negative Werte werden abgelehnt; ungültige oder leere Werte fallen in Engine-Pfaden defensiv auf 0 zurück.
-- Die Engine setzt den Mindest-Flex ratenbasiert um: `requiredRate = minimumFlexAnnual / inflatedBedarf.flex`.
-- Der Bedarf selbst bleibt unverändert; Diagnose und Logs zeigen Status, erforderliche Rate, Blockiergrund und effektiven Flex vor/nach dem Policy-Schritt.
+- Fehlende oder leere Werte bedeuten `0`; vorhandene nicht-finite, negative oder den Flexbedarf ueberschreitende Werte werden an der jeweiligen Eingangsgrenze abgelehnt.
+- Die Engine setzt den Mindest-Flex ratenbasiert um: `requiredRate = minimumFlexAnnual / inflatedBedarf.flex`; eine rechnerische Rate ueber 100 Prozent bleibt als nicht erreichbares Soll sichtbar und wird nicht als erfuellt ausgegeben.
+- Der Bedarf selbst bleibt unverändert; Diagnose und Logs zeigen Status, erforderliche Rate, Blockiergrund, Policy-Effekt sowie finalen wirksamen Flex und nominalen Fehlbetrag nach allen Stufen.
 - Guardrail-Resets erkennen relevante Änderungen am Mindest-Flex, erhalten aber den steuerlichen Zustand (`lastState.taxState`).
-- Profilverbund addiert profilbezogene Mindest-Flex-Werte für den Haushaltslauf und transportiert die Aufschlüsselung in `minimumFlexProfiles`.
+- Profilverbund addiert profilbezogene Mindest-Flex-Werte für den Haushaltslauf und transportiert die Aufschlüsselung in `minimumFlexProfiles`. Jeder Profilwert wird gegen seinen Profil-Flexbedarf geprueft; auch die Summe darf den aggregierten Haushalts-Flexbedarf nicht ueberschreiten.
 
 Policy-Reihenfolge:
 
-1. Alarm und Guardrails bestimmen zunächst die gekürzte Flex-Rate.
-2. Mindest-Flex kann diese Rate anheben, wenn kein Notfallblocker greift.
-3. Flex-Budget-Cap und finale Rate-Limits laufen danach weiter und können die Anhebung begrenzen.
+Die Reihenfolge ist als `SpendingPolicyOrderV1` in
+`spending-policy-pipeline.mjs` versioniert. Die Pipeline prueft ihren
+Ausfuehrungstrace bei jedem Lauf gegen diesen Vertrag.
+
+1. Alarmstatus.
+2. Guardrails.
+3. Mindest-Flex.
+4. Flex-Budget.
+5. Finale Glaettung.
+
+Die anschliessende Monatsquantisierung und Ist-Auszahlung bestimmen
+`minimumFlexEffectiveFinal`, `minimumFlexShortfallAnnual`,
+`minimumFlexFulfilled` und gegebenenfalls einen Limitstatus. Liegt die
+Ist-Auszahlung unter dem geplanten wirksamen Mindest-Flex, lautet der Status
+`limited_by_actual_payout`.
 
 Notfallblocker:
 
@@ -1677,7 +1690,7 @@ Notfallblocker:
 | Gesamtvermögen deckt Floor + Mindest-Flex nicht | Blockierstatus `floor_minimum_flex_not_covered` |
 | Mindest-Runway wäre nach Proxy nicht wiederherstellbar | Blockierstatus `minimum_runway_not_restorable` |
 
-Backtest- und Monte-Carlo-Logs enthalten `MinFlex€` und `MinFSt`; im Detailmodus zusätzlich `MinFBlock` und `MinFEff`. Gold-bezogene Logspalten werden ausgeblendet, wenn das Goldmodul inaktiv ist.
+Backtest- und Monte-Carlo-Logs enthalten `MinFlex€`, `MinFIst€`, `MinFGap€` und `MinFSt`; im Detailmodus zusätzlich `MinFBlock` und den Policy-Zwischenwert `MinFEff`. Der Backtest-Raw-Export trennt Haushalts-Flexbedarf, Rentenueberschuss, Depot-Flex und final erfuellten Haushalts-Flex. Gold-bezogene Logspalten werden ausgeblendet, wenn das Goldmodul inaktiv ist.
 
 ---
 

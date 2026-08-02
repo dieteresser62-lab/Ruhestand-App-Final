@@ -113,6 +113,8 @@ export function readSweepMetricValue(result, metricKey) {
         || !SWEEP_DECISION_METRIC_KEYS.includes(metricKey)) {
         return null;
     }
-    const value = Number(result.metrics[metricKey]);
+    const rawValue = result.metrics[metricKey];
+    if (rawValue === null || rawValue === undefined) return null;
+    const value = Number(rawValue);
     return Number.isFinite(value) ? value : null;
 }

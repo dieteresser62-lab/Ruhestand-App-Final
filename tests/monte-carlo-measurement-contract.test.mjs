@@ -86,6 +86,7 @@ const benchmarkContract = readFixture('benchmark-contract-v1.json');
 const benchmarkResults = readFixture('benchmark-results-2026-07-22.json');
 const consumerInventory = readFixture('consumer-inventory-v1.json');
 const slice08MeasurementPath = path.join(fixtureDir, 'liquidity-runway-slice-08-v1.json');
+const slice09MeasurementPath = path.join(fixtureDir, 'minimum-flex-slice-09-v1.json');
 
 function getGolden(id) {
     return goldenFixture.cases.find(entry => entry.id === id);
@@ -1494,6 +1495,7 @@ assertEqual(preHardening.result.bufferBytesPerRun, 63, 'Immutable pre-hardening 
 assertJsonEqual(preHardening.result.buffers.volatilities, preHardening.result.buffers.maxDrawdowns, 'Immutable baseline must retain the documented pre-fix volatility defect');
 const activeSnapshot = postBacktestData06;
 const slice08ExpectedFixture = JSON.parse(fs.readFileSync(slice08MeasurementPath, 'utf8'));
+const slice09ExpectedFixture = JSON.parse(fs.readFileSync(slice09MeasurementPath, 'utf8'));
 const sameRuntime = process.version === slice08ExpectedFixture.targetMeasurement.runtime.node
     && process.platform === slice08ExpectedFixture.targetMeasurement.runtime.platform
     && process.arch === slice08ExpectedFixture.targetMeasurement.runtime.architecture;
@@ -1595,6 +1597,55 @@ if (process.env.MC_PRINT_SLICE_08 === '1') {
         activeSnapshot.metadata.numericTolerance
     );
 }
+const slice08FixtureSha256 = createHash('sha256')
+    .update(fs.readFileSync(slice08MeasurementPath))
+    .digest('hex');
+const currentSlice09Measurement = {
+    schemaVersion: 'MinimumFlexMonteCarloSweepMeasurementV1',
+    snapshotId: 'post-backtest-data-09-v1',
+    sourceReference: 'post-backtest-data-08-v1',
+    sourceFixtureSha256: slice08FixtureSha256,
+    sourceResultDocument: 'docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_08_LIQUIDITAETS_RUNWAY_PUFFERVERTRAG.md',
+    targetResultDocument: 'docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_09_FLOOR_MINDEST_FLEX_STABILISATOR.md',
+    reviewStatus: 'pending',
+    measurementScope: {
+        monteCarloAggregateProjectionMeasured: true,
+        sweepAggregateProjectionMeasured: true,
+        minimumFlexRowDiagnosticsMeasuredHere: false,
+        minimumFlexRowDiagnosticsEvidence: 'tests/worker-parity.test.mjs and tests/simulator-backtest-characterization.test.mjs'
+    },
+    sourceProjectionHashes: {
+        carResultSha256: slice08ExpectedFixture.carResultSha256,
+        autoOptimizeResultSha256: slice08ExpectedFixture.autoOptimizeResultSha256,
+        finalResultSha256: slice08ExpectedFixture.finalResultSha256
+    },
+    targetProjectionHashes: {
+        carResultSha256: sha256Json(actualSlice07Result),
+        autoOptimizeResultSha256: sha256Json(actualAutoOptimizeProjection),
+        finalResultSha256: sha256Json(actualFinalProjection)
+    },
+    changedProjectionCount: [
+        ['carResultSha256', sha256Json(actualSlice07Result)],
+        ['autoOptimizeResultSha256', sha256Json(actualAutoOptimizeProjection)],
+        ['finalResultSha256', sha256Json(actualFinalProjection)]
+    ].filter(([key, value]) => slice08ExpectedFixture[key] !== value).length,
+    economicAggregateDeltaExpected: false
+};
+if (process.env.MC_PRINT_SLICE_09 === '1') {
+    console.log('__POST_BACKTEST_DATA_09_CAPTURE_START__');
+    console.log(JSON.stringify(currentSlice09Measurement, null, 2));
+    console.log('__POST_BACKTEST_DATA_09_CAPTURE_END__');
+} else {
+    compareSnapshotNode(
+        currentSlice09Measurement,
+        slice09ExpectedFixture,
+        'postBacktestData09.measurement',
+        sameRuntime,
+        activeSnapshot.metadata.numericTolerance
+    );
+}
+assertEqual(slice08FixtureSha256, slice09ExpectedFixture.sourceFixtureSha256, 'Slice 09 must consume the byte-identical Slice-08 Monte Carlo fixture');
+assertEqual(currentSlice09Measurement.changedProjectionCount, 0, 'Slice 09 must not change the measured Monte Carlo/Sweep aggregate projections');
 assertEqual(MONTE_CARLO_SNAPSHOT_POLICY.finalCandidate, finalCandidate.snapshotId, 'Public snapshot policy must name the integrated final candidate');
 assertEqual(
     MONTE_CARLO_SNAPSHOT_POLICY.currentReference,

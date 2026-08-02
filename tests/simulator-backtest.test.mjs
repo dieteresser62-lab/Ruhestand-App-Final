@@ -310,7 +310,7 @@ try {
         }
     }
 
-    // --- TEST 8: Mindest-Flex increases stressed withdrawals without flow drift ---
+    // --- TEST 8: Mindest-Flex reconciles final fulfillment without flow drift ---
     {
         global.document = createMockDocument({
             ...baseInputs,
@@ -359,8 +359,12 @@ try {
             'Applied minimum flex should not reduce the same-year withdrawal'
         );
         assert(
-            appliedMinimumRows.some(row => row.entscheidung?.jahresEntnahme > (withoutMinimumByYear.get(row.jahr)?.entscheidung?.jahresEntnahme || 0)),
-            'Minimum flex should increase at least one same-year withdrawal when applied'
+            appliedMinimumRows.every(row => (
+                Number(row.row?.minimumFlexEffectiveFinal) + 0.01 >= Number(row.row?.minimumFlexAnnual)
+                && Number(row.row?.minimumFlexShortfallAnnual) <= 0.01
+                && row.row?.minimumFlexFulfilled === true
+            )),
+            'Applied minimum flex should reconcile as fulfilled after final quantization'
         );
         assert(withMinimumFlexRows.every(r => Math.abs(Number(r.row?.portfolio_flow_delta) || 0) < 1), 'FlowDelta should remain near zero with minimum flex');
     }

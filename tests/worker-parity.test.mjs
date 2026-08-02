@@ -789,6 +789,7 @@ try {
     const dynamicInputs = {
         ...baseInputs,
         startAlter: 52,
+        minimumFlexAnnual: 9000,
         dynamicFlex: true,
         horizonMethod: 'mean',
         horizonYears: 32,
@@ -847,8 +848,14 @@ try {
         'portfolio_total_end',
         'taxSavedByLossCarry',
         'Person1Alive',
+        'minimumFlexAnnual',
+        'minimumFlexStatus',
+        'minimumFlexEffectiveFinal',
+        'minimumFlexShortfallAnnual',
+        'minimumFlexFulfilled',
         'vpw'
     ];
+    let minimumFlexWitnessObserved = false;
 
     assert(fullChunk.runMeta.length === monteCarloParams.anzahl, 'Full logshape runMeta length mismatch');
     assert(merged.runMeta.length === monteCarloParams.anzahl, 'Merged logshape runMeta length mismatch');
@@ -878,6 +885,20 @@ try {
             assertEqual(mergedRow.histJahr, fullRow.histJahr, `Log histJahr mismatch for run ${runIdx}, row ${rowIdx}`);
             assertClose(mergedRow.entnahme_effektiv, fullRow.entnahme_effektiv, 1e-6, `Log entnahme mismatch for run ${runIdx}, row ${rowIdx}`);
             assertClose(mergedRow.portfolio_total_end, fullRow.portfolio_total_end, 1e-6, `Log portfolio total mismatch for run ${runIdx}, row ${rowIdx}`);
+            for (const field of [
+                'minimumFlexAnnual',
+                'minimumFlexStatus',
+                'minimumFlexEffectiveFinal',
+                'minimumFlexShortfallAnnual',
+                'minimumFlexFulfilled'
+            ]) {
+                assertEqual(
+                    JSON.stringify(mergedRow[field] ?? null),
+                    JSON.stringify(fullRow[field] ?? null),
+                    `Log ${field} mismatch for run ${runIdx}, row ${rowIdx}`
+                );
+            }
+            if (Number(fullRow.minimumFlexAnnual) > 0) minimumFlexWitnessObserved = true;
             assertEqual(
                 JSON.stringify(mergedRow.vpw || null),
                 JSON.stringify(fullRow.vpw || null),
@@ -885,6 +906,7 @@ try {
             );
         }
     }
+    assert(minimumFlexWitnessObserved, 'Monte-Carlo log parity must exercise an active minimum-flex target');
 
     console.log('✅ Monte-Carlo logshape chunk-boundary parity passed');
 } catch (e) {

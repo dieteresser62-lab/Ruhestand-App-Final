@@ -96,7 +96,15 @@ function baseResult(outcomeKind = 'completed') {
                 floor_brutto: 24000,
                 renteSum: 12000,
                 flex_erfuellt_nominal: 3456.78,
+                flex_brutto_haushalt: 6000,
+                flex_rentenueberschuss: 1000,
+                flex_aus_depot_bedarf: 5000,
+                flex_aus_depot_erfuellt: 3456.78,
+                flex_haushalt_erfuellt: 4456.78,
+                flex_haushalt_kuerzung_pct: 25.72033333333333,
                 minimumFlexAnnual: 3000,
+                minimumFlexEffectiveFinal: 2500,
+                minimumFlexShortfallAnnual: 500,
                 portfolio_total_end: 90234.56,
                 steuern_gesamt: 456.78,
                 lossCarryEnd: 12.34,
@@ -196,7 +204,7 @@ function baseResult(outcomeKind = 'completed') {
     });
     assertEqual(withCohorts.result.cohortInventory.inventory.eligible, 2, 'optional cohort inventory is exported without recalculation');
     assert(first.fingerprint.value !== withCohorts.fingerprint.value, 'optional cohort inventory participates in the result fingerprint');
-    assertEqual(first.fingerprint.value, '1a9093fcbd28ff650c8079a7501ba4f534c3aea45bd13f5a96221335249a59b3', 'canonical fixture fingerprint remains golden');
+    assertEqual(first.fingerprint.value, '71c24becff4684898cc0ee4d53f60cdd1911b1880bbf2c1c951da1546ead44fb', 'canonical fixture fingerprint remains golden');
 }
 
 {
@@ -211,6 +219,16 @@ function baseResult(outcomeKind = 'completed') {
     assert(csv.includes("'+unsafe") && csv.includes("'-unsafe"), 'CSV protects plus/minus formula prefixes');
     assert(!csv.includes('<span'), 'CSV never calls HTML display formatters');
     assertEqual(HISTORICAL_BACKTEST_CSV_CONTRACT.missingValue, '', 'CSV missing values use empty cells');
+    const csvContext = { entry: result.rows[0], result, record: result.historicalYearRecords[0] };
+    const readColumn = id => HISTORICAL_BACKTEST_CSV_COLUMNS.find(column => column.id === id)?.read(csvContext);
+    assertEqual(readColumn('flex_household_required_nominal_eur'), 6000,
+        'CSV exports the explicit gross household-flex basis');
+    assertEqual(readColumn('flex_household_fulfilled_nominal_eur'), 4456.78,
+        'CSV exports fulfilled household flex after pension/depot reconciliation');
+    assertEqual(readColumn('minimum_flex_effective_final_nominal_eur'), 2500,
+        'CSV exports final effective minimum flex');
+    assertEqual(readColumn('minimum_flex_shortfall_nominal_eur'), 500,
+        'CSV exports the nominal minimum-flex shortfall');
 }
 
 {

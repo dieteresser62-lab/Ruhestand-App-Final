@@ -523,6 +523,15 @@ export function buildSweepInputs(baseInputs, params) {
     return inputs;
 }
 
+export function mergeApplicableRunwayMinimum(currentMinimum, coveragePct) {
+    if (typeof coveragePct !== 'number' || !Number.isFinite(coveragePct)) {
+        return currentMinimum;
+    }
+    return currentMinimum === null || coveragePct < currentMinimum
+        ? coveragePct
+        : currentMinimum;
+}
+
 export function runSweepChunk({
     baseInputs,
     paramCombinations,
@@ -661,7 +670,7 @@ export function runSweepChunk({
             const depotWertHistorie = [portfolioTotal(simState.portfolio)];
             let stressCtx = cloneStressContext(stressCtxMaster);
 
-            let minRunway = Infinity;
+            let minRunway = null;
             let effectiveTransitionYear = inputs.transitionYear ?? 0;
             let triggeredAge = null;
             let careEverActive = false;
@@ -862,8 +871,10 @@ export function runSweepChunk({
                     depotWertHistorie.push(portfolioTotal(simState.portfolio));
 
                     // Track the worst runway coverage within a run.
-                    const runway = result.logData.RunwayCoveragePct || 0;
-                    if (runway < minRunway) minRunway = runway;
+                    minRunway = mergeApplicableRunwayMinimum(
+                        minRunway,
+                        result.logData.RunwayCoveragePct
+                    );
                 }
             }
 
@@ -880,7 +891,7 @@ export function runSweepChunk({
             runOutcomes.push({
                 finalVermoegen: endVermoegen,
                 maxDrawdown: maxDDpct,
-                minRunway: minRunway === Infinity ? 0 : minRunway,
+                minRunway,
                 taxSavedByLossCarry: totalTaxSavedByLossCarryThisRun,
                 failed: failed
             });
