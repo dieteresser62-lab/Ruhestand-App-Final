@@ -36,6 +36,7 @@ function getBaseInputs() {
 
 const baseMarket = { sKey: 'hot_neutral' };
 const baseContext = { saleBudgets: {} }; // No budget limits
+const engineLot = overrides => ({ schemaVersion: 2, taxExempt: false, ...overrides });
 
 // --- TEST 1: KESt Calculation (Base Claim) ---
 {
@@ -263,8 +264,8 @@ const baseContext = { saleBudgets: {} }; // No budget limits
     input.costBasisNeu = 0;
 
     input.detailledTranches = [
-        { trancheId: 't1', isin: 'SAME', name: 'Lot A', type: 'aktien_neu', category: 'equity', marketValue: 1000, costBasis: 1000, tqf: 0, purchaseDate: '2020-01-01' },
-        { trancheId: 't2', isin: 'SAME', name: 'Lot B', type: 'aktien_neu', category: 'equity', marketValue: 1000, costBasis: 1000, tqf: 0, purchaseDate: '2021-01-01' }
+        engineLot({ trancheId: 't1', isin: 'SAME', name: 'Lot A', type: 'aktien_neu', category: 'equity', marketValue: 1000, costBasis: 1000, tqf: 0, purchaseDate: '2020-01-01' }),
+        engineLot({ trancheId: 't2', isin: 'SAME', name: 'Lot B', type: 'aktien_neu', category: 'equity', marketValue: 1000, costBasis: 1000, tqf: 0, purchaseDate: '2021-01-01' })
     ];
 
     const result = TransactionEngine.calculateSaleAndTax(
@@ -291,8 +292,8 @@ const baseContext = { saleBudgets: {} }; // No budget limits
     input.costBasisNeu = 0;
 
     input.detailledTranches = [
-        { trancheId: 't1', isin: 'SAME', name: 'Lot A', type: 'aktien_neu', category: 'equity', marketValue: 1000, costBasis: 1000, tqf: 0, purchaseDate: '2020-01-01' },
-        { trancheId: 't2', isin: 'SAME', name: 'Lot B', type: 'aktien_neu', category: 'equity', marketValue: 1000, costBasis: 1000, tqf: 0, purchaseDate: '2021-01-01' }
+        engineLot({ trancheId: 't1', isin: 'SAME', name: 'Lot A', type: 'aktien_neu', category: 'equity', marketValue: 1000, costBasis: 1000, tqf: 0, purchaseDate: '2020-01-01' }),
+        engineLot({ trancheId: 't2', isin: 'SAME', name: 'Lot B', type: 'aktien_neu', category: 'equity', marketValue: 1000, costBasis: 1000, tqf: 0, purchaseDate: '2021-01-01' })
     ];
 
     const budgetContext = { saleBudgets: { aktien_neu: 1200 } };
@@ -370,7 +371,7 @@ const baseContext = { saleBudgets: {} }; // No budget limits
     input.tqfAlt = 0.30;
 
     input.detailledTranches = [
-        {
+        engineLot({
             trancheId: 'loss-lot',
             isin: 'ETF-MIX',
             name: 'Loss Lot',
@@ -380,8 +381,8 @@ const baseContext = { saleBudgets: {} }; // No budget limits
             costBasis: 1300,
             tqf: 0.30,
             purchaseDate: '2020-01-01'
-        },
-        {
+        }),
+        engineLot({
             trancheId: 'gain-lot',
             isin: 'ETF-MIX',
             name: 'Gain Lot',
@@ -391,7 +392,7 @@ const baseContext = { saleBudgets: {} }; // No budget limits
             costBasis: 500,
             tqf: 0.30,
             purchaseDate: '2021-01-01'
-        }
+        })
     ];
 
     const result = TransactionEngine.calculateSaleAndTax(
@@ -424,7 +425,7 @@ const baseContext = { saleBudgets: {} }; // No budget limits
     input.sparerPauschbetrag = 0;
 
     input.detailledTranches = [
-        {
+        engineLot({
             trancheId: 'gold-taxed',
             isin: 'GOLD',
             name: 'Gold Taxed',
@@ -434,8 +435,8 @@ const baseContext = { saleBudgets: {} }; // No budget limits
             costBasis: 400,
             tqf: 0,
             purchaseDate: '2022-01-01'
-        },
-        {
+        }),
+        engineLot({
             trancheId: 'equity-tqf',
             isin: 'ETF',
             name: 'Equity TQF',
@@ -445,7 +446,7 @@ const baseContext = { saleBudgets: {} }; // No budget limits
             costBasis: 400,
             tqf: 0.30,
             purchaseDate: '2022-01-01'
-        }
+        })
     ];
 
     const goldOnly = TransactionEngine.calculateSaleAndTax(
@@ -483,7 +484,7 @@ const baseContext = { saleBudgets: {} }; // No budget limits
     input.sparerPauschbetrag = 0;
 
     input.detailledTranches = [
-        {
+        engineLot({
             trancheId: 'profile-a:shared',
             sourceProfileId: 'profile-a',
             isin: 'ETF-SAME',
@@ -494,8 +495,8 @@ const baseContext = { saleBudgets: {} }; // No budget limits
             costBasis: 900,
             tqf: 0.30,
             purchaseDate: '2020-01-01'
-        },
-        {
+        }),
+        engineLot({
             trancheId: 'profile-b:shared',
             sourceProfileId: 'profile-b',
             isin: 'ETF-SAME',
@@ -506,7 +507,7 @@ const baseContext = { saleBudgets: {} }; // No budget limits
             costBasis: 800,
             tqf: 0.30,
             purchaseDate: '2021-01-01'
-        }
+        })
     ];
 
     const result = TransactionEngine.calculateSaleAndTax(
@@ -527,14 +528,14 @@ const baseContext = { saleBudgets: {} }; // No budget limits
 // --- TEST 13: Invalid mixed classification fails closed ---
 {
     const input = getBaseInputs();
-    input.detailledTranches = [{
+    input.detailledTranches = [engineLot({
         trancheId: 'mismatch',
         type: 'anleihe',
         category: 'equity',
         marketValue: 100,
         costBasis: 100,
         tqf: 0
-    }];
+    })];
     let error = null;
     try {
         TransactionEngine.calculateSaleAndTax(150, input, baseContext, baseMarket, false);
@@ -552,8 +553,8 @@ const baseContext = { saleBudgets: {} }; // No budget limits
 {
     const input = getBaseInputs();
     input.detailledTranches = [
-        { trancheId: 'duplicate', type: 'aktien_neu', category: 'equity', marketValue: 100, costBasis: 100, tqf: 0 },
-        { trancheId: 'duplicate', type: 'aktien_neu', category: 'equity', marketValue: 100, costBasis: 100, tqf: 0 }
+        engineLot({ trancheId: 'duplicate', type: 'aktien_neu', category: 'equity', marketValue: 100, costBasis: 100, tqf: 0 }),
+        engineLot({ trancheId: 'duplicate', type: 'aktien_neu', category: 'equity', marketValue: 100, costBasis: 100, tqf: 0 })
     ];
     let error = null;
     try {
@@ -579,5 +580,75 @@ const baseContext = { saleBudgets: {} }; // No budget limits
     assert(error instanceof ValidationError, 'Malformed detailed collection should fail with engine ValidationError');
     assert(error.errors.some(item => item.code === 'TRANCHE_COLLECTION_INVALID'), 'Malformed collection should retain stable contract code');
     console.log('✅ Malformed detailed collection fails closed');
+}
+
+// --- TEST 16: Explicit tax exemption is independent from TQF and lot metadata ---
+{
+    const input = getBaseInputs();
+    const common = {
+        schemaVersion: 2,
+        type: 'aktien_neu',
+        category: 'equity',
+        marketValue: 1000,
+        costBasis: 400,
+        tqf: 0,
+        purchaseDate: '2022-01-01'
+    };
+    input.detailledTranches = [
+        { ...common, trancheId: 'taxed', name: 'Altbestand steuerfrei laut Name', taxExempt: false },
+        { ...common, trancheId: 'exempt', name: 'Neutraler Name', taxExempt: true }
+    ];
+    const exemptSale = TransactionEngine.calculateSaleAndTax(
+        1000,
+        input,
+        { ...baseContext, forceGrossSellAmount: 1000 },
+        baseMarket,
+        false
+    );
+    assertEqual(exemptSale.breakdown[0].trancheId, 'exempt',
+        'Tax-optimized ordering should select the explicitly exempt lot first');
+    assertEqual(exemptSale.breakdown[0].taxExempt, true,
+        'Sale breakdown should retain the explicit exemption marker');
+    assertClose(exemptSale.sumTaxableAfterTqfSigned, 0, 1e-9,
+        'Explicitly exempt sale should produce no taxable gain');
+    assertClose(exemptSale.steuerGesamt, 0, 1e-9,
+        'Explicitly exempt sale should produce no plan tax');
+    assertClose(exemptSale.bruttoVerkaufGesamt, 1000, 1e-9,
+        'Only the requested exempt lot should be sold');
+
+    const taxedSale = TransactionEngine.calculateSaleAndTax(
+        1000,
+        { ...input, detailledTranches: [input.detailledTranches[0]] },
+        { ...baseContext, forceGrossSellAmount: 1000 },
+        baseMarket,
+        false
+    );
+    assertClose(taxedSale.sumTaxableAfterTqfSigned, 600, 1e-9,
+        'Identical explicitly taxable sale should retain its taxable gain');
+    assertClose(taxedSale.steuerGesamt, 600 * 0.26375, 0.01,
+        'Name and purchase date should not create tax exemption');
+    console.log('✅ Explicit tax exemption is independent and sale-bound');
+}
+
+// --- TEST 17: Historical market year does not switch the current tax contract ---
+{
+    const historicalInput = { ...getBaseInputs(), simulationYear: 2000 };
+    const currentInput = { ...getBaseInputs(), simulationYear: 2025 };
+    const historical = TransactionEngine.calculateSaleAndTax(
+        20000,
+        historicalInput,
+        baseContext,
+        baseMarket,
+        false
+    );
+    const current = TransactionEngine.calculateSaleAndTax(
+        20000,
+        currentInput,
+        baseContext,
+        baseMarket,
+        false
+    );
+    assertClose(historical.steuerGesamt, current.steuerGesamt, 1e-9,
+        'Historical sequence year should not switch away from the current tax-law parameters');
 }
 console.log('--- Transaction Tax Tests Completed ---');

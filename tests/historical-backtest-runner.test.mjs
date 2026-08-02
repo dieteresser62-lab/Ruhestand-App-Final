@@ -222,6 +222,7 @@ const dependencies = {
         const reductionPct = yearIndex === 0 ? 5 : 10;
         const logData = {
             entscheidung: { jahresEntnahme: 10 + yearIndex, kuerzungProzent: reductionPct },
+            flex_haushalt_basis: 'static_input',
             wertAktien: value,
             wertGold: 0,
             liquiditaet: 0,

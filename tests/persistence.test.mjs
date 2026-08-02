@@ -1477,9 +1477,17 @@ try {
             },
             {
                 name: 'historic independent-select money-market classification',
-                raw: JSON.stringify([{ ...legacyBase, id: 'legacy-money-market', category: 'money_market' }]),
+                raw: JSON.stringify([{ ...legacyBase, id: 'legacy-money-market', category: 'money_market', tqf: 0 }]),
                 expectedStatus: 'valid',
                 expectedType: 'geldmarkt'
+            },
+            {
+                name: 'historic money-market classification with unsupported equity TQF',
+                raw: JSON.stringify([{ ...legacyBase, id: 'legacy-money-market-tqf', category: 'money_market' }]),
+                expectedStatus: 'valid',
+                expectedType: 'geldmarkt',
+                expectedTqf: 0,
+                expectedTaxExempt: false
             },
             {
                 name: 'schema-one contradictory category and type',
@@ -1529,9 +1537,15 @@ try {
 
             if (first.status === 'valid') {
                 assertEqual(JSON.stringify(second.tranches), JSON.stringify(first.tranches), `${testCase.name}: kanonische Ausgabe ist deterministisch`);
-                assert(first.tranches.every(tranche => tranche.schemaVersion === 1), `${testCase.name}: Ausgabe verwendet Schema 1`);
+                assert(first.tranches.every(tranche => tranche.schemaVersion === 2), `${testCase.name}: Ausgabe verwendet Schema 2`);
                 if (testCase.expectedType) {
                     assertEqual(first.tranches[0].type, testCase.expectedType, `${testCase.name}: historischer Typ wird eindeutig migriert`);
+                }
+                if (testCase.expectedTqf !== undefined) {
+                    assertEqual(first.tranches[0].tqf, testCase.expectedTqf, `${testCase.name}: unbelegte Legacy-TQF wird explizit entfernt`);
+                }
+                if (testCase.expectedTaxExempt !== undefined) {
+                    assertEqual(first.tranches[0].taxExempt, testCase.expectedTaxExempt, `${testCase.name}: Steuerfreiheit wird explizit migriert`);
                 }
             } else if (first.status === 'corrupt') {
                 assertEqual(first.raw, testCase.raw, `${testCase.name}: nicht automatisch behebbare Daten bleiben raw-preserving`);

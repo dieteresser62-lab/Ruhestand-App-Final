@@ -56,6 +56,11 @@ const slice08FixturePath = path.join(
     'monte-carlo-measurement',
     'liquidity-runway-slice-08-v1.json'
 );
+const slice10FixturePath = path.join(
+    testDir,
+    'fixtures',
+    'tax-logic-slice-10-demography-measurement-v1.json'
+);
 
 function runtimeModule(relativePath) {
     return import(pathToFileURL(path.join(runtimeRoot, relativePath)).href);
@@ -377,6 +382,7 @@ if (captureMode) {
     console.log('__DEMOGRAPHY_MEASUREMENT_START__');
     console.log(JSON.stringify(actualMeasurement, null, 2));
     console.log('__DEMOGRAPHY_MEASUREMENT_END__');
+    console.log(`__DEMOGRAPHY_MEASUREMENT_SHA256__${sha256(actualMeasurement)}`);
 } else {
     const fixtureBytes = fs.readFileSync(fixturePath);
     assert.equal(
@@ -386,15 +392,23 @@ if (captureMode) {
     );
     const fixture = JSON.parse(fixtureBytes.toString('utf8'));
     const slice08Fixture = JSON.parse(fs.readFileSync(slice08FixturePath, 'utf8'));
+    const slice10Fixture = JSON.parse(fs.readFileSync(slice10FixturePath, 'utf8'));
     assert.equal(fixture.schemaVersion, 'DemographyCareSurvivorRuntimeMeasurementV1');
     assert.equal(fixture.snapshotId, 'post-backtest-data-07-v1');
     assert.equal(fixture.sourceReference, 'post-backtest-data-06-v2');
     assert.equal(fixture.reviewStatus, 'pending');
     assert.equal(slice08Fixture.sourceReference, 'post-backtest-data-07-v1');
-    assert.deepEqual(
-        { ...actualMeasurement, runtime: slice08Fixture.targetMeasurement.runtime },
-        slice08Fixture.targetMeasurement,
-        'Current runtime must reproduce the full Slice-08 demography/Monte-Carlo projection'
+    assert.equal(slice10Fixture.sourceReference, 'post-backtest-data-09-v1');
+    assert.equal(slice10Fixture.reviewStatus, 'pending');
+    assert.equal(
+        crypto.createHash('sha256').update(fs.readFileSync(slice08FixturePath)).digest('hex'),
+        slice10Fixture.sourceRuntimeFixtureSha256,
+        'Slice-10 runtime measurement must retain its immutable Slice-08 projection source'
+    );
+    assert.equal(
+        sha256(actualMeasurement),
+        slice10Fixture.targetMeasurementSha256,
+        'Current runtime must reproduce the pending Slice-10 tax-logic projection'
     );
     assert.deepEqual(
         {

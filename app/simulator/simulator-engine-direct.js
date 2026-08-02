@@ -8,7 +8,7 @@ import {
     sumDepot
 } from './simulator-portfolio.js';
 import { resolveProfileKey } from './simulator-heatmap.js';
-import { euros, normalizeHouseholdContext, resolveCapeRatio } from './simulator-engine-direct-utils.js';
+import { euros, normalizeHouseholdContext, resolveCapeRatio, signedEuros } from './simulator-engine-direct-utils.js';
 import { CONFIG } from '../../engine/config.mjs';
 import { STRATEGY_OPTIONS } from '../../types/strategy-options.js';
 import {
@@ -809,16 +809,23 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         combinedTaxRawAggregate,
         sparerPauschbetrag: engineInput.sparerPauschbetrag,
         kirchensteuerSatz: engineInput.kirchensteuerSatz,
+        cashInterestIncomeSigned: cashZinsen,
         forcedSaleScaleApplied,
         regularSaleScale,
         forcedTaxReserved
     });
     totalTaxesThisYear = taxReconciliation.totalTaxesThisYear;
-    liquiditaet += taxReconciliation.taxCashAdjustment;
+    // Verkaufssteuer ist bereits in den Verkaufserloesen reserviert. Der
+    // zusaetzliche signierte Anteil stammt ausschliesslich aus dem
+    // Cashzins-Settlement und ist durch den verzinsten Cashbestand gedeckt.
+    // Hier darf deshalb kein spaeter, von MC/Sweep nicht isolierter Wurf einen
+    // kompletten Batch abbrechen; die naechste Enginegrenze validiert den
+    // bilanzierten Zustand weiterhin fail-closed.
+    liquiditaet = euros(liquiditaet + taxReconciliation.taxCashAdjustment);
     snapshotBalance('after_tax_reconciliation', {
         regularSaleScale,
         forcedTaxReserved: euros(forcedTaxReserved),
-        taxCashAdjustment: euros(taxReconciliation.taxCashAdjustment)
+        taxCashAdjustment: signedEuros(taxReconciliation.taxCashAdjustment)
     });
 
     // Verkäufe erst nach der finalen Jahressteuer zusammenfassen.

@@ -20,7 +20,8 @@ function row({
     explicitShortfall,
     taxes,
     taxSaved,
-    lossCarry
+    lossCarry,
+    flexBasis = 'static_input'
 }) {
     const flexRequired = 100;
     const flexFulfilled = flexRequired * (1 - reductionPct / 100);
@@ -42,6 +43,7 @@ function row({
             flex_brutto_haushalt: flexRequired,
             flex_haushalt_erfuellt: flexFulfilled,
             flex_haushalt_kuerzung_pct: reductionPct,
+            flex_haushalt_basis: flexBasis,
             minimumFlexApplicable: year !== 2000,
             minimumFlexShortfallAnnual: year === 2001 ? 25 : (year === 2002 ? 75 : 0),
             ...(explicitShortfall === undefined ? {} : { floor_shortfall_nominal: explicitShortfall }),
@@ -116,6 +118,8 @@ assertEqual(FLEX_REDUCTION_OPERATOR, 'gte', 'reduction operator is explicit');
 assertEqual(FLEX_REDUCTION_THRESHOLD_PCT, 10, 'reduction threshold is explicit');
 assertEqual(metrics.reductionContract.includesExactThreshold, true, 'exactly ten percent is included');
 assertEqual(metrics.reductionContract.metricId, 'flex_reduction_years_gte_10_pct', 'metric id encodes the inclusive threshold');
+assertEqual(metrics.flexBasisContract.effective, 'static_input', 'one consistent household-flex basis is explicit');
+assertEqual(metrics.flexBasisContract.consistent, true, 'uniform household-flex bases are aggregatable');
 assertEqual(values.wealth_start_nominal_eur, 1000, 'start wealth reconciles to the canonical start snapshot');
 assertEqual(values.wealth_end_nominal_eur, 700, 'end wealth reconciles to the canonical end snapshot');
 assertClose(values.wealth_end_real_eur, 700 / 1.1, 1e-12, 'real end wealth uses the complete inflation path without display rounding');
@@ -207,5 +211,24 @@ assertEqual(positiveNeedWithoutCoverage.values.runway_min_coverage_pct, 0,
     'A real zero-coverage year with positive need remains a finite crisis value');
 assertEqual(positiveNeedWithoutCoverage.values.runway_stress_years_below_100_pct, 1,
     'A real zero-coverage year remains counted as runway stress');
+
+const mixedFlexBasis = deriveHistoricalBacktestMetrics({
+    ...goldenResult,
+    rows: goldenResult.rows.map((entry, index) => ({
+        ...entry,
+        row: {
+            ...entry.row,
+            flex_haushalt_basis: index === 1 ? 'effective_vpw_plus_pension_surplus' : 'static_input'
+        }
+    }))
+});
+assertEqual(mixedFlexBasis.flexBasisContract.consistent, false,
+    'A run that switches household-flex basis is identified explicitly');
+assertEqual(mixedFlexBasis.values.flex_required_total_nominal_eur, null,
+    'Mixed household-flex bases fail closed instead of summing incomparable requirements');
+assertEqual(mixedFlexBasis.values.flex_fulfilled_total_nominal_eur, null,
+    'Mixed household-flex bases fail closed for fulfilled-flex totals');
+assertEqual(mixedFlexBasis.values.flex_reduction_years_gte_10_pct, null,
+    'Mixed household-flex bases fail closed for reduction metrics');
 
 console.log('✅ Historical backtest metrics tests passed');

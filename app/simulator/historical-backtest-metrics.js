@@ -5,6 +5,7 @@ export const FLEX_REDUCTION_THRESHOLD_PCT = 10;
 export const FLEX_REDUCTION_OPERATOR = 'gte';
 
 const FINANCIAL_OUTCOMES = new Set(['completed', 'ruin']);
+const FLEX_HOUSEHOLD_BASES = new Set(['static_input', 'effective_vpw_plus_pension_surplus']);
 
 function freezeDeep(value, seen = new WeakSet()) {
     if (value === null || typeof value !== 'object' || seen.has(value)) return value;
@@ -185,7 +186,7 @@ export const HISTORICAL_BACKTEST_METRIC_DESCRIPTORS = freezeDeep([
         aggregationRule: 'sum',
         denominator: 'decumulation_years',
         fractionDigits: 2,
-        missingnessRule: 'null_if_any_decumulation_row_lacks_flex_brutto_haushalt',
+        missingnessRule: 'null_if_any_decumulation_row_lacks_flex_value_or_if_flex_haushalt_basis_is_missing_or_mixed',
         outcomeRule: 'available_for_completed_or_ruin',
         source: 'rows[*].row.flex_brutto_haushalt'
     }),
@@ -198,7 +199,7 @@ export const HISTORICAL_BACKTEST_METRIC_DESCRIPTORS = freezeDeep([
         aggregationRule: 'sum',
         denominator: 'decumulation_years',
         fractionDigits: 2,
-        missingnessRule: 'null_if_any_decumulation_row_lacks_flex_haushalt_erfuellt',
+        missingnessRule: 'null_if_any_decumulation_row_lacks_flex_value_or_if_flex_haushalt_basis_is_missing_or_mixed',
         outcomeRule: 'available_for_completed_or_ruin',
         source: 'rows[*].row.flex_haushalt_erfuellt'
     }),
@@ -210,7 +211,7 @@ export const HISTORICAL_BACKTEST_METRIC_DESCRIPTORS = freezeDeep([
         aggregationRule: 'sum_fulfilled_div_sum_required_times_100',
         denominator: 'summed_household_flex_requirement',
         fractionDigits: 2,
-        missingnessRule: 'null_if_flex_series_missing_or_total_requirement_not_positive',
+        missingnessRule: 'null_if_flex_series_or_consistent_flex_haushalt_basis_missing_or_total_requirement_not_positive',
         outcomeRule: 'available_for_completed_or_ruin',
         source: 'rows[*].row.flex_haushalt_erfuellt / rows[*].row.flex_brutto_haushalt'
     }),
@@ -222,7 +223,7 @@ export const HISTORICAL_BACKTEST_METRIC_DESCRIPTORS = freezeDeep([
         aggregationRule: 'count_value_greater_than_or_equal_10_pct',
         denominator: 'decumulation_years',
         fractionDigits: 0,
-        missingnessRule: 'null_if_any_decumulation_row_lacks_household_or_legacy_reduction_pct',
+        missingnessRule: 'null_if_any_decumulation_row_lacks_reduction_or_if_flex_haushalt_basis_is_missing_or_mixed',
         outcomeRule: 'available_for_completed_or_ruin',
         source: 'rows[*].row.flex_haushalt_kuerzung_pct ?? rows[*].entscheidung.kuerzungProzent'
     }),
@@ -234,7 +235,7 @@ export const HISTORICAL_BACKTEST_METRIC_DESCRIPTORS = freezeDeep([
         aggregationRule: 'maximum',
         denominator: 'decumulation_years',
         fractionDigits: 2,
-        missingnessRule: 'null_if_no_decumulation_reduction_values',
+        missingnessRule: 'null_if_no_decumulation_reduction_values_or_if_flex_haushalt_basis_is_missing_or_mixed',
         outcomeRule: 'available_for_completed_or_ruin',
         source: 'rows[*].row.flex_haushalt_kuerzung_pct ?? rows[*].entscheidung.kuerzungProzent'
     }),
@@ -246,7 +247,7 @@ export const HISTORICAL_BACKTEST_METRIC_DESCRIPTORS = freezeDeep([
         aggregationRule: 'longest_consecutive_value_greater_than_or_equal_10_pct',
         denominator: 'decumulation_years',
         fractionDigits: 0,
-        missingnessRule: 'null_if_any_decumulation_row_lacks_household_or_legacy_reduction_pct',
+        missingnessRule: 'null_if_any_decumulation_row_lacks_reduction_or_if_flex_haushalt_basis_is_missing_or_mixed',
         outcomeRule: 'available_for_completed_or_ruin',
         source: 'rows[*].row.flex_haushalt_kuerzung_pct ?? rows[*].entscheidung.kuerzungProzent'
     }),
@@ -478,13 +479,21 @@ export function deriveHistoricalBacktestMetrics(result) {
         entry?.row?.Regime !== 'BANKRUPT'
         && entry?.row?.Regime !== 'accumulation'
     ));
-    const flexRequiredSeries = isFinancialOutcome
+    const flexBasisValues = decumulationRows.map(entry => entry?.row?.flex_haushalt_basis);
+    const flexBasisSet = new Set(flexBasisValues.filter(value => FLEX_HOUSEHOLD_BASES.has(value)));
+    const flexBasisComplete = flexBasisValues.length > 0
+        && flexBasisValues.every(value => FLEX_HOUSEHOLD_BASES.has(value));
+    const flexHouseholdBasis = flexBasisComplete && flexBasisSet.size === 1
+        ? [...flexBasisSet][0]
+        : null;
+    const flexBasisConsistent = flexHouseholdBasis !== null;
+    const flexRequiredSeries = isFinancialOutcome && flexBasisConsistent
         ? completeFiniteSeries(decumulationRows, entry => finiteOrNull(entry?.row?.flex_brutto_haushalt))
         : null;
-    const flexFulfilledSeries = isFinancialOutcome
+    const flexFulfilledSeries = isFinancialOutcome && flexBasisConsistent
         ? completeFiniteSeries(decumulationRows, entry => finiteOrNull(entry?.row?.flex_haushalt_erfuellt))
         : null;
-    const reductionSeries = isFinancialOutcome
+    const reductionSeries = isFinancialOutcome && flexBasisConsistent
         ? completeFiniteSeries(decumulationRows, entry => finiteOrNull(
             entry?.row?.flex_haushalt_kuerzung_pct
             ?? entry?.entscheidung?.kuerzungProzent
@@ -573,6 +582,13 @@ export function deriveHistoricalBacktestMetrics(result) {
             thresholdPct: FLEX_REDUCTION_THRESHOLD_PCT,
             includesExactThreshold: true,
             metricId: 'flex_reduction_years_gte_10_pct'
+        },
+        flexBasisContract: {
+            allowed: [...FLEX_HOUSEHOLD_BASES],
+            observed: [...flexBasisSet],
+            effective: flexHouseholdBasis,
+            consistent: flexBasisConsistent,
+            decumulationRowCount: decumulationRows.length
         },
         drawdownReferenceSeries: 'portfolioStart followed by each rows[*].row.portfolio_total_end, nominal, including health bucket',
         descriptors: HISTORICAL_BACKTEST_METRIC_DESCRIPTORS,

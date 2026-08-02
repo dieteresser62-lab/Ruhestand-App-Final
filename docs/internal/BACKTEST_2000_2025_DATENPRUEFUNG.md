@@ -2,10 +2,11 @@
 
 **Pruefdatum:** 2026-07-29
 **Pruefer:** Claude (Primary reviewer & Analyst)
-**Status:** Korrekturprogramm in Umsetzung; Slice 01 bis 06 extern technisch
-freigegeben und lokal committed; die drei Blocker aus dem ersten Slice-07-
-Review sind technisch nachgebessert und selbstgeprueft, aber erneutes externes
-Review, Freigabe und Commit stehen aus
+**Status:** Korrekturprogramm in Umsetzung; Slice 01 bis 09 extern technisch
+freigegeben und lokal committed; Slice 10 ist auf Basis des vollstaendigen
+Slice-09-Ergebnisdokuments technisch umgesetzt und CR10-1 bis CR10-12 sowie
+S10-STOP-04 sind im nutzergenehmigten Scope von exakt fuenfzehn produktiven
+Dateien korrigiert und selbstgetestet; externes Re-Review ausstehend
 **Pruefgegenstand:** Exportdatei
 `backtest-2000-2025-89fc3e368d64-2026-07-29T10-00-22.287Z.json`
 **Anlass:** Nutzerseitige Verifikation nach Abschluss der Suite-Datenintegritaet-
@@ -754,15 +755,24 @@ reine Stressparameter duerfen im Manifest nicht dieselbe Evidenzklasse tragen.
 
 ### Arbeitsstatus und Branch-Regel
 
-- Status: Die Slices 01 bis 08 liegen auf
+- Status: Die Slices 01 bis 09 liegen auf
   `codex/suite-datenintegritaet-hardening` als lokale Commits vor. Slice 08
   ist durch Claudes Reviewrunde 3 technisch freigegeben und als Commit
-  `ad08236` vorhanden. Slice 09 ist auf diesem Stand mit dem vollstaendigen
-  Slice-08-Ergebnisdokument als Eingangsgrenze im durch zwei
-  Nutzerentscheidungen freigegebenen Scope von zwoelf produktiven Dateien
-  technisch umgesetzt und mit allen Pflichtgates validiert. Profilwerte werden
-  addiert; eine Summe oberhalb des aggregierten Haushalts-Flexbedarfs scheitert
-  fail-closed. Externes Review, Freigabe und lokaler Commit stehen aus.
+  `ad08236` vorhanden. Slice 09 ist nach Claude-Review Runde 2 technisch
+  freigegeben und als Commit `2e4867f` vorhanden. Slice 10 verwendet das
+  vollstaendige Slice-09-Ergebnisdokument als Eingangsgrenze; CR09-4 und
+  CR09-14 werden als ausdrueckliche Vorgates behandelt. Preflight und
+  zuerst festgeschriebener Zehn-Dateien-Scope sind dokumentiert. Die Baseline
+  ist gruen. Der Vertragsabgleich erforderte zusaetzlich
+  `app/simulator/simulator-portfolio-init.js` und
+  `app/simulator/simulation-data-inventory.js`; S10-STOP-01 und S10-STOP-02
+  sind durch Nutzerfreigaben vom 2026-08-02 geschlossen. Das Claude-Review
+  Runde 1 erforderte fuer CR10-8 und CR10-11 zwei weitere produktive Dateien;
+  S10-STOP-03 und S10-STOP-04 sowie der Scope von exakt fuenfzehn produktiven
+  Dateien sind durch den Nutzer freigegeben. CR10-1 bis CR10-12 und der
+  anschliessende Browser-Befund zu synthetischen Profiltranchen sind
+  korrigiert. 17.930 von 17.930 Assertions, Coverage- und Browser-Gates sind
+  gruen; Re-Review und Commit stehen aus.
 - Dokumentierter Ausgangsstand der Nachrechnung: `ca982cf`.
 - Nutzerentscheidung vom 2026-07-29: Die Umsetzung bleibt ausdruecklich auf
   dem vorhandenen Branch `codex/suite-datenintegritaet-hardening`; es wird
@@ -1402,6 +1412,24 @@ unterschritten werden.
 - `minimumFlexAnnual` wird validiert und nirgends still begrenzt.
 
 ### Slice 10 - Heutige Steuerlogik auf heutigem Startbestand
+
+**Slice-Dokument:**
+[`SLICE_BACKTEST_DATENPRUEFUNG_10_HEUTIGE_STEUERLOGIK.md`](SLICE_BACKTEST_DATENPRUEFUNG_10_HEUTIGE_STEUERLOGIK.md)
+
+**Umsetzungsstatus:** am 2026-08-02 auf Basis des freigegebenen und als Commit
+`2e4867f` vorliegenden Slice-09-Ergebnisdokuments technisch umgesetzt. CR09-4
+und CR09-14 wurden als Eingangsgates geschlossen. Nach vier dokumentierten
+Stopps hat der Nutzer den Scope von zehn auf exakt fuenfzehn produktive Dateien
+erweitert. Das Claude-Review Runde 1 blockierte mit CR10-1 bis CR10-12; alle
+zwoelf Punkte sind korrigiert und selbstgetestet. Das Ergebnis stellt 31
+Cross-Slice-Orakel wieder her, vergleicht Slice 09 aktiv, beziffert die
+Slice-09-zu-10-Steuerdeltas, trennt Persistenzmigration vom strikten
+Engine-Vertrag, macht Legacy-Steuermigration sichtbar und verhindert
+Flexaggregation ueber gemischte Bezugsbasen. Die Abschlusssuite ist mit
+17.930/17.930 Assertions gruen; Coverage liegt bei 78,40 %
+(39.539/50.430). Alle 28 Browser-Szenarien sowie Architektur-Evidenz- und
+Engine-Build-Gates sind gruen. Codex erteilt keine Selbstfreigabe; externes
+Re-Review und Commit stehen aus.
 
 **Abhaengigkeiten:** Slices 1, 2 und 4.
 

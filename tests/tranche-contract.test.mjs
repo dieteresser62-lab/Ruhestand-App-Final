@@ -14,7 +14,7 @@ console.log('--- Tranche Contract Tests ---');
 
 function validTranche(overrides = {}) {
     return {
-        schemaVersion: 1,
+        schemaVersion: TRANCHE_SCHEMA_VERSION,
         trancheId: 'lot-1',
         name: 'Global ETF',
         isin: ' de00 abc 12345 ',
@@ -26,6 +26,7 @@ function validTranche(overrides = {}) {
         category: 'equity',
         type: 'aktien_neu',
         tqf: 0.3,
+        taxExempt: false,
         notes: ' synthetisch ',
         ...overrides
     };
@@ -43,7 +44,7 @@ function captureValidationError(action, message) {
     return error;
 }
 
-console.log('Test 1: canonical v1 normalization is deterministic and mutation-free');
+console.log('Test 1: canonical v2 normalization is deterministic and mutation-free');
 {
     const input = validTranche();
     const before = JSON.stringify(input);
@@ -61,6 +62,7 @@ console.log('Test 1: canonical v1 normalization is deterministic and mutation-fr
 console.log('Test 2: field groups distinguish persistence, derivation, and provenance');
 {
     assert(TRANCHE_FIELD_GROUPS.persisted.includes('trancheId'), 'trancheId is a persisted field');
+    assert(TRANCHE_FIELD_GROUPS.persisted.includes('taxExempt'), 'taxExempt is a persisted field');
     assert(TRANCHE_FIELD_GROUPS.derived.includes('instrumentId'), 'instrumentId is derived');
     assert(TRANCHE_FIELD_GROUPS.provenance.includes('sourceProfileId'), 'sourceProfileId is merge provenance');
     assert(!TRANCHE_FIELD_GROUPS.persisted.includes('sourceProfileId'), 'Merge provenance is not a required persisted field');
@@ -83,7 +85,8 @@ console.log('Test 3: supported v0 records migrate by explicit rules');
         notes: ''
     };
     const migrated = normalizeTranche(legacy);
-    assertEqual(migrated.schemaVersion, 1, 'Legacy record migrates to schema v1');
+    assertEqual(migrated.schemaVersion, TRANCHE_SCHEMA_VERSION, 'Legacy record migrates to current schema');
+    assertEqual(migrated.taxExempt, false, 'Legacy record migrates conservatively to taxable');
     assertEqual(migrated.trancheId, 'legacy-id', 'Legacy id migrates to trancheId');
     assertEqual(migrated.type, 'anleihe', 'Legacy kind migrates to type');
     assertEqual(migrated.category, 'bonds', 'Missing legacy category is inferred from type');
@@ -100,7 +103,7 @@ console.log('Test 3: supported v0 records migrate by explicit rules');
         currentPrice: 101,
         category: 'money_market',
         type: 'aktien_neu',
-        tqf: 0.3
+        tqf: 0
     });
     assertEqual(historicMoneyMarket.category, 'money_market', 'Persisted v0 category remains authoritative');
     assertEqual(historicMoneyMarket.type, 'geldmarkt', 'Historic independent-select equity type migrates to the unique category type');
@@ -164,7 +167,7 @@ console.log('Test 6: duplicate ids and unknown versions are rejected');
     assert(duplicate.errors.some(error => error.code === 'TRANCHE_ID_DUPLICATE'), 'Duplicate id is reported');
 
     const unknownVersion = captureValidationError(
-        () => normalizeTranche(validTranche({ schemaVersion: 2 })),
+        () => normalizeTranche(validTranche({ schemaVersion: 3 })),
         'Unknown schema version'
     );
     assert(unknownVersion.errors.some(error => error.code === 'TRANCHE_SCHEMA_VERSION_UNSUPPORTED'), 'Unknown version is not interpreted');
@@ -193,6 +196,29 @@ console.log('Test 7: financial values and TQF reject non-finite and out-of-range
         'Empty TQF'
     );
     assert(missingTqf.errors.some(error => error.code === 'TRANCHE_TQF_REQUIRED'), 'Empty TQF is not converted to zero');
+
+    const unsupportedMoneyMarketTqf = captureValidationError(
+        () => normalizeTranche(validTranche({ category: 'money_market', type: 'geldmarkt', tqf: 0.3 })),
+        'Money-market TQF'
+    );
+    assert(unsupportedMoneyMarketTqf.errors.some(error => error.code === 'TRANCHE_TQF_CATEGORY_UNSUPPORTED'),
+        'Money-market lots reject a positive TQF');
+
+    const missingTaxExempt = { ...validTranche() };
+    delete missingTaxExempt.taxExempt;
+    const missingTaxExemptError = captureValidationError(
+        () => normalizeTranche(missingTaxExempt),
+        'Missing current-schema tax exemption'
+    );
+    assert(missingTaxExemptError.errors.some(error => error.code === 'TRANCHE_TAX_EXEMPT_REQUIRED'),
+        'Current schema requires an explicit tax-exemption Boolean');
+
+    const invalidTaxExempt = captureValidationError(
+        () => normalizeTranche(validTranche({ taxExempt: 'true' })),
+        'Non-Boolean tax exemption'
+    );
+    assert(invalidTaxExempt.errors.some(error => error.code === 'TRANCHE_TAX_EXEMPT_INVALID'),
+        'Tax exemption rejects truthy non-Boolean values');
 }
 
 console.log('Test 8: dates and current-schema identities are strict');
@@ -213,6 +239,7 @@ console.log('Test 8: dates and current-schema identities are strict');
 console.log('Test 9: engine records preserve exact values and provenance');
 {
     const engineLot = normalizeTranche({
+        schemaVersion: 2,
         trancheId: 'profile-a:lot-1',
         sourceProfileId: ' profile-a ',
         name: 'ETF',
@@ -222,28 +249,68 @@ console.log('Test 9: engine records preserve exact values and provenance');
         marketValue: 100,
         costBasis: 0,
         tqf: 0.3,
+        taxExempt: false,
         purchaseDate: '2020-01-01'
     }, { mode: 'engine' });
     assertEqual(engineLot.marketValue, 100, 'Engine market value is preserved');
     assertEqual(engineLot.costBasis, 0, 'Zero engine cost basis is valid');
     assertEqual(engineLot.sourceProfileId, 'profile-a', 'Merge provenance is normalized and preserved');
 
-    const legacyAggregate = normalizeTranche({
-        trancheId: null,
+    const aggregate = normalizeTranche({
+        schemaVersion: 2,
+        trancheId: 'aggregate:equity',
         name: null,
         isin: null,
-        shares: 0,
-        purchasePrice: 0,
-        currentPrice: 0,
         type: 'aktien_neu',
         category: 'equity',
         marketValue: 150,
         costBasis: 120,
-        tqf: 0.3
+        tqf: 0.3,
+        taxExempt: false
     }, { mode: 'engine' });
-    assert(legacyAggregate.trancheId.startsWith('tranche_legacy_'), 'Nullable legacy engine id migrates deterministically');
-    assertEqual(legacyAggregate.marketValue, 150, 'Legacy zero unit placeholders do not replace aggregate market value');
-    assertEqual('shares' in legacyAggregate, false, 'Legacy zero unit placeholder is removed from canonical engine output');
+    assertEqual(aggregate.trancheId, 'aggregate:equity', 'Current engine aggregate keeps its explicit id');
+    assertEqual(aggregate.marketValue, 150, 'Current engine aggregate keeps explicit market value');
+    assertEqual('shares' in aggregate, false, 'Current engine aggregate may omit unavailable unit data');
+
+    const implicitLegacyTax = captureValidationError(
+        () => normalizeTranche({
+            trancheId: null,
+            type: 'aktien_neu',
+            category: 'equity',
+            marketValue: 150,
+            costBasis: 120,
+            tqf: 0.3
+        }, { mode: 'engine' }),
+        'Unversioned engine tax contract'
+    );
+    assert(implicitLegacyTax.errors.some(error => error.code === 'TRANCHE_TAX_EXEMPT_REQUIRED'),
+        'Engine inputs may not obtain a silent taxable default from a missing schema version');
+}
+
+console.log('Test 9a: only equity can carry TQF and legacy Gold exemption migrates explicitly');
+{
+    for (const [category, type] of [['bonds', 'anleihe'], ['money_market', 'geldmarkt'], ['gold', 'gold']]) {
+        const error = captureValidationError(
+            () => normalizeTranche(validTranche({ category, type, tqf: 0.3 })),
+            `${category} positive TQF`
+        );
+        assert(error.errors.some(entry => entry.code === 'TRANCHE_TQF_CATEGORY_UNSUPPORTED'),
+            `${category} rejects an equity-fund partial exemption`);
+    }
+    const migratedGold = normalizeTranche({
+        schemaVersion: 1,
+        trancheId: 'legacy-gold',
+        name: 'Gold',
+        shares: 1,
+        purchasePrice: 100,
+        currentPrice: 150,
+        category: 'gold',
+        type: 'gold',
+        tqf: 1,
+        notes: ''
+    }, { mode: 'persisted' });
+    assertEqual(migratedGold.tqf, 0, 'Legacy Gold TQF-1 encoding is removed during persisted migration');
+    assertEqual(migratedGold.taxExempt, true, 'Legacy Gold TQF-1 encoding becomes the explicit exemption flag');
 }
 
 console.log('Test 10: derived-value helper is strict and mutation-free');

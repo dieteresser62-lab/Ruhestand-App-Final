@@ -121,7 +121,8 @@ export function calculateSaleAndTax(requestedRefill, input, context, market, isE
             // Maximal möglichen Netto-Erlös berechnen
             const gewinnBruttoMax = maxBruttoVerkaufbar * gewinnQuote;
             const tqf = Number(tranche.tqf) || 0;
-            const steuerpflichtigerAnteilMax = gewinnBruttoMax * (1 - tqf);
+            const taxableFactor = tranche.taxExempt === true ? 0 : (1 - tqf);
+            const steuerpflichtigerAnteilMax = gewinnBruttoMax * taxableFactor;
             const anrechenbarerPauschbetragMax = Math.min(pauschbetragRest, steuerpflichtigerAnteilMax);
             const finaleSteuerbasisMax = steuerpflichtigerAnteilMax - anrechenbarerPauschbetragMax;
             const steuerMax = Math.max(0, finaleSteuerbasisMax) * keSt;
@@ -173,8 +174,8 @@ export function calculateSaleAndTax(requestedRefill, input, context, market, isE
             // Tatsächliche Steuer berechnen
             const bruttogewinn = zuVerkaufenBrutto * gewinnQuote;
             const bruttogewinnSigned = zuVerkaufenBrutto * gewinnQuoteSigned;
-            const gewinnNachTFSSigned = bruttogewinnSigned * (1 - tqf);
-            const gewinnNachTFS = bruttogewinn * (1 - tqf);
+            const gewinnNachTFSSigned = bruttogewinnSigned * taxableFactor;
+            const gewinnNachTFS = bruttogewinn * taxableFactor;
             const anrechenbarerPauschbetrag = Math.min(pauschbetragRest, gewinnNachTFS);
             const finaleSteuerbasis = gewinnNachTFS - anrechenbarerPauschbetrag;
             const steuer = Math.max(0, finaleSteuerbasis) * keSt;
@@ -199,6 +200,7 @@ export function calculateSaleAndTax(requestedRefill, input, context, market, isE
                 brutto: zuVerkaufenBrutto,
                 steuer,
                 tqf: tranche.tqf,
+                taxExempt: tranche.taxExempt === true,
                 spbUsed: anrechenbarerPauschbetrag,
                 netto: nettoErlös,
                 gainQuotePlan: gewinnQuote,
@@ -242,6 +244,7 @@ export function calculateSaleAndTax(requestedRefill, input, context, market, isE
                 marketValue: input.depotwertAlt,
                 costBasis: input.costBasisAlt,
                 tqf: input.tqfAlt,
+                taxExempt: input.taxExemptAlt === true,
                 kind: 'aktien_alt',
                 type: 'aktien_alt',
                 category: 'equity'
@@ -250,6 +253,7 @@ export function calculateSaleAndTax(requestedRefill, input, context, market, isE
                 marketValue: input.depotwertNeu,
                 costBasis: input.costBasisNeu,
                 tqf: input.tqfNeu,
+                taxExempt: input.taxExemptNeu === true,
                 kind: 'aktien_neu',
                 type: 'aktien_neu',
                 category: 'equity'
@@ -258,7 +262,8 @@ export function calculateSaleAndTax(requestedRefill, input, context, market, isE
                 ? {
                     marketValue: input.goldWert,
                     costBasis: input.goldCost,
-                    tqf: input.goldSteuerfrei ? 1.0 : 0.0,
+                    tqf: 0,
+                    taxExempt: input.goldSteuerfrei === true,
                     kind: 'gold',
                     type: 'gold',
                     category: 'gold'
@@ -320,8 +325,8 @@ export function getSellOrder(tranches, market, input, context, isEmergencySale) 
         const tqfB = Number(tB.tqf) || 0;
         const gqA = mvA > 0 ? Math.max(0, (mvA - cbA) / mvA) : 0;
         const gqB = mvB > 0 ? Math.max(0, (mvB - cbB) / mvB) : 0;
-        const taxRateA = gqA * (1 - tqfA) * keSt;
-        const taxRateB = gqB * (1 - tqfB) * keSt;
+        const taxRateA = tA.taxExempt === true ? 0 : gqA * (1 - tqfA) * keSt;
+        const taxRateB = tB.taxExempt === true ? 0 : gqB * (1 - tqfB) * keSt;
 
         if (taxRateA !== taxRateB) return taxRateA - taxRateB;
         if (gqA !== gqB) return gqA - gqB;

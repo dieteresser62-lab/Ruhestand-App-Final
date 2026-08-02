@@ -18,7 +18,8 @@ const FIELD_LABELS = Object.freeze({
     purchaseDate: 'Kaufdatum',
     category: 'Kategorie',
     type: 'Typ',
-    tqf: 'Teilfreistellung'
+    tqf: 'Teilfreistellung',
+    taxExempt: 'Steuerfreiheit'
 });
 
 function byId(doc, id) {
@@ -32,7 +33,8 @@ function setFieldValue(doc, id, value) {
 
 export function resetTrancheForm(doc = document) {
     byId(doc, 'trancheForm')?.reset();
-    setFieldValue(doc, 'tqf', '0.30');
+    setFieldValue(doc, 'tqf', '0');
+    if (byId(doc, 'taxExempt')) byId(doc, 'taxExempt').checked = false;
     setFieldValue(doc, 'category', 'equity');
     syncTrancheTypeOptions(doc, 'aktien_neu');
     clearTrancheFormError(doc);
@@ -99,6 +101,7 @@ export function openEditTrancheModal(tranche, doc = document, opener = null) {
     setFieldValue(doc, 'category', tranche.category);
     syncTrancheTypeOptions(doc, tranche.type);
     setFieldValue(doc, 'tqf', tranche.tqf);
+    if (byId(doc, 'taxExempt')) byId(doc, 'taxExempt').checked = tranche.taxExempt === true;
     setFieldValue(doc, 'notes', tranche.notes || '');
     activateDialog(doc, opener);
     return true;
@@ -198,7 +201,7 @@ export function readTrancheFromForm(existingId = null, doc = document, options =
     const currentPriceInput = byId(doc, 'currentPrice').value.trim();
     const tqfInput = byId(doc, 'tqf').value.trim();
     const derived = calculateTrancheDerivedValues({
-        schemaVersion: 1,
+        schemaVersion: 2,
         trancheId: existingId || createUniqueTrancheId(options.existingIds, options.idFactory),
         name: byId(doc, 'name').value,
         isin: byId(doc, 'isin').value,
@@ -210,6 +213,7 @@ export function readTrancheFromForm(existingId = null, doc = document, options =
         category: byId(doc, 'category').value,
         type: byId(doc, 'type').value,
         tqf: tqfInput === '' ? '' : Number(tqfInput),
+        taxExempt: byId(doc, 'taxExempt')?.checked === true,
         notes: byId(doc, 'notes').value
     });
     return normalizeTranche(derived, { mode: 'persisted' });

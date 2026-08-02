@@ -53,7 +53,7 @@ function createBalanceStorage(activeYear = 2025) {
 
 function createBrowserTranche(overrides = {}) {
     return {
-        schemaVersion: 1,
+        schemaVersion: 2,
         trancheId: 'browser-lot-1',
         name: 'Synthetische Browser-Tranche',
         isin: '',
@@ -65,6 +65,7 @@ function createBrowserTranche(overrides = {}) {
         category: 'equity',
         type: 'aktien_neu',
         tqf: 0.3,
+        taxExempt: false,
         notes: '',
         ...overrides
     };
@@ -645,6 +646,7 @@ async function runBalanceFiveYearRunwayForcedSale(browser, baseUrl) {
         const base = UIReader.readAllInputs();
         const detailledTranches = [{
             trancheId: 'runway-witness:eq',
+            schemaVersion: 2,
             sourceProfileId: 'runway-witness',
             marketValue: 500000,
             costBasis: 250000,
@@ -654,7 +656,8 @@ async function runBalanceFiveYearRunwayForcedSale(browser, baseUrl) {
             purchaseDate: '2000-01-01',
             type: 'aktien_alt',
             category: 'equity',
-            tqf: 0.3
+            tqf: 0.3,
+            taxExempt: false
         }];
         const run = liquidityRunwayYears => window.EngineAPI.simulateSingleYear({
             ...base,

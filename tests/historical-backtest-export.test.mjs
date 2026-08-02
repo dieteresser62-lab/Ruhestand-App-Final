@@ -49,7 +49,16 @@ function baseResult(outcomeKind = 'completed') {
             },
             inputs: {
                 startFloorBedarf: 24000,
-                nested: { enabled: true }
+                nested: { enabled: true },
+                detailTranches: [{
+                    trancheId: 'start-lot-1',
+                    category: 'equity',
+                    type: 'aktien_alt',
+                    marketValue: 80000,
+                    costBasis: 50000,
+                    tqf: 0.3,
+                    taxExempt: false
+                }]
             }
         },
         outcome: technicalError
@@ -150,6 +159,10 @@ function baseResult(outcomeKind = 'completed') {
     assert(raw.identifiers.runId.startsWith('btrun_'), 'raw JSON exposes a run id');
     assertEqual(raw.request.executionMode, 'single_path', 'raw JSON retains the execution mode');
     assertEqual(raw.request.breakOnRuin, true, 'raw JSON retains breakOnRuin');
+    assertEqual(raw.request.inputs.detailTranches[0].tqf, 0.3,
+        'Raw request should retain the explicit start-lot TQF');
+    assertEqual(raw.request.inputs.detailTranches[0].taxExempt, false,
+        'Raw request should retain the explicit start-lot tax exemption');
     assertEqual(raw.result.completedYears, 2, 'raw JSON retains completion semantics');
     assertEqual(raw.result.provenance.dataset.manifestSchemaVersion, 'HistoricalDataManifestV1', 'raw JSON retains manifest provenance');
     assertEqual(raw.result.provenance.engine.buildId, 'fixture-build', 'raw JSON retains the engine build id');
@@ -182,7 +195,19 @@ function baseResult(outcomeKind = 'completed') {
     assertEqual(JSON.stringify(first.result), JSON.stringify(second.result), 'display detail does not change the raw export scope');
     assert(first.exportedAt !== second.exportedAt, 'exportedAt remains export metadata');
     const reorderedInputs = baseResult();
-    reorderedInputs.request.inputs = { nested: { enabled: true }, startFloorBedarf: 24000 };
+    reorderedInputs.request.inputs = {
+        detailTranches: [{
+            taxExempt: false,
+            tqf: 0.3,
+            costBasis: 50000,
+            marketValue: 80000,
+            type: 'aktien_alt',
+            category: 'equity',
+            trancheId: 'start-lot-1'
+        }],
+        nested: { enabled: true },
+        startFloorBedarf: 24000
+    };
     assertEqual(
         serializeHistoricalBacktestJson(result, { exportedAt: first.exportedAt }),
         serializeHistoricalBacktestJson(reorderedInputs, { exportedAt: first.exportedAt }),
@@ -195,16 +220,20 @@ function baseResult(outcomeKind = 'completed') {
     changedDataset.request.dataset.contentHash = 'e'.repeat(64);
     const changedTemporal = baseResult();
     changedTemporal.request.temporalConventionId = 'different_temporal_v2';
+    const changedTaxExemption = baseResult();
+    changedTaxExemption.request.inputs.detailTranches[0].taxExempt = true;
     assert(first.fingerprint.value !== buildHistoricalBacktestRawExport(changedConfig, { exportedAt: first.exportedAt }).fingerprint.value, 'config changes alter the result fingerprint');
     assert(first.fingerprint.value !== buildHistoricalBacktestRawExport(changedDataset, { exportedAt: first.exportedAt }).fingerprint.value, 'dataset changes alter the result fingerprint');
     assert(first.fingerprint.value !== buildHistoricalBacktestRawExport(changedTemporal, { exportedAt: first.exportedAt }).fingerprint.value, 'temporal convention changes alter the result fingerprint');
+    assert(first.fingerprint.value !== buildHistoricalBacktestRawExport(changedTaxExemption, { exportedAt: first.exportedAt }).fingerprint.value,
+        'Explicit start-lot tax exemption participates in the replay fingerprint');
     const withCohorts = buildHistoricalBacktestRawExport(result, {
         exportedAt: first.exportedAt,
         cohortInventory: { schemaVersion: 'HistoricalBacktestCohortsV1', inventory: { eligible: 2 } }
     });
     assertEqual(withCohorts.result.cohortInventory.inventory.eligible, 2, 'optional cohort inventory is exported without recalculation');
     assert(first.fingerprint.value !== withCohorts.fingerprint.value, 'optional cohort inventory participates in the result fingerprint');
-    assertEqual(first.fingerprint.value, '71c24becff4684898cc0ee4d53f60cdd1911b1880bbf2c1c951da1546ead44fb', 'canonical fixture fingerprint remains golden');
+    assertEqual(first.fingerprint.value, 'd9037523d64dbb431c17b7cd230e8df6ddf941bed9859c350108cf3a324bfc7f', 'canonical fixture fingerprint remains golden');
 }
 
 {

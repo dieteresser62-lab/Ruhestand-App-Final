@@ -22,6 +22,7 @@ export function applySimulatorTaxRecompute({
     combinedTaxRawAggregate,
     sparerPauschbetrag,
     kirchensteuerSatz,
+    cashInterestIncomeSigned = 0,
     forcedSaleScaleApplied = null,
     regularSaleScale = 1,
     forcedTaxReserved = 0
@@ -30,25 +31,48 @@ export function applySimulatorTaxRecompute({
     const regularTaxReserved = (Number(actionResult?.steuer) || 0) * normalizedRegularSaleScale;
     const normalizedForcedTaxReserved = Math.max(0, Number(forcedTaxReserved) || 0);
     const taxReservedTotal = regularTaxReserved + normalizedForcedTaxReserved;
-    const shouldRecompute = didForcedSale || normalizedRegularSaleScale < 1 - 1e-9;
+    const normalizedCashInterestIncomeSigned = Number.isFinite(Number(cashInterestIncomeSigned))
+        ? Number(cashInterestIncomeSigned)
+        : 0;
+    const saleOnlyRawAggregate = buildTaxRawAggregate(combinedTaxRawAggregate);
+    const settlementRawAggregate = {
+        ...saleOnlyRawAggregate,
+        sumTaxableAfterTqfSigned: saleOnlyRawAggregate.sumTaxableAfterTqfSigned
+            + normalizedCashInterestIncomeSigned
+    };
+    const shouldRecompute = didForcedSale
+        || normalizedRegularSaleScale < 1 - 1e-9
+        || Math.abs(normalizedCashInterestIncomeSigned) > 1e-9;
 
     if (shouldRecompute) {
-        const recomputedSettlement = settleTaxYear({
+        const saleOnlySettlement = settleTaxYear({
             taxStatePrev,
-            rawAggregate: combinedTaxRawAggregate,
+            rawAggregate: saleOnlyRawAggregate,
             sparerPauschbetrag,
             kirchensteuerSatz
         });
-        const rawTaxCashAdjustment = taxReservedTotal - recomputedSettlement.taxDue;
-        if (rawTaxCashAdjustment < -0.01) {
+        const recomputedSettlement = settleTaxYear({
+            taxStatePrev,
+            rawAggregate: settlementRawAggregate,
+            sparerPauschbetrag,
+            kirchensteuerSatz
+        });
+        const saleTaxCashAdjustment = taxReservedTotal - saleOnlySettlement.taxDue;
+        if (saleTaxCashAdjustment < -0.01) {
             throw new Error(
-                `Simulator-Steuerreserve-Contract verletzt: finale Steuer uebersteigt Reserven um ${Math.abs(rawTaxCashAdjustment).toFixed(2)} EUR.`
+                `Simulator-Steuerreserve-Contract verletzt: finale Verkaufssteuer uebersteigt Reserven um ${Math.abs(saleTaxCashAdjustment).toFixed(2)} EUR.`
             );
         }
-        // A tolerated sub-cent reserve difference is only floating-point noise.
-        // Persisting it as negative cash makes the next engine validation fail and
-        // Monte Carlo can then misclassify that validation error as portfolio ruin.
-        const taxCashAdjustment = Math.max(0, rawTaxCashAdjustment);
+        const rawTaxCashAdjustment = taxReservedTotal - recomputedSettlement.taxDue;
+        // Historisch fuehrte ein negativer Subcent-Rest aus der Verkaufsreserve
+        // an der naechsten Enginegrenze zu einem Validierungsfehler, den Monte
+        // Carlo als Portfolio-Ruin fehlklassifizieren konnte. Nur dieses
+        // negative Rundungsrauschen wird neutralisiert. Positive Erstattungen
+        // bleiben auch unter einem Cent erhalten; groessere negative Werte sind
+        // die gewollte Cashbelastung aus dem Zins-Settlement.
+        const taxCashAdjustment = rawTaxCashAdjustment < 0 && rawTaxCashAdjustment >= -0.01
+            ? 0
+            : rawTaxCashAdjustment;
         actionResult.steuer = recomputedSettlement.taxDue;
         actionResult.taxSettlement = {
             ...recomputedSettlement.details,
@@ -58,9 +82,17 @@ export function applySimulatorTaxRecompute({
             regularTaxReserved,
             forcedTaxReserved: normalizedForcedTaxReserved,
             taxReservedTotal,
+            cashInterestIncomeSigned: normalizedCashInterestIncomeSigned,
+            taxableBaseIncludesCashInterest: true,
+            saleTaxDue: saleOnlySettlement.taxDue,
+            cashInterestTaxDelta: recomputedSettlement.taxDue - saleOnlySettlement.taxDue,
+            saleTaxCashAdjustment,
             taxCashAdjustment
         };
-        actionResult.taxRawAggregate = { ...combinedTaxRawAggregate };
+        actionResult.taxRawAggregate = {
+            ...settlementRawAggregate,
+            cashInterestIncomeSigned: normalizedCashInterestIncomeSigned
+        };
         if (spendingNewState && typeof spendingNewState === 'object') {
             spendingNewState.taxState = recomputedSettlement.taxStateNext;
         }
@@ -80,6 +112,11 @@ export function applySimulatorTaxRecompute({
             regularTaxReserved,
             forcedTaxReserved: 0,
             taxReservedTotal: regularTaxReserved,
+            cashInterestIncomeSigned: 0,
+            taxableBaseIncludesCashInterest: true,
+            saleTaxDue: Number(actionResult?.steuer) || 0,
+            cashInterestTaxDelta: 0,
+            saleTaxCashAdjustment: 0,
             taxCashAdjustment: 0
         };
     }

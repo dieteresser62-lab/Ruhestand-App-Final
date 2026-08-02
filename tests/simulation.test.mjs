@@ -718,6 +718,46 @@ try {
     assertEqual(payoutLimitedMinimumFlexResult.logData.minimumFlexFulfilled, false, 'Actual payout shortfall cannot report fulfilled minimum flex');
     assertEqual(payoutLimitedMinimumFlexResult.logData.minimumFlexStatus, 'limited_by_actual_payout', 'Actual payout limitation has an explicit status');
 
+    const dynamicFlexResult = buildSimulatorYearResult({
+        ...yearResultArgs,
+        pensionAnnual: 26000,
+        jahresEntnahmePlan: 27000,
+        jahresEntnahmeEffektiv: 26500,
+        fullResult: {
+            ...yearResultArgs.fullResult,
+            input: { flexBedarf: 6000 },
+            ui: {
+                ...yearResultArgs.fullResult.ui,
+                vpw: { enabled: true, dynamicFlex: 3000, staticFlexBaseline: 6000 }
+            },
+            diagnosis: {
+                ...yearResultArgs.fullResult.diagnosis,
+                keyParams: {
+                    minimumFlexAnnual: 5000,
+                    minimumFlexStatus: 'applied',
+                    minimumFlexApplicable: true,
+                    minimumFlexEffectiveFinal: 5000,
+                    minimumFlexShortfallAnnual: 0,
+                    minimumFlexFulfilled: true
+                }
+            }
+        }
+    });
+    assertEqual(dynamicFlexResult.logData.flex_brutto_haushalt, 5000,
+        'Dynamic Flex household basis combines effective VPW flex with pension surplus');
+    assertEqual(dynamicFlexResult.logData.flex_aus_depot_bedarf, 3000,
+        'Dynamic Flex depot need uses effective VPW flex instead of static input');
+    assertEqual(dynamicFlexResult.logData.flex_haushalt_erfuellt, 4500,
+        'Dynamic Flex fulfillment uses the same effective household basis');
+    assertClose(dynamicFlexResult.logData.flex_haushalt_kuerzung_pct, 10, 1e-9,
+        'Dynamic Flex reduction uses the effective household denominator');
+    assertEqual(dynamicFlexResult.logData.minimumFlexEffectiveFinal, 4500,
+        'Dynamic Flex final minimum witness is capped by actual effective household payout');
+    assertEqual(dynamicFlexResult.logData.minimumFlexShortfallAnnual, 500,
+        'Dynamic Flex minimum shortfall uses the effective household payout');
+    assertEqual(dynamicFlexResult.logData.flex_haushalt_basis, 'effective_vpw_plus_pension_surplus',
+        'Dynamic Flex logs its effective household basis provenance');
+
     const invalidInflationResult = buildSimulatorYearResult({
         ...yearResultArgs,
         yearData: { ...yearResultArgs.yearData, inflation: undefined },
@@ -891,6 +931,27 @@ try {
 // Test 2: Ruin Scenario
 // Extremely high withdrawals or 0 assets
 try {
+    const financeableFloorState = JSON.parse(JSON.stringify(state));
+    financeableFloorState.portfolio.liquiditaet = 0;
+    assertEqual(financeableFloorState.portfolio.liquiditaet, 0,
+        'Financeable floor witness starts without liquid cash');
+    assert(financeableFloorState.portfolio.depotTranchesAktien[0].marketValue > inputs.startFloorBedarf,
+        'Financeable floor witness has enough total wealth only through sellable assets');
+    const financeableFloor = simulateOneYear(
+        financeableFloorState,
+        inputs,
+        { ...yearDataNormal, rendite: 0, zinssatz: 0 },
+        0
+    );
+    assert(!financeableFloor.isRuin, 'Financeable floor witness should complete successfully');
+    assert(financeableFloor.logData.liq_before_payout >= financeableFloor.logData.floor_aus_depot,
+        'Forced asset liquidation should finance the floor before payout despite zero starting liquidity');
+    assertEqual(
+        Math.max(0, financeableFloor.logData.floor_aus_depot - financeableFloor.logData.entnahme_effektiv),
+        0,
+        'Financeable floor witness should expose no floor shortfall'
+    );
+
     const poorState = JSON.parse(JSON.stringify(state));
     poorState.portfolio.depotTranchesAktien = [];
     poorState.portfolio.liquiditaet = 0;

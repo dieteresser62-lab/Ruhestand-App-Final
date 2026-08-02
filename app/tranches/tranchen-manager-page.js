@@ -62,6 +62,7 @@ const state = {
     quoteBatchPromise: null,
     persistenceMessage: '',
     persistenceError: '',
+    taxMigrationWarning: '',
     rawRevealed: false,
     reconciliationPreview: null,
     pendingReconciliation: null,
@@ -174,6 +175,36 @@ function setPersistenceStatus(message, kind = '') {
     target.dataset.kind = kind;
 }
 
+export function describeLegacyTaxMigration(raw) {
+    if (typeof raw !== 'string' || raw.trim() === '') return '';
+    let records;
+    try {
+        records = JSON.parse(raw);
+    } catch {
+        return '';
+    }
+    if (!Array.isArray(records)) return '';
+    const legacy = records.filter(record => {
+        const version = record?.schemaVersion;
+        return version === undefined || version === null || version === 0 || version === 1;
+    });
+    if (legacy.length === 0) return '';
+    const goldExemptions = legacy.filter(record => (
+        (record?.category === 'gold' || record?.type === 'gold' || record?.kind === 'gold')
+        && Number(record?.tqf) === 1
+        && typeof record?.taxExempt !== 'boolean'
+    )).length;
+    const resetNonEquityTqf = legacy.filter(record => (
+        record?.category !== 'equity'
+        && Number(record?.tqf) > 0
+        && !((record?.category === 'gold' || record?.type === 'gold' || record?.kind === 'gold') && Number(record?.tqf) === 1)
+    )).length;
+    return `${legacy.length} Legacy-Tranche(n) wurden nur fuer die Anzeige auf den heutigen Steuervertrag migriert: `
+        + `Steuerfreiheit standardmaessig nein, ${goldExemptions} alte Gold-TQF-1-Kodierung(en) als explizit steuerfrei, `
+        + `${resetNonEquityTqf} unbelegte Nicht-Aktien-TQF auf 0. Bis Sie jede Tranche fachlich pruefen und speichern, `
+        + 'rechnet die Simulation mit diesen konservativen Annahmen.';
+}
+
 function clearProfileValidationStatus() {
     const status = byId('profileValidationStatus');
     if (status) {
@@ -254,6 +285,10 @@ function renderPersistenceState() {
     }
     if (state.persistenceError) {
         setPersistenceStatus(state.persistenceError, 'error');
+        return;
+    }
+    if (state.taxMigrationWarning) {
+        setPersistenceStatus(state.taxMigrationWarning, 'pending');
         return;
     }
     if (state.persistenceMessage) {
@@ -703,6 +738,7 @@ async function persistTranchen(nextTranches, options = {}) {
         state.corruptRaw = null;
         state.loadStatus = persisted.length > 0 ? 'valid' : 'empty';
         state.pendingCommit = null;
+        state.taxMigrationWarning = '';
         state.persistenceMessage = successMessage;
         clearRawPreview();
         if (typeof onSuccess === 'function') onSuccess();
@@ -1044,6 +1080,7 @@ async function resetCorruptPayload() {
 function applyLoadResult(result) {
     state.persistenceMessage = '';
     state.persistenceError = '';
+    state.taxMigrationWarning = '';
     state.pendingCommit = null;
     state.pendingReconciliation = null;
     state.reconciliationPreview = null;
@@ -1058,6 +1095,7 @@ function applyLoadResult(result) {
         state.confirmedRaw = result.raw;
         state.corruptRaw = null;
         state.loadStatus = result.status;
+        state.taxMigrationWarning = describeLegacyTaxMigration(result.raw);
     } else if (result?.status === 'corrupt') {
         state.loadStatus = 'corrupt';
         state.corruptRaw = result.raw;
@@ -1166,6 +1204,7 @@ function resetRuntimeState(profileId) {
     state.quoteBatchPromise = null;
     state.persistenceMessage = '';
     state.persistenceError = '';
+    state.taxMigrationWarning = '';
     state.rawRevealed = false;
     state.reconciliationPreview = null;
     state.pendingReconciliation = null;

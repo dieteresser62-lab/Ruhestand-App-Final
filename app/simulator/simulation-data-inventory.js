@@ -684,22 +684,26 @@ const STATIC_DATA = {
         implementationLocations: [
             'engine/tax-settlement.mjs',
             'engine/transactions/sale-engine.mjs',
-            'app/simulator/simulator-portfolio-tranches.js'
+            'types/tranche-contract.js',
+            'app/simulator/simulator-portfolio-init.js',
+            'app/simulator/simulator-portfolio-tranches.js',
+            'app/simulator/simulator-tax-recompute.js'
         ],
         unit: 'tax_rate_ratio',
         rawDataHash: unresolved(),
-        embeddedValueHash: resolved('29987f286598e41c7def51bd4cbe3cb241f375e69d6ef8a321787b269ec53a8e'),
+        embeddedValueHash: resolved('9315d68a04f35d2dd577349b07d88677311c45b3bbac119cea462a87d9f6be2a'),
         source: unresolved(),
         seriesIdentifier: notApplicable(),
         yearConvention: resolved('current_parameterization_applied_to_all_simulated_years'),
-        transformation: resolved('capitalGainsTaxRate * (1 + solidaritySurchargeRate + userChurchTaxRate), then tranche partial exemption'),
+        transformation: resolved('Current tax parameters apply to every simulated year; signed cash interest and realized gains share one annual settlement; tranche TQF and taxExempt remain independent explicit inputs.'),
         license: notApplicable(),
         retrievedAt: unresolved(),
         contractValue: {
             capitalGainsTaxRate: 0.25,
             solidaritySurchargeRate: 0.055,
-            defaultEquityTqf: 0.30,
-            goldTaxFreeTqf: 1
+            defaultEquityTqf: 0,
+            defaultTaxExempt: false,
+            goldTaxExemptFromExplicitInput: true
         },
         externalValidationStatus: 'not_validated'
     }),

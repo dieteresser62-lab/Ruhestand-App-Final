@@ -7,6 +7,7 @@ import { runMonteCarloChunk } from '../app/simulator/monte-carlo-runner.js';
 import { initializePortfolio, initializePortfolioDetailed } from '../app/simulator/simulator-portfolio-init.js';
 import {
     applySaleToPortfolio,
+    buildInputsCtxFromPortfolio,
     buyGold,
     buyStocksNeu
 } from '../app/simulator/simulator-portfolio-tranches.js';
@@ -26,6 +27,7 @@ function detailedLot(overrides = {}) {
         marketValue: 1200,
         costBasis: 1000,
         tqf: 0.30,
+        taxExempt: false,
         type: 'aktien_neu',
         category: 'equity',
         metadata: { nested: { owner: 'profile-a' } },
@@ -284,6 +286,34 @@ function detailedLot(overrides = {}) {
 }
 
 console.log('--- Simulator Portfolio Tranche Invariants Completed ---');
+
+{
+    const portfolio = {
+        depotTranchesAktien: [
+            detailedLot({ trancheId: 'alt-taxed', type: 'aktien_alt', marketValue: 200, costBasis: 100, tqf: 0.3, taxExempt: false }),
+            detailedLot({ trancheId: 'alt-exempt', type: 'aktien_alt', marketValue: 200, costBasis: 100, tqf: 0, taxExempt: true }),
+            detailedLot({ trancheId: 'new-taxed', type: 'aktien_neu', marketValue: 300, costBasis: 200, tqf: 0.3, taxExempt: false }),
+            detailedLot({ trancheId: 'bond-taxed', type: 'anleihe', category: 'bonds', marketValue: 150, costBasis: 100, tqf: 0, taxExempt: false })
+        ],
+        depotTranchesGold: [],
+        depotTranchesGeldmarkt: [],
+        liquiditaet: 0,
+        tagesgeld: 0,
+        geldmarktEtf: 0
+    };
+    const context = buildInputsCtxFromPortfolio({ startSPB: 1000 }, portfolio, {
+        pensionAnnual: 0,
+        marketData: {}
+    });
+    assertClose(context.tqfAlt, 0.65, 1e-12,
+        'Aggregated planning context preserves the gain-weighted taxable effect of mixed TQF/exemption lots');
+    assertEqual(context.taxExemptAlt, false,
+        'Mixed taxed and exempt lots are not misrepresented as a wholly exempt aggregate');
+    assertClose(context.tqfNeu, 0.2, 1e-12,
+        'Aggregated new-equity/bond fallback includes taxable bond gains instead of inventing one equity TQF');
+    assertEqual(context.taxExemptNeu, false,
+        'Taxable bonds keep the combined fallback aggregate taxable');
+}
 
 {
     const portfolio = initializePortfolio({

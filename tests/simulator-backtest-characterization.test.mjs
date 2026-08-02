@@ -25,6 +25,7 @@ const slice06DeltaFixturePath = path.join(__dirname, 'fixtures', 'cape-wage-back
 const slice07DeltaFixturePath = path.join(__dirname, 'fixtures', 'demography-care-survivor-backtest-delta-v1.json');
 const slice08MeasurementFixturePath = path.join(__dirname, 'fixtures', 'liquidity-runway-slice-08-measurement-v1.json');
 const slice09MeasurementFixturePath = path.join(__dirname, 'fixtures', 'minimum-flex-slice-09-measurement-v1.json');
+const slice10MeasurementFixturePath = path.join(__dirname, 'fixtures', 'tax-logic-slice-10-backtest-measurement-v1.json');
 const backtestSourcePath = path.join(__dirname, '..', 'app', 'simulator', 'simulator-backtest.js');
 const backtestRunnerSourcePath = path.join(__dirname, '..', 'app', 'simulator', 'historical-backtest-runner.js');
 const UPDATE_TARGET = process.env.UPDATE_BACKTEST_TARGET === '1';
@@ -1583,10 +1584,6 @@ try {
         'CAPE-only replacement should be observable when Dynamic Flex is enabled'
     );
     assertEqual(capeLegacyStepDeltaOracle.returnPolicy, 'legacy_step', 'CAPE active delta must measure the released default policy');
-    assertEqual(capeLegacyStepDeltaOracle.financialMetrics.summaryEndWealth.delta, 56705.98, 'Slice-08 CAPE end-wealth effect must stay exact');
-    assertEqual(capeLegacyStepDeltaOracle.financialMetrics.totalWithdrawal.delta, -30000, 'Slice-08 CAPE withdrawal effect must stay exact');
-    assertEqual(capeLegacyStepDeltaOracle.financialMetrics.totalTax.delta, -4318.72, 'Slice-08 CAPE tax effect must stay exact');
-    assertEqual(capeLegacyStepDeltaOracle.financialMetrics.minRunwayCoveragePct.delta, 10.517888, 'Slice-08 CAPE runway effect must stay exact');
     assertEqual(capeLegacyStepThresholdOracle.comparisonYearCount, 100, 'Legacy-step threshold oracle should cover every comparable decision year');
     assertEqual(capeLegacyStepThresholdOracle.changedYearCount, 21, 'CAPE replacement should retain the measured 21 legacy-step threshold changes');
     const threshold2023 = capeLegacyStepThresholdOracle.changes.find(entry => entry.returnYear === 2023);
@@ -1610,23 +1607,9 @@ try {
     }
     assertEqual(earlyWage1930?.outcome.before, 'completed', '1930-1940 baseline should complete');
     assertEqual(earlyWage1930?.outcome.after, 'completed', '1930-1940 JST case should complete');
-    assertEqual(earlyWage1930?.financialMetrics.summaryEndWealth.before, 2740858.55, '1930-1940 constant-wage baseline end wealth must stay exact');
-    assertEqual(earlyWage1930?.financialMetrics.summaryEndWealth.after, 2670022.78, '1930-1940 JST end wealth must stay exact');
-    assertEqual(earlyWage1930?.financialMetrics.summaryEndWealth.delta, -70835.77, '1930-1940 JST end-wealth delta must stay exact');
-    assertEqual(earlyWage1930?.financialMetrics.totalWithdrawal.delta, 51000, '1930-1940 JST withdrawal delta must stay exact');
-    assertEqual(earlyWage1930?.financialMetrics.totalTax.delta, 879.27, '1930-1940 JST tax delta must stay exact');
-    assertEqual(earlyWage1930?.financialMetrics.yearsWithReductionAtLeast10Pct.before, 7, '1930-1940 baseline reduction years must stay exact');
-    assertEqual(earlyWage1930?.financialMetrics.yearsWithReductionAtLeast10Pct.after, 9, '1930-1940 JST reduction years must stay exact');
     const earlyWage1935 = earlyWageDataDeltaOracles.find(entry => entry.scenarioId === 'wage_indexed_pension_jst_1935_1946');
     assertEqual(earlyWage1935?.outcome.before, 'completed', '1935-1946 baseline should complete');
     assertEqual(earlyWage1935?.outcome.after, 'completed', '1935-1946 JST case should complete');
-    assertEqual(earlyWage1935?.financialMetrics.summaryEndWealth.before, 5136609.35, '1935-1946 constant-wage baseline end wealth must stay exact');
-    assertEqual(earlyWage1935?.financialMetrics.summaryEndWealth.after, 5091243.1, '1935-1946 JST end wealth must stay exact');
-    assertEqual(earlyWage1935?.financialMetrics.summaryEndWealth.delta, -45366.25, '1935-1946 JST end-wealth delta must stay exact');
-    assertEqual(earlyWage1935?.financialMetrics.totalWithdrawal.delta, 28200, '1935-1946 JST withdrawal delta must stay exact');
-    assertEqual(earlyWage1935?.financialMetrics.totalTax.delta, 3755.72, '1935-1946 JST tax delta must stay exact');
-    assertEqual(earlyWage1935?.financialMetrics.yearsWithReductionAtLeast10Pct.before, 10, '1935-1946 baseline reduction years must stay exact');
-    assertEqual(earlyWage1935?.financialMetrics.yearsWithReductionAtLeast10Pct.after, 1, '1935-1946 JST reduction years must stay exact');
     for (const deltaOracle of [
         capeDisabledDeltaOracle,
         capeLegacyStepDeltaOracle,
@@ -1741,18 +1724,42 @@ try {
         activeCapeProviderArm: buildSlice07To08Arm('after'),
         legacyCapeReferenceArm: buildSlice07To08Arm('before')
     };
-    assertEqual(slice07To08BacktestDeltaOracle.activeCapeProviderArm.financialMetrics.summaryEndWealth.delta, -48559.87, 'Slice 07 to 08 active-arm end wealth must stay exact');
-    assertEqual(slice07To08BacktestDeltaOracle.activeCapeProviderArm.financialMetrics.totalWithdrawal.delta, 15000, 'Slice 07 to 08 active-arm withdrawal must stay exact');
-    assertEqual(slice07To08BacktestDeltaOracle.activeCapeProviderArm.financialMetrics.totalTax.delta, -3157.35, 'Slice 07 to 08 active-arm tax must stay exact');
-    assertEqual(slice07To08BacktestDeltaOracle.activeCapeProviderArm.financialMetrics.minRunwayCoveragePct.delta, -38.457989, 'Slice 07 to 08 active-arm runway must stay exact');
-    assertEqual(slice07To08BacktestDeltaOracle.activeCapeProviderArm.financialMetrics.maxDrawdownPct.delta, 0.2987, 'Slice 07 to 08 active-arm drawdown must stay exact');
-    assertEqual(slice07To08BacktestDeltaOracle.legacyCapeReferenceArm.financialMetrics.summaryEndWealth.delta, -80782.77, 'Slice 07 to 08 reference-arm end wealth must stay exact');
-    assertEqual(slice07To08BacktestDeltaOracle.legacyCapeReferenceArm.financialMetrics.totalWithdrawal.delta, 42000, 'Slice 07 to 08 reference-arm withdrawal must stay exact');
-    assertEqual(slice07To08BacktestDeltaOracle.legacyCapeReferenceArm.financialMetrics.totalTax.delta, -2293.69, 'Slice 07 to 08 reference-arm tax must stay exact');
-    assertEqual(slice07To08BacktestDeltaOracle.legacyCapeReferenceArm.financialMetrics.minRunwayCoveragePct.delta, -39.687904, 'Slice 07 to 08 reference-arm runway must stay exact');
-    assertEqual(slice07To08BacktestDeltaOracle.legacyCapeReferenceArm.financialMetrics.maxDrawdownPct.delta, 0.426498, 'Slice 07 to 08 reference-arm drawdown must stay exact');
-    assertEqual(slice07To08BacktestDeltaOracle.activeCapeProviderArm.financialMetrics.maxAbsolutePortfolioFlowDelta.delta, 0, 'Slice 07 to 08 active-arm FlowDelta must stay zero');
-    assertEqual(slice07To08BacktestDeltaOracle.legacyCapeReferenceArm.financialMetrics.maxAbsolutePortfolioFlowDelta.delta, 0, 'Slice 07 to 08 reference-arm FlowDelta must stay zero');
+    const crossSliceOracleProjection = {
+        capeLegacyStepEffect: {
+            summaryEndWealthDelta: capeLegacyStepDeltaOracle.financialMetrics.summaryEndWealth.delta,
+            totalWithdrawalDelta: capeLegacyStepDeltaOracle.financialMetrics.totalWithdrawal.delta,
+            totalTaxDelta: capeLegacyStepDeltaOracle.financialMetrics.totalTax.delta,
+            minRunwayCoveragePctDelta: capeLegacyStepDeltaOracle.financialMetrics.minRunwayCoveragePct.delta
+        },
+        earlyWage1930To1940: {
+            summaryEndWealthBefore: earlyWage1930?.financialMetrics.summaryEndWealth.before,
+            summaryEndWealthAfter: earlyWage1930?.financialMetrics.summaryEndWealth.after,
+            summaryEndWealthDelta: earlyWage1930?.financialMetrics.summaryEndWealth.delta,
+            totalWithdrawalDelta: earlyWage1930?.financialMetrics.totalWithdrawal.delta,
+            totalTaxDelta: earlyWage1930?.financialMetrics.totalTax.delta,
+            reductionYearsBefore: earlyWage1930?.financialMetrics.yearsWithReductionAtLeast10Pct.before,
+            reductionYearsAfter: earlyWage1930?.financialMetrics.yearsWithReductionAtLeast10Pct.after
+        },
+        earlyWage1935To1946: {
+            summaryEndWealthBefore: earlyWage1935?.financialMetrics.summaryEndWealth.before,
+            summaryEndWealthAfter: earlyWage1935?.financialMetrics.summaryEndWealth.after,
+            summaryEndWealthDelta: earlyWage1935?.financialMetrics.summaryEndWealth.delta,
+            totalWithdrawalDelta: earlyWage1935?.financialMetrics.totalWithdrawal.delta,
+            totalTaxDelta: earlyWage1935?.financialMetrics.totalTax.delta,
+            reductionYearsBefore: earlyWage1935?.financialMetrics.yearsWithReductionAtLeast10Pct.before,
+            reductionYearsAfter: earlyWage1935?.financialMetrics.yearsWithReductionAtLeast10Pct.after
+        },
+        slice07To08BacktestDeltaOracle: {
+            activeCapeProviderArm: Object.fromEntries(crossSliceMetricKeys.map(key => [
+                key,
+                slice07To08BacktestDeltaOracle.activeCapeProviderArm.financialMetrics[key].delta
+            ])),
+            legacyCapeReferenceArm: Object.fromEntries(crossSliceMetricKeys.map(key => [
+                key,
+                slice07To08BacktestDeltaOracle.legacyCapeReferenceArm.financialMetrics[key].delta
+            ]))
+        }
+    };
 
     const archivedSlice08Bytes = fs.readFileSync(slice08MeasurementFixturePath);
     const archivedSlice08Sha256 = createHash('sha256').update(archivedSlice08Bytes).digest('hex');
@@ -1798,14 +1805,78 @@ try {
         console.log('__BACKTEST_DATA_09_MEASUREMENT_START__');
         console.log(stableStringify(slice09Measurement, 2));
         console.log('__BACKTEST_DATA_09_MEASUREMENT_END__');
+    }
+    const slice09FixtureBytes = fs.readFileSync(slice09MeasurementFixturePath);
+    const expectedSlice09Measurement = JSON.parse(slice09FixtureBytes.toString('utf8'));
+    const sourceCaseDeltas = new Map(expectedSlice09Measurement.existingCaseFinancialDeltas.map(entry => [entry.id, entry]));
+    const slice09To10CaseDeltas = slice09Measurement.existingCaseFinancialDeltas.map(target => {
+        const source = sourceCaseDeltas.get(target.id);
+        return {
+            id: target.id,
+            outcomeChanged: { source: source.outcomeChanged, slice10: target.outcomeChanged !== source.outcomeChanged },
+            summaryEndWealth: {
+                source: source.summaryEndWealthDelta,
+                slice10: round(target.summaryEndWealthDelta - source.summaryEndWealthDelta)
+            },
+            totalWithdrawal: {
+                source: source.totalWithdrawalDelta,
+                slice10: round(target.totalWithdrawalDelta - source.totalWithdrawalDelta)
+            },
+            totalTax: {
+                source: source.totalTaxDelta,
+                slice10: round(target.totalTaxDelta - source.totalTaxDelta)
+            },
+            maxAbsolutePortfolioFlowDelta: {
+                source: source.maxAbsolutePortfolioFlowDeltaDelta,
+                slice10: round(target.maxAbsolutePortfolioFlowDeltaDelta - source.maxAbsolutePortfolioFlowDeltaDelta, 6)
+            }
+        };
+    });
+    const slice09To10D17 = Object.fromEntries(Object.entries(slice09Measurement.d17Witness).map(([year, target]) => {
+        const source = expectedSlice09Measurement.d17Witness[year];
+        return [year, {
+            source,
+            slice10: {
+                effectiveFinalDelta: round(target.effectiveFinal - source.effectiveFinal),
+                minimumFlexAnnualDelta: round(target.minimumFlexAnnual - source.minimumFlexAnnual),
+                shortfallAnnualDelta: round(target.shortfallAnnual - source.shortfallAnnual),
+                status: target.status
+            }
+        }];
+    }));
+    const slice10Measurement = {
+        schemaVersion: 'TaxLogicSlice10BacktestMeasurementV1',
+        snapshotId: 'post-backtest-data-10-v1',
+        sourceReference: 'post-backtest-data-09-v1',
+        sourceFixtureSha256: createHash('sha256').update(slice09FixtureBytes).digest('hex'),
+        sourceActualSha256: expectedSlice09Measurement.targetActualSha256,
+        targetResultDocument: 'docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_10_HEUTIGE_STEUERLOGIK.md',
+        reviewStatus: 'pending',
+        targetActualSha256: createHash('sha256').update(stableStringify(actual)).digest('hex'),
+        caseCount: actual.cases.length,
+        negativeCaseCount: actual.negativeCases.length,
+        ruinCaseCount: actual.cases.filter(entry => entry.outcomeObservation === 'ruin').length,
+        maxAbsolutePortfolioFlowDelta: round(Math.max(...actual.cases.map(entry => entry.values.maxAbsolutePortfolioFlowDelta)), 6),
+        crossSliceOracleProjection,
+        slice09To10DeltaLedger: {
+            sourceSchemaVersion: expectedSlice09Measurement.schemaVersion,
+            sourceCaseCount: expectedSlice09Measurement.caseCount,
+            cases: slice09To10CaseDeltas,
+            d17Witness: slice09To10D17
+        }
+    };
+    if (process.env.PRINT_BACKTEST_DATA_10 === '1') {
+        console.log('__BACKTEST_DATA_10_MEASUREMENT_START__');
+        console.log(stableStringify(slice10Measurement, 2));
+        console.log('__BACKTEST_DATA_10_MEASUREMENT_END__');
     } else {
-        const expectedSlice09Measurement = JSON.parse(fs.readFileSync(slice09MeasurementFixturePath, 'utf8'));
-        const unexpected = collectDiffs(expectedSlice09Measurement, slice09Measurement);
+        const expectedSlice10Measurement = JSON.parse(fs.readFileSync(slice10MeasurementFixturePath, 'utf8'));
+        const unexpected = collectDiffs(expectedSlice10Measurement, slice10Measurement);
         if (unexpected.length > 0) {
-            console.error('Unexpected Slice-09 backtest measurement deltas:');
+            console.error('Unexpected Slice-10 backtest measurement deltas:');
             console.error(stableStringify(unexpected.slice(0, 20), 2));
         }
-        assertEqual(unexpected.length, 0, 'Slice-09 backtest measurement should reproduce exactly with field-level diagnostics');
+        assertEqual(unexpected.length, 0, 'Slice-10 backtest measurement should reproduce exactly with field-level diagnostics');
     }
     assertEqual(
         archivedSlice07Evidence.schemaVersion,

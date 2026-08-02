@@ -13,6 +13,7 @@ console.log('--- Suite Data Slice 02 Final Action Tests ---');
 
 function equityLot(overrides = {}) {
     return {
+        schemaVersion: 2,
         trancheId: 'eq-1',
         isin: 'EQ1',
         name: 'Equity Lot',
@@ -21,6 +22,7 @@ function equityLot(overrides = {}) {
         marketValue: 100000,
         costBasis: 100000,
         tqf: 0,
+        taxExempt: false,
         purchaseDate: '2020-01-01',
         ...overrides
     };
@@ -28,6 +30,7 @@ function equityLot(overrides = {}) {
 
 function goldLot(trancheId, overrides = {}) {
     return {
+        schemaVersion: 2,
         trancheId,
         isin: trancheId.toUpperCase(),
         name: `Gold ${trancheId}`,
@@ -35,7 +38,8 @@ function goldLot(trancheId, overrides = {}) {
         category: 'gold',
         marketValue: 60000,
         costBasis: 60000,
-        tqf: 1,
+        tqf: 0,
+        taxExempt: true,
         purchaseDate: '2020-01-01',
         ...overrides
     };
@@ -390,18 +394,22 @@ function saleInput(detailledTranches, overrides = {}) {
         },
         detailledTranches: [{
             trancheId: 'bond-1',
+            schemaVersion: 2,
             type: 'anleihe',
             category: 'bonds',
             marketValue: 50000,
             costBasis: 25000,
-            tqf: 0
+            tqf: 0,
+            taxExempt: false
         }, {
             trancheId: 'equity-1',
+            schemaVersion: 2,
             type: 'aktien_neu',
             category: 'equity',
             marketValue: 100000,
             costBasis: 90000,
-            tqf: 0.3
+            tqf: 0.3,
+            taxExempt: false
         }]
     }, { taxState: { lossCarry: 777 } });
     const sources = result.ui.action.quellen || [];

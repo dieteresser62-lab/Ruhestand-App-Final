@@ -47,7 +47,7 @@ console.log('Test 1: normalizeTranches migrates stable ids and canonical values'
     assert(normalized[0].trancheId.startsWith('tranche_legacy_'), 'Missing legacy trancheId should be generated');
     assertEqual(normalized[0].trancheId, repeated[0].trancheId, 'Legacy id generation should be deterministic');
     assertEqual(normalized[1].trancheId, 'legacy-id', 'Legacy id should be promoted to trancheId');
-    assertEqual(normalized[0].schemaVersion, 1, 'Normalized lots should use the current schema');
+    assertEqual(normalized[0].schemaVersion, 2, 'Normalized lots should use the current schema');
 }
 console.log('✓ normalizeTranches canonical migration OK');
 
@@ -84,7 +84,8 @@ console.log('Test 3a: historic money-market records from independent selects rem
         isin: ' IE00TEST0001 ',
         ticker: ' mmkt.de ',
         category: 'money_market',
-        type: 'aktien_neu'
+        type: 'aktien_neu',
+        tqf: 0
     })]);
     storage.setItem('depot_tranchen', historicRaw);
     const writesBeforeLoad = storage.setCalls;
@@ -129,7 +130,7 @@ console.log('Test 4: save validates and persists only canonical records');
     const storage = createLocalStorageMock();
     const saved = saveTranchesToStorage([validLegacyTranche({ id: 'saved-id' })], storage);
     const persisted = JSON.parse(storage.getItem('depot_tranchen'));
-    assertEqual(saved[0].schemaVersion, 1, 'Save returns canonical schema');
+  assertEqual(saved[0].schemaVersion, 2, 'Save returns canonical schema');
     assertEqual(persisted[0].trancheId, 'saved-id', 'Save persists canonical trancheId');
     assertEqual('id' in persisted[0], false, 'Save does not persist legacy id alias');
 }

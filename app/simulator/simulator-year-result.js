@@ -1,5 +1,5 @@
 import { sumDepot } from './simulator-portfolio.js';
-import { euros } from './simulator-engine-direct-utils.js';
+import { euros, signedEuros } from './simulator-engine-direct-utils.js';
 import { shortenReasonText } from './simulator-utils.js';
 import { sumBondBucketValuation } from '../../engine/transactions/three-bucket-logic.mjs';
 import {
@@ -114,7 +114,7 @@ export function buildSimulatorYearResult({
     const healthBucketEnd = euros(Number(nextPortfolio.healthBucketGeldmarkt) || 0);
     const portfolioActiveEnd = euros(wertAktien + wertGold + liquiditaet);
     const portfolioTotalEnd = euros(portfolioActiveEnd + healthBucketEnd);
-    const taxCashAdjustment = euros(actionResult?.taxSettlement?.taxCashAdjustment);
+    const taxCashAdjustment = signedEuros(actionResult?.taxSettlement?.taxCashAdjustment);
     const signedCashInterest = Number.isFinite(Number(cashZinsen)) ? Number(cashZinsen) : 0;
     const portfolioFlowDelta = portfolioActiveEnd - (
         euros(portfolioTotalBeforePayout)
@@ -153,12 +153,18 @@ export function buildSimulatorYearResult({
     const runwayMonths = Number.isFinite(annualRunwayNeedRaw)
         ? (annualRunwayNeedRaw > 0 ? liquiditaet / (annualRunwayNeedRaw / 12) : null)
         : null;
-    const grossHouseholdFlex = Number.isFinite(fullResult.input?.flexBedarf)
-        ? Math.max(0, fullResult.input.flexBedarf)
-        : Math.max(0, inflatedFlex);
+    const pensionFlexCapacity = Math.max(0, pensionAnnual - effectiveBaseFloor);
+    const dynamicPortfolioFlex = vpw?.enabled === true && Number.isFinite(vpw?.dynamicFlex)
+        ? Math.max(0, vpw.dynamicFlex)
+        : null;
+    const grossHouseholdFlex = dynamicPortfolioFlex !== null
+        ? pensionFlexCapacity + dynamicPortfolioFlex
+        : (Number.isFinite(fullResult.input?.flexBedarf)
+            ? Math.max(0, fullResult.input.flexBedarf)
+            : Math.max(0, inflatedFlex));
     const pensionFlexContribution = Math.min(
         grossHouseholdFlex,
-        Math.max(0, pensionAnnual - effectiveBaseFloor)
+        pensionFlexCapacity
     );
     const fulfilledFlexFromPortfolio = jahresEntnahmeEffektiv > inflatedFloor
         ? jahresEntnahmeEffektiv - inflatedFloor
@@ -295,6 +301,8 @@ export function buildSimulatorYearResult({
             portfolio_active_end: portfolioActiveEnd,
             portfolio_flow_delta: portfolioFlowDelta,
             tax_cash_adjustment: taxCashAdjustment,
+            cash_interest_taxable_signed: signedEuros(actionResult?.taxSettlement?.cashInterestIncomeSigned),
+            cash_interest_tax_delta: signedEuros(actionResult?.taxSettlement?.cashInterestTaxDelta),
             balance_trace: normalizedBalanceTrace,
             health_bucket_enabled: !!healthBucketDiagnostics?.enabled,
             health_bucket_start: euros(healthBucketCoverage?.startAmount ?? healthBucketInterest?.startAmount),
@@ -350,7 +358,10 @@ export function buildSimulatorYearResult({
             flex_erfuellt_nominal: fulfilledFlexFromPortfolio,
             flex_brutto_haushalt: grossHouseholdFlex,
             flex_rentenueberschuss: pensionFlexContribution,
-            flex_aus_depot_bedarf: inflatedFlex,
+            flex_aus_depot_bedarf: dynamicPortfolioFlex ?? inflatedFlex,
+            flex_haushalt_basis: dynamicPortfolioFlex !== null
+                ? 'effective_vpw_plus_pension_surplus'
+                : 'static_input',
             flex_aus_depot_erfuellt: fulfilledFlexFromPortfolio,
             flex_haushalt_erfuellt: fulfilledHouseholdFlex,
             flex_haushalt_kuerzung_pct: householdFlexReductionPct,

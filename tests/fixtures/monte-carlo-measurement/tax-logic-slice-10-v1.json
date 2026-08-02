@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "TaxLogicSlice10MonteCarloMeasurementV1",
+  "snapshotId": "post-backtest-data-10-v1",
+  "sourceReference": "post-backtest-data-09-v1",
+  "sourceFixtureSha256": "e8a74655a66a10c613fd6d87df8ebb4442fdc5b925dc805a93f99e754344c408",
+  "sourceResultDocument": "docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_09_FLOOR_MINDEST_FLEX_STABILISATOR.md",
+  "targetResultDocument": "docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_10_HEUTIGE_STEUERLOGIK.md",
+  "reviewStatus": "pending",
+  "sourceProjectionHashes": {
+    "carResultSha256": "0b146054561cfa97dc2050bf191f8c88712c0169f494cac30c92e69100ea9130",
+    "autoOptimizeResultSha256": "90bdd52006da1f2e2253feb2265691ef104208bf26d230aa6925ce62483e17c4",
+    "finalResultSha256": "521d89845e89941ad211299ee09a7b91b8ddfbbba7a750761cb5743773e5b41f"
+  },
+  "targetProjectionHashes": {
+    "carResultSha256": "a0285fd9db124002c1d0b19df0a291a529d7597077223c00febdde5694f04a7a",
+    "autoOptimizeResultSha256": "6bdae6a888f953d5883e7282ebaab52ac950a1e7d8181230507f3afe01e7505c",
+    "finalResultSha256": "ce35cc8ed7ebfec25ed4c3ba44b66bf2c074bc6685b735628dd2780615459ff9"
+  },
+  "changedProjectionCount": 3,
+  "economicAggregateDeltaExpected": true
+}

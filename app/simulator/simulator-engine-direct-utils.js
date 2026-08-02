@@ -143,18 +143,23 @@ export function buildDetailedTranchesFromPortfolio(portfolio) {
             t.trancheId = trancheId;
         }
         usedIds.add(trancheId);
+        const shares = Number(t.shares);
+        const purchasePrice = Number(t.purchasePrice);
+        const currentPrice = Number(t.currentPrice);
         list.push({
+            schemaVersion: 2,
             trancheId,
             ...(t.sourceProfileId ? { sourceProfileId: String(t.sourceProfileId) } : {}),
             name: t.name || null,
             isin: t.isin || null,
-            shares: Number(t.shares) || 0,
-            purchasePrice: Number(t.purchasePrice) || 0,
+            ...(Number.isFinite(shares) && shares > 0 ? { shares } : {}),
+            ...(Number.isFinite(purchasePrice) && purchasePrice > 0 ? { purchasePrice } : {}),
             purchaseDate: t.purchaseDate || null,
-            currentPrice: Number(t.currentPrice) || 0,
+            ...(Number.isFinite(currentPrice) && currentPrice > 0 ? { currentPrice } : {}),
             marketValue,
             costBasis: Number(t.costBasis) || 0,
-            tqf: Number.isFinite(Number(t.tqf)) ? Number(t.tqf) : 0.30,
+            tqf: Number.isFinite(Number(t.tqf)) ? Number(t.tqf) : 0,
+            taxExempt: t.taxExempt === true,
             type: type || (fallbackCategory === 'gold' ? 'gold' : (fallbackCategory === 'money_market' ? 'geldmarkt' : 'aktien_alt')),
             category
         });

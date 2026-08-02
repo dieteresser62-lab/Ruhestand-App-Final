@@ -76,7 +76,7 @@ function createSimulationLot(portfolio, amount, assetKind) {
 
     const isGold = assetKind === 'gold';
     return {
-        schemaVersion: 1,
+        schemaVersion: 2,
         trancheId,
         sourceProfileId,
         name: isGold ? 'Simulierter Goldkauf' : 'Simulierter Aktienkauf',
@@ -88,7 +88,10 @@ function createSimulationLot(portfolio, amount, assetKind) {
         purchaseDate,
         marketValue: value,
         costBasis: value,
-        tqf: isGold ? (Number(portfolio.simulationGoldTqf) || 0) : 0.30,
+        tqf: isGold
+            ? (Number(portfolio.simulationGoldTqf) || 0)
+            : (Number(portfolio.simulationEquityTqf) || 0),
+        taxExempt: isGold && portfolio.simulationGoldTaxExempt === true,
         type: isGold ? 'gold' : 'aktien_neu',
         category: isGold ? 'gold' : 'equity',
         simulationLotStatus: 'open'
@@ -115,8 +118,8 @@ export function sortTranchesTaxOptimized(tranches) {
     return [...tranches].sort((a, b) => {
         const gqA = a.marketValue > 0 ? Math.max(0, (a.marketValue - a.costBasis) / a.marketValue) : 0;
         const gqB = b.marketValue > 0 ? Math.max(0, (b.marketValue - b.costBasis) / b.marketValue) : 0;
-        const taxLoadA = gqA * (1 - (a.tqf || 0));
-        const taxLoadB = gqB * (1 - (b.tqf || 0));
+        const taxLoadA = a.taxExempt === true ? 0 : gqA * (1 - (a.tqf || 0));
+        const taxLoadB = b.taxExempt === true ? 0 : gqB * (1 - (b.tqf || 0));
         return taxLoadA - taxLoadB;
     });
 }
@@ -147,7 +150,7 @@ export function calculateTrancheTax(tranche, sellAmount, sparerPauschbetrag, kir
     const bruttogewinn = sellAmount * gewinnQuote;
 
     // Teilfreistellung anwenden
-    const gewinnNachTFS = bruttogewinn * (1 - tqf);
+    const gewinnNachTFS = tranche.taxExempt === true ? 0 : bruttogewinn * (1 - tqf);
 
     // Sparer-Pauschbetrag anwenden
     const anrechenbarerPauschbetrag = Math.min(sparerPauschbetrag, gewinnNachTFS);
@@ -330,21 +333,48 @@ export function buildInputsCtxFromPortfolio(inputs, portfolio, { pensionAnnual, 
         const list = Array.isArray(arr) ? arr : [];
         return list.reduce((acc, t) => {
             if (t.type === type) {
-                acc.marketValue += Number(t.marketValue) || 0;
-                acc.costBasis += Number(t.costBasis) || 0;
+                const marketValue = Number(t.marketValue) || 0;
+                const costBasis = Number(t.costBasis) || 0;
+                const gain = Math.max(0, marketValue - costBasis);
+                const tqf = Math.max(0, Math.min(1, Number(t.tqf) || 0));
+                acc.marketValue += marketValue;
+                acc.costBasis += costBasis;
+                acc.gain += gain;
+                acc.taxableGain += t.taxExempt === true ? 0 : gain * (1 - tqf);
+                acc.allTaxExempt = acc.allTaxExempt && t.taxExempt === true;
+                acc.count += 1;
             }
             return acc;
-        }, { marketValue: 0, costBasis: 0 });
+        }, { marketValue: 0, costBasis: 0, gain: 0, taxableGain: 0, allTaxExempt: true, count: 0 });
     };
+    const effectiveTqf = aggregate => aggregate.gain > 0
+        ? Math.max(0, Math.min(1, 1 - (aggregate.taxableGain / aggregate.gain)))
+        : 0;
+    const combineAggregates = (...aggregates) => aggregates.reduce((combined, aggregate) => ({
+        marketValue: combined.marketValue + aggregate.marketValue,
+        costBasis: combined.costBasis + aggregate.costBasis,
+        gain: combined.gain + aggregate.gain,
+        taxableGain: combined.taxableGain + aggregate.taxableGain,
+        allTaxExempt: combined.allTaxExempt && aggregate.allTaxExempt,
+        count: combined.count + aggregate.count
+    }), { marketValue: 0, costBasis: 0, gain: 0, taxableGain: 0, allTaxExempt: true, count: 0 });
 
     const aktAlt = sumByType(portfolio.depotTranchesAktien, 'aktien_alt');
     const aktNeu = sumByType(portfolio.depotTranchesAktien, 'aktien_neu');
     const bond = (Array.isArray(portfolio?.depotTranchesAktien) ? portfolio.depotTranchesAktien : []).reduce((acc, t) => {
         if (!isBondKind(t?.type) && !isBondKind(t?.category)) return acc;
-        acc.marketValue += Number(t.marketValue) || 0;
-        acc.costBasis += Number(t.costBasis) || 0;
+        const marketValue = Number(t.marketValue) || 0;
+        const costBasis = Number(t.costBasis) || 0;
+        const gain = Math.max(0, marketValue - costBasis);
+        acc.marketValue += marketValue;
+        acc.costBasis += costBasis;
+        acc.gain += gain;
+        acc.taxableGain += t.taxExempt === true ? 0 : gain;
+        acc.allTaxExempt = acc.allTaxExempt && t.taxExempt === true;
+        acc.count += 1;
         return acc;
-    }, { marketValue: 0, costBasis: 0 });
+    }, { marketValue: 0, costBasis: 0, gain: 0, taxableGain: 0, allTaxExempt: true, count: 0 });
+    const aktNeuAndBond = combineAggregates(aktNeu, bond);
     const gTr = sumByType(portfolio.depotTranchesGold, 'gold');
 
     const gmm = sumByType(portfolio.depotTranchesGeldmarkt, 'geldmarkt');
@@ -355,8 +385,14 @@ export function buildInputsCtxFromPortfolio(inputs, portfolio, { pensionAnnual, 
         ...inputs,
         tagesgeld,
         geldmarktEtf,
-        depotwertAlt: aktAlt.marketValue, costBasisAlt: aktAlt.costBasis, tqfAlt: 0.30,
-        depotwertNeu: aktNeu.marketValue + bond.marketValue, costBasisNeu: aktNeu.costBasis + bond.costBasis, tqfNeu: 0.30,
+        depotwertAlt: aktAlt.marketValue,
+        costBasisAlt: aktAlt.costBasis,
+        tqfAlt: effectiveTqf(aktAlt),
+        taxExemptAlt: aktAlt.count > 0 && aktAlt.allTaxExempt,
+        depotwertNeu: aktNeuAndBond.marketValue,
+        costBasisNeu: aktNeuAndBond.costBasis,
+        tqfNeu: effectiveTqf(aktNeuAndBond),
+        taxExemptNeu: aktNeuAndBond.count > 0 && aktNeuAndBond.allTaxExempt,
         goldWert: gTr.marketValue, goldCost: gTr.costBasis,
         goldSteuerfrei: inputs.goldSteuerfrei,
         sparerPauschbetrag: inputs.startSPB,

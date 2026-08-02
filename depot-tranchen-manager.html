@@ -945,17 +945,26 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="tqf">Teilfreistellung / Steuerfreiheit (0.0 = voll steuerpflichtig, 1.0 = steuerfrei)</label>
-                    <input type="number" id="tqf" step="0.01" min="0" max="1" value="0.30" required>
+                    <label for="tqf">Teilfreistellung (0.0 = keine, 0.30 = Aktienfonds)</label>
+                    <input type="number" id="tqf" step="0.01" min="0" max="1" value="0" required>
                     <small style="color: #718096; display: block; margin-top: 5px;">
-                        0.30 = 30% Teilfreistellung (Standard Aktienfonds)<br>
-                        1.0 = 100% steuerfrei (Altbestand vor 2009)
+                        Einzelaktien, Geldmarkt und Anleihen: 0. Steuerfreiheit wird separat bestaetigt.
+                    </small>
+                </div>
+
+                <div class="form-group">
+                    <label for="taxExempt">
+                        <input type="checkbox" id="taxExempt">
+                        Diese Tranche ist im heutigen Startzustand vollstaendig steuerfrei
+                    </label>
+                    <small style="color: #718096; display: block; margin-top: 5px;">
+                        Wird nicht aus Name, Notiz, Kaufdatum oder Alt-/Neubestand abgeleitet.
                     </small>
                 </div>
 
                 <div class="form-group">
                     <label for="notes">Notizen</label>
-                    <input type="text" id="notes" placeholder="z.B. 'Steuerfrei durch Spekulationsfrist'">
+                    <input type="text" id="notes" placeholder="Freie Notiz ohne automatische Steuerwirkung">
                 </div>
 
                 <div class="form-actions">

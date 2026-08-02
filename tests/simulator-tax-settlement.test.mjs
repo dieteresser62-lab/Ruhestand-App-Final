@@ -86,7 +86,12 @@ const crashYear = {
     gold_eur_perf: 0
 };
 
-function makeStubEngine({ monthlyWithdrawal, actionTax, actionTaxableRaw = 1000 }) {
+function makeStubEngine({
+    monthlyWithdrawal,
+    actionTax,
+    actionTaxableRaw = 1000,
+    actionSources = [{ kind: 'aktien_alt', brutto: 1000, steuer: actionTax, netto: 1000 - actionTax }]
+}) {
     return {
         simulateSingleYear: (_engineInput, lastState) => ({
             ui: {
@@ -99,7 +104,7 @@ function makeStubEngine({ monthlyWithdrawal, actionTax, actionTaxableRaw = 1000 
                     type: 'TRANSACTION',
                     title: 'Test Transaction',
                     anweisungKlasse: 'anweisung-gelb',
-                    quellen: [{ kind: 'aktien_alt', brutto: 1000, steuer: actionTax, netto: 1000 - actionTax }],
+                    quellen: actionSources,
                     verwendungen: {},
                     nettoErlös: 1000 - actionTax,
                     steuer: actionTax,
@@ -218,6 +223,87 @@ function makeStubEngine({ monthlyWithdrawal, actionTax, actionTaxableRaw = 1000 
         'Partial regular sale should reconcile scaled reserve against scaled settlement');
 }
 
+// 0ad) Signed cash interest participates in the same annual settlement and SPB.
+{
+    const actionResult = {
+        steuer: 0,
+        taxSettlement: {},
+        taxRawAggregate: { sumRealizedGainSigned: 0, sumTaxableAfterTqfSigned: 0 }
+    };
+    const spendingNewState = {};
+    const recompute = applySimulatorTaxRecompute({
+        didForcedSale: false,
+        actionResult,
+        spendingNewState,
+        taxStatePrev: { lossCarry: 0 },
+        combinedTaxRawAggregate: buildTaxRawAggregate(),
+        sparerPauschbetrag: 1000,
+        kirchensteuerSatz: 0,
+        cashInterestIncomeSigned: 2000
+    });
+    assertClose(actionResult.steuer, 1000 * 0.26375, 1e-9,
+        'Positive cash interest above SPB should create annual settlement tax');
+    assertClose(recompute.taxCashAdjustment, -1000 * 0.26375, 1e-9,
+        'Interest tax without a sale reserve should be a signed cash charge');
+    assertClose(actionResult.taxSettlement.spbUsedThisYear, 1000, 1e-9,
+        'Cash interest should consume the existing annual SPB');
+    assertEqual(actionResult.taxSettlement.taxableBaseIncludesCashInterest, true,
+        'Settlement provenance should mark cash interest as included');
+    assertClose(actionResult.taxRawAggregate.cashInterestIncomeSigned, 2000, 1e-9,
+        'Raw annual diagnostics should retain signed cash interest');
+    assertClose(spendingNewState.taxState.lossCarry, 0, 1e-9,
+        'Positive cash interest should update the shared annual tax state');
+}
+
+// 0ae) Sale gains and interest share one allowance instead of being settled separately.
+{
+    const saleRaw = buildTaxRawAggregate({
+        sumRealizedGainSigned: 800,
+        sumTaxableAfterTqfSigned: 800
+    });
+    const actionResult = { steuer: 0, taxSettlement: {}, taxRawAggregate: saleRaw };
+    const recompute = applySimulatorTaxRecompute({
+        didForcedSale: false,
+        actionResult,
+        spendingNewState: {},
+        taxStatePrev: { lossCarry: 0 },
+        combinedTaxRawAggregate: saleRaw,
+        sparerPauschbetrag: 1000,
+        kirchensteuerSatz: 0,
+        cashInterestIncomeSigned: 700
+    });
+    assertClose(recompute.totalTaxesThisYear, 500 * 0.26375, 1e-9,
+        'Sale gain and cash interest should share one SPB in the central settlement');
+    assertClose(actionResult.taxSettlement.saleTaxDue, 0, 1e-9,
+        'Sale-only comparison should remain tax-free below SPB');
+    assertClose(actionResult.taxSettlement.cashInterestTaxDelta, 500 * 0.26375, 1e-9,
+        'Diagnostics should isolate the incremental interest tax in the shared settlement');
+}
+
+// 0af) Negative cash interest reduces the signed annual taxable base.
+{
+    const saleRaw = buildTaxRawAggregate({
+        sumRealizedGainSigned: 1500,
+        sumTaxableAfterTqfSigned: 1500
+    });
+    const saleTax = 1500 * 0.26375;
+    const actionResult = { steuer: saleTax, taxSettlement: {}, taxRawAggregate: saleRaw };
+    const recompute = applySimulatorTaxRecompute({
+        didForcedSale: false,
+        actionResult,
+        spendingNewState: {},
+        taxStatePrev: { lossCarry: 0 },
+        combinedTaxRawAggregate: saleRaw,
+        sparerPauschbetrag: 0,
+        kirchensteuerSatz: 0,
+        cashInterestIncomeSigned: -1000
+    });
+    assertClose(recompute.totalTaxesThisYear, 500 * 0.26375, 1e-9,
+        'Negative cash interest should reduce the signed annual taxable base');
+    assertClose(recompute.taxCashAdjustment, 1000 * 0.26375, 1e-9,
+        'Tax over-reserved by the sale path should return to operative cash');
+}
+
 // 0ab) An underfunded reserve is a hard contract error, not another cash withdrawal.
 {
     let error = null;
@@ -270,6 +356,25 @@ function makeStubEngine({ monthlyWithdrawal, actionTax, actionTaxableRaw = 1000 
         'Sub-cent floating-point under-reserve must normalize to zero cash adjustment');
     assert(actionResult.taxSettlement.taxCashAdjustment === 0,
         'Settlement diagnostics must not expose a negative-zero cash adjustment');
+}
+
+// 0ad) A real positive sub-cent refund remains signed cash, not rounding noise.
+{
+    const actionResult = { steuer: 0.005, taxSettlement: {}, taxRawAggregate: {} };
+    const recompute = applySimulatorTaxRecompute({
+        didForcedSale: true,
+        actionResult,
+        spendingNewState: {},
+        taxStatePrev: { lossCarry: 0 },
+        combinedTaxRawAggregate: buildTaxRawAggregate(),
+        sparerPauschbetrag: 0,
+        kirchensteuerSatz: 0,
+        forcedTaxReserved: 0
+    });
+    assertClose(recompute.taxCashAdjustment, 0.005, 1e-12,
+        'Positive sub-cent tax refunds must remain visible in cash reconciliation');
+    assertClose(actionResult.taxSettlement.taxCashAdjustment, 0.005, 1e-12,
+        'Settlement diagnostics must retain a positive sub-cent refund');
 }
 
 // 0a) Direct recompute consumes existing loss carry before SPB/final tax.
@@ -445,6 +550,48 @@ function makeStubEngine({ monthlyWithdrawal, actionTax, actionTaxableRaw = 1000 
     assert(result.totalTaxesThisYear === 77, 'Year tax should come from action.steuer directly');
     assertClose(result.ui.action.taxSettlement.taxCashAdjustment, 0, 1e-9,
         'Scale-1 year without forced sale should not run simulator cash reconciliation');
+}
+
+// 3) Ten deterministic years reconcile reserves without cumulative tax/cash drift.
+{
+    const inputs = buildInputs({ startFloorBedarf: 0, startFlexBedarf: 0, startSPB: 1000 });
+    const state = buildState({
+        baseFloor: 0,
+        baseFlex: 0,
+        portfolio: {
+            depotTranchesAktien: [],
+            depotTranchesGold: [],
+            liquiditaet: 200000
+        }
+    });
+    const engine = makeStubEngine({
+        monthlyWithdrawal: 0,
+        actionTax: 0,
+        actionTaxableRaw: 0,
+        actionSources: []
+    });
+    const result = simulateOneYear(
+        state,
+        inputs,
+        { ...crashYear, rendite: 0, zinssatz: 5 },
+        0,
+        null,
+        0,
+        null,
+        1,
+        engine
+    );
+    const expectedInterest = 10000;
+    const expectedTax = (expectedInterest - 1000) * 0.26375;
+    assert(!result.isRuin, 'Interest-only marker year should complete without a sale');
+    assertClose(result.ui.action.taxSettlement.cashInterestIncomeSigned, expectedInterest, 1e-9,
+        'Interest-only marker year should feed signed interest into annual settlement');
+    assertClose(result.totalTaxesThisYear, expectedTax, 1e-9,
+        'Interest-only marker year should tax interest above the shared SPB');
+    assertClose(result.portfolio.liquiditaet, 200000 + expectedInterest - expectedTax, 1e-9,
+        'Interest-only marker year should pay interest tax from accrued cash');
+    assertClose(result.logData.portfolio_flow_delta, 0, 0.01,
+        'Interest tax, cash delta and FlowDelta should reconcile exactly once');
 }
 
 // 3) Ten deterministic years reconcile reserves without cumulative tax/cash drift.

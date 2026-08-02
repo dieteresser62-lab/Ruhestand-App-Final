@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath, URL as NodeURL } from 'node:url';
-import { initTranchenManagerPage } from '../app/tranches/tranchen-manager-page.js';
+import { describeLegacyTaxMigration, initTranchenManagerPage } from '../app/tranches/tranchen-manager-page.js';
 import { PersistenceFacade, persistenceStorage } from '../app/shared/persistence-facade.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -140,6 +140,7 @@ function createTranchenPageDom() {
         'category',
         'type',
         'tqf',
+        'taxExempt',
         'notes'
     ].forEach(id => doc.register(new MockElement(id)));
     [
@@ -218,6 +219,22 @@ function shouldRun() {
 async function runTranchenManagerPageTests() {
     console.log('--- Tranchen Manager Page Tests ---');
 
+    console.log('Test 1a: legacy tax migration is quantified and visible');
+    {
+        const warning = describeLegacyTaxMigration(JSON.stringify([
+            { schemaVersion: 1, category: 'equity', type: 'aktien_alt', tqf: 0.3 },
+            { schemaVersion: 1, category: 'gold', type: 'gold', tqf: 1 },
+            { category: 'money_market', type: 'geldmarkt', tqf: 0.3 }
+        ]));
+        assert(warning.includes('3 Legacy-Tranche(n)'), 'Migration warning quantifies every affected legacy lot');
+        assert(warning.includes('1 alte Gold-TQF-1-Kodierung(en)'), 'Migration warning quantifies converted Gold exemptions');
+        assert(warning.includes('1 unbelegte Nicht-Aktien-TQF'), 'Migration warning quantifies reset non-equity TQF values');
+        assert(warning.includes('rechnet die Simulation mit diesen konservativen Annahmen'),
+            'Migration warning states the active calculation consequence until confirmation');
+        assertEqual(describeLegacyTaxMigration(JSON.stringify([{ schemaVersion: 2, taxExempt: false }])), '',
+            'Current schema does not display a migration warning');
+    }
+
     console.log('Test 1: page initializes empty storage without crashing');
     {
         const storageRef = createLocalStorageMock();
@@ -268,6 +285,8 @@ async function runTranchenManagerPageTests() {
 
         assertEqual(window.tranchen.length, 1, 'Valid storage should load one tranche');
         assertEqual(window.tranchen[0].currentPrice, 120, 'Offline price update must preserve existing local price');
+        assert(doc.getElementById('tranchePersistenceStatus').textContent.includes('1 Legacy-Tranche(n)'),
+            'Loaded legacy storage must surface the tax-contract migration before user confirmation');
         const offlineStatus = doc.getElementById('priceUpdateStatus').textContent;
         assert(offlineStatus.startsWith('Kurse konnten nicht aktualisiert werden.'), 'Offline update should render a concise failure status');
         assert(offlineStatus.includes('ETF: Lokaler Kursproxy nicht erreichbar'), 'Offline update should name the affected tranche and understandable reason');

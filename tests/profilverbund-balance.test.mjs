@@ -478,7 +478,7 @@ global.localStorage = createLocalStorageMock();
 {
     console.log('\n📋 Test 8a: household tranche IDs are profile-scoped');
     const sharedTranche = {
-        schemaVersion: 1,
+        schemaVersion: 2,
         trancheId: 'shared-lot',
         name: 'Shared lot',
         isin: '',
@@ -490,6 +490,7 @@ global.localStorage = createLocalStorageMock();
         category: 'equity',
         type: 'aktien_neu',
         tqf: 0.3,
+        taxExempt: false,
         notes: '',
         marketValue: 240,
         costBasis: 200
@@ -532,6 +533,13 @@ global.localStorage = createLocalStorageMock();
     assertEqual(owned.length, 4, 'Fallback should expose every positive profile asset exactly once');
     assert(owned.every(tranche => tranche.sourceProfileId === 'fallback-a'), 'Every fallback tranche should have one sourceProfileId');
     assert(owned.every(tranche => tranche.syntheticProfileFallback === true), 'Fallback tranches should remain diagnostically identifiable');
+    assert(owned.every(tranche => tranche.schemaVersion === 2 && typeof tranche.taxExempt === 'boolean'),
+        'Every fallback tranche should satisfy the explicit v2 engine tax contract');
+    const gold = owned.find(tranche => tranche.category === 'gold');
+    assertEqual(gold?.tqf, 0, 'Synthetic gold should never encode tax exemption as TQF');
+    assertEqual(gold?.taxExempt, true, 'Synthetic gold should preserve the explicit profile exemption');
+    const normalized = normalizeTrancheCollection(owned, { mode: 'engine' });
+    assertEqual(normalized.length, 4, 'Strict engine normalization should accept every synthetic fallback tranche');
 }
 
 // --- TEST 9: Household need counts shared spending and all income exactly once ---
@@ -762,6 +770,47 @@ global.localStorage = createLocalStorageMock();
     const proportionalOwners = new Set(proportional.finalAction.quellen.map(source => source.sourceProfileId));
     assertEqual(proportionalOwners.size, 2, 'Proportional mode should attribute the sale across both equally weighted owners');
     assertClose(proportional.finalAction.nettoErlös, 10000, 0.01, 'Mode may change sources but not the household total');
+}
+
+// --- TEST 16b: Explicit exemption participates in household attribution ---
+{
+    console.log('\n📋 Test 16b: explicit tax exemption in household attribution');
+    const profiles = [
+        {
+            profileId: 'named-taxable-owner',
+            inputs: { depotwertNeu: 20000, tagesgeld: 0, sparerPauschbetrag: 0, kirchensteuerSatz: 0 },
+            tranches: [{
+                trancheId: 'named-taxable', name: 'Altbestand steuerfrei', type: 'aktien_neu', category: 'equity',
+                marketValue: 20000, costBasis: 10000, tqf: 0, taxExempt: false
+            }],
+            balanceState: { lastState: { taxState: { lossCarry: 0 } } }
+        },
+        {
+            profileId: 'explicit-exempt-owner',
+            inputs: { depotwertNeu: 20000, tagesgeld: 0, sparerPauschbetrag: 0, kirchensteuerSatz: 0 },
+            tranches: [{
+                trancheId: 'explicit-exempt', name: 'Neutral', type: 'aktien_neu', category: 'equity',
+                marketValue: 20000, costBasis: 10000, tqf: 0, taxExempt: true
+            }],
+            balanceState: { lastState: { taxState: { lossCarry: 0 } } }
+        }
+    ];
+    const householdAction = {
+        type: 'TRANSACTION',
+        quellen: [{
+            kind: 'aktien_neu', category: 'equity', sourceProfileId: 'named-taxable-owner',
+            trancheId: 'named-taxable-owner:named-taxable', brutto: 10000, steuer: 1318.75, netto: 8681.25,
+            tqf: 0, taxExempt: false, realizedGainSigned: 5000, taxableAfterTqfSigned: 5000
+        }],
+        verwendungen: { liquiditaet: 10000 }
+    };
+    const optimized = attributeHouseholdAction({ householdAction, profiles, mode: 'tax_optimized' });
+    assertEqual(optimized.finalAction.quellen[0].sourceProfileId, 'explicit-exempt-owner',
+        'Household attribution should prefer the explicitly exempt lot');
+    assertEqual(optimized.finalAction.quellen[0].taxExempt, true,
+        'Household source should retain explicit exemption provenance');
+    assertClose(optimized.finalAction.steuer, 0, 0.001,
+        'Explicitly exempt household sale should create no current tax');
 }
 
 // --- TEST 17: Money-market tranches never become equity-sale candidates ---

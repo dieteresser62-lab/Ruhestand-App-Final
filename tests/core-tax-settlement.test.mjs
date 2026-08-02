@@ -180,16 +180,16 @@ function assertSaleContract(action, messagePrefix) {
         tqfAlt: 0.3,
         detailledTranches: [
             {
-                trancheId: 'loss-lot', type: 'aktien_alt', category: 'equity',
-                marketValue: 1500, costBasis: 1950, tqf: 0.3, purchaseDate: '2020-01-01'
+                trancheId: 'loss-lot', schemaVersion: 2, type: 'aktien_alt', category: 'equity',
+                marketValue: 1500, costBasis: 1950, tqf: 0.3, taxExempt: false, purchaseDate: '2020-01-01'
             },
             {
-                trancheId: 'gain-lot', type: 'aktien_alt', category: 'equity',
-                marketValue: 1500, costBasis: 750, tqf: 0.3, purchaseDate: '2021-01-01'
+                trancheId: 'gain-lot', schemaVersion: 2, type: 'aktien_alt', category: 'equity',
+                marketValue: 1500, costBasis: 750, tqf: 0.3, taxExempt: false, purchaseDate: '2021-01-01'
             },
             {
-                trancheId: 'high-gain-lot', type: 'aktien_alt', category: 'equity',
-                marketValue: 3000, costBasis: 0, tqf: 0.3, purchaseDate: '2022-01-01'
+                trancheId: 'high-gain-lot', schemaVersion: 2, type: 'aktien_alt', category: 'equity',
+                marketValue: 3000, costBasis: 0, tqf: 0.3, taxExempt: false, purchaseDate: '2022-01-01'
             }
         ]
     }, {});
@@ -217,12 +217,12 @@ function assertSaleContract(action, messagePrefix) {
         tqfAlt: 0.3,
         detailledTranches: [
             {
-                trancheId: 'loss-only-lot', type: 'aktien_alt', category: 'equity',
-                marketValue: 1000, costBasis: 1300, tqf: 0.3, purchaseDate: '2020-01-01'
+                trancheId: 'loss-only-lot', schemaVersion: 2, type: 'aktien_alt', category: 'equity',
+                marketValue: 1000, costBasis: 1300, tqf: 0.3, taxExempt: false, purchaseDate: '2020-01-01'
             },
             {
-                trancheId: 'gain-not-sold', type: 'aktien_alt', category: 'equity',
-                marketValue: 1000, costBasis: 0, tqf: 0.3, purchaseDate: '2021-01-01'
+                trancheId: 'gain-not-sold', schemaVersion: 2, type: 'aktien_alt', category: 'equity',
+                marketValue: 1000, costBasis: 0, tqf: 0.3, taxExempt: false, purchaseDate: '2021-01-01'
             }
         ]
     }, {});

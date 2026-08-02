@@ -20,6 +20,7 @@ function createElement(id, doc) {
         textContent: '',
         hidden: false,
         disabled: false,
+        checked: false,
         options: [],
         listeners: {},
         attributes: new Map(),
@@ -46,7 +47,7 @@ function createDocumentMock() {
     const elements = new Map();
     const ids = [
         'modalTitle', 'trancheModal', 'trancheForm', 'name', 'isin', 'ticker', 'shares',
-        'purchasePrice', 'currentPrice', 'purchaseDate', 'category', 'type', 'tqf', 'notes',
+        'purchasePrice', 'currentPrice', 'purchaseDate', 'category', 'type', 'tqf', 'taxExempt', 'notes',
         'trancheFormError', 'closeTrancheModalBtn', 'saveTrancheBtn', 'opener'
     ];
     ids.forEach(id => elements.set(id, createElement(id, doc)));
@@ -56,7 +57,7 @@ function createDocumentMock() {
         .map(value => ({ value, disabled: false, hidden: false }));
     const focusOrder = [
         'name', 'isin', 'ticker', 'shares', 'purchasePrice', 'currentPrice', 'purchaseDate',
-        'category', 'type', 'tqf', 'notes', 'closeTrancheModalBtn', 'saveTrancheBtn'
+        'category', 'type', 'tqf', 'taxExempt', 'notes', 'closeTrancheModalBtn', 'saveTrancheBtn'
     ].map(id => elements.get(id));
     elements.get('trancheModal').querySelectorAll = () => focusOrder;
     doc.getElementById = id => elements.get(id) || null;
@@ -67,9 +68,11 @@ console.log('Test 1: create modal resets form and opens');
 {
     const doc = createDocumentMock();
     doc.getElementById('tqf').value = '0.1';
+    doc.getElementById('taxExempt').checked = true;
     openCreateTrancheModal(doc);
     assertEqual(doc.getElementById('modalTitle').textContent, 'Neue Tranche hinzufügen', 'Create modal should set title');
-    assertEqual(doc.getElementById('tqf').value, '0.30', 'Create modal should reset default tqf');
+    assertEqual(doc.getElementById('tqf').value, '0', 'Create modal should reset TQF without asset-class inference');
+    assertEqual(doc.getElementById('taxExempt').checked, false, 'Create modal should reset explicit tax exemption');
     assert(doc.getElementById('trancheModal').classList.has('active'), 'Create modal should open modal');
     assertEqual(doc.activeElement.id, 'name', 'Create modal should focus the first form field');
     assert(doc.getElementById('type').options.find(option => option.value === 'gold').disabled, 'Create modal should hide incompatible types');
@@ -90,10 +93,12 @@ console.log('Test 2: edit modal fills fields');
         category: 'equity',
         type: 'aktien_neu',
         tqf: 0.3,
+        taxExempt: true,
         notes: 'Test'
     }, doc);
     assertEqual(doc.getElementById('name').value, 'ETF', 'Edit modal should fill name');
     assertEqual(doc.getElementById('ticker').value, 'VWCE', 'Edit modal should fill ticker');
+    assertEqual(doc.getElementById('taxExempt').checked, true, 'Edit modal should fill explicit tax exemption');
     assert(doc.getElementById('trancheModal').classList.has('active'), 'Edit modal should open modal');
 }
 console.log('✓ edit modal fills fields OK');
@@ -109,10 +114,12 @@ console.log('Test 3: readTrancheFromForm computes derived values');
     doc.getElementById('category').value = 'equity';
     doc.getElementById('type').value = 'aktien_neu';
     doc.getElementById('tqf').value = '0.3';
+    doc.getElementById('taxExempt').checked = true;
     const tranche = readTrancheFromForm('id-1', doc);
     assertEqual(tranche.trancheId, 'id-1', 'Form reader should preserve existing id');
     assertEqual(tranche.marketValue, 1200, 'Form reader should compute market value');
     assertEqual(tranche.costBasis, 1000, 'Form reader should compute cost basis');
+    assertEqual(tranche.taxExempt, true, 'Form reader should persist explicit tax exemption');
 }
 console.log('✓ readTrancheFromForm computes derived values OK');
 

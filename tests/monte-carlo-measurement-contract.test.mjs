@@ -87,6 +87,7 @@ const benchmarkResults = readFixture('benchmark-results-2026-07-22.json');
 const consumerInventory = readFixture('consumer-inventory-v1.json');
 const slice08MeasurementPath = path.join(fixtureDir, 'liquidity-runway-slice-08-v1.json');
 const slice09MeasurementPath = path.join(fixtureDir, 'minimum-flex-slice-09-v1.json');
+const slice10MeasurementPath = path.join(fixtureDir, 'tax-logic-slice-10-v1.json');
 
 function getGolden(id) {
     return goldenFixture.cases.find(entry => entry.id === id);
@@ -1587,15 +1588,6 @@ if (process.env.MC_PRINT_SLICE_08 === '1') {
     console.log('__POST_BACKTEST_DATA_08_CAPTURE_START__');
     console.log(JSON.stringify(currentSlice08Measurement, null, 2));
     console.log('__POST_BACKTEST_DATA_08_CAPTURE_END__');
-} else {
-    const { targetMeasurement: _demographyTargetMeasurement, ...expectedSlice08Measurement } = slice08ExpectedFixture;
-    compareSnapshotNode(
-        currentSlice08Measurement,
-        expectedSlice08Measurement,
-        'postBacktestData08.measurement',
-        sameRuntime,
-        activeSnapshot.metadata.numericTolerance
-    );
 }
 const slice08FixtureSha256 = createHash('sha256')
     .update(fs.readFileSync(slice08MeasurementPath))
@@ -1635,17 +1627,48 @@ if (process.env.MC_PRINT_SLICE_09 === '1') {
     console.log('__POST_BACKTEST_DATA_09_CAPTURE_START__');
     console.log(JSON.stringify(currentSlice09Measurement, null, 2));
     console.log('__POST_BACKTEST_DATA_09_CAPTURE_END__');
+}
+assertEqual(slice08FixtureSha256, slice09ExpectedFixture.sourceFixtureSha256, 'Slice 09 must consume the byte-identical Slice-08 Monte Carlo fixture');
+const slice09FixtureSha256 = createHash('sha256')
+    .update(fs.readFileSync(slice09MeasurementPath))
+    .digest('hex');
+const currentSlice10Measurement = {
+    schemaVersion: 'TaxLogicSlice10MonteCarloMeasurementV1',
+    snapshotId: 'post-backtest-data-10-v1',
+    sourceReference: 'post-backtest-data-09-v1',
+    sourceFixtureSha256: slice09FixtureSha256,
+    sourceResultDocument: 'docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_09_FLOOR_MINDEST_FLEX_STABILISATOR.md',
+    targetResultDocument: 'docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_10_HEUTIGE_STEUERLOGIK.md',
+    reviewStatus: 'pending',
+    sourceProjectionHashes: slice09ExpectedFixture.targetProjectionHashes,
+    targetProjectionHashes: {
+        carResultSha256: sha256Json(actualSlice07Result),
+        autoOptimizeResultSha256: sha256Json(actualAutoOptimizeProjection),
+        finalResultSha256: sha256Json(actualFinalProjection)
+    },
+    changedProjectionCount: [
+        ['carResultSha256', sha256Json(actualSlice07Result)],
+        ['autoOptimizeResultSha256', sha256Json(actualAutoOptimizeProjection)],
+        ['finalResultSha256', sha256Json(actualFinalProjection)]
+    ].filter(([key, value]) => slice09ExpectedFixture.targetProjectionHashes[key] !== value).length,
+    economicAggregateDeltaExpected: true
+};
+if (process.env.MC_PRINT_SLICE_10 === '1') {
+    console.log('__POST_BACKTEST_DATA_10_CAPTURE_START__');
+    console.log(JSON.stringify(currentSlice10Measurement, null, 2));
+    console.log('__POST_BACKTEST_DATA_10_CAPTURE_END__');
 } else {
+    const slice10ExpectedFixture = JSON.parse(fs.readFileSync(slice10MeasurementPath, 'utf8'));
     compareSnapshotNode(
-        currentSlice09Measurement,
-        slice09ExpectedFixture,
-        'postBacktestData09.measurement',
+        currentSlice10Measurement,
+        slice10ExpectedFixture,
+        'postBacktestData10.measurement',
         sameRuntime,
         activeSnapshot.metadata.numericTolerance
     );
 }
-assertEqual(slice08FixtureSha256, slice09ExpectedFixture.sourceFixtureSha256, 'Slice 09 must consume the byte-identical Slice-08 Monte Carlo fixture');
-assertEqual(currentSlice09Measurement.changedProjectionCount, 0, 'Slice 09 must not change the measured Monte Carlo/Sweep aggregate projections');
+assertEqual(currentSlice10Measurement.changedProjectionCount, 3,
+    'Slice 10 tax logic should change all three measured Monte Carlo/Sweep aggregate projections');
 assertEqual(MONTE_CARLO_SNAPSHOT_POLICY.finalCandidate, finalCandidate.snapshotId, 'Public snapshot policy must name the integrated final candidate');
 assertEqual(
     MONTE_CARLO_SNAPSHOT_POLICY.currentReference,

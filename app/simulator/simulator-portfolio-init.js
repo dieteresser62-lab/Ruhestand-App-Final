@@ -152,6 +152,7 @@ export function carveOutHealthBucketFromPortfolio(portfolio, inputs = {}) {
             marketValue: usedFromUntranchedMoneyMarket,
             costBasis: usedFromUntranchedMoneyMarket,
             tqf: 0,
+            taxExempt: false,
             type: 'geldmarkt',
             category: 'money_market',
             name: 'Geldmarkt (aggregiert)',
@@ -239,6 +240,12 @@ export function initializePortfolioDetailed(inputs) {
                 : (shares > 0 && marketValueRaw > 0 ? marketValueRaw / shares : 0);
             const marketValue = marketValueRaw > 0 ? marketValueRaw : (shares * currentPrice);
             const costBasis = costBasisRaw > 0 ? costBasisRaw : (shares * purchasePrice);
+            const rawTqf = Number.isFinite(Number(tranche.tqf)) ? Number(tranche.tqf) : 0;
+            const isLegacyTaxContract = !Number.isInteger(tranche.schemaVersion) || tranche.schemaVersion < 2;
+            const migratedLegacyGoldExemption = isLegacyTaxContract
+                && category === 'gold'
+                && rawTqf === 1
+                && typeof tranche.taxExempt !== 'boolean';
             const trancheObj = {
                 ...tranche,
                 trancheId: tranche.trancheId || tranche.id || null,
@@ -250,9 +257,8 @@ export function initializePortfolioDetailed(inputs) {
                 currentPrice,
                 marketValue,
                 costBasis,
-                tqf: Number.isFinite(Number(tranche.tqf))
-                    ? Number(tranche.tqf)
-                    : (category === 'equity' ? 0.30 : 0),
+                tqf: category === 'equity' ? rawTqf : 0,
+                taxExempt: migratedLegacyGoldExemption || tranche.taxExempt === true,
                 type: normalizedType || 'aktien_alt',
                 category
             };
@@ -286,7 +292,9 @@ export function initializePortfolioDetailed(inputs) {
         tagesgeld,
         geldmarktEtf,
         simulationSourceProfileId,
-        simulationGoldTqf: inputs.goldSteuerfrei ? 1 : 0,
+        simulationEquityTqf: Number.isFinite(Number(inputs.tqfNeu)) ? Number(inputs.tqfNeu) : 0,
+        simulationGoldTqf: 0,
+        simulationGoldTaxExempt: inputs.goldSteuerfrei === true,
         simulationDate: '1970-01-01'
     }, inputs);
 }
@@ -327,7 +335,8 @@ export function initializePortfolio(inputs) {
             trancheId: `simbase:${encodeURIComponent(simulationSourceProfileId)}:aktien_alt`,
             marketValue: inputs.depotwertAlt,
             costBasis: inputs.einstandAlt,
-            tqf: 0.30,
+            tqf: Number.isFinite(Number(inputs.tqfAlt)) ? Number(inputs.tqfAlt) : 0,
+            taxExempt: false,
             type: 'aktien_alt',
             category: 'equity',
             sourceProfileId: simulationSourceProfileId
@@ -338,7 +347,8 @@ export function initializePortfolio(inputs) {
             trancheId: `simbase:${encodeURIComponent(simulationSourceProfileId)}:aktien_neu`,
             marketValue: depotwertNeu,
             costBasis: depotwertNeu,
-            tqf: 0.30,
+            tqf: Number.isFinite(Number(inputs.tqfNeu)) ? Number(inputs.tqfNeu) : 0,
+            taxExempt: false,
             type: 'aktien_neu',
             category: 'equity',
             sourceProfileId: simulationSourceProfileId
@@ -350,6 +360,7 @@ export function initializePortfolio(inputs) {
             marketValue: inputs.geldmarktEtf,
             costBasis: inputs.geldmarktEtf,
             tqf: 0,
+            taxExempt: false,
             type: 'geldmarkt',
             category: 'money_market',
             sourceProfileId: simulationSourceProfileId
@@ -360,7 +371,8 @@ export function initializePortfolio(inputs) {
             trancheId: `simbase:${encodeURIComponent(simulationSourceProfileId)}:gold`,
             marketValue: zielwertGold,
             costBasis: zielwertGold,
-            tqf: inputs.goldSteuerfrei ? 1.0 : 0.0,
+            tqf: 0,
+            taxExempt: inputs.goldSteuerfrei === true,
             type: 'gold',
             category: 'gold',
             sourceProfileId: simulationSourceProfileId
@@ -375,7 +387,9 @@ export function initializePortfolio(inputs) {
         tagesgeld: inputs.tagesgeld || 0,
         geldmarktEtf: inputs.geldmarktEtf || 0,
         simulationSourceProfileId,
-        simulationGoldTqf: inputs.goldSteuerfrei ? 1 : 0,
+        simulationEquityTqf: Number.isFinite(Number(inputs.tqfNeu)) ? Number(inputs.tqfNeu) : 0,
+        simulationGoldTqf: 0,
+        simulationGoldTaxExempt: inputs.goldSteuerfrei === true,
         simulationDate: '1970-01-01'
     }, inputs);
 }

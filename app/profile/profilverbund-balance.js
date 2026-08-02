@@ -189,7 +189,8 @@ function buildSyntheticProfileTranches(entry) {
             category: 'equity',
             marketValue: inputs.depotwertAlt,
             costBasis: inputs.costBasisAlt,
-            tqf: inputs.tqfAlt
+            tqf: inputs.tqfAlt,
+            taxExempt: false
         },
         {
             suffix: 'aktien_neu',
@@ -197,7 +198,8 @@ function buildSyntheticProfileTranches(entry) {
             category: 'equity',
             marketValue: inputs.depotwertNeu,
             costBasis: inputs.costBasisNeu,
-            tqf: inputs.tqfNeu
+            tqf: inputs.tqfNeu,
+            taxExempt: false
         },
         {
             suffix: 'gold',
@@ -205,7 +207,8 @@ function buildSyntheticProfileTranches(entry) {
             category: 'gold',
             marketValue: inputs.goldWert,
             costBasis: inputs.goldCost,
-            tqf: inputs.goldSteuerfrei ? 1 : 0
+            tqf: 0,
+            taxExempt: inputs.goldSteuerfrei === true
         },
         {
             suffix: 'geldmarkt',
@@ -213,19 +216,22 @@ function buildSyntheticProfileTranches(entry) {
             category: 'money_market',
             marketValue: inputs.geldmarktEtf,
             costBasis: inputs.geldmarktEtf,
-            tqf: 0
+            tqf: 0,
+            taxExempt: false
         }
     ];
     return definitions
         .filter(definition => readNumber(definition.marketValue, 0) > 0)
         .map(definition => ({
             trancheId: `profilverbund:${profileId}:${definition.suffix}`,
+            schemaVersion: 2,
             name: `${profileName} ${definition.suffix}`,
             type: definition.type,
             category: definition.category,
             marketValue: readNumber(definition.marketValue, 0),
             costBasis: readNumber(definition.costBasis, 0),
             tqf: readNumber(definition.tqf, 0),
+            taxExempt: definition.taxExempt === true,
             sourceProfileId: profileId,
             sourceProfileName: profileName,
             syntheticProfileFallback: true

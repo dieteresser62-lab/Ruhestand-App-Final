@@ -30,14 +30,15 @@ Der Feldname fuer Engine- und Simulatorinputs bleibt bewusst
 `detailledTranches`. Beide Namen haben unterschiedliche Ebenen und duerfen nicht
 umbenannt oder vermischt werden.
 
-Eine persistierte Schema-1-Tranche enthaelt:
+Eine persistierte Schema-2-Tranche enthaelt:
 
-- `schemaVersion: 1`, stabile `trancheId` und einen nichtleeren `name`;
+- `schemaVersion: 2`, stabile `trancheId` und einen nichtleeren `name`;
 - optionale, normalisierte Identifikatoren `isin` und `ticker`;
 - positive endliche `shares`, `purchasePrice` und `currentPrice`;
 - optionales ISO-Kaufdatum `purchaseDate` (`JJJJ-MM-TT`);
 - ein zulaessiges Paar aus `category` und `type`;
 - explizit bestaetigte Teilfreistellung `tqf` zwischen `0` und `1`;
+- den expliziten booleschen Steuerfreiheitsstatus `taxExempt`;
 - optionale `notes`.
 
 `marketValue`, `costBasis` und `instrumentId` werden abgeleitet. Persistierte
@@ -54,15 +55,22 @@ schreibt weder Provenienz noch die profilbezogene Laufzeit-ID in den Realbestand
 | `money_market` | `geldmarkt` |
 | `gold` | `gold` |
 
-Widerspruechliche Schema-1-Paare, doppelte IDs, nicht endliche Finanzwerte,
-fehlende TQF oder unbekannte Schema-Versionen werden gemeinsam und strukturiert
-abgelehnt. Es gibt keine Prioritaetsregel, die einen aktuellen Widerspruch still
-korrigiert.
+Widerspruechliche Schema-2-Paare, doppelte IDs, nicht endliche Finanzwerte,
+fehlende TQF, fehlendes beziehungsweise nicht boolesches `taxExempt` oder
+unbekannte Schema-Versionen werden gemeinsam und strukturiert abgelehnt.
+Nur Aktien-/Aktienfonds-Tranchen duerfen eine positive TQF tragen. Geldmarkt,
+Anleihen und Gold muessen `tqf: 0` verwenden. Es gibt keine Prioritaetsregel,
+die einen aktuellen Widerspruch still korrigiert.
 
 ## 3. Legacy-Migration und Recovery
 
-Unversionierte Datensaetze beziehungsweise `schemaVersion: 0` sind der einzige
-unterstuetzte Legacy-Eingang. `id` wird zu `trancheId`, `kind` zu `type`; eine
+Unversionierte Datensaetze sowie `schemaVersion: 0` und `schemaVersion: 1` sind
+ausschliesslich am Persistenzrand unterstuetzte Legacy-Eingaenge. Alte
+Goldkodierung `tqf: 1` wird zu `tqf: 0` plus `taxExempt: true`; andere
+Nicht-Aktien-TQF werden auf 0 gesetzt, waehrend Aktien-TQF erhalten bleibt.
+Alle uebrigen Legacy-Tranchen erhalten `taxExempt: false`. Die Manager-UI zeigt
+Anzahl und Art dieser Migration bis zur Nutzerbestaetigung an. `id` wird zu
+`trancheId`, `kind` zu `type`; eine
 fehlende Legacy-ID wird deterministisch aus Inhalt und Arrayposition erzeugt. Eine
 fehlende Legacy-Kategorie darf eindeutig aus dem Typ abgeleitet werden, ein
 fehlender Legacy-Aktuellkurs aus dem Kaufpreis. Fehlende optionale Text-/Datumsfelder

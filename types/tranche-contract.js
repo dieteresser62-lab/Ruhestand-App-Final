@@ -5,11 +5,12 @@
  *
  * Storage remains an array. The schema version therefore lives on every lot:
  * - missing / 0: supported legacy record
- * - 1: current canonical record
+ * - 1: supported legacy record without explicit tax exemption
+ * - 2: current canonical record
  * - every other value: rejected
  */
 
-export const TRANCHE_SCHEMA_VERSION = 1;
+export const TRANCHE_SCHEMA_VERSION = 2;
 
 export const TRANCHE_CATEGORY_TYPES = Object.freeze({
     equity: Object.freeze(['aktien_alt', 'aktien_neu']),
@@ -22,7 +23,7 @@ export const TRANCHE_FIELD_GROUPS = Object.freeze({
     persisted: Object.freeze([
         'schemaVersion', 'trancheId', 'name', 'isin', 'ticker', 'shares',
         'purchasePrice', 'currentPrice', 'purchaseDate', 'category', 'type',
-        'tqf', 'notes'
+        'tqf', 'taxExempt', 'notes'
     ]),
     derived: Object.freeze(['marketValue', 'costBasis', 'instrumentId']),
     provenance: Object.freeze(['sourceProfileId'])
@@ -126,7 +127,7 @@ function normalizeDate(value, errors, context) {
 function readSchemaVersion(raw, errors, context) {
     if (!hasOwn(raw, 'schemaVersion') || raw.schemaVersion === null) return 0;
     const version = raw.schemaVersion;
-    if (!Number.isInteger(version) || (version !== 0 && version !== TRANCHE_SCHEMA_VERSION)) {
+    if (!Number.isInteger(version) || ![0, 1, TRANCHE_SCHEMA_VERSION].includes(version)) {
         errors.push(fieldError(
             'TRANCHE_SCHEMA_VERSION_UNSUPPORTED', 'schemaVersion', context.index,
             context.trancheId, `Tranche-Schema-Version ${String(version)} wird nicht unterstützt.`, version
@@ -167,6 +168,28 @@ function readNumber(raw, field, errors, context, options = {}) {
         ));
     }
     return value;
+}
+
+function readTaxExempt(raw, errors, context, schemaVersion, allowPersistedLegacyMigration) {
+    if (!hasOwn(raw, 'taxExempt')) {
+        // Existing v0/v1 records had no independent exemption marker. They are
+        // migrated conservatively to taxable and never inferred from name,
+        // note, purchase date or the legacy alt/new type.
+        if (allowPersistedLegacyMigration && schemaVersion < TRANCHE_SCHEMA_VERSION) return false;
+        errors.push(fieldError(
+            'TRANCHE_TAX_EXEMPT_REQUIRED', 'taxExempt', context.index, context.trancheId,
+            'taxExempt muss fuer aktuelle Tranchendaten explizit true oder false sein.', raw.taxExempt
+        ));
+        return false;
+    }
+    if (typeof raw.taxExempt !== 'boolean') {
+        errors.push(fieldError(
+            'TRANCHE_TAX_EXEMPT_INVALID', 'taxExempt', context.index, context.trancheId,
+            'taxExempt muss ein Boolean sein.', raw.taxExempt
+        ));
+        return false;
+    }
+    return raw.taxExempt;
 }
 
 function normalizeClassification(raw, errors, context, allowLegacy, options = {}) {
@@ -312,7 +335,7 @@ function normalizeOne(raw, options = {}) {
         required: sharesRequired,
         greaterThan: 0
     });
-    const tqf = readNumber(raw, 'tqf', errors, context, {
+    let tqf = readNumber(raw, 'tqf', errors, context, {
         required: true,
         min: 0,
         requiredCode: 'TRANCHE_TQF_REQUIRED'
@@ -323,6 +346,28 @@ function normalizeOne(raw, options = {}) {
             'tqf muss zwischen 0 und 1 liegen.', tqf
         ));
     }
+    let migratedLegacyTaxExempt = null;
+    if (mode === 'persisted' && version < TRANCHE_SCHEMA_VERSION && typeof tqf === 'number' && tqf > 0 && category !== 'equity') {
+        // Schema 0/1 used TQF partly as an asset/default proxy and, for Gold
+        // with 1.0, as the old exemption encoding. Persisted legacy data is
+        // converted into the explicit Schema-2 fields so it remains editable;
+        // the manager surfaces this migration and requires user confirmation.
+        migratedLegacyTaxExempt = category === 'gold' && tqf === 1;
+        tqf = 0;
+    }
+    if (typeof tqf === 'number' && tqf > 0 && category !== 'equity') {
+        errors.push(fieldError(
+            'TRANCHE_TQF_CATEGORY_UNSUPPORTED', 'tqf', index, trancheId,
+            `Fuer die Kategorie ${category} ist keine Aktienfonds-Teilfreistellung belegt; tqf muss 0 sein.`, tqf
+        ));
+    }
+    const taxExempt = migratedLegacyTaxExempt ?? readTaxExempt(
+        raw,
+        errors,
+        context,
+        version,
+        mode === 'persisted'
+    );
 
     let marketValue;
     let costBasis;
@@ -384,6 +429,7 @@ function normalizeOne(raw, options = {}) {
         category,
         type,
         tqf,
+        taxExempt,
         notes,
         marketValue,
         costBasis,

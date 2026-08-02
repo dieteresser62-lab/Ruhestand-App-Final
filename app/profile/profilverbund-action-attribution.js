@@ -77,7 +77,7 @@ function sourceRawAggregate(source, scale = 1) {
     const tqf = Math.max(0, Math.min(1, finiteNumber(source?.tqf)));
     const taxableAfterTqfSigned = Number.isFinite(taxableRaw)
         ? taxableRaw * factor
-        : realizedGainSigned * (1 - tqf);
+        : (source?.taxExempt === true ? 0 : realizedGainSigned * (1 - tqf));
     return { sumRealizedGainSigned: realizedGainSigned, sumTaxableAfterTqfSigned: taxableAfterTqfSigned };
 }
 
@@ -222,8 +222,9 @@ function candidateFromTranche(tranche, profile, index) {
     const bucket = resolveAssetBucket(tranche);
     if (!bucket || marketValue <= EPSILON) return null;
     const tqf = readConfirmedTqf(tranche);
+    const taxExempt = tranche?.taxExempt === true;
     const realizedRatio = (marketValue - costBasis) / marketValue;
-    const taxableRatio = realizedRatio * (1 - tqf);
+    const taxableRatio = taxExempt ? 0 : realizedRatio * (1 - tqf);
     const purchaseStamp = tranche?.purchaseDate && Number.isFinite(Date.parse(tranche.purchaseDate))
         ? Date.parse(tranche.purchaseDate)
         : Number.POSITIVE_INFINITY;
@@ -241,6 +242,7 @@ function candidateFromTranche(tranche, profile, index) {
         purchaseDate: tranche?.purchaseDate || null,
         purchaseStamp,
         tqf,
+        taxExempt,
         capacity: marketValue,
         realizedRatio,
         taxableRatio,
@@ -253,12 +255,13 @@ function candidateFromPlannedSource(source, profile, index) {
     const bucket = resolveAssetBucket(source);
     if (!bucket || capacity <= EPSILON) return null;
     const tqf = readConfirmedTqf(source);
+    const taxExempt = source?.taxExempt === true;
     const realizedRatio = hasFiniteValue(source?.realizedGainSigned)
         ? finiteNumber(source.realizedGainSigned) / capacity
         : finiteNumber(source?.gainQuoteSigned, finiteNumber(source?.gainQuotePlan));
     const taxableRatio = hasFiniteValue(source?.taxableAfterTqfSigned)
         ? finiteNumber(source.taxableAfterTqfSigned) / capacity
-        : realizedRatio * (1 - tqf);
+        : (taxExempt ? 0 : realizedRatio * (1 - tqf));
     const purchaseStamp = source?.purchaseDate && Number.isFinite(Date.parse(source.purchaseDate))
         ? Date.parse(source.purchaseDate)
         : Number.POSITIVE_INFINITY;
@@ -276,6 +279,7 @@ function candidateFromPlannedSource(source, profile, index) {
         purchaseDate: source?.purchaseDate || null,
         purchaseStamp,
         tqf,
+        taxExempt,
         capacity,
         realizedRatio,
         taxableRatio,
@@ -341,6 +345,7 @@ function sourceFromCandidate(candidate, gross) {
         steuer: 0,
         netto: brutto,
         tqf: candidate.tqf,
+        taxExempt: candidate.taxExempt === true,
         gainQuotePlan: Math.max(0, candidate.realizedRatio),
         gainQuoteSigned: candidate.realizedRatio,
         realizedGainSigned,

@@ -886,7 +886,7 @@ Reconciliation bricht den gesamten Multi-Profil-Pfad ab. Erst nach erfolgreicher
 Attribution werden Haushaltssteuer, Diagnose und Liquiditäts-KPIs aus den
 finalen Quellen neu aufgebaut.
 
-**Tranchen-Contract:** Detailtranchen sind mehr als UI-Komfort. `types/tranche-contract.js` erzwingt Schema 1, eindeutige Lot-IDs, endliche Finanzwerte, explizite TQF und eine disjunkte Kategorie-/Typ-Matrix. Marktwert und Einstand werden aus Stueckzahl und Preisen abgeleitet. Gueltige unversionierte Altdaten werden deterministisch gelesen. Der Persistenz-Lesepfad migriert dabei ausschliesslich den von der frueheren Manager-UI erzeugbaren Fall eines alten Aktien-Typs unter einer eindeutigen Nicht-Aktien-Kategorie; Schema 1 und Engine-Eingaben bleiben strikt. Nicht automatisch behebbare Widersprueche, Duplikate und korrupter JSON-Rohtext bleiben unveraendert und blockieren fail-closed. Bei mehrprofiligen Haushalten muessen `trancheId` und `sourceProfileId` erhalten bleiben, damit spaetere Reduktionen nicht versehentlich Cost Basis oder Profilherkunft vermischen.
+**Tranchen-Contract:** Detailtranchen sind mehr als UI-Komfort. `types/tranche-contract.js` erzwingt Schema 2, eindeutige Lot-IDs, endliche Finanzwerte, explizite TQF, ein explizites boolesches `taxExempt` und eine disjunkte Kategorie-/Typ-Matrix. Nur Equity darf positive TQF tragen. Marktwert und Einstand werden aus Stueckzahl und Preisen abgeleitet. Unversionierte sowie Schema-0/-1-Altdaten werden ausschliesslich am Persistenzrand deterministisch migriert: alte Gold-TQF 1 wird zur expliziten Steuerfreiheit bei TQF 0, andere Nicht-Equity-TQF wird entfernt, Aktien-TQF bleibt erhalten. Die UI beziffert diese Migration und fordert eine fachliche Bestaetigung. Schema 2 und Engine-Eingaben bleiben strikt; insbesondere erzeugt eine fehlende Schemaversion keinen stillen Steuerdefault. Synthetische Profilverbund-Lots werden deshalb bereits im Profiladapter als vollstaendige Schema-2-Steuerdatensaetze erzeugt. Nicht automatisch behebbare Widersprueche, Duplikate und korrupter JSON-Rohtext bleiben unveraendert und blockieren fail-closed. Bei mehrprofiligen Haushalten muessen `trancheId` und `sourceProfileId` erhalten bleiben, damit spaetere Reduktionen nicht versehentlich Cost Basis, Steuerfreiheit oder Profilherkunft vermischen.
 
 Der automatische Quote-Pfad akzeptiert nur positive EUR-Kurse mit Symbol,
 Quelle und plausibler UTC-Zeit. Gültige Teilergebnisse eines deduplizierten
@@ -1293,14 +1293,15 @@ Die wichtigsten fachlichen Bremsen sind:
 - Bei überschüssiger Liquidität kann `transaction-surplus.mjs` Investitionsvorschläge erzeugen.
 - Wenn keine Schwelle ausgelöst wird, liefert die Engine bewusst `type: 'NONE'`.
 
-Verkäufe laufen über `sale-engine.mjs`. Die Eingangsgrenze akzeptiert nur kanonisch validierte, eindeutig klassifizierte Lots. Bei Detailtranchen werden `trancheId`, `sourceProfileId`, `isin`, Kaufdatum, Cost Basis und TQF mitgeführt. Die Reihenfolge ist steuerbewusst:
+Verkäufe laufen über `sale-engine.mjs`. Die Eingangsgrenze akzeptiert nur kanonisch validierte, eindeutig klassifizierte Lots. Bei Detailtranchen werden `trancheId`, `sourceProfileId`, `isin`, Kaufdatum, Cost Basis, TQF und `taxExempt` mitgeführt. Die Reihenfolge ist steuerbewusst:
 
 - Aktien/ETF werden primär nach niedriger effektiver Steuerlast und danach nach
   niedriger nichtnegativer Gewinnquote sortiert; der Datums-Tie-Breaker
   bevorzugt neuere Lots.
 - Gold wird untereinander nach älterem Kaufdatum zuerst sortiert. Eine
-  modellierte Steuerfreiheit entsteht nur durch das explizite Nutzerflag
-  `goldSteuerfrei`, nicht automatisch aus der Haltedauer.
+  modellierte Steuerfreiheit entsteht nur durch den expliziten
+  Steuerfreiheitsstatus (`taxExempt`, bei aggregiertem Gold aus der expliziten
+  Eingabe `goldSteuerfrei`), nicht automatisch aus der Haltedauer.
 - Bonds/Anleihen verwenden kanonisch die Kategorie `bonds` mit Typ `anleihe`.
 - Im defensiven Kontext können Gold/Bonds vor Aktien genutzt werden.
 
@@ -1770,7 +1771,8 @@ Brokerverantwortung.
 
 ### C.2.4 Explizite Modellflags statt automatische Rechtsprüfung
 
-`goldSteuerfrei` und `tranche.tqf` sind Eingaben in den Modellvertrag. Die
+`goldSteuerfrei`, `tranche.tqf` und `tranche.taxExempt` sind voneinander
+getrennte Eingaben in den Modellvertrag. Die
 Suite leitet eine Steuerbefreiung weder automatisch aus einer Gold-Haltedauer
 noch aus einem Kaufdatum vor 2009 ab. Das Kaufdatum beeinflusst die
 Verkaufsreihenfolge, ersetzt aber keinen steuerrechtlichen Nachweis. Wer
@@ -1779,11 +1781,11 @@ passenden Parameter bewusst setzen und fachlich selbst prüfen.
 
 ### C.2.5 Jahres-Settlement mit Verlustverrechnungstopf
 
-Die finale Steuer eines Jahres wird nicht pro Einzelverkauf bestimmt, sondern durch ein zentrales **Jahres-Settlement** (`tax-settlement.mjs`). Die Sale-Engine liefert dafür nur noch Roh-Aggregate (`realizedGainSigned`, `taxableAfterTqfSigned`) pro Verkauf.
+Die finale Steuer eines Jahres wird nicht pro Einzelverkauf bestimmt, sondern durch ein zentrales **Jahres-Settlement** (`tax-settlement.mjs`). Die Sale-Engine liefert dafuer Roh-Aggregate (`realizedGainSigned`, `taxableAfterTqfSigned`) pro Verkauf. Der Simulator addiert den signierten Cashzinsertrag zum steuerpflichtigen Jahresaggregat, sodass Verkaufsergebnis und Cashzins denselben Verlustvortrag und Sparer-Pauschbetrag verwenden. Die daraus entstehende Steuerzahlung oder Erstattung wird signiert mit dem verzinsten Cashbestand reconciliert.
 
 **Modellinterne Verrechnungsreihenfolge:**
 
-1. **Rohsumme bilden:** Alle Gewinne und Verluste des Jahres nach TQF summieren (`sumTaxableAfterTqfSigned`)
+1. **Rohsumme bilden:** Alle Gewinne und Verluste des Jahres nach TQF sowie den signierten Cashzinsertrag summieren (`sumTaxableAfterTqfSigned`)
 2. **Verlustvortrag verrechnen:** Vorjahres-`lossCarry` von der Summe abziehen
 3. **Sparer-Pauschbetrag anwenden:** Nur auf verbleibenden positiven Rest
 4. **Steuer berechnen:** KESt + Soli + ggf. KiSt auf finalen Steuerbetrag

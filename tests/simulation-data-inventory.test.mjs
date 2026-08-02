@@ -390,12 +390,17 @@ console.log('Test 7: source-local user/tax defaults match their inventoried cont
         );
     }
     assert(
-        portfolioInit.includes(`tqf: ${taxContract.defaultEquityTqf.toFixed(2)}`),
-        'Default equity TQF should match the inventory'
+        taxContract.defaultEquityTqf === 0 && portfolioInit.includes('tqf: Number.isFinite(Number(inputs.tqfAlt)) ? Number(inputs.tqfAlt) : 0'),
+        'Default equity TQF should be zero unless explicitly supplied'
     );
     assert(
-        portfolioInit.includes(`inputs.goldSteuerfrei ? ${taxContract.goldTaxFreeTqf}.0 : 0.0`),
-        'Gold tax-free TQF should match the inventory'
+        taxContract.defaultTaxExempt === false && portfolioInit.includes('taxExempt: false'),
+        'Default tranche tax exemption should be explicitly false'
+    );
+    assert(
+        taxContract.goldTaxExemptFromExplicitInput === true
+            && portfolioInit.includes('taxExempt: inputs.goldSteuerfrei === true'),
+        'Gold tax exemption should come from the explicit input instead of TQF'
     );
     assertSimulationDataValueHash('capital_income_tax_parameters', taxContract);
 }

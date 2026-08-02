@@ -39,6 +39,7 @@ function persistedLot(overrides = {}) {
 function engineLot(overrides = {}) {
     return {
         trancheId: 'engine-lot',
+        schemaVersion: 2,
         name: 'Engine Lot',
         marketValue: 100,
         costBasis: 80,
@@ -46,6 +47,7 @@ function engineLot(overrides = {}) {
         type: 'aktien_neu',
         category: 'equity',
         tqf: 0.30,
+        taxExempt: false,
         ...overrides
     };
 }

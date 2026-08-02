@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "TaxLogicSlice10DemographyMeasurementV1",
+  "snapshotId": "post-backtest-data-10-v1",
+  "sourceReference": "post-backtest-data-09-v1",
+  "sourceRuntimeFixture": "tests/fixtures/monte-carlo-measurement/liquidity-runway-slice-08-v1.json",
+  "sourceRuntimeFixtureSha256": "fd546d32f8e9cc0774a78bfae76d5ca5754774cadd2409e7ab202ff7b30ad4bd",
+  "targetResultDocument": "docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_10_HEUTIGE_STEUERLOGIK.md",
+  "reviewStatus": "pending",
+  "targetMeasurementSha256": "10e50f9e6aa72716df3d4a4f7e1ede0a25936fe8594c22bca69f5e6ad600ce06"
+}

@@ -1594,14 +1594,14 @@ async function runBalanceUiOrchestrationTests() {
                 profileId: 'bond-owner',
                 name: 'Bond Owner',
                 inputs: { depotwertNeu: 50000, tagesgeld: 0, renteAktiv: false, sparerPauschbetrag: 1000, kirchensteuerSatz: 0 },
-                tranches: [{ trancheId: 'bond-1', type: 'anleihe', category: 'bonds', marketValue: 50000, costBasis: 50000, tqf: 0 }],
+                tranches: [{ trancheId: 'bond-1', schemaVersion: 2, type: 'anleihe', category: 'bonds', marketValue: 50000, costBasis: 50000, tqf: 0, taxExempt: false }],
                 balanceState: { lastState: { taxState: { lossCarry: 0 } } }
             },
             {
                 profileId: 'equity-owner',
                 name: 'Equity Owner',
                 inputs: { depotwertNeu: 100000, tagesgeld: 0, renteAktiv: false, sparerPauschbetrag: 1000, kirchensteuerSatz: 0 },
-                tranches: [{ trancheId: 'equity-1', type: 'aktien_neu', category: 'equity', marketValue: 100000, costBasis: 90000, tqf: 0.3 }],
+                tranches: [{ trancheId: 'equity-1', schemaVersion: 2, type: 'aktien_neu', category: 'equity', marketValue: 100000, costBasis: 90000, tqf: 0.3, taxExempt: false }],
                 balanceState: { lastState: { taxState: { lossCarry: 0 } } }
             }
         ];
