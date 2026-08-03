@@ -1,0 +1,88 @@
+{
+  "schemaVersion": "BacktestDataValidationSlice16V1",
+  "status": "derived_from_committed_slice_15_result",
+  "sourceCommit": "efd51aded173410d22e62c5faa59fe72937bd25c",
+  "sourceParentCommit": "619c4d4c43bc469af4320759c1f52212e4c39390",
+  "sourceTreeStatus": "clean",
+  "ciCheckoutContract": {
+    "workflowPath": ".github/workflows/ci-tests.yml",
+    "historyMode": "full_history_required_for_commit_bound_evidence"
+  },
+  "sourceResultDocument": {
+    "path": "docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_15_DATENPRUEFUNG.md",
+    "sha256": "50226f3614271d943f2cc3f7489c6a82c612fac508b5ec8edfa0747f91e9dca2"
+  },
+  "sourceValidationFixture": {
+    "path": "tests/fixtures/backtest-data-validation-slice-15-v1.json",
+    "sha256": "3fc306e4375e70591e5d05a2b8575a786ef2b9726f6626263c8e1135fec18e3e"
+  },
+  "sourceValidationTest": {
+    "path": "tests/backtest-data-validation-slice-15.test.mjs",
+    "sha256": "59a9c25c20ee81fb19ea5c93b01f0b4f64f9270a59e5ce71fa63a56614dbe64f"
+  },
+  "sourceFingerprintBasis": {
+    "path": "tests/fixtures/backtest-data-validation-slice-14-fingerprint-basis-v1.json",
+    "sha256": "1e7825e477b50f992dd2d6ec885bc17ddb5daaf0574d169ede26e0c1cae54079"
+  },
+  "atomicBinaryContract": {
+    "mode": "same_commit_exact_bytes_v1",
+    "attributesPath": ".gitattributes",
+    "attributesSha256": "e67c008e4d72e5f82be1ac903f034f2ec17dea67dac2a87cc7c5529f3c75a2c1",
+    "originals": [
+      {
+        "path": "data/historical/global-equity-research-chain/originals/oecd-share-prices-monthly.csv",
+        "sha256": "9ea88f6d07d2d7382ae72ccc8101eed1bd46db5efee8f049352161f3448414e8"
+      },
+      {
+        "path": "data/historical/global-equity-research-chain/originals/ecb-fx-monthly.csv",
+        "sha256": "047cab457467d382a1933b0759e5b1b2fc8f68c88b2b4de5f21fece4d9ca624a"
+      },
+      {
+        "path": "data/historical/german-cpi-chain/originals/destatis-vpi-current-2026-07-10.html",
+        "sha256": "82ab91a5e53db7cd74cdf4f7b4d85813e586fbd3ae0bbd3d01a6cb231b596743"
+      },
+      {
+        "path": "data/historical/german-cash-money-market-chain/originals/bundesbank-money-market-pages-15-16-layout.txt",
+        "sha256": "85e3b0f6678944a555bb6848b2eefe5601475124bae497e6e63faf47b759c383"
+      },
+      {
+        "path": "data/historical/gold-german-investor-chain/originals/bundesbank-frankfurt-gold-annual-1968-1998.csv",
+        "sha256": "c08654b065a5685456bf2ebd954b43fec3cef9a9755f121d9dab6420c9410e2e"
+      },
+      {
+        "path": "data/historical/gold-german-investor-chain/originals/bundesbank-usd-eur-annual-1999-2025.csv",
+        "sha256": "ba8810d1b754e63f26e84824dcf0dd2f24716c51e9ba385bb09002b2fc087a7e"
+      },
+      {
+        "path": "data/historical/german-gross-wage-growth-chain/originals/destatis-bruttomonatsverdienst-index-2026-08-01.html",
+        "sha256": "1f62492a2efe78fba3ec2ac81dfd90a1c4ccd6f8b68b7bcc6c53ae4d8cd51f1a"
+      }
+    ]
+  },
+  "dataset": {
+    "datasetId": "ruhestandsapp-historical-data-v1",
+    "revision": "2026-08-01.4",
+    "contentHash": "c79350c5abf2dee2feeaae65c88ed5e58487f878cb598fdffc132fbf48d01e79",
+    "manifestHash": "7ee83d2c04ece133903fb8617f9da4448979b602c3b03649eefe4cd0d2ff62fb"
+  },
+  "finalExport": {
+    "startYear": 2000,
+    "endYear": 2025,
+    "inclusiveYears": 26,
+    "observedRowCount": 26,
+    "summaryEndWealth": 5829580.79,
+    "totalWithdrawal": 805112.51,
+    "totalTax": 114306.75,
+    "maxAbsolutePortfolioFlowDelta": 0,
+    "canonicalRowsHash": "9de469d6dff25a9a9b93ad8c51285b6db945561a54ec1a9538f4375904b753ff",
+    "resultFingerprint": "e0362da98330a4a7eb1c12224ee79d796629479b336e1a1ec59e81907cd1e0fa"
+  },
+  "resultEvidence": {
+    "resultFingerprint": "archived_canonical_basis_self_consistency_not_live_run",
+    "canonicalRowsHash": "validated_by_independent_characterization_gate_not_reexecuted_here"
+  },
+  "financialNeutralityAssessment": {
+    "status": "not_demonstrated_against_slice_12_commit"
+  },
+  "claimBoundary": "repository_reconstruction_not_external_scientific_validation"
+}

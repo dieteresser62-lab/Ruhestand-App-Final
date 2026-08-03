@@ -2,11 +2,12 @@
 
 **Pruefdatum:** 2026-07-29
 **Pruefer:** Claude (Primary reviewer & Analyst)
-**Status:** Korrekturprogramm in Umsetzung; Slice 01 bis 14 liegen lokal
-committed vor. Slice 15 verwendet das vollstaendige Slice-14-Ergebnisdokument
-als Eingangsgrenze und prueft die eingefrorene Ergebnisgrenze zusaetzlich
-durch die sieben rekonstruktiven historischen Datenketten; externes Review
-und Freigabe von Slice 15 stehen aus
+**Status:** Korrekturprogramm in Umsetzung; Slice 01 bis 15 liegen lokal
+committed vor. Slice 16 verwendet das vollstaendige Slice-15-Ergebnisdokument
+als Eingangsgrenze und prueft den ausgefuehrten Post-Commit-Binaervertrag,
+die eingefrorene Ergebnisgrenze und die kanonischen Datenhashes nachgelagert;
+Slice 16 ist technisch umgesetzt und selbstgeprueft, externes Review und
+Nutzerfreigabe stehen aus
 **Pruefgegenstand:** Exportdatei
 `backtest-2000-2025-89fc3e368d64-2026-07-29T10-00-22.287Z.json`
 **Anlass:** Nutzerseitige Verifikation nach Abschluss der Suite-Datenintegritaet-
@@ -1671,10 +1672,11 @@ zeilenendensensitiven Originalquellen werden bytegenau als Git-
 Binaerquellen gefuehrt und bestanden zusaetzlich in einem isolierten
 LF-Kandidatencheckout. Die vorhandenen Rekonstruktionsgates bleiben Owner der
 Builderausfuehrung; Slice 15 bindet deren Paket-, Skript- und Prozessvertrag
-ohne Doppelausfuehrung. Der aktuelle Basiscommit enthaelt die Binaerattribute
-noch nicht und gilt nicht als frisch reproduzierbar. Nach dem gemeinsamen
-Slice-Commit werden die tatsaechlichen HEAD-Blobbytes zwingend geprueft.
-Externes Re-Review und Nutzerfreigabe stehen aus.
+ohne Doppelausfuehrung. Der gemeinsame Slice-15-Commit `efd51ad` enthaelt
+`.gitattributes` und alle sieben Originalquellen atomar. Der verpflichtende
+Post-Commit-HEAD-Blobpfad besteht mit 155/155 Assertions; Slice 16 prueft
+diesen vollzogenen Zustand nachgelagert. Die externe Runde-3-Freigabe unter
+der Commit-Auflage und der gemeinsame Commit sind erfolgt.
 
 **Abhaengigkeit:** Slice 14 und dessen vollstaendiges Ergebnisdokument.
 
@@ -1708,6 +1710,62 @@ rekonstruktiven Datenketten geprueft.
 - Offene Aussagegrenzen und Restrisiken bleiben sichtbar.
 - Pflichtgates bestehen; externe Freigabe bleibt erforderlich.
 
+### Slice 16 - Datenpruefung des Slice-15-Ergebnisses
+
+**Slice-Dokument:**
+[`SLICE_BACKTEST_DATENPRUEFUNG_16_DATENPRUEFUNG.md`](SLICE_BACKTEST_DATENPRUEFUNG_16_DATENPRUEFUNG.md)
+
+**Umsetzungsstatus:** am 2026-08-03 auf Basis des vollstaendigen
+Slice-15-Ergebnisdokuments und des sauberen Commits `efd51ad` technisch
+umgesetzt und selbstgeprueft. Der
+Post-Commit-Pfad von Slice 15 besteht mit 155/155 Assertions. Die neue
+Evidenzschicht bindet Ergebnisdokument, Validierungsfixture und
+Validierungstest an den Eingangscommit, weist die atomare Aufnahme von
+`.gitattributes` und allen aus `data/historical` sowie `data/static`
+abgeleiteten zeilenendensensitiven Originalquellen nach. Dataset und Manifest
+werden aus Live-Daten rekonstruiert; archivierte Fingerprint-Selbstkonsistenz
+und der unabhaengig im Charakterisierungsgate gepruefte Engine-Rowhash werden
+als getrennte Evidenzarten ausgewiesen. Slice 16 bindet diesen Gate-Owner
+nicht ueber Quelltext-Teilstrings. Die CI stellt die fuer die Commitbindung
+erforderliche volle Git-Historie bereit und der Test isoliert dafuer den
+benannten Checkout-Schritt strukturell.
+Produktivcode, Engine und historische Werte bleiben unveraendert. Die
+Claude-Findings CR16-1 bis CR16-5 sind technisch nachgebessert; externes
+Re-Review und Nutzerfreigabe stehen aus.
+
+**Abhaengigkeit:** Slice 15 und dessen vollstaendiges Ergebnisdokument.
+
+**Ziel**
+
+Die Slice-15-Ergebnisgrenze wird nach dem gemeinsamen Commit read-only gegen
+Commitbytes, den atomaren Binaervertrag, aktive Daten, Manifest und
+Fingerprintbasis geprueft.
+
+**Scope**
+
+- Commit-/SHA-256-Bindung der vollstaendigen Slice-15-Eingangsgrenze.
+- Commit- und Live-Bytebindung der drei Slice-15-Eingangsartefakte.
+- Nachweis, dass `.gitattributes` und alle abgeleiteten
+  zeilenendensensitiven Originalquellen im selben Slice-15-Commit liegen.
+- Bytevergleich der Originalquellen im Commit und im lebenden Baum.
+- Rekonstruktion von Dataset und Manifest; getrennte Kennzeichnung von
+  archivierter Fingerprint-Selbstkonsistenz und lebendem Engine-Rowhash.
+- Vollstaendige Git-Historie im CI-Checkout.
+- Keine Produktiv-, Engine- oder historischen Datenaenderungen.
+
+**Abnahmekriterien**
+
+- Eingangscommit, Ergebnisdokument, Slice-15-Fixture und -Test stimmen
+  im Commit und im lebenden Baum ueberein.
+- Der atomare Binaervertrag ist am Eingangscommit belegt und gegen den
+  abgeleiteten Originalquellenbestand vollstaendig.
+- Alle Commit- und Live-Bytes stimmen mit den gepinnten SHA-256-Werten
+  ueberein.
+- Dataset-/Manifesthash werden neu berechnet; Fingerprint- und
+  Rowhash-Evidenz werden nicht vermischt.
+- Offene Aussagegrenzen und Restrisiken bleiben sichtbar.
+- Pflichtgates bestehen; externe Freigabe bleibt erforderlich.
+
 ## Priorisierung und Startreihenfolge
 
 Die technische Reihenfolge ist:
@@ -1720,6 +1778,8 @@ Die technische Reihenfolge ist:
 6. Slice 13 als gemeinsame Integration.
 7. Slice 14 als post-commit Ergebnis- und Datenvalidierung.
 8. Slice 15 als nachgelagerte Datenketten- und Evidenzpruefung.
+9. Slice 16 als nachgelagerte Pruefung des ausgefuehrten Slice-15-Commit- und
+   Binaervertrags.
 
 Innerhalb der Datenersetzung besitzt Slice 2 wegen des bereits quantifizierten
 2024-Aktienfehlers die hoechste Ergebnisprioritaet. Ein Quellen- oder

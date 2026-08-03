@@ -989,14 +989,34 @@ Pflege-/Todes-/Hinterbliebenenpfade werden getrennt geprueft.
   Originalquellen sind in `.gitattributes` als `binary` markiert. Vor dem
   Commit prueft das Gate den gemeinsamen Acht-Pfade-Kandidaten; nach dem
   Slice-Commit vergleicht es die tatsaechlichen HEAD-Blobbytes mit den
-  gepinnten SHA-256-Werten. Der aktuelle Basiscommit `619c4d4` enthaelt den
-  Binaervertrag noch nicht und gilt nicht als frisch reproduzierbar. Die offene
+  gepinnten SHA-256-Werten. Der gemeinsame Slice-15-Commit `efd51ad` enthaelt
+  den Binaervertrag und der Post-Commit-Pfad besteht mit 155/155 Assertions.
+  Die offene
   Finanzneutralitaet gegen Slice 12 bleibt als
   `not_demonstrated_against_slice_12_commit` erhalten. Das versionierte
   Nachfolgerverfahren fuer Evidenzfortschreibungen ist dokumentiert, aber
   ausdruecklich nicht maschinell gegen autorisierte Fixtureaenderungen oder
   fehlendes externes Review erzwingbar. Repositoryinterne Rekonstruktion ist
   keine externe wissenschaftliche Validierung.
+- **Slice-16-Datenpruefung:**
+  `backtest-data-validation-slice-16.test.mjs` verwendet das vollstaendige
+  Slice-15-Ergebnisdokument am sauberen Commit `efd51ad` als Eingangsgrenze.
+  Die Fixture `fixtures/backtest-data-validation-slice-16-v1.json` bindet
+  Ergebnisdokument, Slice-15-Fixture und Slice-15-Test per SHA-256 und prueft
+  alle drei Pfade auch im lebenden Baum. Der CI-Checkout muss mit
+  `fetch-depth: 0` die fuer Slices 14 bis 16 benoetigte Vorgaengerhistorie
+  bereitstellen; das Gate isoliert den benannten Checkout-Schritt und prueft
+  `fetch-depth: 0` nur in dessen eigenem `with`-Block. Der Test leitet alle
+  textartigen Originalquellen unter `data/historical` und `data/static` aus
+  Commit- und Live-Inventar ab, verlangt fuer die vollstaendige Menge
+  Binaerattribute und vergleicht deren Bytes mit den gepinnten Hashes. Dataset
+  und Manifest werden aus produktiven Daten neu
+  berechnet. Der Result-Fingerprint belegt nur die Selbstkonsistenz der
+  committeten kanonischen Archivbasis. Der lebende Engine-Nachweis bleibt
+  unabhaengig beim Charakterisierungsgate; Slice 16 fuehrt ihn nicht erneut
+  aus und bindet ihn nicht ueber Quelltext-Teilstrings. Die offenen Grenzen zur
+  Slice-12-Finanzneutralitaet und zur externen wissenschaftlichen Validierung
+  bleiben erhalten; Builder werden nicht doppelt ausgefuehrt.
 
 #### `simulator-real-withdrawal-contract.test.mjs`
 **Zweck:** Testet den Simulatorvertrag für echte Realentnahmen.
