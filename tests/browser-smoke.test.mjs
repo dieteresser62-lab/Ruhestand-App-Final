@@ -205,12 +205,21 @@ async function createPage(browser, label, options = {}) {
             }).observe(target, { childList: true, subtree: true, characterData: true });
         });
     }, options.storage || {});
+    if (options.engineMismatch) {
+        await context.addInitScript(() => {
+            window.EngineAPI = {
+                getVersion() {
+                    return { api: '0.0', build: 'e2e-mismatch' };
+                }
+            };
+        });
+    }
     await context.route('**/*', async route => {
         const url = new URL(route.request().url());
         if (options.engineMismatch && url.pathname === '/engine.js') {
             await route.fulfill({
                 contentType: 'text/javascript',
-                body: 'window.EngineAPI={getVersion(){return {api:"0.0",build:"e2e-mismatch"}}};'
+                body: ''
             });
             return;
         }

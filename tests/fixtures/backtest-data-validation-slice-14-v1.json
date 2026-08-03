@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "BacktestDataValidationSlice14V1",
+  "status": "captured_from_clean_slice_13_commit",
+  "sourceResultDocument": {
+    "path": "docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_13_GESAMTINTEGRATION_REFERENZBACKTESTS.md",
+    "sha256": "1a803c055fea64a9477d256b21c397076da80e3fc76da605e11308c596556aed"
+  },
+  "sourceIntegrationFixture": {
+    "path": "tests/fixtures/backtest-data-integration-slice-13-v1.json",
+    "sha256": "49ab47b46c844bc32db3a07cf1b9bbc53b2635e5290168afce93bab6d9e33ffa"
+  },
+  "fingerprintBasis": {
+    "path": "tests/fixtures/backtest-data-validation-slice-14-fingerprint-basis-v1.json",
+    "sha256": "1e7825e477b50f992dd2d6ec885bc17ddb5daaf0574d169ede26e0c1cae54079",
+    "canonicalization": "sha256-canonical-json-v1"
+  },
+  "sourceCommit": "bbc25abeecfb853912004125ae2b91535ce7dbd2",
+  "sourceTreeStatus": "clean",
+  "dataset": {
+    "datasetId": "ruhestandsapp-historical-data-v1",
+    "revision": "2026-08-01.4",
+    "contentHash": "c79350c5abf2dee2feeaae65c88ed5e58487f878cb598fdffc132fbf48d01e79",
+    "manifestHash": "7ee83d2c04ece133903fb8617f9da4448979b602c3b03649eefe4cd0d2ff62fb"
+  },
+  "finalExport": {
+    "period": { "startYear": 2000, "endYear": 2025, "inclusiveYears": 26 },
+    "outcome": "completed",
+    "observedRowCount": 26,
+    "summaryEndWealth": 5829580.79,
+    "totalWithdrawal": 805112.51,
+    "totalTax": 114306.75,
+    "maxAbsolutePortfolioFlowDelta": 0,
+    "canonicalRowsHash": "9de469d6dff25a9a9b93ad8c51285b6db945561a54ec1a9538f4375904b753ff",
+    "resultFingerprint": "e0362da98330a4a7eb1c12224ee79d796629479b336e1a1ec59e81907cd1e0fa"
+  },
+  "referenceCaseCount": 8,
+  "attributionEvidenceCount": 9,
+  "financialNeutralityAssessment": {
+    "status": "not_demonstrated_against_slice_12_commit",
+    "reason": "integrated_reference_2000_2025 did not exist in source commit 43d7848; equal constants only preserve later drift detection"
+  },
+  "captureMethod": "isolated detached worktree on sourceCommit; productive Slice-13 characterization/export path 247/247"
+}

@@ -2,11 +2,10 @@
 
 **Pruefdatum:** 2026-07-29
 **Pruefer:** Claude (Primary reviewer & Analyst)
-**Status:** Korrekturprogramm in Umsetzung; Slice 01 bis 12 extern technisch
-freigegeben und lokal committed. Slice 13 verwendet das vollstaendige
-Slice-12-Ergebnisdokument als Eingangsgrenze und ist bis zum externen
-Review-/Commit- und Exportfinalisierungsgate technisch umgesetzt; Freigabe,
-Commit und finaler provenance-korrekter Export stehen aus
+**Status:** Korrekturprogramm in Umsetzung; Slice 01 bis 13 liegen lokal
+committed vor. Slice 14 verwendet das vollstaendige Slice-13-Ergebnisdokument
+als Eingangsgrenze und validiert den finalen Clean-Tree-Export des
+Slice-13-Commits; externes Review und Freigabe von Slice 14 stehen aus
 **Pruefgegenstand:** Exportdatei
 `backtest-2000-2025-89fc3e368d64-2026-07-29T10-00-22.287Z.json`
 **Anlass:** Nutzerseitige Verifikation nach Abschluss der Suite-Datenintegritaet-
@@ -1611,6 +1610,47 @@ Ergebniswirkung nachvollziehbar dokumentiert.
 - Abschlussreview durch Gemini, Claude oder Nutzer; keine
   Selbstfreigabe durch Codex.
 
+### Slice 14 - Validierung des Slice-13-Ergebnisses
+
+**Slice-Dokument:**
+[`SLICE_BACKTEST_DATENPRUEFUNG_14_ERGEBNISVALIDIERUNG.md`](SLICE_BACKTEST_DATENPRUEFUNG_14_ERGEBNISVALIDIERUNG.md)
+
+**Umsetzungsstatus:** am 2026-08-03 auf Basis des vollstaendigen
+Slice-13-Ergebnisdokuments und des sauberen Commits `bbc25ab` begonnen. Das
+post-commit Exportgate liefert `final_export_ready` und den Result-Fingerprint
+`e0362da98330a4a7eb1c12224ee79d796629479b336e1a1ec59e81907cd1e0fa`.
+Eine neue Validierungsfixture bindet Ergebnisdokument, Integrationsfixture,
+Attributionsevidenzen, acht Referenzfaelle und den 26-Jahres-Lauf an diesen
+Quellstand. Claudes Blocker CR14-1 und CR14-2 sowie CR14-3 bis CR14-9 sind
+technisch nachgebessert: Die kanonische Fingerprint-Basis ist gespeichert und
+neu berechenbar, unbelegte Finanzneutralitaet wird nicht mehr behauptet,
+aktive Daten/Manifest und lebende Eingangsdateien sind angebunden, Git-Grenzen
+und FlowDelta sind fail-closed und der Browser-Engine-Mismatch ist vor dem
+Dokumentladen deterministisch injiziert. Produktivcode und Engine-Semantik
+bleiben unveraendert; externes Re-Review steht aus.
+
+**Abhaengigkeit:** Slice 13 und dessen vollstaendiges Ergebnisdokument.
+
+**Ziel**
+
+Das finale Slice-13-Ergebnis wird nach dem Commit als unveraenderliche,
+maschinenlesbar gepruefte Datenevidenz festgehalten.
+
+**Scope**
+
+- Clean-Tree-Exportgate und finaler Result-Fingerprint.
+- Bytebindung von Ergebnisdokument, Integrationsfixture und Deltaevidenzen.
+- Perioden-, Summen-, Hash-, Dataset- und FlowDelta-Pruefung.
+- Keine Produktiv- oder Engine-Aenderung.
+
+**Abnahmekriterien**
+
+- Quellcommit, Ergebnisdokument und Fixturehashes stimmen ueberein.
+- Acht Referenzfaelle und neun Attributionsevidenzen sind vollstaendig.
+- 2000-2025 umfasst 26 Jahreszeilen und reproduziert die Slice-13-Summen.
+- Alle Referenzlaeufe halten `FlowDelta < 1 EUR`.
+- Pflichtgates bestehen; externe Freigabe bleibt erforderlich.
+
 ## Priorisierung und Startreihenfolge
 
 Die technische Reihenfolge ist:
@@ -1621,6 +1661,7 @@ Die technische Reihenfolge ist:
 4. Slices 8 bis 11 fuer Runway, Mindest-Flex, Steuern und Exportvertrag.
 5. Slice 12 nach Abschluss der zugrunde liegenden Datenreihen.
 6. Slice 13 als gemeinsame Integration.
+7. Slice 14 als post-commit Ergebnis- und Datenvalidierung.
 
 Innerhalb der Datenersetzung besitzt Slice 2 wegen des bereits quantifizierten
 2024-Aktienfehlers die hoechste Ergebnisprioritaet. Ein Quellen- oder

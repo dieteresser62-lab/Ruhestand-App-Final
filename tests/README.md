@@ -955,6 +955,23 @@ Pflege-/Todes-/Hinterbliebenenpfade werden getrennt geprueft.
   und erwartet im Dirty-Tree `HISTORICAL_EXPORT_SOURCE_TREE_DIRTY`; auf einem
   sauberen Commit muss dasselbe Gate in den erfolgreichen Exportzweig
   umschlagen und einen Result-Fingerprint liefern.
+- **Slice-14-Ergebnisvalidierung:**
+  `backtest-data-validation-slice-14.test.mjs` verwendet das vollstaendige
+  Slice-13-Ergebnisdokument als Eingangsgrenze. Die Fixture
+  `fixtures/backtest-data-validation-slice-14-v1.json` pinnt den sauberen
+  Slice-13-Commit `bbc25ab`, Ergebnisdokument und Integrationsfixture per
+  SHA-256 sowie den finalen Exportfingerprint. Die separate Fixture
+  `fixtures/backtest-data-validation-slice-14-fingerprint-basis-v1.json`
+  enthaelt die vollstaendige kanonische Fingerprint-Basis; der Test berechnet
+  den Fingerprint daraus mit dem produktiven Kanonisierungsvertrag neu. Er
+  liest die Eingangsbytes und alle neun Attributionsevidenzen direkt aus dem
+  archivierten Commit, prueft Ergebnisdokument und Integrationsfixture
+  zusaetzlich im lebenden Arbeitsbaum, bindet aktive Daten und Manifest samt
+  neu berechneten Hashes, verlangt Git-Erreichbarkeit und Vorfahrenbeziehung
+  und prueft acht eindeutige inklusive Referenzperioden, vollstaendige
+  Jahreszeilen, endliche Summen und endliches `FlowDelta < 1 EUR`.
+  Die Slice-11-bis-13-Finanzneutralitaet wird ausdruecklich nicht als belegt
+  behandelt, weil der Integrationsfall im Slice-12-Commit nicht existierte.
 
 #### `simulator-real-withdrawal-contract.test.mjs`
 **Zweck:** Testet den Simulatorvertrag für echte Realentnahmen.
