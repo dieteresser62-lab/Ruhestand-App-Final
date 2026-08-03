@@ -329,6 +329,13 @@ Diese Grenze ist fachlich gewollt: Balance kennt derzeit keinen belastbaren aktu
   rekonstruiert die gefilterten Inputs aus den paketierten Originaldateien,
   fuehrt 1950 noch vollstaendig im USD-Proxy und beginnt die deutsche
   Anlegerwaehrung mit dem Return 1951.
+  Zeilenendensensitive paketierte Originalquellen werden in `.gitattributes`
+  pfadgenau als `binary` gefuehrt. Dadurch speichert und checkt Git die exakt
+  per SHA-256 gepinnten Download-/Extraktionsbytes aus; normale Quellmodule und
+  gefilterte CSV-Eingaben bleiben weiterhin LF-normalisiert. Ein neuer
+  Originalquellpfad darf diesen Vertrag nur erhalten, wenn sein Builder einen
+  bytegenauen Rohquellhash prueft und ein isolierter Frisch-Checkout-Witness
+  die Reproduzierbarkeit belegt.
 * `app/simulator/german-cpi-chain.js` – deterministisch erzeugte, tief
   eingefrorene 1925-2025-Kette der deutschen
   Jahresdurchschnitts-Verbraucherpreisinflation. JST-R6-Levelaenderungen

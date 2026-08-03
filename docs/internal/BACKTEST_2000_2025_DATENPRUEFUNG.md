@@ -2,10 +2,11 @@
 
 **Pruefdatum:** 2026-07-29
 **Pruefer:** Claude (Primary reviewer & Analyst)
-**Status:** Korrekturprogramm in Umsetzung; Slice 01 bis 13 liegen lokal
-committed vor. Slice 14 verwendet das vollstaendige Slice-13-Ergebnisdokument
-als Eingangsgrenze und validiert den finalen Clean-Tree-Export des
-Slice-13-Commits; externes Review und Freigabe von Slice 14 stehen aus
+**Status:** Korrekturprogramm in Umsetzung; Slice 01 bis 14 liegen lokal
+committed vor. Slice 15 verwendet das vollstaendige Slice-14-Ergebnisdokument
+als Eingangsgrenze und prueft die eingefrorene Ergebnisgrenze zusaetzlich
+durch die sieben rekonstruktiven historischen Datenketten; externes Review
+und Freigabe von Slice 15 stehen aus
 **Pruefgegenstand:** Exportdatei
 `backtest-2000-2025-89fc3e368d64-2026-07-29T10-00-22.287Z.json`
 **Anlass:** Nutzerseitige Verifikation nach Abschluss der Suite-Datenintegritaet-
@@ -1651,6 +1652,62 @@ maschinenlesbar gepruefte Datenevidenz festgehalten.
 - Alle Referenzlaeufe halten `FlowDelta < 1 EUR`.
 - Pflichtgates bestehen; externe Freigabe bleibt erforderlich.
 
+### Slice 15 - Datenpruefung des Slice-14-Ergebnisses
+
+**Slice-Dokument:**
+[`SLICE_BACKTEST_DATENPRUEFUNG_15_DATENPRUEFUNG.md`](SLICE_BACKTEST_DATENPRUEFUNG_15_DATENPRUEFUNG.md)
+
+**Umsetzungsstatus:** am 2026-08-03 auf Basis des vollstaendigen, bedingt
+freigegebenen Slice-14-Ergebnisdokuments und des sauberen Commits `619c4d4`
+technisch umgesetzt. CR14-14 und CR14-15 waren in diesem Commit noch
+unerfuellte Auflagen und wurden erst in der Slice-15-Nachbesserung korrigiert.
+Die Vorgaengerbytes von Ergebnisdokument, Validierungsfixture,
+Validierungstest und kanonischer Fingerprintbasis sind gepinnt. Der neue
+Pruefpfad bindet die sieben vorhandenen Rekonstruktionsgates, deren Owner die
+historischen Datenketten weiterhin in der Gesamtsuite ausfuehren. CR13-11 bleibt ausdruecklich
+`not_demonstrated_against_slice_12_commit`; repositoryinterne Reproduktion
+wird nicht als externe wissenschaftliche Validierung bezeichnet. Die sieben
+zeilenendensensitiven Originalquellen werden bytegenau als Git-
+Binaerquellen gefuehrt und bestanden zusaetzlich in einem isolierten
+LF-Kandidatencheckout. Die vorhandenen Rekonstruktionsgates bleiben Owner der
+Builderausfuehrung; Slice 15 bindet deren Paket-, Skript- und Prozessvertrag
+ohne Doppelausfuehrung. Der aktuelle Basiscommit enthaelt die Binaerattribute
+noch nicht und gilt nicht als frisch reproduzierbar. Nach dem gemeinsamen
+Slice-Commit werden die tatsaechlichen HEAD-Blobbytes zwingend geprueft.
+Externes Re-Review und Nutzerfreigabe stehen aus.
+
+**Abhaengigkeit:** Slice 14 und dessen vollstaendiges Ergebnisdokument.
+
+**Ziel**
+
+Die Slice-14-Ergebnisgrenze wird aus einer nachgelagerten Evidenzschicht gegen
+Commitbytes, aktive Daten, Manifest, Fingerprintbasis und alle sieben
+rekonstruktiven Datenketten geprueft.
+
+**Scope**
+
+- Commit-/SHA-256-Bindung der vollstaendigen Slice-14-Eingangsgrenze.
+- Bindung der vorhandenen Read-only-Rekonstruktionsgates fuer Aktien, VPI,
+  Geldmarkt, Gold, CAPE, Lohn und Demografie sowie Pre-/Post-Commit-
+  Byteintegritaetsvertrag.
+- Bytegenaue Git-Binaerfuehrung der sieben zeilenendensensitiven
+  Originalquellen.
+- Dokumentiertes, aber nicht maschinell erzwingbares versioniertes
+  Nachfolgerverfahren fuer beabsichtigte Evidenzfortschreibungen.
+- Keine Produktiv-, Engine- oder historischen Datenaenderungen.
+
+**Abnahmekriterien**
+
+- Eingangscommit, Ergebnisdokument und Slice-14-Artefakte stimmen ueberein.
+- Die vorhandenen Gate-Owner rekonstruieren alle sieben Datenketten; Slice 15
+  prueft keine separaten Outputzeugen.
+- Vor dem Commit ist der gemeinsame Binaervertragskandidat sichtbar; nach dem
+  Commit stimmen alle sieben HEAD-Blobbytes mit den gepinnten SHA-256-Werten
+  ueberein.
+- Dataset-/Manifesthash und finaler Result-Fingerprint werden neu berechnet.
+- Offene Aussagegrenzen und Restrisiken bleiben sichtbar.
+- Pflichtgates bestehen; externe Freigabe bleibt erforderlich.
+
 ## Priorisierung und Startreihenfolge
 
 Die technische Reihenfolge ist:
@@ -1662,6 +1719,7 @@ Die technische Reihenfolge ist:
 5. Slice 12 nach Abschluss der zugrunde liegenden Datenreihen.
 6. Slice 13 als gemeinsame Integration.
 7. Slice 14 als post-commit Ergebnis- und Datenvalidierung.
+8. Slice 15 als nachgelagerte Datenketten- und Evidenzpruefung.
 
 Innerhalb der Datenersetzung besitzt Slice 2 wegen des bereits quantifizierten
 2024-Aktienfehlers die hoechste Ergebnisprioritaet. Ein Quellen- oder

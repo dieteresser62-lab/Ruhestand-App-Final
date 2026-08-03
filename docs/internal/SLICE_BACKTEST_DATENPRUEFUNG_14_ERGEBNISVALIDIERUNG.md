@@ -1,6 +1,6 @@
 # Slice 14 - Validierung des Slice-13-Ergebnisses
 
-**Datum:** 2026-08-03  
+**Datum:** 2026-08-03
 **Feature-Branch:** `codex/suite-datenintegritaet-hardening`  
 **GitHub-Status:** lokal; kein Upstream konfiguriert, Push bleibt Nutzerentscheidung  
 **Basiscommit:** `bbc25abeecfb853912004125ae2b91535ce7dbd2`  
@@ -75,7 +75,12 @@ Attributionsevidenzen, die acht Referenzfaelle, Dataset-/Manifestidentitaet,
 - Schliessen der als Restrisiken uebernommenen Findings durch Codex;
 - Commit oder Push durch Codex.
 
-## Diff-Risiko vor Coding
+## Diff-Risiko vor Coding und nachtraeglicher Nachbesserungsscope
+
+Der Block begann vor Coding mit den damals geplanten fuenf Slice-Dateien. Die
+Eintraege fuer Fingerprintbasis, Browser-Gate und technische Referenz wurden
+erst waehrend der Nachbesserung auf CR14-1 bis CR14-9 ergaenzt und bilden den
+finalen Acht-Dateien-Scope ab; sie sind keine rueckwirkende Preflight-Aussage.
 
 ```text
 Geplante Dateien:
@@ -129,14 +134,14 @@ nicht ausfuehrbares Pflichtgate stoppt den Slice.
   mit `PRINT_BACKTEST_DATA_13=1`: 246/246 Assertions, finaler Export bereit.
 - Fokussiert:
   `node tests/run-single.mjs tests/backtest-data-validation-slice-14.test.mjs`:
-  108/108 Assertions.
+  144/144 Assertions.
 - `npm test`: 164 Testdateien, 18.299/18.299 Assertions, Exit 0.
 - `npm run test:coverage`: Exit 0; Pflichtdatei-Gates bestanden.
 - `npm run test:browser`: 28/28 Szenarien bestanden.
 - `npm run docs:evidence`: gruen; 69 Markt-, 55 Forschungsrecords und
   17 Mappinganker validiert.
 - `git diff --check`: gruen.
-- Arbeitsbaum nach den Gates: ausschliesslich die fuenf erwarteten
+- Arbeitsbaum nach den Gates: ausschliesslich die acht erwarteten
   Slice-14-Dateien; keine Produktivdatei und kein generiertes Artefakt.
 
 ## Abweichungen vom Plan
@@ -152,6 +157,10 @@ nicht ausfuehrbares Pflichtgate stoppt den Slice.
   `bbc25ab` aus der Branchhistorie entfernt, laesst den Test bewusst rot werden.
 - CR13-11 wird nicht als Finanzneutralitaet ausgegeben. Die Fixture bezeichnet
   den Zustand explizit als `not_demonstrated_against_slice_12_commit`.
+- CR13-13 bestand am Commit `619c4d4` noch als ungefangene Git-Prozessgrenze
+  im Slice-13-Charakterisierungstest. Die Slice-15-Nachbesserung ersetzt beide
+  `execFileSync`-Aufrufe durch `spawnSync` mit benannten Assertions und
+  lesbarer stderr/stdout-Diagnose; CR14-15 ist damit nachtraeglich erfuellt.
 
 ## Rueckdokumentation
 
@@ -181,8 +190,8 @@ auf externes Review durch Gemini, Claude oder den Nutzer.
 | CR14-11 | Claude-Review (Runde 2) | `computeHistoricalDatasetHash(HISTORICAL_DATA)` gegen den gepinnten Contenthash friert zusaetzlich den aktiven historischen Datenbestand ein; verifiziert sensitiv (eine Aenderung von 1e-9 im Jahr 1925 kippt den Hash). Jede kuenftige, fachlich berechtigte Datenkorrektur -- der eigentliche Zweck des Korrekturprogramms -- erzwingt damit eine Aenderung genau der Fixture, die als unveraenderliche Evidenz deklariert ist. Ein Verfahren dafuer ist nirgends beschrieben | offen | ausstehend |
 | CR14-12 | Claude-Review (Runde 2) | Der Umbau des Browser-Engine-Gates verkuerzt die gepruefte Kette: `window.EngineAPI` wird jetzt per `addInitScript` unabhaengig von `engine.js` injiziert, waehrend `engine.js` leer ausgeliefert wird. Die Versionsmismatch-Erkennung bleibt geprueft, die Herkunft der Engine-API aus `engine.js` nicht mehr; ein Regress, bei dem die Anwendung `engine.js` gar nicht mehr konsumiert, bliebe in diesem Gate unbemerkt | offen | ausstehend |
 | CR14-13 | Claude-Review (Runde 2) | Die Flakebehebung ist eine plausible, aber unbewiesene Ursachenhypothese. Bei der beobachteten Fehlerrate von 1 aus 3 besitzen drei aufeinanderfolgende gruene Laeufe auch ohne jede Korrektur eine Wahrscheinlichkeit von rund 30 Prozent; erst die sechs gruenen Laeufe aus Codex- und Reviewmessung zusammen druecken diesen Wert auf rund 9 Prozent. Ein Nachweis der Ursache -- etwa ein reproduzierender Lauf gegen den alten Routingpfad -- fehlt | offen | ausstehend |
-| CR14-14 | Claude-Review (Runde 2) | Die Dokumentchronologie ist nach der Nachbesserung widerspruechlich: der Block "Diff-Risiko vor Coding" wurde nachtraeglich von fuenf auf acht Dateien erweitert und nennt jetzt Artefakte, die erst nach dem Review entstanden sind, waehrend "Ausgefuehrte Tests" unveraendert 108/108 Assertions und "ausschliesslich die fuenf erwarteten Slice-14-Dateien" behauptet. Der aktuelle Stand sind 144 Assertions und acht Dateien | offen | ausstehend |
-| CR14-15 | Claude-Review (Runde 2) | Der Abschnitt "Offene Risiken" fuehrt CR13-13 nicht mehr auf, obwohl `tests/simulator-backtest-characterization.test.mjs:1503` und `:1507` unveraendert zwei ungefangene `execFileSync`-Aufrufe ohne Auffangpfad besitzen. Der in Slice 14 fuer die eigene Testdatei eingefuehrte gefangene Git-Grenzpfad wurde dort nicht nachgezogen; die Offenlegung wurde entfernt, ohne dass das Risiko entfallen ist | offen | ausstehend |
+| CR14-14 | Claude-Review (Runde 2) | Die Dokumentchronologie ist nach der Nachbesserung widerspruechlich: der Block "Diff-Risiko vor Coding" wurde nachtraeglich von fuenf auf acht Dateien erweitert und nennt jetzt Artefakte, die erst nach dem Review entstanden sind, waehrend "Ausgefuehrte Tests" unveraendert 108/108 Assertions und "ausschliesslich die fuenf erwarteten Slice-14-Dateien" behauptet. Der aktuelle Stand sind 144 Assertions und acht Dateien | angenommen | erledigt in Slice 15; Testzahlen und Dateizahl korrigiert, nachtraeglicher Nachbesserungsscope chronologisch gekennzeichnet |
+| CR14-15 | Claude-Review (Runde 2) | Der Abschnitt "Offene Risiken" fuehrt CR13-13 nicht mehr auf, obwohl `tests/simulator-backtest-characterization.test.mjs:1503` und `:1507` unveraendert zwei ungefangene `execFileSync`-Aufrufe ohne Auffangpfad besitzen. Der in Slice 14 fuer die eigene Testdatei eingefuehrte gefangene Git-Grenzpfad wurde dort nicht nachgezogen; die Offenlegung wurde entfernt, ohne dass das Risiko entfallen ist | angenommen | erledigt in Slice 15; beide Git-Aufrufe verwenden `spawnSync` und benannte Assertions mit Prozessdiagnose |
 | CR14-16 | Claude-Review (Runde 2) | Die Fingerprintbindung ist repointern nur intern konsistent: die gespeicherte Basis belegt ihre eigene Kanonisierung, aber kein Lauf im Repository erzeugt sie nach dem Slice-14-Commit noch aus dem Produktivpfad. Der externe Anker fuer `e0362da9...` ist derzeit ausschliesslich die in diesem Review ausserhalb des Repositories durchgefuehrte Reproduktion auf einem sauberen Worktree | offen | ausstehend |
 
 ## Nachbesserungs-Preflight nach Claude-Review
@@ -699,3 +708,20 @@ Korruptionsmeldung rot wird, obwohl nichts korrupt ist.
 4. CR14-13: den alten Routingpfad einmal gezielt gegen das neue Gate laufen
    lassen, um die Ursachenhypothese zu belegen, oder das Restrisiko als
    unbewiesen kennzeichnen.
+
+## Nachbesserung der Auflagen CR14-14 und CR14-15 in Slice 15
+
+**Datum:** 2026-08-03
+**Ausgangsgrenze:** Commit `619c4d4` enthaelt die bedingte Runde-2-Freigabe,
+aber noch nicht die beiden Auflagenkorrekturen.
+
+- CR14-14 ist durch die korrigierten 144/144 Assertions, acht Dateien und die
+  explizite Kennzeichnung des nachtraeglich erweiterten Scopes erfuellt.
+- CR14-15 ist durch die gefangenen Git-Prozessgrenzen im
+  Slice-13-Charakterisierungstest erfuellt. Ein Gitfehler wird nun als
+  fehlgeschlagene, benannte Assertion statt als anonymer Dateiabruch erfasst.
+- Diese Nachbesserung veraendert das nach Commit `619c4d4` lebende
+  Ergebnisdokument absichtlich. Slice 15 fuehrt deshalb die unveraenderlichen
+  Commitbytes als Vorgaengerevidenz und den korrigierten Live-Stand getrennt;
+  die Korrektur darf nicht als urspruenglicher Inhalt des Commits ausgegeben
+  werden.

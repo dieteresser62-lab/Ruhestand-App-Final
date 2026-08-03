@@ -31,3 +31,14 @@
 *.ico   binary
 *.exe   binary
 *.wasm  binary
+
+# Immutable original research inputs: preserve the exact downloaded/extracted
+# bytes used by their pinned SHA-256 contracts. Some upstream files contain
+# CRLF or intentionally mixed line endings and must not be rewritten by Git.
+data/historical/global-equity-research-chain/originals/oecd-share-prices-monthly.csv binary
+data/historical/global-equity-research-chain/originals/ecb-fx-monthly.csv binary
+data/historical/german-cpi-chain/originals/destatis-vpi-current-2026-07-10.html binary
+data/historical/german-cash-money-market-chain/originals/bundesbank-money-market-pages-15-16-layout.txt binary
+data/historical/gold-german-investor-chain/originals/bundesbank-frankfurt-gold-annual-1968-1998.csv binary
+data/historical/gold-german-investor-chain/originals/bundesbank-usd-eur-annual-1999-2025.csv binary
+data/historical/german-gross-wage-growth-chain/originals/destatis-bruttomonatsverdienst-index-2026-08-01.html binary

@@ -972,6 +972,31 @@ Pflege-/Todes-/Hinterbliebenenpfade werden getrennt geprueft.
   Jahreszeilen, endliche Summen und endliches `FlowDelta < 1 EUR`.
   Die Slice-11-bis-13-Finanzneutralitaet wird ausdruecklich nicht als belegt
   behandelt, weil der Integrationsfall im Slice-12-Commit nicht existierte.
+- **Slice-15-Datenpruefung:**
+  `backtest-data-validation-slice-15.test.mjs` verwendet das vollstaendige
+  Slice-14-Ergebnisdokument am sauberen Commit `619c4d4` als Eingangsgrenze.
+  Die Fixture `fixtures/backtest-data-validation-slice-15-v1.json` pinnt
+  Ergebnisdokument, Slice-14-Validierungsfixture und -test sowie die
+  kanonische Fingerprintbasis per SHA-256. Der Test liest die unveraenderten
+  Vorgaengerartefakte direkt aus dem Commit, protokolliert CR14-14/CR14-15
+  ohne erneute Bytebindung des fortschreibbaren Slice-14-Dokuments und
+  rekonstruiert Dataset-/Manifest- und Result-Fingerprint aus der
+  bytegebundenen Live-Basis. Die sieben bereits
+  vorhandenen Rekonstruktions-/Kettengates bleiben Owner der
+  `verify:*data`-Builderausfuehrung; Slice 15 bindet Paketkommando, Skriptpfad,
+  Gate-Datei und gefangene `spawnSync`-Prozessgrenze, ohne die
+  Builder in `npm test` doppelt auszufuehren. Sieben zeilenendensensitive
+  Originalquellen sind in `.gitattributes` als `binary` markiert. Vor dem
+  Commit prueft das Gate den gemeinsamen Acht-Pfade-Kandidaten; nach dem
+  Slice-Commit vergleicht es die tatsaechlichen HEAD-Blobbytes mit den
+  gepinnten SHA-256-Werten. Der aktuelle Basiscommit `619c4d4` enthaelt den
+  Binaervertrag noch nicht und gilt nicht als frisch reproduzierbar. Die offene
+  Finanzneutralitaet gegen Slice 12 bleibt als
+  `not_demonstrated_against_slice_12_commit` erhalten. Das versionierte
+  Nachfolgerverfahren fuer Evidenzfortschreibungen ist dokumentiert, aber
+  ausdruecklich nicht maschinell gegen autorisierte Fixtureaenderungen oder
+  fehlendes externes Review erzwingbar. Repositoryinterne Rekonstruktion ist
+  keine externe wissenschaftliche Validierung.
 
 #### `simulator-real-withdrawal-contract.test.mjs`
 **Zweck:** Testet den Simulatorvertrag für echte Realentnahmen.

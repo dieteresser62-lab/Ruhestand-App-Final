@@ -1,0 +1,136 @@
+{
+  "schemaVersion": "BacktestDataValidationSlice15V1",
+  "status": "derived_from_committed_slice_14_result",
+  "sourceCommit": "619c4d4c43bc469af4320759c1f52212e4c39390",
+  "sourceTreeStatus": "clean",
+  "sourceResultDocument": {
+    "path": "docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_14_ERGEBNISVALIDIERUNG.md",
+    "sha256": "be7dee62c308479c15ad187c31a4cba281fc93d531829702501fce4f63c9b509"
+  },
+  "slice14PostCommitCorrections": {
+    "documentPath": "docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_14_ERGEBNISVALIDIERUNG.md",
+    "completedFindings": ["CR14-14", "CR14-15"],
+    "recordedBySlice": 15,
+    "liveDocumentBinding": "mutable_not_byte_pinned"
+  },
+  "sourceValidationFixture": {
+    "path": "tests/fixtures/backtest-data-validation-slice-14-v1.json",
+    "sha256": "d7492aa3a01d4d209bfb1ed041f374721de55c00befde142d6565d90ed771a6d"
+  },
+  "sourceValidationTest": {
+    "path": "tests/backtest-data-validation-slice-14.test.mjs",
+    "sha256": "c6fe9b36dcba0e01b321c396e6d637cc4256e5b050d8a293415cfe82b772482a"
+  },
+  "sourceFingerprintBasis": {
+    "path": "tests/fixtures/backtest-data-validation-slice-14-fingerprint-basis-v1.json",
+    "sha256": "1e7825e477b50f992dd2d6ec885bc17ddb5daaf0574d169ede26e0c1cae54079"
+  },
+  "dataset": {
+    "datasetId": "ruhestandsapp-historical-data-v1",
+    "revision": "2026-08-01.4",
+    "contentHash": "c79350c5abf2dee2feeaae65c88ed5e58487f878cb598fdffc132fbf48d01e79",
+    "manifestHash": "7ee83d2c04ece133903fb8617f9da4448979b602c3b03649eefe4cd0d2ff62fb"
+  },
+  "finalExport": {
+    "startYear": 2000,
+    "endYear": 2025,
+    "inclusiveYears": 26,
+    "observedRowCount": 26,
+    "summaryEndWealth": 5829580.79,
+    "totalWithdrawal": 805112.51,
+    "totalTax": 114306.75,
+    "maxAbsolutePortfolioFlowDelta": 0,
+    "canonicalRowsHash": "9de469d6dff25a9a9b93ad8c51285b6db945561a54ec1a9538f4375904b753ff",
+    "resultFingerprint": "e0362da98330a4a7eb1c12224ee79d796629479b336e1a1ec59e81907cd1e0fa"
+  },
+  "reconstructionGates": [
+    {
+      "packageScript": "verify:global-equity-data",
+      "scriptPath": "scripts/build-global-equity-research-chain.mjs",
+      "existingGate": "tests/global-equity-source-reconstruction.test.mjs"
+    },
+    {
+      "packageScript": "verify:german-cpi-data",
+      "scriptPath": "scripts/build-german-cpi-chain.mjs",
+      "existingGate": "tests/german-cpi-source-reconstruction.test.mjs"
+    },
+    {
+      "packageScript": "verify:german-cash-money-market-data",
+      "scriptPath": "scripts/build-german-cash-money-market-chain.mjs",
+      "existingGate": "tests/german-cash-money-market-source-reconstruction.test.mjs"
+    },
+    {
+      "packageScript": "verify:gold-german-investor-data",
+      "scriptPath": "scripts/build-gold-german-investor-chain.mjs",
+      "existingGate": "tests/gold-german-investor-chain.test.mjs"
+    },
+    {
+      "packageScript": "verify:us-shiller-cape-data",
+      "scriptPath": "scripts/build-us-shiller-cape-chain.mjs",
+      "existingGate": "tests/us-shiller-cape-chain.test.mjs"
+    },
+    {
+      "packageScript": "verify:german-gross-wage-data",
+      "scriptPath": "scripts/build-german-gross-wage-growth-chain.mjs",
+      "existingGate": "tests/german-gross-wage-growth-chain.test.mjs"
+    },
+    {
+      "packageScript": "verify:german-demography-data",
+      "scriptPath": "scripts/build-german-demography-care-survivor-contract.mjs",
+      "existingGate": "tests/german-demography-care-survivor-contract.test.mjs"
+    }
+  ],
+  "financialNeutralityAssessment": {
+    "status": "not_demonstrated_against_slice_12_commit",
+    "reason": "Slice 15 inherits the evidence boundary from Slice 14; no integrated_reference_2000_2025 baseline exists at the Slice-12 commit."
+  },
+  "sourceIntegrity": {
+    "mode": "git_binary_exact_bytes_v1",
+    "commitRequirement": {
+      "policy": "external_review_then_atomic_commit",
+      "atomicPathSet": "gitattributes_and_all_originals",
+      "headBlobVerification": "mandatory_when_head_contains_binary_contract"
+    },
+    "originals": [
+      {
+        "path": "data/historical/global-equity-research-chain/originals/oecd-share-prices-monthly.csv",
+        "sha256": "9ea88f6d07d2d7382ae72ccc8101eed1bd46db5efee8f049352161f3448414e8"
+      },
+      {
+        "path": "data/historical/global-equity-research-chain/originals/ecb-fx-monthly.csv",
+        "sha256": "047cab457467d382a1933b0759e5b1b2fc8f68c88b2b4de5f21fece4d9ca624a"
+      },
+      {
+        "path": "data/historical/german-cpi-chain/originals/destatis-vpi-current-2026-07-10.html",
+        "sha256": "82ab91a5e53db7cd74cdf4f7b4d85813e586fbd3ae0bbd3d01a6cb231b596743"
+      },
+      {
+        "path": "data/historical/german-cash-money-market-chain/originals/bundesbank-money-market-pages-15-16-layout.txt",
+        "sha256": "85e3b0f6678944a555bb6848b2eefe5601475124bae497e6e63faf47b759c383"
+      },
+      {
+        "path": "data/historical/gold-german-investor-chain/originals/bundesbank-frankfurt-gold-annual-1968-1998.csv",
+        "sha256": "c08654b065a5685456bf2ebd954b43fec3cef9a9755f121d9dab6420c9410e2e"
+      },
+      {
+        "path": "data/historical/gold-german-investor-chain/originals/bundesbank-usd-eur-annual-1999-2025.csv",
+        "sha256": "ba8810d1b754e63f26e84824dcf0dd2f24716c51e9ba385bb09002b2fc087a7e"
+      },
+      {
+        "path": "data/historical/german-gross-wage-growth-chain/originals/destatis-bruttomonatsverdienst-index-2026-08-01.html",
+        "sha256": "1f62492a2efe78fba3ec2ac81dfd90a1c4ccd6f8b68b7bcc6c53ae4d8cd51f1a"
+      }
+    ]
+  },
+  "evidenceAdvancementProcedure": {
+    "status": "documented_not_machine_enforced",
+    "requiredSuccessorElements": [
+      "new_source_commit",
+      "new_basis_file",
+      "new_schema_version",
+      "external_review"
+    ],
+    "knownLimitation": "Repository tests cannot prove that an external review occurred or prevent an authorized maintainer from rewriting fixture declarations."
+  },
+  "claimBoundary": "repository_reconstruction_not_external_scientific_validation"
+}

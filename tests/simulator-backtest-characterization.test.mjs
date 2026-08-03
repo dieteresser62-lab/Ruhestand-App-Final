@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { runBacktest } from '../app/simulator/simulator-backtest.js';
@@ -33,6 +33,17 @@ const slice13IntegrationFixturePath = path.join(__dirname, 'fixtures', 'backtest
 const backtestSourcePath = path.join(__dirname, '..', 'app', 'simulator', 'simulator-backtest.js');
 const backtestRunnerSourcePath = path.join(__dirname, '..', 'app', 'simulator', 'historical-backtest-runner.js');
 const UPDATE_TARGET = process.env.UPDATE_BACKTEST_TARGET === '1';
+
+function runGitCommand(args, repositoryRoot, label) {
+    const result = spawnSync('git', args, {
+        cwd: repositoryRoot,
+        encoding: 'utf8',
+        windowsHide: true
+    });
+    assertEqual(result.status, 0,
+        `${label} must succeed: ${result.stderr || result.stdout || result.error?.message || 'unknown git error'}`);
+    return String(result.stdout || '').trim();
+}
 const UPDATE_SLICE10_MEASUREMENT = process.env.UPDATE_BACKTEST_DATA_10 === '1';
 
 console.log('--- Simulator Backtest Characterization Tests ---');
@@ -1500,14 +1511,16 @@ try {
     });
 
     const repositoryRoot = path.join(__dirname, '..');
-    const measuredGitCommit = execFileSync('git', ['rev-parse', 'HEAD'], {
-        cwd: repositoryRoot,
-        encoding: 'utf8'
-    }).trim().toLowerCase();
-    const measuredGitStatus = execFileSync('git', ['status', '--porcelain'], {
-        cwd: repositoryRoot,
-        encoding: 'utf8'
-    }).trim();
+    const measuredGitCommit = runGitCommand(
+        ['rev-parse', 'HEAD'],
+        repositoryRoot,
+        'Slice-13 Git commit measurement'
+    ).toLowerCase();
+    const measuredGitStatus = runGitCommand(
+        ['status', '--porcelain'],
+        repositoryRoot,
+        'Slice-13 Git status measurement'
+    );
     const measuredSourceTreeStatus = measuredGitStatus === '' ? 'clean' : 'dirty';
     const runtimeBuildProvenance = {
         schemaVersion: 'RuntimeBuildProvenanceV1',
