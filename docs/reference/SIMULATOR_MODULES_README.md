@@ -95,7 +95,7 @@ DOM-freie Startjahr- und CAPE-Sampling-Logik fuer Monte-Carlo.
 **Hauptfunktionen / Exporte:**
 - `buildStartYearCdf()` / `pickStartYearIndex()` – CDF-Aufbau und deterministische Startjahrwahl fuer FILTER/RECENCY/UNIFORM.
 - `buildYearSamplingConfig()` – gewichtete Sampling-Konfiguration fuer Startjahr und laufende Jahresdaten.
-- `resolveMonteCarloSamplingContractV1()` / `pickMonteCarloStartYearIndex()` – versionierte Praezedenzaufloesung und per-Run-Auswahl inklusive CAPE-Kandidaten, methodenspezifischer Jahr-1-Regel und sichtbarem Fallback.
+- `resolveMonteCarloSamplingContractV1()` / `pickMonteCarloStartYearIndex()` – versionierte Praezedenzaufloesung und per-Run-Auswahl inklusive CAPE-Kandidaten, methodenspezifischer Jahr-1-Regel sowie Preflight fuer harte Regime- und historische Stresspools.
 - `createMonteCarloSamplingDiagnosticsV1()` / `recordMonteCarloSampledYearV1()` / `mergeMonteCarloSamplingDiagnosticsV1()` – kompakte Startjahr-, Jahres-, Quellen-, Regime-, Stationary- und Tail-Risk-Zaehler mit Datenfingerprints.
 
 **Einbindung:** Wird von `mc-run-context.js` fuer die Basiskonfiguration, vom Runner fuer die einmalige Vertragsaufloesung und Startjahrwahl sowie vom Chunkresultat fuer Validierung und reihenfolgeunabhaengiges Merge genutzt.
@@ -406,7 +406,7 @@ Kernlogik für Jahr-für-Jahr-Simulation (Direct Engine).
 - Der kanonische Faktor liegt auf `simState.cumulativeInflationFactor`; `simulator-engine-direct.js` spiegelt ihn für Realvermögen und Real-Drawdown in den Engine-`lastState`.
 - Recompute-Pfad für Notfallverkäufe: kombiniert reguläre + Notfall-Rohaggregate und rechnet Settlement mit `taxStatePrev` neu.
 - Pflegebucket-Pfad: nutzt `simulator-health-bucket.js` nach der Engine-Entscheidung und vor `applyForcedSaleLiquidityCoverage()`, damit zweckgebundene Geldmarkt-/Cash-Reserve Pflege-Liquiditätslücken deckt, bevor Risikoanlagen notverkauft werden.
-- `sampleNextYearData()` (Helpers) – sampelt nächstes Jahr (historisch/Regime/Block)
+- `sampleNextYearData()` (Helpers) – sampelt das nächste kanonische Jahr (historisch/Regime/Block); fehlende Historie, leere effektive Regimepools und unbrauchbare Transitionen scheitern fail-closed statt Null-/SIDEWAYS-Daten zu erfinden oder auf ungefilterte Jahre zurueckzufallen
 - `makeDefaultCareMeta()` / `updateCareMeta()` (Helpers) – Pflegefall-Zustandsmaschine
 - `calcCareCost()` (Helpers) – berechnet Pflege-Kosten nach Grad
 - `computeCareMortalityMultiplier()` (Helpers) – erhöhte Sterblichkeit bei Pflege
@@ -551,7 +551,7 @@ Portfolio-Initialisierung, Renten- und Stress-Kontexte.
 - `updateStartPortfolioDisplay()` – UI-Display für Start-Allokation
 - `initializePortfolio()` / `initializePortfolioDetailed()` – Tranchen-Setup inklusive optionalem Pflegebucket-Carve-Out nach Profilverbund-Merge
 - `computeRentAdjRate()` / `computePensionNext()` – Rentenanpassungslogik
-- `buildStressContext()` / `applyStressOverride()` – Stresstest-Szenarien
+- `resolveStressHistoricalPool()` / `buildStressContext()` / `applyStressOverride()` – gepinnte historische Stresspools mit Kalenderjahresclustern und Mindestdiversitaet sowie Stresstest-Szenarien/Overrides; Kontextaufbau und Laufzeit-Schnittmenge erzwingen die Diversitaet zusaetzlich zum Vertragspreflight
 
 **Helper-Module (ausgelagert):**
 - `simulator-portfolio-inputs.js` – DOM-Input-Parsing

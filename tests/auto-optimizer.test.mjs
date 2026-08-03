@@ -92,6 +92,7 @@ try {
         buildAutoOptimizeModelStatus,
         runAutoOptimize
     } = await import('../app/simulator/auto_optimize.js');
+    const { formatAutoOptimizeError } = await import('../app/simulator/auto_optimize_ui.js');
     const createVersionedMetricResult = (overrides = {}) => ({
         metricContract: { schemaVersion: AUTO_OPTIMIZE_METRIC_RESULT_VERSION },
         medianEndWealth: 500000,
@@ -104,6 +105,14 @@ try {
     });
 
     // ========== Auto-Optimize UI Helper Tests ==========
+
+    assert(
+        formatAutoOptimizeError({
+            code: 'SIMULATOR_STRESS_PRESET_UNKNOWN',
+            message: 'SIMULATOR_STRESS_PRESET_UNKNOWN: raw English'
+        }).includes('gespeicherte Preset'),
+        'Auto-Optimize uses the shared German simulator contract error mapping'
+    );
 
     // Test 0a: Presets bleiben DOM-frei importierbar
     console.log('Test 0a: UI presets importierbar');

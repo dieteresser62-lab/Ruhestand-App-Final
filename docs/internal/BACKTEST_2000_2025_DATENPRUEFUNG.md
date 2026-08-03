@@ -2,12 +2,10 @@
 
 **Pruefdatum:** 2026-07-29
 **Pruefer:** Claude (Primary reviewer & Analyst)
-**Status:** Korrekturprogramm in Umsetzung; Slice 01 bis 10 extern technisch
-freigegeben und lokal committed; Slice 11 verwendet das vollstaendige
-Slice-10-Ergebnisdokument als Eingangsgrenze, CR10-13/14 sind geschlossen und
-Claudes Findings CR11-1 bis CR11-22 aus beiden Reviewrunden sind technisch
-nachgebessert sowie selbstgeprueft; erneutes externes Re-Review, Freigabe und
-Commit stehen aus
+**Status:** Korrekturprogramm in Umsetzung; Slice 01 bis 11 extern technisch
+freigegeben und lokal committed. Slice 12 verwendet das vollstaendige
+Slice-11-Ergebnisdokument als Eingangsgrenze, ist technisch umgesetzt und
+selbstgeprueft; externes Review, Freigabe und Commit stehen aus
 **Pruefgegenstand:** Exportdatei
 `backtest-2000-2025-89fc3e368d64-2026-07-29T10-00-22.287Z.json`
 **Anlass:** Nutzerseitige Verifikation nach Abschluss der Suite-Datenintegritaet-
@@ -756,17 +754,17 @@ reine Stressparameter duerfen im Manifest nicht dieselbe Evidenzklasse tragen.
 
 ### Arbeitsstatus und Branch-Regel
 
-- Status: Die Slices 01 bis 10 liegen auf
+- Status: Die Slices 01 bis 11 liegen auf
   `codex/suite-datenintegritaet-hardening` als lokale Commits vor. Slice 08
   ist durch Claudes Reviewrunde 3 technisch freigegeben und als Commit
   `ad08236` vorhanden. Slice 09 ist nach Claude-Review Runde 2 technisch
   freigegeben und als Commit `2e4867f` vorhanden. Slice 10 ist nach
   Claude-Review Runde 2 freigegeben und als Commit `05ff8c3` vorhanden.
-  Slice 11 verwendet das vollstaendige Slice-10-Ergebnisdokument als
-  Eingangsgrenze. CR10-13/14 sind durch Ergebnisprosa, eine am Slice-09-Commit
-  nachgemessene D-17-Basis und ein vollstaendiges 12/12-Delta-Ledger
-  geschlossen. Preflight, fuenf produktive Dateien und Diff-Risiko sind vor
-  Coding dokumentiert; die Eingangsbaseline mit 160 Testdateien ist gruen.
+  Slice 11 ist nach Claude-Review Runde 4 freigegeben und als Commit `6ecb249`
+  vorhanden. Slice 12 verwendet dessen vollstaendiges Ergebnisdokument als
+  Eingangsgrenze; CR11-29, S01-1 und P-06 sind technisch geschlossen.
+  Preflight, fuenf produktive Dateien und Diff-Risiko wurden vor Coding
+  dokumentiert; die Abschlussbaseline umfasst 163 Testdateien und ist gruen.
 - Dokumentierter Ausgangsstand der Nachrechnung: `ca982cf`.
 - Nutzerentscheidung vom 2026-07-29: Die Umsetzung bleibt ausdruecklich auf
   dem vorhandenen Branch `codex/suite-datenintegritaet-hardening`; es wird
@@ -1515,6 +1513,32 @@ mehrdeutige Felder.
 - D-16 und D-19 sind im Exportvertrag adressiert.
 
 ### Slice 12 - Stressszenarien, Regime und Fallbackwerte
+
+**Slice-Dokument:**
+[`SLICE_BACKTEST_DATENPRUEFUNG_12_STRESS_REGIME_FALLBACKS.md`](SLICE_BACKTEST_DATENPRUEFUNG_12_STRESS_REGIME_FALLBACKS.md)
+
+**Umsetzungsstatus:** am 2026-08-03 auf Basis des vollstaendigen, durch Claude
+Runde 4 freigegebenen und als Commit `6ecb249` vorliegenden
+Slice-11-Ergebnisdokuments technisch umgesetzt und selbstgeprueft. CR11-29 ist
+durch einen unabhaengigen literalen CSV-V2-Goldenheader geschlossen; S01-1
+durch Entfernung des zweiten Regimeaufbaus. Die unveraenderten absoluten
+Regimegrenzen sind nach der Slice-2-Verteilungsverschiebung mit 40/6/49/6 und
+explizitem Nichtvalidierungsstatus gebunden. Stresspresets trennen historische
+Filter, rekonstruierte Fenster, hybride und synthetische Schocks; irrefuehrende
+historische Replay-Namen sind entfernt. `minCluster: 2` wirkt nun tatsaechlich
+und reduziert den betroffenen Verlustjahrpool von 17 auf 10 Jahre. Leere oder
+ungueltige Daten-/Preset-/Regimepfade scheitern mit stabilen Codes statt
+Nullreturn, `SIDEWAYS` oder still `NONE` zu erzeugen. Die Claude-Blocker
+CR12-1/CR12-2 und Findings CR12-3 bis CR12-7 sind angenommen und nachgebessert:
+Preflight vor Workerstart, kein ungefilterter Regimefallback, mindestens drei
+unterschiedliche historische Stressjahre, auffangbarer Regime-Driftcheck,
+deutsche Handlungsmeldungen und exportierte Stressprovenienz. Insgesamt neun
+produktive Dateien nach Runde 1; Runde 2 erweitert den finalen Scope auf exakt
+zehn Dateien und schliesst die V1-Lesekompatibilitaet, alle deutschen
+Stress-/Regimemeldungen, den Auto-Optimizer-Fehlerpfad sowie die unabhaengige
+Runtime-Mindestdiversitaet. `npm test` 18.135/18.135 Assertions, Coverage 78,66
+Prozent und Browser-Smoke gruen. Erneutes externes Review, Freigabe und Commit
+stehen aus.
 
 **Abhaengigkeiten:** Slices 1 bis 6.
 

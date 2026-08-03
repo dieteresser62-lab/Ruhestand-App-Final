@@ -7,37 +7,107 @@
  */
 "use strict";
 
-import { STRESS_PRESETS, annualData } from './simulator-data.js';
+import { STRESS_PRESETS, annualData, simulatorDataContractError } from './simulator-data.js';
+
+function matchesStressFilter(dataPoint, filter) {
+    const realReturnPct = (dataPoint.rendite * 100) - dataPoint.inflation;
+    return (filter.yearMin === undefined || dataPoint.jahr >= filter.yearMin)
+        && (filter.yearMax === undefined || dataPoint.jahr <= filter.yearMax)
+        && (filter.inflationMin === undefined || dataPoint.inflation >= filter.inflationMin)
+        && (filter.equityRealMax === undefined || realReturnPct <= filter.equityRealMax);
+}
+
+function enforceMinimumConsecutiveCluster(matches, minimumCluster) {
+    if (!Number.isInteger(minimumCluster) || minimumCluster <= 1) {
+        return matches.map(match => match.index);
+    }
+    const allowed = new Set();
+    let cluster = [];
+    const flush = () => {
+        if (cluster.length >= minimumCluster) cluster.forEach(match => allowed.add(match.index));
+        cluster = [];
+    };
+    for (const match of matches) {
+        if (cluster.length === 0 || match.jahr === cluster[cluster.length - 1].jahr + 1) cluster.push(match);
+        else {
+            flush();
+            cluster.push(match);
+        }
+    }
+    flush();
+    return matches.map(match => match.index).filter(index => allowed.has(index));
+}
+
+export function resolveStressHistoricalPool(presetKey, data = annualData) {
+    const normalizedPresetKey = presetKey == null || presetKey === '' ? 'NONE' : presetKey;
+    if (!Object.prototype.hasOwnProperty.call(STRESS_PRESETS, normalizedPresetKey)) {
+        throw simulatorDataContractError(
+            'SIMULATOR_STRESS_PRESET_UNKNOWN',
+            `Unknown stress preset ${String(normalizedPresetKey)}.`
+        );
+    }
+    const preset = STRESS_PRESETS[normalizedPresetKey];
+    if (preset.type !== 'conditional_bootstrap') {
+        return Object.freeze({
+            presetKey: normalizedPresetKey,
+            type: preset.type,
+            minimumDistinctYears: 0,
+            candidateIndices: Object.freeze([]),
+            candidateYears: Object.freeze([])
+        });
+    }
+    const matches = data
+        .map((entry, index) => ({ ...entry, index }))
+        .filter(entry => matchesStressFilter(entry, preset.filter));
+    const candidateIndices = enforceMinimumConsecutiveCluster(matches, preset.filter.minCluster);
+    const candidateYears = candidateIndices.map(index => Number(data[index]?.jahr));
+    return Object.freeze({
+        presetKey: normalizedPresetKey,
+        type: preset.type,
+        minimumDistinctYears: Math.min(3, preset.years),
+        candidateIndices: Object.freeze(candidateIndices),
+        candidateYears: Object.freeze(candidateYears)
+    });
+}
 
 /**
  * Bereitet den Kontext für ein Stress-Szenario vor
  */
 export function buildStressContext(presetKey, rand) {
-    const preset = STRESS_PRESETS[presetKey] || STRESS_PRESETS.NONE;
+    const normalizedPresetKey = presetKey == null || presetKey === '' ? 'NONE' : presetKey;
+    if (!Object.prototype.hasOwnProperty.call(STRESS_PRESETS, normalizedPresetKey)) {
+        throw simulatorDataContractError(
+            'SIMULATOR_STRESS_PRESET_UNKNOWN',
+            `Unknown stress preset ${String(normalizedPresetKey)}.`
+        );
+    }
+    const preset = STRESS_PRESETS[normalizedPresetKey];
     if (preset.type === 'none') return null;
 
     const context = {
         preset: preset,
         remainingYears: preset.years,
-        type: preset.type
+        type: preset.type,
+        provenance: preset.provenance
     };
 
     if (preset.type === 'conditional_bootstrap') {
-        // Build a filtered list of historical years that match the stress criteria.
-        context.pickableIndices = annualData
-            .map((d, i) => ({ ...d, index: i }))
-            .filter(d => {
-                const realReturnPct = (d.rendite * 100) - d.inflation;
-                const passesYearMin = preset.filter.yearMin === undefined || d.jahr >= preset.filter.yearMin;
-                const passesYearMax = preset.filter.yearMax === undefined || d.jahr <= preset.filter.yearMax;
-                const passesInflation = preset.filter.inflationMin === undefined || d.inflation >= preset.filter.inflationMin;
-                const passesRealReturn = preset.filter.equityRealMax === undefined || realReturnPct <= preset.filter.equityRealMax;
-                return passesYearMin && passesYearMax && passesInflation && passesRealReturn;
-            })
-            .map(d => d.index);
+        const pool = resolveStressHistoricalPool(normalizedPresetKey, annualData);
+        context.pickableIndices = [...pool.candidateIndices];
+        context.candidateYears = [...pool.candidateYears];
+        context.minimumDistinctYears = pool.minimumDistinctYears;
 
         if (context.pickableIndices.length === 0) {
-            return null;
+            throw simulatorDataContractError(
+                'SIMULATOR_STRESS_POOL_EMPTY',
+                `Stress preset ${normalizedPresetKey} has no eligible canonical historical observations.`
+            );
+        }
+        if (context.pickableIndices.length < context.minimumDistinctYears) {
+            throw simulatorDataContractError(
+                'SIMULATOR_STRESS_EFFECTIVE_POOL_TOO_SMALL',
+                `Stress preset ${normalizedPresetKey} requires at least ${context.minimumDistinctYears} distinct historical observations.`
+            );
         }
     }
 
@@ -69,7 +139,13 @@ export function applyStressOverride(yearData, stressCtx, rand) {
     switch (preset.type) {
         case 'parametric_sequence':
             const i = preset.years - stressCtx.remainingYears;
-            const baseReturn = preset.seqReturnsEq[i] || 0;
+            const baseReturn = preset.seqReturnsEq[i];
+            if (!Number.isFinite(baseReturn)) {
+                throw simulatorDataContractError(
+                    'SIMULATOR_STRESS_SEQUENCE_INVALID',
+                    `Stress preset sequence has no finite return at offset ${i}.`
+                );
+            }
             const noise = (rand() * 2 - 1) * (preset.noiseVol || 0);
             modifiedData.rendite = baseReturn + noise;
             if (preset.inflationFixed !== undefined) {
@@ -92,7 +168,15 @@ export function applyStressOverride(yearData, stressCtx, rand) {
 
     // Lineare Shifts
     modifiedData.rendite += (preset.muShiftEq || 0);
-    modifiedData.gold_eur_perf = (modifiedData.gold_eur_perf || 0) + ((preset.muShiftAu || 0) * 100);
+    if (!Number.isFinite(modifiedData.rendite)
+        || !Number.isFinite(modifiedData.inflation)
+        || !Number.isFinite(modifiedData.gold_eur_perf)) {
+        throw simulatorDataContractError(
+            'SIMULATOR_STRESS_INPUT_INVALID',
+            'Stress overrides require finite equity, inflation and gold observations.'
+        );
+    }
+    modifiedData.gold_eur_perf += (preset.muShiftAu || 0) * 100;
 
     // Caps (Obergrenzen für Renditen) - WICHTIG für "Lost Decade" (keine Gold-Raketen)
     if (preset.returnMaxAu !== undefined) {
@@ -105,7 +189,7 @@ export function applyStressOverride(yearData, stressCtx, rand) {
     }
 
     // Floors/Caps
-    if (preset.inflationFloor) {
+    if (preset.inflationFloor !== undefined) {
         modifiedData.inflation = Math.max(modifiedData.inflation, preset.inflationFloor);
     }
 

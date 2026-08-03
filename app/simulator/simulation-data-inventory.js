@@ -7,7 +7,7 @@ import {
 import { GERMAN_DEMOGRAPHY_CARE_SURVIVOR_CONTRACT } from './german-demography-care-survivor-contract.js';
 
 export const SIMULATION_DATA_INVENTORY_SCHEMA_VERSION = 'SimulationDataInventoryV1';
-export const SIMULATION_DATA_INVENTORY_REVISION = '2026-08-01.5';
+export const SIMULATION_DATA_INVENTORY_REVISION = '2026-08-03.1';
 
 export const SIMULATION_DATA_EVIDENCE_CLASSES = Object.freeze([
     'official',
@@ -743,9 +743,19 @@ const STATIC_DATA = {
         category: 'stress_regime',
         label: 'Historical-filter and parametric stress presets',
         evidenceClass: 'stress_parameter',
-        implementationLocations: ['app/simulator/simulator-data.js:STRESS_PRESETS'],
+        implementationLocations: [
+            'app/simulator/simulator-data.js:STRESS_PRESETS',
+            'app/simulator/simulator-portfolio-stress.js:buildStressContext'
+        ],
         unit: 'mixed_stress_parameter_contract',
-        embeddedValueHash: resolved('f63aaaa9deae062da2b815bb3b0f3a24d696a6448c81ebd7f5f73193686a8b11'),
+        embeddedValueHash: resolved('e42d795bef1f5f30b9664864aa8981d1a55efa691ed827d29faeb78675ec3988'),
+        contractValue: {
+            evidenceKinds: ['none', 'historical_filter', 'reconstructed_window', 'hybrid_synthetic', 'synthetic_shock'],
+            sourceEvidenceKinds: ['not_applicable', 'mixed_observation_proxy_and_reconstruction', 'research_proxy_reconstruction', 'mixed_observation_proxy_and_reconstruction_plus_synthetic_shift'],
+            unknownPresetPolicy: 'reject',
+            emptyHistoricalPoolPolicy: 'reject',
+            missingOptionalPresetDefault: 'NONE'
+        },
         externalValidationStatus: 'not_applicable'
     }),
     regime_classification_thresholds: staticEntry({
@@ -753,15 +763,28 @@ const STATIC_DATA = {
         category: 'stress_regime',
         label: 'Historical regime-classification thresholds',
         evidenceClass: 'model_assumption',
-        implementationLocations: ['app/simulator/simulator-data.js:REGIME_CLASSIFICATION_THRESHOLDS'],
+        implementationLocations: [
+            'app/simulator/simulator-data.js:REGIME_CLASSIFICATION_THRESHOLDS',
+            'app/simulator/simulator-data.js:classifyHistoricalRegime'
+        ],
         unit: 'mixed_percent_and_ratio_thresholds',
-        embeddedValueHash: resolved('dcc698a12aa98bac88943cfcf0fa2be63c1ca04ac384dd054ff37a2fe3420a3c'),
+        embeddedValueHash: resolved('8dad669ee3def85c107b2ea21d5e4531af9fd0a0cb0d0bfe4271a02dd9f448da'),
         contractValue: {
+            schemaVersion: 'HistoricalRegimeClassificationV1',
+            sourceSeries: 'global_equity_research_annual_returns',
             inflationHighPct: 5,
             equityPoorRatio: 0,
             equityCrashRatio: -0.15,
             equityBoomRatio: 0.15,
-            labels: ['BULL', 'BEAR', 'SIDEWAYS', 'STAGFLATION']
+            labels: ['BULL', 'BEAR', 'SIDEWAYS', 'STAGFLATION'],
+            calibrationStatus: 'retained_after_total_return_distribution_review',
+            reviewedDistribution1925To2025: {
+                observationCount: 101,
+                BULL: 40,
+                BEAR: 6,
+                SIDEWAYS: 49,
+                STAGFLATION: 6
+            }
         },
         externalValidationStatus: 'not_validated'
     }),
@@ -775,7 +798,7 @@ const STATIC_DATA = {
         embeddedValueHash: resolved('ab1a37acbf4a1f141983ad194108f028fac85eb3f3c5522efe1d70c42601f398'),
         source: resolved('ruhestandsapp-historical-data-v1 plus REGIME_CLASSIFICATION_THRESHOLDS'),
         seriesIdentifier: resolved('REGIME_TRANSITIONS'),
-        transformation: resolved('Count consecutive annual regime labels; empty source regimes fall back to one SIDEWAYS transition.'),
+        transformation: resolved('Count consecutive canonical annual regime labels; missing regime pools or outgoing transitions reject initialization.'),
         externalValidationStatus: 'not_validated'
     }),
     engine_policy_defaults: staticEntry({

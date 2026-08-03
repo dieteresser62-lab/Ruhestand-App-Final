@@ -498,7 +498,7 @@ The static inventory covers these product classes:
 | Survivor | `widow_benefit_parameters` | user-input/default contract, not an observed benefit entitlement |
 | Tax/tranches | `capital_income_tax_parameters` | current parameterized approximation; no historical-tax simulation or external tax validation |
 | Pension/social | `pension_user_defaults`, `social_insurance_parameters` | user inputs are authoritative; an automatic social-insurance table is explicitly `missing`, not fabricated |
-| Stress/regime | `stress_presets`, `regime_classification_thresholds`, `regime_transition_matrix` | stress parameters, model thresholds and derived transition counts use different classes |
+| Stress/regime | `stress_presets`, `regime_classification_thresholds`, `regime_transition_matrix` | every preset distinguishes historical filter, reconstructed window, hybrid or synthetic evidence; retained model thresholds and derived transition counts use separate classes and remain externally unvalidated |
 | Defaults/fallbacks | `engine_policy_defaults`, `monte_carlo_defaults`, `longevity_defaults`, `tail_risk_defaults`, `health_bucket_defaults` | policy assumptions and stress defaults are hash-gated without being promoted to observations |
 
 The source gate deliberately separates three questions:
@@ -571,19 +571,29 @@ The active backtest record separates ex-post `realized` observations from
 `approved_d01` and uses temporal convention
 `realized_t_decision_t_minus_1_v1`.
 
-| Simulated field in year `t` | Legacy backtest | Active `annualData` / Monte Carlo | Alternative `prepareHistoricalData()` | Active D-01 backtest contract |
-| --- | --- | --- | --- | --- |
-| Equity return | index `t / (t-1) - 1` | index `t / (t-1) - 1` | index `t / (t-1) - 1` | realized `t`, input levels `t-1` and `t` |
-| Gold return | `t-1` | `t` | `t-1` | realized `t` |
-| Cash/bond proxy | `t-1` | `t` | `t-1` | realized `t` |
-| Inflation | `t-1` | `t` | `t-1` | realized `t` |
-| Wage/pension adjustment | `t` via `simStartYear - series.startYear + yearIdx` | `t` | `t-1` | realized `t` |
-| CAPE | effective double lag before Slice 06 | return-year `t` key contains December `t-1` signal | not mapped | December observation `t-1`, as-of `t-1`, decision year `t`; no second lag |
+| Simulated field in year `t` | Legacy backtest | Active `annualData` / Monte Carlo | Active D-01 backtest contract |
+| --- | --- | --- | --- |
+| Equity return | index `t / (t-1) - 1` | canonical generated annual total return `t` | realized `t`, input levels `t-1` and `t` |
+| Gold return | `t-1` | `t` | realized `t` |
+| Cash/bond proxy | `t-1` | `t` | realized `t` |
+| Inflation | `t-1` | `t` | realized `t` |
+| Wage/pension adjustment | `t` via `simStartYear - series.startYear + yearIdx` | `t` | realized `t` |
+| CAPE | effective double lag before Slice 06 | return-year `t` key contains December `t-1` signal | December observation `t-1`, as-of `t-1`, decision year `t`; no second lag |
 
 Marker tests cover the pension-adjustment offset for 1950, 2000, and 2001. The
 low-level `simulator-year-portfolio.js:readYearReturnRates()` normalizer retains
 its fallback shape, while the productive Backtest/Monte-Carlo/Sweep adapter
 rejects non-finite required returns before portfolio mutation.
+
+`prepareHistoricalData()` is now only an availability gate for the canonical
+module-initialized `annualData`; it no longer rebuilds a second, differently
+lagged dataset. `HistoricalRegimeClassificationV1` applies one classifier to
+the canonical total-return and inflation series. The retained absolute
+thresholds produce 40 BULL, 6 BEAR, 49 SIDEWAYS and 6 STAGFLATION observations
+over 1925-2025. This retention followed a distribution review but is explicitly
+`not_validated`, not an external calibration. Empty data, empty stress pools
+and unusable regime transitions reject execution instead of fabricating zero
+returns, `SIDEWAYS` observations or transitions.
 
 ## Important notes
 

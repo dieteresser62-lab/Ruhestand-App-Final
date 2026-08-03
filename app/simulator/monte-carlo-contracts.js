@@ -4,6 +4,8 @@ import {
     canonicalizeHistoricalContractValue,
     sha256Hex
 } from './historical-backtest-contract.js';
+import { annualData, STRESS_PRESETS } from './simulator-data.js';
+import { resolveStressHistoricalPool } from './simulator-portfolio-stress.js';
 
 export const MONTE_CARLO_RUN_REQUEST_VERSION = 'MonteCarloRunRequestV1';
 export const MONTE_CARLO_RUN_RESULT_VERSION = 'MonteCarloRunResultV1';
@@ -189,6 +191,9 @@ export function createMonteCarloRunRequestV1({
     const samplingContract = normalizeMonteCarloJsonValue(samplingDiagnostics?.contract || {}, {
         path: '$.sampling.effectiveContract'
     });
+    const stressPresetKey = String(normalizedInputs?.stressPreset || 'NONE');
+    const stressPreset = STRESS_PRESETS[stressPresetKey] || STRESS_PRESETS.NONE;
+    const stressPool = resolveStressHistoricalPool(stressPresetKey, annualData);
     const scenario = {
         schemaVersion: MONTE_CARLO_SCENARIO_VERSION,
         cacheKey: typeof scenarioKey === 'string' && scenarioKey.trim() ? scenarioKey : null,
@@ -220,8 +225,17 @@ export function createMonteCarloRunRequestV1({
             effectiveContract: samplingContract
         },
         stress: {
-            preset: String(normalizedInputs?.stressPreset || 'NONE'),
-            method: 'conditional-preset-then-tail-risk-overlay-v1'
+            preset: stressPresetKey,
+            method: 'conditional-preset-then-tail-risk-overlay-v1',
+            provenance: normalizeMonteCarloJsonValue(stressPreset.provenance, { path: '$.stress.provenance' }),
+            pool: normalizeMonteCarloJsonValue({
+                policy: stressPreset.type === 'conditional_bootstrap'
+                    ? 'independent_draws_from_filtered_historical_pool'
+                    : 'not_applicable',
+                minimumDistinctYears: stressPool.minimumDistinctYears,
+                rawCandidateCount: stressPool.candidateIndices.length,
+                rawCandidateYears: [...stressPool.candidateYears]
+            }, { path: '$.stress.pool' })
         },
         scenario,
         data: {
@@ -263,6 +277,17 @@ export function validateMonteCarloRunRequestV1(request) {
     }
     requireObject(request.stress, MONTE_CARLO_RUN_REQUEST_VERSION, 'stress');
     requireString(request.stress.preset, MONTE_CARLO_RUN_REQUEST_VERSION, 'stress.preset');
+    // V1 added provenance and pool metadata additively. New writers always
+    // emit both objects; readers keep accepting V1 exports created before the
+    // additive fields existed.
+    if (request.stress.provenance !== undefined) {
+        requireObject(request.stress.provenance, MONTE_CARLO_RUN_REQUEST_VERSION, 'stress.provenance');
+        requireString(request.stress.provenance.evidenceKind, MONTE_CARLO_RUN_REQUEST_VERSION, 'stress.provenance.evidenceKind');
+        requireString(request.stress.provenance.claimScope, MONTE_CARLO_RUN_REQUEST_VERSION, 'stress.provenance.claimScope');
+    }
+    if (request.stress.pool !== undefined) {
+        requireObject(request.stress.pool, MONTE_CARLO_RUN_REQUEST_VERSION, 'stress.pool');
+    }
     const scenario = requireObject(request.scenario, MONTE_CARLO_RUN_REQUEST_VERSION, 'scenario');
     if (scenario.schemaVersion !== MONTE_CARLO_SCENARIO_VERSION) {
         throw contractError(MONTE_CARLO_RUN_REQUEST_VERSION, 'MC_REQUEST_SCENARIO_VERSION_UNSUPPORTED', 'scenario.schemaVersion is unsupported.');

@@ -2,8 +2,10 @@ import { getStartYearCandidates } from '../shared/cape-utils.js';
 import {
     ESTIMATED_HISTORY_CUTOFF_YEAR,
     REGIME_DATA,
-    REGIME_TRANSITIONS
+    REGIME_TRANSITIONS,
+    STRESS_PRESETS
 } from './simulator-data.js';
+import { resolveStressHistoricalPool } from './simulator-portfolio-stress.js';
 import {
     STATIONARY_BOOTSTRAP_METHOD,
     isStationaryBootstrapMethod
@@ -349,6 +351,23 @@ export function resolveMonteCarloSamplingContractV1({
         effectiveYearSamplingConfig,
         annualData
     });
+    const stressPresetKey = String(inputs?.stressPreset || 'NONE');
+    const stressPreset = STRESS_PRESETS[stressPresetKey];
+    const stressPool = resolveStressHistoricalPool(stressPresetKey, annualData);
+    const effectiveStressIndices = stressPreset?.type === 'conditional_bootstrap'
+        ? stressPool.candidateIndices.filter(index => effectiveYearSamplingConfig.allowedIndexSet.has(index))
+        : [];
+    if (stressPreset?.type === 'conditional_bootstrap'
+        && effectiveStressIndices.length < stressPool.minimumDistinctYears) {
+        const code = effectiveStressIndices.length === 0
+            ? 'SIMULATOR_STRESS_EFFECTIVE_POOL_EMPTY'
+            : 'SIMULATOR_STRESS_EFFECTIVE_POOL_TOO_SMALL';
+        throw samplingContractError(
+            code,
+            `stress preset ${stressPresetKey} requires at least ${stressPool.minimumDistinctYears} distinct years; `
+                + `the effective sampling universe contains ${effectiveStressIndices.length}.`
+        );
+    }
 
     const warnings = [];
     if (useCapeSampling === true && !(Number.isFinite(capeValue) && capeValue > 0)) {

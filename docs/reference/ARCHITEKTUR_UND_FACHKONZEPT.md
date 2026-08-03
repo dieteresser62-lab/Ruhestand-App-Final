@@ -1860,23 +1860,35 @@ von der Fertigstellungsreihenfolge. Die Startjahr- und Folgejahrlogik liegt in
 
 ### C.3.2 Stress-Presets
 
-**9 vordefinierte Stress-Szenarien** (siehe `simulator-data.js`):
+**9 vordefinierte Stress-Szenarien** (siehe `simulator-data.js`). Jedes Preset
+traegt maschinenlesbar eine der Evidenzklassen `historical_filter`,
+`reconstructed_window`, `hybrid_synthetic` oder `synthetic_shock`:
 
 | Preset | Typ | Jahre | Parameter |
 |--------|-----|-------|-----------|
-| `STAGFLATION_70s` | conditional_bootstrap | 7 | Inflation ≥ 7%, Real-Rendite ≤ -2% |
-| `DOUBLE_BEAR_00s` | conditional_bootstrap | 6 | Real-Rendite ≤ -8%, Min-Cluster 2 |
-| `GREAT_DEPRESSION_29_33` | conditional_bootstrap | 5 | Jahre 1929-1933 |
-| `WWII_40s` | conditional_bootstrap | 7 | Jahre 1939-1945 |
-| `STAGFLATION_SUPER` | hybrid | 8 | 70er + künstlich -3% μ |
+| `STAGFLATION_70s` | conditional_bootstrap | 7 | historischer Filter: Inflation ≥ 7%, Real-Rendite ≤ -2%; kein 1970er-Replay |
+| `DOUBLE_BEAR_00s` | conditional_bootstrap | 6 | historischer Filter: Real-Rendite ≤ -8%, mindestens zwei aufeinanderfolgende Treffer; kein Dotcom-/GFC-Replay |
+| `GREAT_DEPRESSION_29_33` | conditional_bootstrap | 5 | rekonstruiertes Proxy-Zeitfenster 1929-1933 |
+| `WWII_40s` | conditional_bootstrap | 7 | rekonstruiertes Proxy-Zeitfenster 1939-1945 |
+| `STAGFLATION_SUPER` | hybrid | 8 | historischer Filter plus synthetisch -3 Prozentpunkte Aktienrendite |
 | `INFLATION_SPIKE_3Y` | parametric | 3 | μ = -5%, σ × 1.5, Inflation ≥ 7% |
 | `FORCED_DRAWDOWN_3Y` | parametric_sequence | 3 | -25%, -20%, -15% |
 | `LOST_DECADE_12Y` | parametric | 12 | μ = -6%, Gold capped bei +15% |
 | `CORRELATION_CRASH_4Y` | parametric | 4 | Aktien -15%, Gold -5%, Inflation 5% |
 
-**Neue historische Stress-Szenarien (ab 1925):**
-- **Great Depression (1929-1933):** Bootstrapped aus den historischen Jahren der Weltwirtschaftskrise. Ermöglicht Tests für extreme Deflation und Vermögensvernichtung.
-- **Zweiter Weltkrieg (1939-1945):** Bootstrapped aus der Kriegsperiode mit Kapitalverkehrskontrollen, Inflation und Wirtschaftsumstellung.
+Die Fenster 1929-1933 und 1939-1945 sampeln zwar exakt die benannten
+Kalenderjahre, beruhen in den fruehen Segmenten aber auf Forschungsproxy- und
+Rekonstruktionsdaten. Sie duerfen daher nicht als exakte beobachtete Replays
+der Weltwirtschaftskrise oder des Zweiten Weltkriegs interpretiert werden.
+Unbekannte Presets und leere historische Filterpools scheitern fail-closed.
+
+Die Regime BULL, BEAR, SIDEWAYS und STAGFLATION werden ausschliesslich durch
+`HistoricalRegimeClassificationV1` aus der kanonischen Aktien-Total-Return- und
+Inflationsreihe bestimmt. Die nach dem Datenersatz gepruefte Verteilung
+1925-2025 ist 40/6/49/6. Die absoluten Grenzen wurden nach dieser
+Verteilungspruefung beibehalten, bleiben aber ausdruecklich extern nicht
+validierte Modellannahmen. Fehlende Regimepools oder Uebergangszeilen werden
+nicht durch erfundene SIDEWAYS-Uebergaenge ersetzt.
 
 ### C.3.3 Historische Daten
 

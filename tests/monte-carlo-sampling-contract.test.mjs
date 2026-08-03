@@ -250,6 +250,44 @@ for (const method of ['block', 'stationary', 'regime_markov', 'regime_iid']) {
 }
 
 {
+    let rejected = null;
+    try {
+        resolveMonteCarloSamplingContractV1({
+            method: 'block',
+            inputs: buildInputs({ stressPreset: 'GREAT_DEPRESSION_29_33' }),
+            annualData,
+            useCapeSampling: false,
+            startYearMode: 'FILTER',
+            startYearFilter: 1970,
+            blockSize: 3
+        });
+    } catch (error) {
+        rejected = error;
+    }
+    assertEqual(rejected?.code, 'SIMULATOR_STRESS_EFFECTIVE_POOL_EMPTY',
+        'historical stress conflicts fail during sampling preflight');
+}
+
+{
+    let rejected = null;
+    try {
+        resolveMonteCarloSamplingContractV1({
+            method: 'block',
+            inputs: buildInputs({ stressPreset: 'STAGFLATION_70s' }),
+            annualData,
+            useCapeSampling: false,
+            startYearMode: 'UNIFORM',
+            blockSize: 3,
+            excludeEstimatedHistory: true
+        });
+    } catch (error) {
+        rejected = error;
+    }
+    assertEqual(rejected?.code, 'SIMULATOR_STRESS_EFFECTIVE_POOL_TOO_SMALL',
+        'one-year effective stress pools are rejected as degenerate');
+}
+
+{
     const chunk = await runCase('block', {
         inputs: {
             tailRiskEnabled: true,

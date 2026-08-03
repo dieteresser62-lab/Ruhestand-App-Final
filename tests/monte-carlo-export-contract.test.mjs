@@ -143,6 +143,16 @@ const request = createMonteCarloRunRequestV1({
     execution,
     scenarioKey
 });
+const historicalStressRequest = createMonteCarloRunRequestV1({
+    inputs: { ...inputs, stressPreset: 'STAGFLATION_70s' },
+    widowOptions,
+    monteCarloParams,
+    useCapeSampling: false,
+    samplingDiagnostics: firstRun.samplingDiagnostics,
+    dataVersion: getDataVersion(),
+    execution,
+    scenarioKey: null
+});
 const result = createMonteCarloRunResultV1({
     aggregatedResults: firstRun.aggregatedResults,
     samplingDiagnostics: firstRun.samplingDiagnostics,
@@ -152,6 +162,15 @@ const result = createMonteCarloRunResultV1({
 const engine = captureMonteCarloEngineProvenance(EngineAPI);
 const exportedAt = '2026-07-22T12:34:56.789Z';
 const document = buildMonteCarloExportV1({ request, result, engine, exportedAt });
+const legacyV1Request = JSON.parse(JSON.stringify(request));
+delete legacyV1Request.stress.provenance;
+delete legacyV1Request.stress.pool;
+const legacyV1Document = buildMonteCarloExportV1({
+    request: legacyV1Request,
+    result,
+    engine,
+    exportedAt
+});
 const schemaGolden = JSON.parse(fs.readFileSync(
     new URL('./fixtures/monte-carlo-export-v1-schema.json', import.meta.url),
     'utf8'
@@ -175,6 +194,12 @@ const schemaGolden = JSON.parse(fs.readFileSync(
     assertEqual(request.parameters.samplingMethod, 'block', 'request retains the sampling method');
     assertEqual(request.sampling.startYearMode, 'FILTER', 'request retains start-year weighting');
     assertEqual(request.stress.preset, 'NONE', 'request identifies the stress method and preset');
+    assertEqual(request.stress.provenance.evidenceKind, 'none', 'request exports stress evidence provenance');
+    assertEqual(request.stress.pool.policy, 'not_applicable', 'request exports the stress pool policy');
+    assertEqual(historicalStressRequest.stress.provenance.evidenceKind, 'historical_filter',
+        'historical stress exports its evidence kind');
+    assertEqual(JSON.stringify(historicalStressRequest.stress.pool.rawCandidateYears), JSON.stringify([1946, 1948, 1973]),
+        'historical stress export pins the complete raw candidate pool');
     assertEqual(request.scenario.schemaVersion, 'MonteCarloScenarioV1', 'request versions the scenario payload');
     assertEqual(request.scenario.normalizedInputs.startFloorBedarf, 24000, 'request carries only the normalized scenario used by the run');
     assert(/^[a-f0-9]{64}$/.test(request.scenario.fingerprint.value), 'scenario fingerprint is a SHA-256 hex value');
@@ -198,6 +223,9 @@ const schemaGolden = JSON.parse(fs.readFileSync(
     );
     assert(Object.isFrozen(request) && Object.isFrozen(request.scenario.normalizedInputs), 'request is deeply immutable');
     validateMonteCarloRunRequestV1(request);
+    validateMonteCarloRunRequestV1(legacyV1Request);
+    assertEqual(readMonteCarloExportV1(JSON.stringify(legacyV1Document)).document.request.stress.preset, 'NONE',
+        'reader accepts a pre-extension MonteCarloRunRequestV1 without stress provenance or pool');
 }
 
 {

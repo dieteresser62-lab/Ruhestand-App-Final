@@ -398,12 +398,44 @@ export const DATASET_META = Object.freeze({
 });
 
 export const REGIME_CLASSIFICATION_THRESHOLDS = Object.freeze({
+  schemaVersion: 'HistoricalRegimeClassificationV1',
+  sourceSeries: 'global_equity_research_annual_returns',
   inflationHighPct: 5,
   equityPoorRatio: 0,
   equityCrashRatio: -0.15,
   equityBoomRatio: 0.15,
-  labels: Object.freeze(['BULL', 'BEAR', 'SIDEWAYS', 'STAGFLATION'])
+  labels: Object.freeze(['BULL', 'BEAR', 'SIDEWAYS', 'STAGFLATION']),
+  calibrationStatus: 'retained_after_total_return_distribution_review',
+  externalValidationStatus: 'not_validated',
+  reviewedDistribution1925To2025: Object.freeze({
+    observationCount: 101,
+    BULL: 40,
+    BEAR: 6,
+    SIDEWAYS: 49,
+    STAGFLATION: 6
+  })
 });
+
+export function simulatorDataContractError(code, message) {
+  const error = new Error(`${code}: ${message}`);
+  error.code = code;
+  return error;
+}
+
+export function classifyHistoricalRegime({ rendite, inflation } = {}) {
+  if (!Number.isFinite(rendite) || !Number.isFinite(inflation)) {
+    throw simulatorDataContractError(
+      'SIMULATOR_REGIME_INPUT_INVALID',
+      'Regime classification requires finite equity return and inflation values.'
+    );
+  }
+  const inflHigh = inflation > REGIME_CLASSIFICATION_THRESHOLDS.inflationHighPct;
+  const equityPoor = rendite < REGIME_CLASSIFICATION_THRESHOLDS.equityPoorRatio;
+  if (inflHigh && equityPoor) return 'STAGFLATION';
+  if (rendite < REGIME_CLASSIFICATION_THRESHOLDS.equityCrashRatio) return 'BEAR';
+  if (rendite > REGIME_CLASSIFICATION_THRESHOLDS.equityBoomRatio) return 'BULL';
+  return 'SIDEWAYS';
+}
 
 /**
  * Historische Marktdaten (1925-2025)
@@ -524,43 +556,73 @@ export const HISTORICAL_DATA = {
 /**
  * Stress-Szenarien für die Simulation
  */
-export const STRESS_PRESETS = {
-  NONE: { label: "Kein Stress", type: "none", years: 0 },
+export const STRESS_PRESETS = deepFreezeDataMetadata({
+  NONE: {
+    label: "Kein Stress",
+    type: "none",
+    years: 0,
+    provenance: { evidenceKind: 'none', sourceEvidence: 'not_applicable', claimScope: 'no_stress_override' }
+  },
 
   STAGFLATION_70s: {
-    label: "Stagflation (70er-ähnlich)",
+    label: "Historischer Stagflationsfilter (Proxy-Mix)",
     type: "conditional_bootstrap",
     years: 7,
-    filter: { inflationMin: 7.0, equityRealMax: -2.0 }
+    filter: { inflationMin: 7.0, equityRealMax: -2.0 },
+    provenance: {
+      evidenceKind: 'historical_filter',
+      sourceEvidence: 'mixed_observation_proxy_and_reconstruction',
+      claimScope: 'all_years_matching_filter_not_a_1970s_replay'
+    }
   },
 
   DOUBLE_BEAR_00s: {
-    label: "Doppelbär (Dotcom/GFC-ähnlich)",
+    label: "Jahre aus historischen Verlustclustern (mind. 2 Jahre)",
     type: "conditional_bootstrap",
     years: 6,
-    filter: { equityRealMax: -8.0, minCluster: 2 }
+    filter: { equityRealMax: -8.0, minCluster: 2 },
+    provenance: {
+      evidenceKind: 'historical_filter',
+      sourceEvidence: 'mixed_observation_proxy_and_reconstruction',
+      claimScope: 'independent_draws_from_years_in_consecutive_filter_clusters_not_a_contiguous_replay'
+    }
   },
 
   GREAT_DEPRESSION_29_33: {
-    label: "Great Depression (1929-1933)",
+    label: "Rekonstruiertes Fenster 1929-1933 (Proxy-Daten)",
     type: "conditional_bootstrap",
     years: 5,
-    filter: { yearMin: 1929, yearMax: 1933 }
+    filter: { yearMin: 1929, yearMax: 1933 },
+    provenance: {
+      evidenceKind: 'reconstructed_window',
+      sourceEvidence: 'research_proxy_reconstruction',
+      claimScope: 'calendar_window_using_research_proxy_series'
+    }
   },
 
   WWII_40s: {
-    label: "Zweiter Weltkrieg (1939-1945)",
+    label: "Rekonstruiertes Fenster 1939-1945 (Proxy-Daten)",
     type: "conditional_bootstrap",
     years: 7,
-    filter: { yearMin: 1939, yearMax: 1945 }
+    filter: { yearMin: 1939, yearMax: 1945 },
+    provenance: {
+      evidenceKind: 'reconstructed_window',
+      sourceEvidence: 'research_proxy_reconstruction',
+      claimScope: 'calendar_window_using_research_proxy_series'
+    }
   },
 
   STAGFLATION_SUPER: {
-    label: "Stagflation (Extrem: 70er -3% Rendite)",
+    label: "Hybrider Stagflationsfilter (-3 %-Pkt. Aktien)",
     type: "conditional_bootstrap",
     years: 8,
     filter: { inflationMin: 7.0, equityRealMax: -2.0 },
-    muShiftEq: -0.03 // Hybrid-Modus: Echte 70er Jahre, aber künstlich noch schlechter gemacht
+    muShiftEq: -0.03,
+    provenance: {
+      evidenceKind: 'hybrid_synthetic',
+      sourceEvidence: 'mixed_observation_proxy_and_reconstruction_plus_synthetic_shift',
+      claimScope: 'historical_filter_plus_synthetic_equity_shift'
+    }
   },
 
   INFLATION_SPIKE_3Y: {
@@ -570,7 +632,8 @@ export const STRESS_PRESETS = {
     muShiftEq: -0.05,
     volScaleEq: 1.5,
     inflationFloor: 7.0,
-    muShiftAu: 0.00
+    muShiftAu: 0.00,
+    provenance: { evidenceKind: 'synthetic_shock', sourceEvidence: 'not_applicable', claimScope: 'parametric_not_historical' }
   },
 
   FORCED_DRAWDOWN_3Y: {
@@ -579,7 +642,8 @@ export const STRESS_PRESETS = {
     years: 3,
     seqReturnsEq: [-0.25, -0.20, -0.15],
     noiseVol: 0.04,
-    reboundClamp: { years: 2, cap: 0.05 }
+    reboundClamp: { years: 2, cap: 0.05 },
+    provenance: { evidenceKind: 'synthetic_shock', sourceEvidence: 'not_applicable', claimScope: 'parametric_sequence_not_historical' }
   },
 
   LOST_DECADE_12Y: {
@@ -589,7 +653,8 @@ export const STRESS_PRESETS = {
     muShiftEq: -0.06,
     volScaleEq: 0.8,
     returnMaxAu: 15.0, // Cap Gold bei +15% (verhindert historische Ausreißer wie 1979 mit +117%)
-    inflationFloor: 2.0
+    inflationFloor: 2.0,
+    provenance: { evidenceKind: 'synthetic_shock', sourceEvidence: 'not_applicable', claimScope: 'parametric_not_historical' }
   },
 
   CORRELATION_CRASH_4Y: {
@@ -598,9 +663,10 @@ export const STRESS_PRESETS = {
     years: 4,
     muShiftEq: -0.15,
     muShiftAu: -0.05,
-    inflationFloor: 5.0
+    inflationFloor: 5.0,
+    provenance: { evidenceKind: 'synthetic_shock', sourceEvidence: 'not_applicable', claimScope: 'parametric_not_historical' }
   }
-};
+});
 
 /**
  * Engine-Version und Hash
@@ -636,22 +702,7 @@ export const BREAK_ON_RUIN = true;
     const goldPerf = raw.gold_eur_perf; // Percent
     const cape = raw.cape;
 
-    // Determine Regime
-    let regime = 'SIDEWAYS';
-    const inflHigh = inflation > REGIME_CLASSIFICATION_THRESHOLDS.inflationHighPct;
-    const equityPoor = rendite < REGIME_CLASSIFICATION_THRESHOLDS.equityPoorRatio;
-    const equityCrash = rendite < REGIME_CLASSIFICATION_THRESHOLDS.equityCrashRatio;
-    const equityBoom = rendite > REGIME_CLASSIFICATION_THRESHOLDS.equityBoomRatio;
-
-    if (inflHigh && equityPoor) {
-      regime = 'STAGFLATION';
-    } else if (equityCrash) {
-      regime = 'BEAR';
-    } else if (equityBoom) {
-      regime = 'BULL';
-    } else {
-      regime = 'SIDEWAYS';
-    }
+    const regime = classifyHistoricalRegime({ rendite, inflation });
 
     const dataPoint = {
       jahr: year,
@@ -690,12 +741,44 @@ export const BREAK_ON_RUIN = true;
     }
   }
 
-  // Fallback for empty regimes to establish basic connectivity
-  regimes.forEach(r => {
-    if (REGIME_TRANSITIONS[r].total === 0) {
-      // If a regime never occurred, assume it transitions to SIDEWAYS with 100%
-      REGIME_TRANSITIONS[r]['SIDEWAYS'] = 1;
-      REGIME_TRANSITIONS[r].total = 1;
-    }
-  });
 })();
+
+export function inspectHistoricalRegimeContract() {
+  const regimes = REGIME_CLASSIFICATION_THRESHOLDS.labels;
+  const expected = REGIME_CLASSIFICATION_THRESHOLDS.reviewedDistribution1925To2025;
+  const observed = {
+    observationCount: annualData.length,
+    ...Object.fromEntries(regimes.map(regime => [regime, REGIME_DATA[regime]?.length || 0]))
+  };
+  const emptyTransitionRegimes = regimes.filter(regime => {
+    const total = REGIME_TRANSITIONS[regime]?.total;
+    return !Number.isFinite(total) || total <= 0;
+  });
+  const distributionMatches = expected.observationCount === observed.observationCount
+    && regimes.every(regime => expected[regime] === observed[regime]);
+  return deepFreezeDataMetadata({
+    expected: { ...expected },
+    observed,
+    emptyTransitionRegimes,
+    distributionMatches
+  });
+}
+
+export const REGIME_CLASSIFICATION_DIAGNOSTICS = inspectHistoricalRegimeContract();
+
+export function assertHistoricalRegimeContract() {
+  const diagnostics = inspectHistoricalRegimeContract();
+  if (diagnostics.emptyTransitionRegimes.length > 0) {
+    throw simulatorDataContractError(
+      'SIMULATOR_REGIME_TRANSITIONS_EMPTY',
+      `No observed outgoing transition exists for regimes ${diagnostics.emptyTransitionRegimes.join(', ')}.`
+    );
+  }
+  if (!diagnostics.distributionMatches) {
+    throw simulatorDataContractError(
+      'SIMULATOR_REGIME_DISTRIBUTION_DRIFT',
+      `Reviewed regime distribution changed; expected ${JSON.stringify(diagnostics.expected)}, observed ${JSON.stringify(diagnostics.observed)}.`
+    );
+  }
+  return diagnostics;
+}

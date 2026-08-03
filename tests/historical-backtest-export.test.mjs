@@ -397,7 +397,9 @@ function baseResult(outcomeKind = 'completed') {
         'leading run identity is explicitly versioned as CSV V2');
     assertEqual(HISTORICAL_BACKTEST_CSV_COLUMNS.length, 34,
         'CSV V2 fixes the 34-column contract');
-    assertEqual(lines[0], HISTORICAL_BACKTEST_CSV_COLUMNS.map(column => column.id).join(';'), 'CSV uses stable technical headers');
+    const expectedCsvV2GoldenHeader = 'run_id;simulation_year_calendar_year;outcome_code;action_code;cut_reason_code;minimum_flex_status_code;equity_return_ratio;gold_return_pct;cash_bond_return_pct;inflation_pct;wage_pension_adjustment_pct;cape_ratio;withdrawal_nominal_eur;floor_required_nominal_eur;pension_total_nominal_eur;flex_fulfilled_nominal_eur;flex_household_required_nominal_eur;flex_pension_contribution_nominal_eur;flex_required_from_portfolio_nominal_eur;flex_fulfilled_from_portfolio_nominal_eur;flex_household_fulfilled_nominal_eur;flex_household_reduction_pct;minimum_flex_annual_nominal_eur;minimum_flex_effective_final_nominal_eur;minimum_flex_shortfall_nominal_eur;flex_reduction_pct;portfolio_equity_end_nominal_eur;portfolio_gold_end_nominal_eur;portfolio_cash_end_nominal_eur;health_bucket_end_nominal_eur;portfolio_total_end_nominal_eur;tax_total_nominal_eur;loss_carry_end_nominal_eur;floor_shortfall_nominal_eur';
+    assertEqual(lines[0], expectedCsvV2GoldenHeader,
+        'CSV V2 uses the independently pinned literal 34-column golden header');
     assert(lines[0].includes('portfolio_total_end_nominal_eur'), 'CSV headers expose units');
     assert(csv.includes('-0.125'), 'CSV retains raw signed ratios with a dot decimal separator');
     assert(csv.includes('12345.67'), 'CSV retains raw financial numbers without localized grouping');

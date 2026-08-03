@@ -89,7 +89,26 @@ export function validateSimulatorInputs(inputs = {}) {
     return inputs;
 }
 
+export const SIMULATOR_CONTRACT_ERROR_MESSAGES_DE = Object.freeze({
+    SIMULATOR_STRESS_PRESET_UNKNOWN: 'Unbekanntes Stressszenario: Das gespeicherte Preset ist nicht mehr verfügbar. Öffnen Sie das Profil, wählen Sie ein vorhandenes Stressszenario und speichern Sie erneut.',
+    SIMULATOR_STRESS_POOL_EMPTY: 'Historisches Stressszenario nicht ausführbar: Der zugehörige historische Rohpool ist leer. Wählen Sie ein synthetisches Stressszenario oder prüfen Sie den Datenbestand.',
+    SIMULATOR_STRESS_SEQUENCE_INVALID: 'Stresssequenz unvollständig: Für mindestens ein Stressjahr fehlt eine gültige Rendite. Wählen Sie ein anderes Szenario oder prüfen Sie den Presetvertrag.',
+    SIMULATOR_STRESS_INPUT_INVALID: 'Stressberechnung abgebrochen: Rendite-, Inflations- oder Golddaten sind ungültig. Prüfen Sie den historischen Datenbestand.',
+    SIMULATOR_STRESS_EFFECTIVE_POOL_EMPTY: 'Historisches Stressszenario nicht ausführbar: Unter dem aktiven Startjahrfilter gibt es keine geeigneten Jahre. Setzen Sie die Grenze früher, erlauben Sie geschätzte Jahre oder wählen Sie ein synthetisches Stressszenario.',
+    SIMULATOR_STRESS_EFFECTIVE_POOL_TOO_SMALL: 'Historisches Stressszenario nicht belastbar: Unter dem aktiven Startjahrfilter bleiben zu wenige unterschiedliche Jahre. Setzen Sie die Grenze früher, erlauben Sie geschätzte Jahre oder wählen Sie ein synthetisches Stressszenario.',
+    SIMULATOR_REGIME_INPUT_INVALID: 'Regimeklassifikation nicht möglich: Rendite oder Inflation ist ungültig. Prüfen Sie den historischen Datenbestand.',
+    SIMULATOR_REGIME_TRANSITIONS_EMPTY: 'Historischer Regimevertrag unvollständig: Für mindestens ein Marktregime fehlen beobachtete Übergänge. Prüfen und bestätigen Sie die aktualisierte Datenklassifikation.',
+    SIMULATOR_REGIME_DISTRIBUTION_DRIFT: 'Historischer Regimevertrag geändert: Die beobachtete Verteilung weicht vom geprüften Datenstand ab. Prüfen und aktualisieren Sie den Regimevertrag vor der Simulation.',
+    SIMULATOR_REGIME_TRANSITIONS_INVALID: 'Regime-Sampling nicht möglich: Die Übergangsdaten des aktuellen Marktregimes fehlen oder sind ungültig. Prüfen Sie den Regimevertrag.',
+    SIMULATOR_REGIME_TRANSITION_SELECTION_FAILED: 'Regime-Sampling abgebrochen: Die Übergangszähler ergeben keine gültige Auswahl. Prüfen Sie die Transitionsmatrix.',
+    MC_SAMPLING_REGIME_POOL_EMPTY: 'Regime-Sampling nicht ausführbar: Der aktive Startjahrfilter enthält nicht alle erreichbaren Marktregime. Setzen Sie die Grenze früher oder wählen Sie eine andere Sampling-Methode.',
+    SIMULATOR_REGIME_POOL_EMPTY: 'Regime-Sampling abgebrochen: Im wirksamen Jahresbereich fehlt das gezogene Marktregime. Setzen Sie die Startjahrgrenze früher oder wählen Sie eine andere Sampling-Methode.'
+});
+
 export function formatSimulatorValidationError(error) {
     if (error instanceof SimulatorValidationError) return error.message;
+    if (error?.code && SIMULATOR_CONTRACT_ERROR_MESSAGES_DE[error.code]) {
+        return SIMULATOR_CONTRACT_ERROR_MESSAGES_DE[error.code];
+    }
     return error?.message || String(error || 'Unbekannter Validierungsfehler');
 }

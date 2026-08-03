@@ -20,8 +20,13 @@ import {
     formatAutoOptimizeProgress,
     renderAutoOptimizeResult
 } from './auto-optimize-renderer.js';
+import { formatSimulatorValidationError } from './simulator-input-validation.js';
 
 let aoParamCounter = 0;
+
+export function formatAutoOptimizeError(error) {
+    return formatSimulatorValidationError(error);
+}
 
 function el(id) {
     return document.getElementById(id);
@@ -199,9 +204,10 @@ async function handleRunAutoOptimize() {
         renderAutoOptimizeResult({ resultEl, result, objective: config.objective });
         applyBtn.style.display = 'inline-block';
     } catch (e) {
-        alert('Error during auto-optimization:\n\n' + e.message);
+        const message = formatAutoOptimizeError(e);
+        alert('Fehler bei der Auto-Optimierung:\n\n' + message);
         console.error(e);
-        progressEl.textContent = 'Error: ' + e.message;
+        progressEl.textContent = 'Fehler: ' + message;
     } finally {
         runBtn.disabled = false;
     }

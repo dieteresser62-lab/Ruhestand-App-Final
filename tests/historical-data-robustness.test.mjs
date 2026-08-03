@@ -1,5 +1,6 @@
 import { annualData, REGIME_DATA, REGIME_TRANSITIONS } from '../app/simulator/simulator-data.js';
 import { sampleNextYearData } from '../app/simulator/simulator-engine-helpers.js';
+import { prepareHistoricalData } from '../app/simulator/simulator-portfolio.js';
 
 console.log('--- Historical Data Robustness Tests ---');
 
@@ -34,13 +35,25 @@ try {
     const state = { samplerState: { currentRegime: 'BULL', yearInBlock: 0 } };
     const rand = createMockRng([0.1, 0.9]);
 
-    const result = sampleNextYearData(state, 'block', 2, rand, null);
+    let sampleError = null;
+    try {
+        sampleNextYearData(state, 'block', 2, rand, null);
+    } catch (error) {
+        sampleError = error;
+    }
+    assert(sampleError?.code === 'SIMULATOR_HISTORICAL_DATA_UNAVAILABLE',
+        'Empty historical data should fail closed instead of inventing SIDEWAYS zero returns');
 
-    assert(result, 'Should return a data object even when historical data is empty');
-    assert(Number.isFinite(result.rendite), 'rendite should be finite');
-    assert(result.regime === 'SIDEWAYS', 'Fallback regime should be SIDEWAYS');
+    let preparationError = null;
+    try {
+        prepareHistoricalData();
+    } catch (error) {
+        preparationError = error;
+    }
+    assert(preparationError?.code === 'SIMULATOR_HISTORICAL_DATA_UNAVAILABLE',
+        'Historical preparation should not rebuild a divergent fallback dataset');
 
-    console.log('✅ Empty historical data handled');
+    console.log('✅ Empty historical data fails closed');
 } finally {
     // Restore original data to avoid polluting other tests.
     annualData.length = 0;

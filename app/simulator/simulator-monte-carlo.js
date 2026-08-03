@@ -35,6 +35,8 @@ import {
     createMonteCarloExportDownload
 } from './monte-carlo-export.js';
 import { resolveMonteCarloWorkerCountV1 } from './monte-carlo-parameters.js';
+import { resolveMonteCarloSamplingContractV1 } from './mc-year-sampling.js';
+import { annualData } from './simulator-data.js';
 
 const formatMs = (value, digits = 0) => `${Number(value).toFixed(digits)} ms`;
 const formatSpeedup = (value, digits = 2) => `${Number(value).toFixed(digits)}x`;
@@ -383,6 +385,18 @@ async function executeMonteCarloRun(runState) {
             startYearHalfLife,
             excludeEstimatedHistory
         };
+        const useCapeSampling = ui.readUseCapeSampling();
+        resolveMonteCarloSamplingContractV1({
+            method: methode,
+            inputs,
+            annualData,
+            useCapeSampling,
+            startYearMode,
+            startYearFilter,
+            startYearHalfLife,
+            blockSize,
+            excludeEstimatedHistory
+        });
 
         const workerConfig = ui.readWorkerConfig();
         ui.requireLargeRunConfirmation(monteCarloParams);
@@ -392,7 +406,6 @@ async function executeMonteCarloRun(runState) {
 
         const scenarioAnalyzer = new ScenarioAnalyzer(anzahl);
         const useWorkers = rngMode !== 'legacy-stream';
-        const useCapeSampling = ui.readUseCapeSampling();
         const compareMode = ui.readCompareMode();
         let results = null;
         let usedWorkers = false;

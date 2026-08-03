@@ -7,7 +7,7 @@
  */
 "use strict";
 
-import { HISTORICAL_DATA, PFLEGE_GRADE_PROBABILITIES, PFLEGE_GRADE_LABELS, PFLEGE_GRADE_PROGRESSION_PROBABILITIES, SUPPORTED_PFLEGE_GRADES, annualData, REGIME_DATA, REGIME_TRANSITIONS, MORTALITY_TABLE } from './simulator-data.js';
+import { HISTORICAL_DATA, PFLEGE_GRADE_PROBABILITIES, PFLEGE_GRADE_LABELS, PFLEGE_GRADE_PROGRESSION_PROBABILITIES, SUPPORTED_PFLEGE_GRADES, annualData, REGIME_DATA, REGIME_TRANSITIONS, MORTALITY_TABLE, simulatorDataContractError } from './simulator-data.js';
 import { initializePortfolio, prepareHistoricalData } from './simulator-portfolio.js';
 import {
     assertRuntimeCumulativeInflationFactor,
@@ -375,16 +375,10 @@ function pickIndexFromSampler(rand, sampler, fallbackIndex = 0) {
  */
 export function sampleNextYearData(state, methode, blockSize, rand, stressCtx) {
     if (!Array.isArray(annualData) || annualData.length === 0) {
-        return {
-            jahr: 0,
-            rendite: 0,
-            inflation: 0,
-            zinssatz: 0,
-            lohn: 0,
-            gold_eur_perf: 0,
-            capeRatio: null,
-            regime: 'SIDEWAYS'
-        };
+        throw simulatorDataContractError(
+            'SIMULATOR_HISTORICAL_DATA_UNAVAILABLE',
+            'Cannot sample a market year without canonical historical data.'
+        );
     }
     const samplerState = state.samplerState;
     const yearSampling = samplerState?.yearSampling || null;
@@ -395,9 +389,20 @@ export function sampleNextYearData(state, methode, blockSize, rand, stressCtx) {
         const filteredPickable = allowedIndexSet
             ? pickable.filter(idx => allowedIndexSet.has(idx))
             : pickable;
-        const pool = filteredPickable.length > 0
-            ? filteredPickable
-            : (yearSampling?.allowedIndices || pickable);
+        const pool = filteredPickable;
+        if (pool.length === 0) {
+            throw simulatorDataContractError(
+                'SIMULATOR_STRESS_EFFECTIVE_POOL_EMPTY',
+                'The stress preset has no observations in the effective sampling universe.'
+            );
+        }
+        const minimumDistinctYears = Math.max(1, Number(stressCtx.minimumDistinctYears) || 1);
+        if (pool.length < minimumDistinctYears) {
+            throw simulatorDataContractError(
+                'SIMULATOR_STRESS_EFFECTIVE_POOL_TOO_SMALL',
+                `The effective stress pool requires at least ${minimumDistinctYears} distinct observations.`
+            );
+        }
         const randomIndex = Math.floor(rand() * pool.length);
         const chosenYearIndex = pool[randomIndex];
         return { ...annualData[chosenYearIndex] };
@@ -439,9 +444,15 @@ export function sampleNextYearData(state, methode, blockSize, rand, stressCtx) {
         }
 
         const transitions = REGIME_TRANSITIONS[samplerState.currentRegime];
+        if (!transitions || !Number.isFinite(transitions.total) || transitions.total <= 0) {
+            throw simulatorDataContractError(
+                'SIMULATOR_REGIME_TRANSITIONS_INVALID',
+                `No usable transitions exist for regime ${String(samplerState.currentRegime)}.`
+            );
+        }
         const r = rand();
         let cumulativeProb = 0;
-        let nextRegime = 'SIDEWAYS';
+        let nextRegime = null;
         for (const [targetRegime, count] of Object.entries(transitions)) {
             if (targetRegime === 'total') continue;
             cumulativeProb += (count / transitions.total);
@@ -449,6 +460,12 @@ export function sampleNextYearData(state, methode, blockSize, rand, stressCtx) {
                 nextRegime = targetRegime;
                 break;
             }
+        }
+        if (!nextRegime) {
+            throw simulatorDataContractError(
+                'SIMULATOR_REGIME_TRANSITION_SELECTION_FAILED',
+                `Transition counts do not reconcile for regime ${String(samplerState.currentRegime)}.`
+            );
         }
         regime = nextRegime;
         samplerState.currentRegime = nextRegime;
@@ -460,7 +477,20 @@ export function sampleNextYearData(state, methode, blockSize, rand, stressCtx) {
         return { ...annualData[idx] };
     }
 
+    if (yearSampling) {
+        throw simulatorDataContractError(
+            'SIMULATOR_REGIME_POOL_EMPTY',
+            `No observation for regime ${String(regime)} exists in the effective sampling universe.`
+        );
+    }
+
     const possibleYears = REGIME_DATA[regime];
+    if (!Array.isArray(possibleYears) || possibleYears.length === 0) {
+        throw simulatorDataContractError(
+            'SIMULATOR_REGIME_POOL_EMPTY',
+            `No canonical historical observations exist for regime ${String(regime)}.`
+        );
+    }
     const chosenYear = possibleYears[Math.floor(rand() * possibleYears.length)];
     return { ...chosenYear };
 }
