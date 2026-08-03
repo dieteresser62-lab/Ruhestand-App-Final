@@ -785,7 +785,7 @@ const STATIC_DATA = {
         evidenceClass: 'model_assumption',
         implementationLocations: ['engine/config.mjs:CONFIG'],
         unit: 'mixed_engine_policy_contract',
-        embeddedValueHash: resolved('17347a0c7f9ee71eddc481c6b7fb1252793974e2db70939a6bd92a77a094ba56'),
+        embeddedValueHash: resolved('d34f548077e1183692fd5b53765fbf68c50343254cd89e3e9209a8204dfeba12'),
         externalValidationStatus: 'not_validated'
     }),
     monte_carlo_defaults: staticEntry({

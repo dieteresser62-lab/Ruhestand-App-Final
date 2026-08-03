@@ -4,6 +4,7 @@ import {
     calcFlexShare,
     calculateFinalWithdrawal,
     quantizeMonthly,
+    SPENDING_ROUNDING_FALLBACK_CODE,
     smoothstep
 } from '../engine/planners/spending-policy-helpers.mjs';
 import { CONFIG } from '../engine/config.mjs';
@@ -41,6 +42,13 @@ const INPUT = { inflation: 2 };
     assertEqual(smoothstep(2), 1, 'smoothstep clamps upper bound');
     assertEqual(calcFlexShare({ floor: 30000, flex: 10000 }), 0.25, 'flex share should use flex / total');
     assertEqual(calcFlexShare({ floor: 0, flex: 0 }), 0, 'empty budget should have no flex share');
+
+    for (const disabledValue of [false, undefined, null, 0, '']) {
+        CONFIG.ANTI_PSEUDO_ACCURACY.ENABLED = disabledValue;
+        assertEqual(quantizeMonthly(1832, 'floor'), 1832,
+            `legacy falsy ENABLED=${String(disabledValue)} disables quantization`);
+    }
+    CONFIG.ANTI_PSEUDO_ACCURACY.ENABLED = true;
 
     console.log('✅ Helper Logic Passed');
 }
@@ -119,6 +127,49 @@ const INPUT = { inflation: 2 };
     assertEqual(result.flexRate, 50, 'Effective flex rate must use the normalized floor consistently');
     assertEqual(result.quantization.floorAnnual, 0, 'Quantization diagnostics should expose the normalized floor');
     console.log('✅ Effective flex rate uses the normalized floor contract');
+}
+
+// --- TEST 5: Exported rounding contract is consumed by the engine helper ---
+{
+    const contract = CONFIG.ANTI_PSEUDO_ACCURACY.WITHDRAWAL_ROUNDING;
+    const previousMode = contract.monthlyMode;
+    try {
+        contract.monthlyMode = 'ceil';
+        const result = calculateFinalWithdrawal({ floor: 0, flex: 24900 }, 100, true);
+        assertEqual(result.quantization.mode, 'ceil', 'Helper diagnostics expose the configured monthly mode');
+        assertEqual(result.quantization.annualizationFactor, 12, 'Helper consumes the configured annualization factor');
+        assertEqual(result.endgueltigeEntnahme, 25200, 'Changing the configured mode changes the actual withdrawal calculation');
+    } finally {
+        contract.monthlyMode = previousMode;
+    }
+    console.log('✅ Engine consumes the exported rounding contract');
+}
+
+// --- TEST 6: Invalid live config degrades to the pinned safe contract ---
+{
+    const previousContract = CONFIG.ANTI_PSEUDO_ACCURACY;
+    const expected = calculateFinalWithdrawal({ floor: 0, flex: 24900 }, 100, true);
+    const previousWarn = console.warn;
+    const warnings = [];
+    try {
+        console.warn = (...args) => warnings.push(args.join(' '));
+        CONFIG.ANTI_PSEUDO_ACCURACY = { ENABLED: true };
+        const result = calculateFinalWithdrawal({ floor: 0, flex: 24900 }, 100, true);
+        assertEqual(result.endgueltigeEntnahme, expected.endgueltigeEntnahme,
+            'Replacing the live anti-pseudo-accuracy config must use the pinned safe calculation');
+        assertEqual(result.quantization.mode, 'floor',
+            'Safe fallback retains the released floor-rounding mode');
+        assert(result.quantization.contractFallbackApplied === true,
+            'Diagnostics expose the defensive rounding/tier fallback');
+        assertEqual(result.quantization.warningCode, SPENDING_ROUNDING_FALLBACK_CODE,
+            'Fallback diagnostics expose a stable warning code');
+        assert(warnings.some(message => message.includes(SPENDING_ROUNDING_FALLBACK_CODE)),
+            'Invalid live rounding config emits a visible stable warning');
+    } finally {
+        console.warn = previousWarn;
+        CONFIG.ANTI_PSEUDO_ACCURACY = previousContract;
+    }
+    console.log('✅ Invalid live rounding config degrades safely without a batch-breaking throw');
 }
 
 console.log('--- Spending Quantization Tests Completed ---');

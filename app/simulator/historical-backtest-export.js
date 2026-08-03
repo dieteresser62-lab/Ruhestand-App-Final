@@ -5,11 +5,16 @@ import {
     sha256Hex
 } from './historical-backtest-contract.js';
 import { BACKTEST_RESULT_SCHEMA_VERSION } from './historical-backtest-runner.js';
+import { normalizeRuntimeBuildProvenance } from '../shared/runtime-build-provenance.js';
 
 export const HISTORICAL_BACKTEST_EXPORT_SCHEMA_ID = 'de.ruhestandsapp.historical-backtest.raw';
-export const HISTORICAL_BACKTEST_EXPORT_SCHEMA_VERSION = 'HistoricalBacktestExportV1';
-export const HISTORICAL_BACKTEST_CSV_SCHEMA_VERSION = 'HistoricalBacktestCsvV1';
+export const HISTORICAL_BACKTEST_EXPORT_SCHEMA_VERSION = 'HistoricalBacktestExportV2';
+export const HISTORICAL_BACKTEST_CSV_SCHEMA_VERSION = 'HistoricalBacktestCsvV2';
 export const HISTORICAL_BACKTEST_FINGERPRINT_ALGORITHM = 'sha256-canonical-json-v1';
+export const HISTORICAL_BACKTEST_RUN_ID_ALGORITHM = 'sha256-canonical-run-identity-v1';
+export const HISTORICAL_BACKTEST_PORTFOLIO_BOUNDARY_SCHEMA_VERSION = 'HistoricalBacktestPortfolioBoundariesV2';
+export const HISTORICAL_BACKTEST_INPUT_SEMANTICS_SCHEMA_VERSION = 'HistoricalBacktestInputSemanticsV1';
+export const HISTORICAL_BACKTEST_QUANTIZATION_SCHEMA_VERSION = 'HistoricalBacktestQuantizationContractV1';
 export const HISTORICAL_BACKTEST_CSV_CONTRACT = Object.freeze({
     delimiter: ';',
     decimalSeparator: '.',
@@ -17,6 +22,36 @@ export const HISTORICAL_BACKTEST_CSV_CONTRACT = Object.freeze({
     missingValue: '',
     lineEnding: 'LF',
     formulaInjectionProtection: 'prefix-apostrophe-for-leading-equals-plus-minus-at-tab-or-cr'
+});
+
+export const HISTORICAL_BACKTEST_INPUT_SEMANTICS = Object.freeze({
+    schemaVersion: HISTORICAL_BACKTEST_INPUT_SEMANTICS_SCHEMA_VERSION,
+    zielLiquiditaet: Object.freeze({
+        role: 'legacy_start_liquidity_alias',
+        value: 'tagesgeld_plus_geldmarktEtf_at_run_start',
+        not: 'strategy_target',
+        strategyTargetSource: 'liquidityRunwayYears_and_year_specific_floor_flex_need'
+    }),
+    capeRatio: Object.freeze({
+        role: 'non_historical_ui_fallback',
+        historicalBacktestEffect: 'none',
+        canonicalHistoricalSource: 'result.historicalYearRecords[*].decisionAsOf.capeRatio'
+    }),
+    startVermoegen: Object.freeze({
+        role: 'canonical_total_start_wealth',
+        unit: 'EUR'
+    }),
+    geldmarktEtf: Object.freeze({
+        role: 'start_wealth_component_money_market',
+        unit: 'EUR',
+        includedIn: ['startVermoegen', 'zielLiquiditaet']
+    }),
+    depotwertNeu: Object.freeze({
+        role: 'derived_aggregate_when_no_detailed_lots_are_supplied',
+        derivation: 'startVermoegen_minus_depotwertAlt_minus_tagesgeld_minus_geldmarktEtf_minus_gold_target',
+        detailedLotSource: 'detailledTranches',
+        missingFieldMeaning: 'derived_or_replaced_by_detailed_lots_not_zero'
+    })
 });
 
 const OMIT = Symbol('omit');
@@ -99,17 +134,234 @@ function normalizeExportedAt(exportedAt) {
     return date.toISOString();
 }
 
-function buildPortfolioSnapshots(result) {
-    if (result.portfolioSnapshots && typeof result.portfolioSnapshots === 'object') {
-        return toJsonValue(result.portfolioSnapshots);
-    }
+function exportContractError(code, message, details = {}) {
+    const error = new TypeError(message);
+    error.name = 'HistoricalBacktestExportError';
+    error.code = code;
+    error.details = Object.freeze({ ...details });
+    return error;
+}
+
+function finiteNumberOrNull(value) {
+    return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function normalizeQuantizationTiers(tiers) {
+    if (!Array.isArray(tiers) || tiers.length === 0) return null;
+    const normalized = tiers.map((tier, index) => {
+        const step = finiteNumberOrNull(tier?.step);
+        const limit = tier?.limit === Infinity ? null : finiteNumberOrNull(tier?.limit);
+        if (!(step > 0)
+            || (limit === null && tier?.limit !== Infinity)
+            || (limit !== null && !(limit > 0))) return null;
+        return {
+            index: index + 1,
+            upperBoundExclusive: limit,
+            unbounded: limit === null,
+            step
+        };
+    });
+    return normalized.every(Boolean) ? normalized : null;
+}
+
+function captureQuantizationContract(config) {
+    const policy = config?.ANTI_PSEUDO_ACCURACY;
+    const annualTiers = normalizeQuantizationTiers(policy?.QUANTIZATION_TIERS);
+    const monthlyTiers = normalizeQuantizationTiers(policy?.QUANTIZATION_TIERS_MONTHLY);
+    const rounding = policy?.WITHDRAWAL_ROUNDING;
+    if (!policy
+        || typeof policy.ENABLED !== 'boolean'
+        || !annualTiers
+        || !monthlyTiers
+        || rounding?.phase !== 'after_floor_plus_flex_decision_before_final_annual_withdrawal'
+        || !['floor', 'ceil'].includes(rounding?.monthlyMode)
+        || !Number.isInteger(rounding?.annualizationFactor)
+        || rounding.annualizationFactor <= 0
+        || rounding?.floorProtection !== 'max_floor_annual'
+        || typeof policy.METRIC_DISPLAY_ROUNDING !== 'string'
+        || policy.METRIC_DISPLAY_ROUNDING.trim() === '') return null;
     return {
-        start: result.portfolioStart == null ? null : { totalNominalEur: result.portfolioStart },
-        end: result.portfolioEnd == null ? null : { totalNominalEur: result.portfolioEnd }
+        schemaVersion: HISTORICAL_BACKTEST_QUANTIZATION_SCHEMA_VERSION,
+        enabled: policy.ENABLED,
+        transactionAnnualTiers: annualTiers,
+        withdrawalMonthlyTiers: monthlyTiers,
+        withdrawalRounding: {
+            phase: rounding.phase,
+            monthlyMode: rounding.monthlyMode,
+            annualizationFactor: rounding.annualizationFactor,
+            floorProtection: rounding.floorProtection
+        },
+        metricDisplayRounding: policy.METRIC_DISPLAY_ROUNDING
     };
 }
 
-function buildCanonicalExportResult(result, cohortInventory) {
+function isValidQuantizationTiers(tiers) {
+    if (!Array.isArray(tiers) || tiers.length === 0) return false;
+    let previousUpperBound = 0;
+    return tiers.every((tier, index) => {
+        if (tier?.index !== index + 1 || !(Number.isFinite(tier?.step) && tier.step > 0)) return false;
+        const isLast = index === tiers.length - 1;
+        if (tier.unbounded === true) return isLast && tier.upperBoundExclusive === null;
+        if (tier.unbounded !== false
+            || !(Number.isFinite(tier.upperBoundExclusive) && tier.upperBoundExclusive > previousUpperBound)) return false;
+        previousUpperBound = tier.upperBoundExclusive;
+        return true;
+    }) && tiers.at(-1)?.unbounded === true;
+}
+
+function isValidQuantizationContract(contract) {
+    const rounding = contract?.withdrawalRounding;
+    return contract?.schemaVersion === HISTORICAL_BACKTEST_QUANTIZATION_SCHEMA_VERSION
+        && typeof contract.enabled === 'boolean'
+        && isValidQuantizationTiers(contract.transactionAnnualTiers)
+        && isValidQuantizationTiers(contract.withdrawalMonthlyTiers)
+        && rounding?.phase === 'after_floor_plus_flex_decision_before_final_annual_withdrawal'
+        && ['floor', 'ceil'].includes(rounding?.monthlyMode)
+        && Number.isInteger(rounding?.annualizationFactor)
+        && rounding.annualizationFactor > 0
+        && rounding?.floorProtection === 'max_floor_annual'
+        && typeof contract.metricDisplayRounding === 'string'
+        && contract.metricDisplayRounding.trim() !== '';
+}
+
+function validateEngineExportProvenance(engine) {
+    const sourceCommit = String(engine?.sourceCommit || '').trim().toLowerCase();
+    const sourceTreeStatus = String(engine?.sourceTreeStatus || '').trim().toLowerCase();
+    if (!/^[0-9a-f]{40}$/.test(sourceCommit)) {
+        throw exportContractError(
+            'HISTORICAL_EXPORT_SOURCE_COMMIT_REQUIRED',
+            'Historical backtest export requires an exact 40-character source commit.'
+        );
+    }
+    if (sourceTreeStatus !== 'clean') {
+        throw exportContractError(
+            'HISTORICAL_EXPORT_SOURCE_TREE_DIRTY',
+            'Historical backtest export requires a clean source tree.',
+            { sourceTreeStatus: sourceTreeStatus || 'missing' }
+        );
+    }
+    if (!isValidQuantizationContract(engine?.quantizationContract)) {
+        throw exportContractError(
+            'HISTORICAL_EXPORT_QUANTIZATION_CONTRACT_REQUIRED',
+            'Historical backtest export requires a complete captured engine quantization contract.'
+        );
+    }
+}
+
+function buildValidatedRequest(result) {
+    const request = toJsonValue(result.request);
+    request.engine = request.engine && typeof request.engine === 'object' ? request.engine : {};
+    validateEngineExportProvenance(request.engine);
+    return request;
+}
+
+function reconcileBoundaryTotal(result, metricId, evidenceValue, evidencePath) {
+    const metricValue = finiteNumberOrNull(result?.metrics?.values?.[metricId]);
+    const independentValue = finiteNumberOrNull(evidenceValue);
+    if ((metricValue === null) !== (independentValue === null)
+        || (metricValue !== null && Math.abs(metricValue - independentValue) > 1e-6)) {
+        throw exportContractError(
+            'HISTORICAL_EXPORT_PORTFOLIO_BOUNDARY_MISMATCH',
+            `${metricId} does not reconcile with ${evidencePath}.`,
+            { metricId, metricValue, evidencePath, evidenceValue: independentValue }
+        );
+    }
+    return metricValue;
+}
+
+function buildPortfolioBoundaries(result) {
+    const rows = Array.isArray(result?.rows) ? result.rows : [];
+    const isFinancialOutcome = result?.outcome?.kind === 'completed' || result?.outcome?.kind === 'ruin';
+    if (!isFinancialOutcome) {
+        return {
+            schemaVersion: HISTORICAL_BACKTEST_PORTFOLIO_BOUNDARY_SCHEMA_VERSION,
+            restartable: false,
+            canonicalFields: ['totalNominalEur'],
+            totalComposition: {
+                includes: ['active_portfolio', 'health_bucket'],
+                healthBucketRelation: 'included_in_total_do_not_add'
+            },
+            omittedInternalState: [
+                'portfolioSnapshots.start',
+                'portfolioSnapshots.end',
+                'portfolioSnapshots.*.detailledTranches',
+                'simulation_lot_state'
+            ],
+            restartInstruction: 'Use a newly validated current input/profile snapshot; historical result boundaries are diagnostic aggregates only.',
+            start: null,
+            end: null
+        };
+    }
+    const startTotal = reconcileBoundaryTotal(
+        result,
+        'wealth_start_nominal_eur',
+        rows[0]?.row?.portfolio_total_start,
+        'rows[0].row.portfolio_total_start'
+    );
+    const endTotal = reconcileBoundaryTotal(
+        result,
+        'wealth_end_nominal_eur',
+        rows.at(-1)?.row?.portfolio_total_end,
+        'rows[-1].row.portfolio_total_end'
+    );
+    return {
+        schemaVersion: HISTORICAL_BACKTEST_PORTFOLIO_BOUNDARY_SCHEMA_VERSION,
+        restartable: false,
+        canonicalFields: ['totalNominalEur'],
+        totalComposition: {
+            includes: ['active_portfolio', 'health_bucket'],
+            healthBucketRelation: 'included_in_total_do_not_add'
+        },
+        omittedInternalState: [
+            'portfolioSnapshots.start',
+            'portfolioSnapshots.end',
+            'portfolioSnapshots.*.detailledTranches',
+            'simulation_lot_state'
+        ],
+        restartInstruction: 'Use a newly validated current input/profile snapshot; historical result boundaries are diagnostic aggregates only.',
+        start: startTotal === null ? null : {
+            totalNominalEur: startTotal,
+            asOf: 'before_first_requested_year'
+        },
+        end: endTotal === null ? null : {
+            totalNominalEur: endTotal,
+            asOfYear: Number.isInteger(result?.lastCompletedYear) ? result.lastCompletedYear : null
+        }
+    };
+}
+
+function buildPeriodContract(result, request, rows) {
+    const startYear = Number.isInteger(request?.startYear) ? request.startYear : null;
+    const endYear = Number.isInteger(request?.endYear) ? request.endYear : null;
+    const inclusiveYears = startYear !== null && endYear !== null && endYear >= startYear
+        ? endYear - startYear + 1
+        : null;
+    const requestedYears = Number.isInteger(result?.requestedYears) ? result.requestedYears : null;
+    if (inclusiveYears !== null && requestedYears !== null && inclusiveYears !== requestedYears) {
+        throw exportContractError(
+            'HISTORICAL_EXPORT_PERIOD_LENGTH_MISMATCH',
+            'Historical backtest requestedYears does not match the inclusive calendar period.',
+            { startYear, endYear, inclusiveYears, requestedYears }
+        );
+    }
+    const completedYears = Number.isInteger(result?.completedYears) ? result.completedYears : 0;
+    return {
+        startYear,
+        endYear,
+        endpointConvention: 'inclusive_start_and_end_calendar_years',
+        inclusiveYears,
+        requestedYears,
+        completedYears,
+        emittedYearRows: rows.length,
+        isCompleteCalendarWindow: result?.outcome?.kind === 'completed'
+            && inclusiveYears !== null
+            && completedYears === inclusiveYears
+            && rows.length === inclusiveYears,
+        projectionClaim: 'observed_requested_calendar_window_not_fixed_30_year_horizon'
+    };
+}
+
+function buildCanonicalExportResult(result, cohortInventory, request) {
     const error = sanitizeError(result.error || result.outcome?.error);
     const rows = toJsonValue(Array.isArray(result.rows) ? result.rows : []);
     const firstYear = Number.isInteger(result.firstYear)
@@ -124,6 +376,7 @@ function buildCanonicalExportResult(result, cohortInventory) {
         outcome: sanitizeOutcome(result.outcome),
         warnings: toJsonValue(Array.isArray(result.warnings) ? result.warnings : [], { omitDiagnosticKeys: true }),
         error,
+        period: buildPeriodContract(result, request, rows),
         requestedYears: result.requestedYears ?? null,
         completedYears: result.completedYears ?? 0,
         firstYear,
@@ -135,11 +388,11 @@ function buildCanonicalExportResult(result, cohortInventory) {
             ? null
             : toJsonValue(result.incompleteReason, { omitDiagnosticKeys: true }),
         provenance: {
-            dataset: toJsonValue(result.request.dataset || null),
-            temporalConventionId: result.request.temporalConventionId ?? null,
-            engine: toJsonValue(result.request.engine || null)
+            dataset: toJsonValue(request.dataset || null),
+            temporalConventionId: request.temporalConventionId ?? null,
+            engine: toJsonValue(request.engine || null)
         },
-        portfolioSnapshots: buildPortfolioSnapshots(result),
+        portfolioBoundaries: buildPortfolioBoundaries(result),
         historicalYearRecords: toJsonValue(Array.isArray(result.historicalYearRecords)
             ? result.historicalYearRecords
             : []),
@@ -150,7 +403,24 @@ function buildCanonicalExportResult(result, cohortInventory) {
     };
 }
 
-export function captureHistoricalBacktestEngineProvenance(engineApi) {
+export function createHistoricalBacktestRunIdentity(result, { cohortInventory = null } = {}) {
+    requireBacktestResult(result);
+    const identityBasis = {
+        algorithm: HISTORICAL_BACKTEST_RUN_ID_ALGORITHM,
+        sourceResultSchemaVersion: result.schemaVersion,
+        request: toJsonValue(result.request),
+        outcome: sanitizeOutcome(result.outcome),
+        rows: toJsonValue(Array.isArray(result.rows) ? result.rows : []),
+        historicalYearRecords: toJsonValue(Array.isArray(result.historicalYearRecords)
+            ? result.historicalYearRecords
+            : []),
+        metrics: toJsonValue(result.metrics || null),
+        cohortInventory: cohortInventory == null ? null : toJsonValue(cohortInventory)
+    };
+    return `btrun_${sha256Hex(canonicalizeHistoricalContractValue(identityBasis))}`;
+}
+
+export function captureHistoricalBacktestEngineProvenance(engineApi, runtimeBuildProvenance = null) {
     let version = null;
     let config = null;
     try {
@@ -160,15 +430,20 @@ export function captureHistoricalBacktestEngineProvenance(engineApi) {
         version = null;
         config = null;
     }
+    const runtime = normalizeRuntimeBuildProvenance(runtimeBuildProvenance);
     return deepFreeze({
         apiVersion: typeof version?.api === 'string' ? version.api : null,
         buildId: typeof version?.build === 'string' ? version.build : null,
+        sourceCommit: runtime?.sourceCommit ?? null,
+        sourceTreeStatus: runtime?.sourceTreeStatus ?? 'unavailable',
+        sourceProvenanceProvider: runtime?.provider ?? null,
         configFingerprint: config == null
             ? null
             : {
                 algorithm: HISTORICAL_BACKTEST_FINGERPRINT_ALGORITHM,
                 value: sha256Hex(canonicalizeHistoricalContractValue(config))
-            }
+            },
+        quantizationContract: captureQuantizationContract(config)
     });
 }
 
@@ -177,16 +452,28 @@ export function buildHistoricalBacktestRawExport(result, {
     cohortInventory = null
 } = {}) {
     requireBacktestResult(result);
-    const request = toJsonValue(result.request);
-    const canonicalResult = buildCanonicalExportResult(result, cohortInventory);
+    const request = buildValidatedRequest(result);
+    const canonicalResult = buildCanonicalExportResult(result, cohortInventory, request);
+    const contracts = {
+        inputSemantics: HISTORICAL_BACKTEST_INPUT_SEMANTICS,
+        flexReductionMaximum: {
+            metricId: 'flex_reduction_max_pct',
+            basis: canonicalResult.metrics?.flexBasisContract?.effective ?? null,
+            basisConsistencyRequired: true,
+            missingness: 'null_if_flex_haushalt_basis_is_missing_or_mixed',
+            interpretation: 'maximum_household_flex_reduction_not_person_reduction'
+        }
+    };
     const requestFingerprint = sha256Hex(canonicalizeHistoricalContractValue(request));
     const fingerprintBasis = {
         schemaId: HISTORICAL_BACKTEST_EXPORT_SCHEMA_ID,
         schemaVersion: HISTORICAL_BACKTEST_EXPORT_SCHEMA_VERSION,
         request,
-        result: canonicalResult
+        result: canonicalResult,
+        contracts
     };
     const resultFingerprint = sha256Hex(canonicalizeHistoricalContractValue(fingerprintBasis));
+    const runId = createHistoricalBacktestRunIdentity(result, { cohortInventory });
 
     return deepFreeze({
         schemaId: HISTORICAL_BACKTEST_EXPORT_SCHEMA_ID,
@@ -194,7 +481,7 @@ export function buildHistoricalBacktestRawExport(result, {
         exportedAt: normalizeExportedAt(exportedAt),
         identifiers: {
             requestId: `btrq_${requestFingerprint}`,
-            runId: `btrun_${resultFingerprint}`
+            runId
         },
         fingerprint: {
             algorithm: HISTORICAL_BACKTEST_FINGERPRINT_ALGORITHM,
@@ -203,10 +490,12 @@ export function buildHistoricalBacktestRawExport(result, {
         },
         request,
         result: canonicalResult,
+        contracts,
         exportContract: {
             sourceResultSchemaVersion: BACKTEST_RESULT_SCHEMA_VERSION,
             canonicalization: HISTORICAL_BACKTEST_FINGERPRINT_ALGORITHM,
             excludedResultFields: ['diagnostics'],
+            excludedInternalPortfolioFields: ['portfolioSnapshots'],
             numericValues: 'finite JSON numbers; no display formatting',
             privacyNotice: 'Der Export enthaelt die vollstaendigen lokalen Simulationsannahmen und wird nur durch eine explizite Nutzeraktion erzeugt.'
         }
@@ -231,6 +520,7 @@ function recordForYear(recordsByYear, year) {
 }
 
 export const HISTORICAL_BACKTEST_CSV_COLUMNS = deepFreeze([
+    { id: 'run_id', read: ({ runId }) => runId },
     { id: 'simulation_year_calendar_year', read: ({ entry }) => entry?.jahr ?? null },
     { id: 'outcome_code', read: ({ result }) => result.outcome?.kind ?? '' },
     { id: 'action_code', read: ({ entry }) => entry?.row?.aktionUndGrund ?? '' },
@@ -275,8 +565,9 @@ function escapeCsvCell(value) {
     return /["\n\r;]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-export function serializeHistoricalBacktestCsv(result) {
+export function serializeHistoricalBacktestCsv(result, { cohortInventory = null, runIdentity = null } = {}) {
     requireBacktestResult(result);
+    const runId = runIdentity || createHistoricalBacktestRunIdentity(result, { cohortInventory });
     const rows = Array.isArray(result.rows) ? result.rows : [];
     const exportRows = rows.length > 0 ? rows : [null];
     const recordsByYear = new Map((Array.isArray(result.historicalYearRecords)
@@ -287,7 +578,8 @@ export function serializeHistoricalBacktestCsv(result) {
         const context = {
             result,
             entry,
-            record: recordForYear(recordsByYear, entry?.jahr)
+            record: recordForYear(recordsByYear, entry?.jahr),
+            runId
         };
         return HISTORICAL_BACKTEST_CSV_COLUMNS
             .map(column => escapeCsvCell(column.read(context)))
@@ -297,22 +589,41 @@ export function serializeHistoricalBacktestCsv(result) {
 }
 
 export function createHistoricalBacktestDownload(result, format = 'json', options = {}) {
-    const exportedAt = normalizeExportedAt(options.exportedAt ?? new Date());
-    const rawDocument = buildHistoricalBacktestRawExport(result, {
-        exportedAt,
-        cohortInventory: options.cohortInventory ?? null
-    });
-    const extension = format === 'csv' ? 'csv' : 'json';
     if (!['json', 'csv'].includes(format)) {
         throw new TypeError(`Unsupported historical backtest export format: ${String(format)}`);
     }
+    const exportedAt = normalizeExportedAt(options.exportedAt ?? new Date());
+    const rawDocument = format === 'json'
+        ? buildHistoricalBacktestRawExport(result, {
+            exportedAt,
+            cohortInventory: options.cohortInventory ?? null
+        })
+        : null;
+    const runId = format === 'json'
+        ? rawDocument.identifiers.runId
+        : createHistoricalBacktestRunIdentity(result, { cohortInventory: options.cohortInventory ?? null });
+    const csvContent = format === 'csv'
+        ? serializeHistoricalBacktestCsv(result, {
+            cohortInventory: options.cohortInventory ?? null,
+            runIdentity: runId
+        })
+        : null;
+    const extension = format === 'csv' ? 'csv' : 'json';
     const timestamp = exportedAt.replace(/[:]/g, '-');
     const period = `${result.request.startYear ?? 'unknown'}-${result.request.endYear ?? 'unknown'}`;
-    const fingerprint = rawDocument.fingerprint.value.slice(0, 12);
+    const fingerprint = format === 'json'
+        ? rawDocument.fingerprint
+        : {
+            algorithm: 'sha256-csv-utf8-v1',
+            value: sha256Hex(csvContent)
+        };
+    const runToken = runId.slice(-64, -52);
+    const formatToken = fingerprint.value.slice(0, 12);
+    const formatTokenLabel = format === 'json' ? 'result' : 'csv';
     return deepFreeze({
-        filename: `backtest-${period}-${fingerprint}-${timestamp}.${extension}`,
-        content: format === 'json' ? stringifyCanonicalExportDocument(rawDocument) : serializeHistoricalBacktestCsv(result),
+        filename: `backtest-${period}-run-${runToken}-${formatTokenLabel}-${formatToken}-${timestamp}.${extension}`,
+        content: format === 'json' ? stringifyCanonicalExportDocument(rawDocument) : csvContent,
         mimeType: format === 'json' ? 'application/json' : 'text/csv;charset=utf-8',
-        fingerprint: rawDocument.fingerprint
+        fingerprint
     });
 }

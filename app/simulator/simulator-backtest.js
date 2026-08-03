@@ -30,6 +30,10 @@ import {
     createHistoricalBacktestDownload
 } from './historical-backtest-export.js';
 import {
+    getRuntimeBuildProvenance,
+    loadRuntimeBuildProvenance
+} from '../shared/runtime-build-provenance.js';
+import {
     buildAccessibleBacktestTableHtml,
     configureHistoricalBacktestControls,
     createBacktestUiStatus,
@@ -101,7 +105,7 @@ function renderBacktestSummary(result) {
         ${summaryItem({ label: 'Max. Kürzungsdauer (≥ 10 %)', displayValue: `${metrics.flex_reduction_longest_streak_gte_10_pct ?? '—'} Jahre`, rawValue: metrics.flex_reduction_longest_streak_gte_10_pct, metricId: 'flex_reduction_longest_streak_gte_10_pct' })}
         ${summaryItem({ label: 'Jahre mit Kürzung (≥ 10 %)', displayValue: `${metrics.flex_reduction_years_gte_10_pct ?? '—'} von ${result.completedYears ?? '—'}`, rawValue: metrics.flex_reduction_years_gte_10_pct, metricId: 'flex_reduction_years_gte_10_pct' })}
         ${summaryItem({ label: 'Gezahlte Steuern', displayValue: currencyOrDash(metrics.tax_total_nominal_eur), rawValue: metrics.tax_total_nominal_eur, metricId: 'tax_total_nominal_eur', className: 'tax' })}
-        ${summaryItem({ label: healthBucket.enabled ? 'Pflegebucket am Laufende' : 'Pflegebucket am Laufende (deaktiviert)', displayValue: currencyOrDash(metrics.health_bucket_end_nominal_eur), rawValue: metrics.health_bucket_end_nominal_eur, metricId: 'health_bucket_end_nominal_eur' })}
+        ${summaryItem({ label: healthBucket.enabled ? 'Pflegebucket am Laufende (im Endvermögen enthalten)' : 'Pflegebucket am Laufende (deaktiviert; im Endvermögen enthalten)', displayValue: currencyOrDash(metrics.health_bucket_end_nominal_eur), rawValue: metrics.health_bucket_end_nominal_eur, metricId: 'health_bucket_end_nominal_eur' })}
         ${summaryItem({ label: 'Pflegebucket-Zieldeckung', displayValue: healthCoverage, rawValue: healthBucket.realCoveragePct, resultField: 'health_bucket_coverage_pct' })}
         ${summaryItem({ label: 'Pflegebucket-Ziellücke', displayValue: currencyOrDash(healthBucket.targetGap), rawValue: healthBucket.targetGap, resultField: 'health_bucket_target_gap' })}
     </div>`;
@@ -186,7 +190,10 @@ export function runBacktest(options = {}) {
             resolveHorizon: dependencies.resolveHorizon || resolveDynamicFlexRunnerHorizon,
             totalPortfolio: dependencies.totalPortfolio || portfolioTotal,
             breakOnRuin: dependencies.breakOnRuin ?? BREAK_ON_RUIN,
-            engineProvenance: captureHistoricalBacktestEngineProvenance(engineApi)
+            engineProvenance: captureHistoricalBacktestEngineProvenance(
+                engineApi,
+                dependencies.runtimeBuildProvenance ?? getRuntimeBuildProvenance()
+            )
         });
 
         let cohortInventory = null;
@@ -263,6 +270,20 @@ export function runBacktest(options = {}) {
     }
 }
 
+export async function runBacktestWithRuntimeProvenance(options = {}) {
+    const dependencies = options && typeof options === 'object' ? options : {};
+    const loader = dependencies.loadRuntimeBuildProvenance || loadRuntimeBuildProvenance;
+    const button = document.getElementById('btButton');
+    if (button) button.disabled = true;
+    let runtimeBuildProvenance = null;
+    try {
+        runtimeBuildProvenance = await loader({ force: true });
+    } catch {
+        runtimeBuildProvenance = null;
+    }
+    return runBacktest({ ...dependencies, runtimeBuildProvenance });
+}
+
 /**
  * Rendert die Backtest-Logtabelle basierend auf dem gespeicherten Log-Level.
  * Nutzt die zuvor abgelegten globalBacktestData, um Re-Renders ohne erneuten Lauf zu ermöglichen.
@@ -315,13 +336,39 @@ export function exportBacktestLogData(format = 'json') {
         });
         triggerDownload(download.filename, download.content, download.mimeType);
     } catch (error) {
-        void error;
+        const known = {
+            HISTORICAL_EXPORT_SOURCE_COMMIT_REQUIRED: {
+                title: 'Quellstand des Backtests fehlt',
+                summary: 'Der JSON-Export benötigt den beim Lauf erfassten exakten Source-Commit.',
+                action: 'Starten Sie die Suite über den lokalen Server oder einen gültigen Desktop-Build und führen Sie den Backtest danach neu aus.'
+            },
+            HISTORICAL_EXPORT_SOURCE_TREE_DIRTY: {
+                title: 'Quellstand des Backtests ist nicht sauber',
+                summary: `Der JSON-Export ist für den erfassten Quellbaumstatus „${error?.details?.sourceTreeStatus || 'unbekannt'}“ gesperrt.`,
+                action: 'Verwenden Sie einen aus einem sauberen Commit gestarteten beziehungsweise erzeugten Build.'
+            },
+            HISTORICAL_EXPORT_QUANTIZATION_CONTRACT_REQUIRED: {
+                title: 'Quantisierungsvertrag fehlt oder ist ungültig',
+                summary: 'Der JSON-Export kann die beim Lauf verwendeten Rundungsregeln nicht vollständig belegen.',
+                action: 'Aktualisieren Sie Anwendung und Engine gemeinsam und führen Sie den Backtest erneut aus.'
+            },
+            HISTORICAL_EXPORT_PORTFOLIO_BOUNDARY_MISMATCH: {
+                title: 'Portfoliogrenzen sind widersprüchlich',
+                summary: 'Kanonische Metrik und unabhängige Jahreszeile stimmen nicht überein.',
+                action: 'Verwenden Sie dieses Ergebnis nicht weiter und melden Sie den angezeigten Fehlercode.'
+            },
+            HISTORICAL_EXPORT_PERIOD_LENGTH_MISMATCH: {
+                title: 'Backtestzeitraum ist widersprüchlich',
+                summary: 'Angeforderte Jahreszahl und inklusive Kalenderperiode stimmen nicht überein.',
+                action: 'Verwenden Sie dieses Ergebnis nicht weiter und melden Sie den angezeigten Fehlercode.'
+            }
+        }[error?.code];
         renderHistoricalBacktestStatus(document, createBacktestUiStatus(
             'technical_error',
-            'BACKTEST_EXPORT_FAILED',
-            'Backtest-Export fehlgeschlagen',
-            'Der kanonische Raw-Export konnte technisch nicht erstellt werden.',
-            'Führen Sie den Backtest erneut aus und wiederholen Sie den Download.'
+            known ? error.code : 'BACKTEST_EXPORT_FAILED',
+            known?.title || 'Backtest-Export fehlgeschlagen',
+            known?.summary || `Der ${format.toUpperCase()}-Export konnte technisch nicht erstellt werden.`,
+            known?.action || 'Melden Sie den angezeigten Fehlercode zur Diagnose.'
         ), { focus: true });
     }
 }
@@ -355,7 +402,9 @@ export function initializeBacktestUI() {
     setBacktestExportEnabled(Boolean(window.globalBacktestData?.result));
 
     const startButton = document.getElementById('btButton');
-    bindBacktestEventOnce(startButton, 'click', 'Start', () => runBacktest());
+    bindBacktestEventOnce(startButton, 'click', 'Start', () => {
+        void runBacktestWithRuntimeProvenance();
+    });
 
     const cohortCheckbox = document.getElementById('runBacktestCohorts');
     const cohortHorizonInput = document.getElementById('backtestCohortHorizon');

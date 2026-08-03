@@ -227,7 +227,16 @@ export const CONFIG = {
             { limit: 2000, step: 50 },    // z.B. 1.832 -> 1.850
             { limit: 5000, step: 100 },   // z.B. 3.420 -> 3.500
             { limit: Infinity, step: 250 } // z.B. 6.100 -> 6.250
-        ]
+        ],
+
+        // Von calculateFinalWithdrawal konsumierter, exportierbarer Vertrag.
+        WITHDRAWAL_ROUNDING: {
+            phase: 'after_floor_plus_flex_decision_before_final_annual_withdrawal',
+            monthlyMode: 'floor',
+            annualizationFactor: 12,
+            floorProtection: 'max_floor_annual'
+        },
+        METRIC_DISPLAY_ROUNDING: 'descriptor_only_not_applied_to_raw_metric_values'
     },
 
     /**

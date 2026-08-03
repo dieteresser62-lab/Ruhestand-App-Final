@@ -6,10 +6,10 @@ kein neuer Feature-Branch
 **GitHub-Status:** Remote `origin` ist vorhanden; der aktive Branch besitzt
 keinen Upstream und bleibt bis zu einer ausdruecklichen Nutzerfreigabe lokal  
 **Basiscommit:** `2e4867f5fa1817a050fd06029b3298b10342764e`  
-**Status:** Claude-Review Runde 1 blockierte; CR10-1 bis CR10-12 sowie der
-abschliessende Browser-Befund S10-STOP-04 sind im durch den Nutzer freigegebenen
-Scope von exakt fuenfzehn produktiven Dateien korrigiert und selbstgetestet;
-externes Re-Review und Freigabe stehen aus  
+**Status:** Claude-Review Runde 2 freigegeben und als Commit `05ff8c3`
+vorhanden; CR10-13 und CR10-14 wurden als Eingangsgates von Slice 11 durch
+Ergebnisprosa und ein vollstaendiges 12/12-Delta-Ledger geschlossen
+
 **Abhaengigkeiten:** Slices 01, 02, 04 und das vollstaendige freigegebene
 Ergebnisdokument von Slice 09
 
@@ -333,6 +333,32 @@ Rollback-Strategie:
   deterministisch unveraendert geblieben.
 - `git diff --check`: gruen.
 
+## Gemessene Ergebniswirkung der Steuerkorrektur
+
+Die heutige Zins-/Verkaufssteuer und der explizite TQF-/Steuerfreiheitsvertrag
+verschieben die Ergebnisse aller zwoelf Charakterisierungsfaelle in dieselbe
+Richtung: Das Endvermoegen sinkt und die Steuer steigt. Die Entnahme bleibt in
+elf Faellen unveraendert; nur der Dynamic-Flex-CAPE-Fall entnimmt 12.000 EUR
+weniger. Kein Fall wechselt sein Outcome, und `FlowDelta` bleibt in allen
+Faellen exakt 0. Die Wirkung ist deshalb eine erklaerte Steuer-/Ergebnis-
+verschiebung und keine Bilanzverletzung.
+
+Die Spannweite reicht von -680,93 EUR Endvermoegen und +764,87 EUR Steuer im
+Ruinfall bis -8.395.042,76 EUR Endvermoegen und +569.838,01 EUR Steuer im
+61-jaehrigen Fall `completed_1960_2020`. Der in Slice 09 neu hinzugekommene
+D-17-Fall `minimum_flex_d17_2000_2010` wurde fuer CR10-14 am freigegebenen
+Slice-09-Commit `2e4867f` separat nachgemessen: Slice 10 veraendert dort das
+Endvermoegen um -8.840,82 EUR und die Steuer um +7.886,87 EUR; Entnahme,
+Outcome und `FlowDelta` bleiben unveraendert.
+
+Das vollstaendige maschinenlesbare 12/12-Ledger ist als
+`Slice09To10FinancialDeltaLedgerV2` direkt in
+`tests/fixtures/tax-logic-slice-10-backtest-measurement-v1.json` konsolidiert;
+die unabhaengig rekonstruierbare Slice-09-Quellmessung des erst dort
+eingefuehrten D-17-Falls liegt in
+`tests/fixtures/minimum-flex-slice-09-added-case-financial-v1.json`. Damit
+existiert fuer CR10-13 und CR10-14 genau ein autoritatives Delta-Ledger.
+
 ## Abweichungen vom Plan
 
 - CR09-4 und CR09-14 stehen nicht im urspruenglichen Steuer-Scope des
@@ -374,9 +400,9 @@ Implementierungsergebnis.
 
 S10-STOP-01 bis S10-STOP-04 sind durch Nutzerfreigaben vom 2026-08-02
 geschlossen. Der Scope umfasst exakt fuenfzehn produktive Dateien. CR10-1 bis
-CR10-12 sowie der Browser-Befund sind korrigiert und selbstgetestet. Codex
-erteilt keine Selbstfreigabe; Re-Review, Freigabe und lokaler Commit bleiben
-extern.
+CR10-12 sowie der Browser-Befund sind korrigiert und in Claude-Review Runde 2
+freigegeben; der lokale Commit ist `05ff8c3`. CR10-13 und CR10-14 sind als
+Eingangsgates von Slice 11 dokumentarisch und messtechnisch geschlossen.
 
 ## Review-Entscheidungen
 

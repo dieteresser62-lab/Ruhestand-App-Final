@@ -25,10 +25,12 @@ const slice06DeltaFixturePath = path.join(__dirname, 'fixtures', 'cape-wage-back
 const slice07DeltaFixturePath = path.join(__dirname, 'fixtures', 'demography-care-survivor-backtest-delta-v1.json');
 const slice08MeasurementFixturePath = path.join(__dirname, 'fixtures', 'liquidity-runway-slice-08-measurement-v1.json');
 const slice09MeasurementFixturePath = path.join(__dirname, 'fixtures', 'minimum-flex-slice-09-measurement-v1.json');
+const slice09AddedCaseFinancialFixturePath = path.join(__dirname, 'fixtures', 'minimum-flex-slice-09-added-case-financial-v1.json');
 const slice10MeasurementFixturePath = path.join(__dirname, 'fixtures', 'tax-logic-slice-10-backtest-measurement-v1.json');
 const backtestSourcePath = path.join(__dirname, '..', 'app', 'simulator', 'simulator-backtest.js');
 const backtestRunnerSourcePath = path.join(__dirname, '..', 'app', 'simulator', 'historical-backtest-runner.js');
 const UPDATE_TARGET = process.env.UPDATE_BACKTEST_TARGET === '1';
+const UPDATE_SLICE10_MEASUREMENT = process.env.UPDATE_BACKTEST_DATA_10 === '1';
 
 console.log('--- Simulator Backtest Characterization Tests ---');
 
@@ -1808,30 +1810,31 @@ try {
     }
     const slice09FixtureBytes = fs.readFileSync(slice09MeasurementFixturePath);
     const expectedSlice09Measurement = JSON.parse(slice09FixtureBytes.toString('utf8'));
+    const slice09AddedCaseFinancialBytes = fs.readFileSync(slice09AddedCaseFinancialFixturePath);
+    const slice09AddedCaseFinancial = JSON.parse(slice09AddedCaseFinancialBytes.toString('utf8'));
+    assertEqual(
+        slice09AddedCaseFinancial.sourceCommit,
+        '2e4867f5fa1817a050fd06029b3298b10342764e',
+        'CR10-14 source baseline must identify the approved Slice-09 commit'
+    );
     const sourceCaseDeltas = new Map(expectedSlice09Measurement.existingCaseFinancialDeltas.map(entry => [entry.id, entry]));
-    const slice09To10CaseDeltas = slice09Measurement.existingCaseFinancialDeltas.map(target => {
-        const source = sourceCaseDeltas.get(target.id);
-        return {
-            id: target.id,
-            outcomeChanged: { source: source.outcomeChanged, slice10: target.outcomeChanged !== source.outcomeChanged },
-            summaryEndWealth: {
-                source: source.summaryEndWealthDelta,
-                slice10: round(target.summaryEndWealthDelta - source.summaryEndWealthDelta)
-            },
-            totalWithdrawal: {
-                source: source.totalWithdrawalDelta,
-                slice10: round(target.totalWithdrawalDelta - source.totalWithdrawalDelta)
-            },
-            totalTax: {
-                source: source.totalTaxDelta,
-                slice10: round(target.totalTaxDelta - source.totalTaxDelta)
-            },
-            maxAbsolutePortfolioFlowDelta: {
-                source: source.maxAbsolutePortfolioFlowDeltaDelta,
-                slice10: round(target.maxAbsolutePortfolioFlowDeltaDelta - source.maxAbsolutePortfolioFlowDeltaDelta, 6)
-            }
-        };
-    });
+    const sourceSlice09Cases = new Map([...archivedCaseOracles.entries()].map(([id, archived]) => {
+        const delta = sourceCaseDeltas.get(id);
+        if (!delta) return [id, null];
+        assertEqual(delta.outcomeChanged, false, `${id}: Slice-09 source outcome remains reconstructible`);
+        return [id, {
+            id,
+            outcomeObservation: archived.outcomeObservation,
+            summaryEndWealth: round(archived.summaryEndWealth + delta.summaryEndWealthDelta),
+            totalWithdrawal: round(archived.totalWithdrawal + delta.totalWithdrawalDelta),
+            totalTax: round(archived.totalTax + delta.totalTaxDelta),
+            maxAbsolutePortfolioFlowDelta: round(
+                archived.maxAbsolutePortfolioFlowDelta + delta.maxAbsolutePortfolioFlowDeltaDelta,
+                6
+            )
+        }];
+    }).filter(([, entry]) => entry !== null));
+    sourceSlice09Cases.set(slice09AddedCaseFinancial.case.id, slice09AddedCaseFinancial.case);
     const slice09To10D17 = Object.fromEntries(Object.entries(slice09Measurement.d17Witness).map(([year, target]) => {
         const source = expectedSlice09Measurement.d17Witness[year];
         return [year, {
@@ -1844,6 +1847,52 @@ try {
             }
         }];
     }));
+
+    const slice09To10CaseDeltas = actual.cases.map(current => {
+        const source = sourceSlice09Cases.get(current.id);
+        assert(source, `${current.id}: every Slice-10 case requires a Slice-09 financial source baseline`);
+        return {
+            id: current.id,
+            sourceSlice09: {
+                outcomeObservation: source.outcomeObservation,
+                summaryEndWealth: source.summaryEndWealth,
+                totalWithdrawal: source.totalWithdrawal,
+                totalTax: source.totalTax,
+                maxAbsolutePortfolioFlowDelta: source.maxAbsolutePortfolioFlowDelta
+            },
+            slice10: {
+                outcomeObservation: current.outcomeObservation,
+                summaryEndWealth: current.values.summaryEndWealth,
+                totalWithdrawal: current.values.totalWithdrawal,
+                totalTax: current.values.totalTax,
+                maxAbsolutePortfolioFlowDelta: current.values.maxAbsolutePortfolioFlowDelta
+            },
+            delta: {
+                outcomeChanged: current.outcomeObservation !== source.outcomeObservation,
+                summaryEndWealth: round(current.values.summaryEndWealth - source.summaryEndWealth),
+                totalWithdrawal: round(current.values.totalWithdrawal - source.totalWithdrawal),
+                totalTax: round(current.values.totalTax - source.totalTax),
+                maxAbsolutePortfolioFlowDelta: round(
+                    current.values.maxAbsolutePortfolioFlowDelta - source.maxAbsolutePortfolioFlowDelta,
+                    6
+                )
+            }
+        };
+    });
+    const slice09To10CompleteLedger = {
+        schemaVersion: 'Slice09To10FinancialDeltaLedgerV2',
+        sourceReference: expectedSlice09Measurement.snapshotId,
+        targetReference: 'post-backtest-data-10-v1',
+        sourceCaseCount: expectedSlice09Measurement.caseCount,
+        targetCaseCount: actual.cases.length,
+        sourceAddedCaseEvidence: {
+            schemaVersion: slice09AddedCaseFinancial.schemaVersion,
+            sourceCommit: slice09AddedCaseFinancial.sourceCommit,
+            sha256: createHash('sha256').update(slice09AddedCaseFinancialBytes).digest('hex')
+        },
+        d17Witness: slice09To10D17,
+        cases: slice09To10CaseDeltas
+    };
     const slice10Measurement = {
         schemaVersion: 'TaxLogicSlice10BacktestMeasurementV1',
         snapshotId: 'post-backtest-data-10-v1',
@@ -1858,14 +1907,12 @@ try {
         ruinCaseCount: actual.cases.filter(entry => entry.outcomeObservation === 'ruin').length,
         maxAbsolutePortfolioFlowDelta: round(Math.max(...actual.cases.map(entry => entry.values.maxAbsolutePortfolioFlowDelta)), 6),
         crossSliceOracleProjection,
-        slice09To10DeltaLedger: {
-            sourceSchemaVersion: expectedSlice09Measurement.schemaVersion,
-            sourceCaseCount: expectedSlice09Measurement.caseCount,
-            cases: slice09To10CaseDeltas,
-            d17Witness: slice09To10D17
-        }
+        slice09To10DeltaLedger: slice09To10CompleteLedger
     };
-    if (process.env.PRINT_BACKTEST_DATA_10 === '1') {
+    if (UPDATE_SLICE10_MEASUREMENT) {
+        fs.writeFileSync(slice10MeasurementFixturePath, stableStringify(slice10Measurement, 2), 'utf8');
+        console.log(`Updated Slice-10 measurement fixture: ${slice10MeasurementFixturePath}`);
+    } else if (process.env.PRINT_BACKTEST_DATA_10 === '1') {
         console.log('__BACKTEST_DATA_10_MEASUREMENT_START__');
         console.log(stableStringify(slice10Measurement, 2));
         console.log('__BACKTEST_DATA_10_MEASUREMENT_END__');

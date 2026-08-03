@@ -559,7 +559,8 @@ does not replace this runtime manifest and does not upgrade any field to
 The embedded 1925-2025 history and every period or rolling cohort derived from
 it are exploratory/contaminated for confirmatory research because the data and
 results have already been visible during development. A raw
-`HistoricalBacktestExportV1` records one explicit run and its fingerprints; it
+`HistoricalBacktestExportV2` records one explicit run, its source/data
+provenance, and its fingerprints; it
 is not an append-only trial registry and does not prove a locked holdout.
 
 ### `HistoricalYearRecordV1` and assignment inventory

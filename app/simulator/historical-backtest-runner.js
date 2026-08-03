@@ -147,6 +147,31 @@ function readPortfolioParts(portfolio) {
     };
 }
 
+function readHealthBucketTotal(portfolio) {
+    const value = Number(portfolio?.healthBucketGeldmarkt);
+    return Number.isFinite(value) ? value : 0;
+}
+
+function computeCanonicalPortfolioTotal(computeActivePortfolioTotal, portfolio) {
+    const activeTotal = Number(computeActivePortfolioTotal(portfolio));
+    if (!Number.isFinite(activeTotal)) return null;
+    return activeTotal + readHealthBucketTotal(portfolio);
+}
+
+// Bewusst unabhaengig von der injizierten totalPortfolio-Funktion: Dieser
+// zweite Rechenweg ist die Evidenz fuer die Exportgrenzen.
+function computeIndependentPortfolioTotal(portfolio) {
+    const hasDetailedShape = Array.isArray(portfolio?.depotTranchesAktien)
+        || Array.isArray(portfolio?.depotTranchesGold)
+        || Object.hasOwn(portfolio || {}, 'liquiditaet');
+    const activeTotal = hasDetailedShape
+        ? sumTranches(portfolio?.depotTranchesAktien)
+            + sumTranches(portfolio?.depotTranchesGold)
+            + (Number(portfolio?.liquiditaet) || 0)
+        : (Number(portfolio?.value) || 0);
+    return activeTotal + readHealthBucketTotal(portfolio);
+}
+
 function normalizeTechnicalError(error, fallbackCode) {
     const code = typeof error?.code === 'string' && error.code.trim()
         ? error.code.trim()
@@ -249,9 +274,19 @@ function buildDatasetProvenance(historicalDataProvider) {
 
 function buildEngineProvenance(engineProvenance) {
     const configFingerprint = engineProvenance?.configFingerprint;
+    const quantizationContract = engineProvenance?.quantizationContract;
     return {
         apiVersion: typeof engineProvenance?.apiVersion === 'string' ? engineProvenance.apiVersion : null,
         buildId: typeof engineProvenance?.buildId === 'string' ? engineProvenance.buildId : null,
+        sourceCommit: typeof engineProvenance?.sourceCommit === 'string'
+            ? engineProvenance.sourceCommit
+            : null,
+        sourceTreeStatus: typeof engineProvenance?.sourceTreeStatus === 'string'
+            ? engineProvenance.sourceTreeStatus
+            : 'unavailable',
+        sourceProvenanceProvider: typeof engineProvenance?.sourceProvenanceProvider === 'string'
+            ? engineProvenance.sourceProvenanceProvider
+            : null,
         configFingerprint: configFingerprint
             && typeof configFingerprint.algorithm === 'string'
             && typeof configFingerprint.value === 'string'
@@ -259,6 +294,9 @@ function buildEngineProvenance(engineProvenance) {
                 algorithm: configFingerprint.algorithm,
                 value: configFingerprint.value
             }
+            : null,
+        quantizationContract: quantizationContract && typeof quantizationContract === 'object'
+            ? cloneRunValue(quantizationContract)
             : null
     };
 }
@@ -337,7 +375,6 @@ export function runHistoricalBacktest({
             breakOnRuin: request.breakOnRuin,
             portfolioStart: null,
             portfolioEnd: null,
-            portfolioSnapshots: { start: null, end: null },
             dataStatus,
             incompleteReason,
             historicalYearRecords: [],
@@ -428,8 +465,8 @@ export function runHistoricalBacktest({
             capeRatio: initialCapeRatio
         }
     };
-    const portfolioStart = computePortfolioTotal(simulationState.portfolio);
-    const portfolioStartSnapshot = deepFreeze(cloneRunValue(simulationState.portfolio));
+    const portfolioStart = computeCanonicalPortfolioTotal(computePortfolioTotal, simulationState.portfolio);
+    const portfolioStartEvidence = computeIndependentPortfolioTotal(simulationState.portfolio);
 
     let totalWithdrawal = 0;
     let currentReductionStreak = 0;
@@ -445,7 +482,7 @@ export function runHistoricalBacktest({
 
     const finishResult = ({ outcome, diagnostics = null }) => {
         const portfolioEnd = simulationState?.portfolio
-            ? computePortfolioTotal(simulationState.portfolio)
+            ? computeCanonicalPortfolioTotal(computePortfolioTotal, simulationState.portfolio)
             : null;
         const legacyMetrics = {
             totalWithdrawal,
@@ -468,10 +505,6 @@ export function runHistoricalBacktest({
             breakOnRuin: request.breakOnRuin,
             portfolioStart,
             portfolioEnd,
-            portfolioSnapshots: {
-                start: portfolioStartSnapshot,
-                end: simulationState?.portfolio ? cloneRunValue(simulationState.portfolio) : null
-            },
             dataStatus: 'complete',
             incompleteReason: null,
             historicalYearRecords: historicalRecords,
@@ -506,6 +539,9 @@ export function runHistoricalBacktest({
                 : {})
         };
         const stateBeforeYear = cloneRunValue(simulationState);
+        const portfolioTotalBeforeYear = yearIndex === 0
+            ? portfolioStartEvidence
+            : computeIndependentPortfolioTotal(stateBeforeYear.portfolio);
         let result;
         try {
             result = simulate(simulationState, adjustedInputs, yearData, yearIndex);
@@ -541,7 +577,7 @@ export function runHistoricalBacktest({
             ruinReason ??= result.reason || 'Floor-Deckungsausfall';
             simulationState = result.newState;
             const terminal = readPortfolioParts(simulationState.portfolio);
-            const terminalPortfolioTotal = computePortfolioTotal(simulationState.portfolio);
+            const terminalPortfolioTotal = computeIndependentPortfolioTotal(simulationState.portfolio);
             const requiredFloorNominal = Number.isFinite(result?.ruinDetails?.requiredFloorNominal)
                 ? result.ruinDetails.requiredFloorNominal
                 : null;
@@ -579,6 +615,7 @@ export function runHistoricalBacktest({
                     floor_shortfall_nominal: floorShortfallNominal,
                     taxSavedByLossCarry: 0,
                     lossCarryEnd: Number(simulationState?.lastState?.taxState?.lossCarry) || 0,
+                    portfolio_total_start: portfolioTotalBeforeYear,
                     portfolio_total_end: terminalPortfolioTotal
                 },
                 entscheidung: { jahresEntnahme: 0 },
@@ -607,7 +644,14 @@ export function runHistoricalBacktest({
 
         simulationState = result.newState;
         totalTaxes += result.totalTaxesThisYear;
-        const row = result.logData;
+        const enginePortfolioTotalEnd = Number(result.logData.portfolio_total_end);
+        const row = {
+            ...result.logData,
+            portfolio_total_start: portfolioTotalBeforeYear,
+            portfolio_total_end: Number.isFinite(enginePortfolioTotalEnd)
+                ? enginePortfolioTotalEnd
+                : computeIndependentPortfolioTotal(simulationState.portfolio)
+        };
         const { entscheidung, wertAktien, wertGold, liquiditaet } = row;
         totalWithdrawal += entscheidung.jahresEntnahme;
         successfulYears++;

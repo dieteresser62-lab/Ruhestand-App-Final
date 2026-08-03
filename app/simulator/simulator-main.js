@@ -47,7 +47,11 @@ import { formatCurrency } from './simulator-utils.js';
 import { annualData } from './simulator-data.js';
 import { runMonteCarlo } from './simulator-monte-carlo.js';
 import { displaySweepResults, runParameterSweep } from './simulator-sweep.js';
-import { exportBacktestLogData, renderBacktestLog, runBacktest } from './simulator-backtest.js';
+import {
+    exportBacktestLogData,
+    renderBacktestLog,
+    runBacktestWithRuntimeProvenance
+} from './simulator-backtest.js';
 import { initializeSimulatorApp } from './simulator-main-init.js';
 import { runSweepSelfTest } from './simulator-main-sweep-selftest.js';
 import { init as initPersistence } from '../shared/persistence-facade.js';
@@ -62,7 +66,7 @@ window.onload = async function () {
 
 // Globale Funktionen für HTML onclick-Handler.
 window.runMonteCarlo = runMonteCarlo;
-window.runBacktest = runBacktest;
+window.runBacktest = runBacktestWithRuntimeProvenance;
 window.runParameterSweep = runParameterSweep;
 window.displaySweepResults = displaySweepResults;
 window.formatCurrency = formatCurrency;

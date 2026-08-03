@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "MinimumFlexSlice09AddedCaseFinancialV1",
+  "sourceCommit": "2e4867f5fa1817a050fd06029b3298b10342764e",
+  "measurementCommand": "node tests/reconstruct-slice09-d17.mjs",
+  "case": {
+    "id": "minimum_flex_d17_2000_2010",
+    "outcomeObservation": "completed",
+    "summaryEndWealth": 1567412.48,
+    "totalWithdrawal": 391200,
+    "totalTax": 6335.05,
+    "maxAbsolutePortfolioFlowDelta": 0
+  }
+}

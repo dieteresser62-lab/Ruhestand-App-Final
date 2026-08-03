@@ -1,170 +1,418 @@
 {
-  "schemaVersion": "TaxLogicSlice10BacktestMeasurementV1",
-  "snapshotId": "post-backtest-data-10-v1",
-  "sourceReference": "post-backtest-data-09-v1",
-  "sourceFixtureSha256": "b3c13e57d3c80997cef1c3515f5f76d7a9a9743019ba98ae219a9685911f94fa",
-  "sourceActualSha256": "6303a479fda3eb2802cdc2657f191ac46101eb242732ef8d9b17f8572449cd13",
-  "targetResultDocument": "docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_10_HEUTIGE_STEUERLOGIK.md",
-  "reviewStatus": "pending",
-  "targetActualSha256": "165766b13991da560451e5dffb22cd6ce536809b404e0f0a41f7217352b9247f",
   "caseCount": 12,
-  "negativeCaseCount": 5,
-  "ruinCaseCount": 1,
-  "maxAbsolutePortfolioFlowDelta": 0,
   "crossSliceOracleProjection": {
     "capeLegacyStepEffect": {
+      "minRunwayCoveragePctDelta": 10.339162,
       "summaryEndWealthDelta": 47270.09,
-      "totalWithdrawalDelta": -9000,
       "totalTaxDelta": -7793.73,
-      "minRunwayCoveragePctDelta": 10.339162
+      "totalWithdrawalDelta": -9000
     },
     "earlyWage1930To1940": {
-      "summaryEndWealthBefore": 2740858.55,
-      "summaryEndWealthAfter": 2666766.45,
-      "summaryEndWealthDelta": -74092.1,
-      "totalWithdrawalDelta": 51000,
-      "totalTaxDelta": 3664.49,
+      "reductionYearsAfter": 9,
       "reductionYearsBefore": 7,
-      "reductionYearsAfter": 9
+      "summaryEndWealthAfter": 2666766.45,
+      "summaryEndWealthBefore": 2740858.55,
+      "summaryEndWealthDelta": -74092.1,
+      "totalTaxDelta": 3664.49,
+      "totalWithdrawalDelta": 51000
     },
     "earlyWage1935To1946": {
-      "summaryEndWealthBefore": 5127743.62,
-      "summaryEndWealthAfter": 5074854.16,
-      "summaryEndWealthDelta": -52889.46,
-      "totalWithdrawalDelta": 28200,
-      "totalTaxDelta": 5721.43,
+      "reductionYearsAfter": 1,
       "reductionYearsBefore": 10,
-      "reductionYearsAfter": 1
+      "summaryEndWealthAfter": 5074854.16,
+      "summaryEndWealthBefore": 5127743.62,
+      "summaryEndWealthDelta": -52889.46,
+      "totalTaxDelta": 5721.43,
+      "totalWithdrawalDelta": 28200
     },
     "slice07To08BacktestDeltaOracle": {
       "activeCapeProviderArm": {
-        "summaryEndWealth": -97739.89,
-        "totalWithdrawal": 3000,
-        "totalTax": 48710.28,
-        "minRunwayCoveragePct": -39.452552,
+        "maxAbsolutePortfolioFlowDelta": 0,
         "maxDrawdownPct": 0.300395,
-        "maxAbsolutePortfolioFlowDelta": 0
+        "minRunwayCoveragePct": -39.452552,
+        "summaryEndWealth": -97739.89,
+        "totalTax": 48710.28,
+        "totalWithdrawal": 3000
       },
       "legacyCapeReferenceArm": {
-        "summaryEndWealth": -120526.9,
-        "totalWithdrawal": 9000,
-        "totalTax": 53048.95,
-        "minRunwayCoveragePct": -40.503741,
+        "maxAbsolutePortfolioFlowDelta": 0,
         "maxDrawdownPct": 0.460541,
-        "maxAbsolutePortfolioFlowDelta": 0
+        "minRunwayCoveragePct": -40.503741,
+        "summaryEndWealth": -120526.9,
+        "totalTax": 53048.95,
+        "totalWithdrawal": 9000
       }
     }
   },
+  "maxAbsolutePortfolioFlowDelta": 0,
+  "negativeCaseCount": 5,
+  "reviewStatus": "pending",
+  "ruinCaseCount": 1,
+  "schemaVersion": "TaxLogicSlice10BacktestMeasurementV1",
   "slice09To10DeltaLedger": {
-    "sourceSchemaVersion": "MinimumFlexSlice09BacktestMeasurementV1",
-    "sourceCaseCount": 12,
     "cases": [
       {
+        "delta": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeChanged": false,
+          "summaryEndWealth": -1722.99,
+          "totalTax": 1512.5,
+          "totalWithdrawal": 0
+        },
         "id": "completed_2000_2005",
-        "outcomeChanged": { "source": false, "slice10": false },
-        "summaryEndWealth": { "source": 0, "slice10": -1722.99 },
-        "totalWithdrawal": { "source": 0, "slice10": 0 },
-        "totalTax": { "source": 0, "slice10": 1512.5 },
-        "maxAbsolutePortfolioFlowDelta": { "source": 0, "slice10": 0 }
+        "slice10": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeObservation": "completed",
+          "summaryEndWealth": 1698474.13,
+          "totalTax": 1708.49,
+          "totalWithdrawal": 176400
+        },
+        "sourceSlice09": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeObservation": "completed",
+          "summaryEndWealth": 1700197.12,
+          "totalTax": 195.99,
+          "totalWithdrawal": 176400
+        }
       },
       {
+        "delta": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeChanged": false,
+          "summaryEndWealth": -1093.21,
+          "totalTax": 940.38,
+          "totalWithdrawal": 0
+        },
         "id": "gold_holding_2000_2005",
-        "outcomeChanged": { "source": false, "slice10": false },
-        "summaryEndWealth": { "source": 0, "slice10": -1093.21 },
-        "totalWithdrawal": { "source": 0, "slice10": 0 },
-        "totalTax": { "source": 0, "slice10": 940.38 },
-        "maxAbsolutePortfolioFlowDelta": { "source": 0, "slice10": 0 }
+        "slice10": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeObservation": "completed",
+          "summaryEndWealth": 1797086.18,
+          "totalTax": 940.38,
+          "totalWithdrawal": 175200
+        },
+        "sourceSlice09": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeObservation": "completed",
+          "summaryEndWealth": 1798179.39,
+          "totalTax": 0,
+          "totalWithdrawal": 175200
+        }
       },
       {
+        "delta": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeChanged": false,
+          "summaryEndWealth": -8395042.76,
+          "totalTax": 569838.01,
+          "totalWithdrawal": 0
+        },
         "id": "completed_1960_2020",
-        "outcomeChanged": { "source": false, "slice10": false },
-        "summaryEndWealth": { "source": 0, "slice10": -8395042.76 },
-        "totalWithdrawal": { "source": 0, "slice10": 0 },
-        "totalTax": { "source": 0, "slice10": 569838.01 },
-        "maxAbsolutePortfolioFlowDelta": { "source": 0, "slice10": 0 }
+        "slice10": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeObservation": "completed",
+          "summaryEndWealth": 172455313.47,
+          "totalTax": 1337373.44,
+          "totalWithdrawal": 4093414.61
+        },
+        "sourceSlice09": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeObservation": "completed",
+          "summaryEndWealth": 180850356.23,
+          "totalTax": 767535.43,
+          "totalWithdrawal": 4093414.61
+        }
       },
       {
+        "delta": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeChanged": false,
+          "summaryEndWealth": -18398.47,
+          "totalTax": 12344.04,
+          "totalWithdrawal": 0
+        },
         "id": "completed_numeraire_seam_1949_1952",
-        "outcomeChanged": { "source": false, "slice10": false },
-        "summaryEndWealth": { "source": 0, "slice10": -18398.47 },
-        "totalWithdrawal": { "source": 0, "slice10": 0 },
-        "totalTax": { "source": 0, "slice10": 12344.04 },
-        "maxAbsolutePortfolioFlowDelta": { "source": 0, "slice10": 0 }
+        "slice10": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeObservation": "completed",
+          "summaryEndWealth": 5150616.27,
+          "totalTax": 29808.5,
+          "totalWithdrawal": 121200
+        },
+        "sourceSlice09": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeObservation": "completed",
+          "summaryEndWealth": 5169014.74,
+          "totalTax": 17464.46,
+          "totalWithdrawal": 121200
+        }
       },
       {
+        "delta": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeChanged": false,
+          "summaryEndWealth": -26114.7,
+          "totalTax": 15837.88,
+          "totalWithdrawal": 0
+        },
         "id": "three_bucket_minimum_flex_2005_2014",
-        "outcomeChanged": { "source": false, "slice10": false },
-        "summaryEndWealth": { "source": 0, "slice10": -26114.7 },
-        "totalWithdrawal": { "source": 0, "slice10": 0 },
-        "totalTax": { "source": 0, "slice10": 15837.88 },
-        "maxAbsolutePortfolioFlowDelta": { "source": 0, "slice10": 0 }
+        "slice10": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeObservation": "completed",
+          "summaryEndWealth": 368753.59,
+          "totalTax": 42005.48,
+          "totalWithdrawal": 328800
+        },
+        "sourceSlice09": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeObservation": "completed",
+          "summaryEndWealth": 394868.29,
+          "totalTax": 26167.6,
+          "totalWithdrawal": 328800
+        }
       },
       {
+        "delta": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeChanged": false,
+          "summaryEndWealth": -8840.82,
+          "totalTax": 7886.87,
+          "totalWithdrawal": 0
+        },
+        "id": "minimum_flex_d17_2000_2010",
+        "slice10": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeObservation": "completed",
+          "summaryEndWealth": 1558571.66,
+          "totalTax": 14221.92,
+          "totalWithdrawal": 391200
+        },
+        "sourceSlice09": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeObservation": "completed",
+          "summaryEndWealth": 1567412.48,
+          "totalTax": 6335.05,
+          "totalWithdrawal": 391200
+        }
+      },
+      {
+        "delta": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeChanged": false,
+          "summaryEndWealth": -680.93,
+          "totalTax": 764.87,
+          "totalWithdrawal": 0
+        },
         "id": "capital_poor_ruin_2000_2005",
-        "outcomeChanged": { "source": false, "slice10": false },
-        "summaryEndWealth": { "source": 0, "slice10": -680.93 },
-        "totalWithdrawal": { "source": 0, "slice10": 0 },
-        "totalTax": { "source": 0, "slice10": 764.87 },
-        "maxAbsolutePortfolioFlowDelta": { "source": 0, "slice10": 0 }
+        "slice10": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeObservation": "ruin",
+          "summaryEndWealth": 26112.12,
+          "totalTax": 2055.13,
+          "totalWithdrawal": 90000
+        },
+        "sourceSlice09": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeObservation": "ruin",
+          "summaryEndWealth": 26793.05,
+          "totalTax": 1290.26,
+          "totalWithdrawal": 90000
+        }
       },
       {
+        "delta": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeChanged": false,
+          "summaryEndWealth": -3225.07,
+          "totalTax": 1538.2,
+          "totalWithdrawal": 0
+        },
         "id": "health_bucket_nested_row_summary_positive",
-        "outcomeChanged": { "source": false, "slice10": false },
-        "summaryEndWealth": { "source": 0, "slice10": -3225.07 },
-        "totalWithdrawal": { "source": 0, "slice10": 0 },
-        "totalTax": { "source": 0, "slice10": 1538.2 },
-        "maxAbsolutePortfolioFlowDelta": { "source": 0, "slice10": 0 }
+        "slice10": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeObservation": "completed",
+          "summaryEndWealth": 2268231.64,
+          "totalTax": 4493.67,
+          "totalWithdrawal": 60000
+        },
+        "sourceSlice09": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeObservation": "completed",
+          "summaryEndWealth": 2271456.71,
+          "totalTax": 2955.47,
+          "totalWithdrawal": 60000
+        }
       },
       {
+        "delta": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeChanged": false,
+          "summaryEndWealth": -49180.02,
+          "totalTax": 51867.63,
+          "totalWithdrawal": -12000
+        },
         "id": "dynamic_flex_cape_legacy_step_2018_2025",
-        "outcomeChanged": { "source": false, "slice10": false },
-        "summaryEndWealth": { "source": 0, "slice10": -49180.02 },
-        "totalWithdrawal": { "source": 0, "slice10": -12000 },
-        "totalTax": { "source": 0, "slice10": 51867.63 },
-        "maxAbsolutePortfolioFlowDelta": { "source": 0, "slice10": 0 }
+        "slice10": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeObservation": "completed",
+          "summaryEndWealth": 2666371.13,
+          "totalTax": 144840.94,
+          "totalWithdrawal": 777000
+        },
+        "sourceSlice09": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeObservation": "completed",
+          "summaryEndWealth": 2715551.15,
+          "totalTax": 92973.31,
+          "totalWithdrawal": 789000
+        }
       },
       {
+        "delta": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeChanged": false,
+          "summaryEndWealth": -3617.97,
+          "totalTax": 3765.28,
+          "totalWithdrawal": 0
+        },
         "id": "wage_indexed_pension_source_seam_1944_1950",
-        "outcomeChanged": { "source": false, "slice10": false },
-        "summaryEndWealth": { "source": 0, "slice10": -3617.97 },
-        "totalWithdrawal": { "source": 0, "slice10": 0 },
-        "totalTax": { "source": 0, "slice10": 3765.28 },
-        "maxAbsolutePortfolioFlowDelta": { "source": 0, "slice10": 0 }
+        "slice10": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeObservation": "completed",
+          "summaryEndWealth": 4004897.17,
+          "totalTax": 9155.03,
+          "totalWithdrawal": 78000
+        },
+        "sourceSlice09": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeObservation": "completed",
+          "summaryEndWealth": 4008515.14,
+          "totalTax": 5389.75,
+          "totalWithdrawal": 78000
+        }
       },
       {
+        "delta": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeChanged": false,
+          "summaryEndWealth": -3256.33,
+          "totalTax": 2785.22,
+          "totalWithdrawal": 0
+        },
         "id": "wage_indexed_pension_jst_1930_1940",
-        "outcomeChanged": { "source": false, "slice10": false },
-        "summaryEndWealth": { "source": 0, "slice10": -3256.33 },
-        "totalWithdrawal": { "source": 0, "slice10": 0 },
-        "totalTax": { "source": 0, "slice10": 2785.22 },
-        "maxAbsolutePortfolioFlowDelta": { "source": 0, "slice10": 0 }
+        "slice10": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeObservation": "completed",
+          "summaryEndWealth": 2666766.45,
+          "totalTax": 3664.49,
+          "totalWithdrawal": 92400
+        },
+        "sourceSlice09": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeObservation": "completed",
+          "summaryEndWealth": 2670022.78,
+          "totalTax": 879.27,
+          "totalWithdrawal": 92400
+        }
       },
       {
+        "delta": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeChanged": false,
+          "summaryEndWealth": -16388.94,
+          "totalTax": 8590.63,
+          "totalWithdrawal": 0
+        },
         "id": "wage_indexed_pension_jst_1935_1946",
-        "outcomeChanged": { "source": false, "slice10": false },
-        "summaryEndWealth": { "source": 0, "slice10": -16388.94 },
-        "totalWithdrawal": { "source": 0, "slice10": 0 },
-        "totalTax": { "source": 0, "slice10": 8590.63 },
-        "maxAbsolutePortfolioFlowDelta": { "source": 0, "slice10": 0 }
+        "slice10": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeObservation": "completed",
+          "summaryEndWealth": 5074854.16,
+          "totalTax": 21677.16,
+          "totalWithdrawal": 147000
+        },
+        "sourceSlice09": {
+          "maxAbsolutePortfolioFlowDelta": 0,
+          "outcomeObservation": "completed",
+          "summaryEndWealth": 5091243.1,
+          "totalTax": 13086.53,
+          "totalWithdrawal": 147000
+        }
       }
     ],
     "d17Witness": {
       "2001": {
-        "source": { "effectiveFinal": 9117, "minimumFlexAnnual": 9117, "shortfallAnnual": 0, "status": "not_needed" },
-        "slice10": { "effectiveFinalDelta": 0, "minimumFlexAnnualDelta": 0, "shortfallAnnualDelta": 0, "status": "not_needed" }
+        "slice10": {
+          "effectiveFinalDelta": 0,
+          "minimumFlexAnnualDelta": 0,
+          "shortfallAnnualDelta": 0,
+          "status": "not_needed"
+        },
+        "source": {
+          "effectiveFinal": 9117,
+          "minimumFlexAnnual": 9117,
+          "shortfallAnnual": 0,
+          "status": "not_needed"
+        }
       },
       "2005": {
-        "source": { "effectiveFinal": 8996.78, "minimumFlexAnnual": 9676.21, "shortfallAnnual": 679.43, "status": "limited_by_final_quantization" },
-        "slice10": { "effectiveFinalDelta": 0, "minimumFlexAnnualDelta": 0, "shortfallAnnualDelta": 0, "status": "limited_by_final_quantization" }
+        "slice10": {
+          "effectiveFinalDelta": 0,
+          "minimumFlexAnnualDelta": 0,
+          "shortfallAnnualDelta": 0,
+          "status": "limited_by_final_quantization"
+        },
+        "source": {
+          "effectiveFinal": 8996.78,
+          "minimumFlexAnnual": 9676.21,
+          "shortfallAnnual": 679.43,
+          "status": "limited_by_final_quantization"
+        }
       },
       "2009": {
-        "source": { "effectiveFinal": 10443.4, "minimumFlexAnnual": 10483.72, "shortfallAnnual": 40.32, "status": "limited_by_final_quantization" },
-        "slice10": { "effectiveFinalDelta": 0, "minimumFlexAnnualDelta": 0, "shortfallAnnualDelta": 0, "status": "limited_by_final_quantization" }
+        "slice10": {
+          "effectiveFinalDelta": 0,
+          "minimumFlexAnnualDelta": 0,
+          "shortfallAnnualDelta": 0,
+          "status": "limited_by_final_quantization"
+        },
+        "source": {
+          "effectiveFinal": 10443.4,
+          "minimumFlexAnnual": 10483.72,
+          "shortfallAnnual": 40.32,
+          "status": "limited_by_final_quantization"
+        }
       },
       "2010": {
-        "source": { "effectiveFinal": 10515.18, "minimumFlexAnnual": 10515.18, "shortfallAnnual": 0, "status": "not_needed" },
-        "slice10": { "effectiveFinalDelta": 0, "minimumFlexAnnualDelta": 0, "shortfallAnnualDelta": 0, "status": "not_needed" }
+        "slice10": {
+          "effectiveFinalDelta": 0,
+          "minimumFlexAnnualDelta": 0,
+          "shortfallAnnualDelta": 0,
+          "status": "not_needed"
+        },
+        "source": {
+          "effectiveFinal": 10515.18,
+          "minimumFlexAnnual": 10515.18,
+          "shortfallAnnual": 0,
+          "status": "not_needed"
+        }
       }
-    }
-  }
+    },
+    "schemaVersion": "Slice09To10FinancialDeltaLedgerV2",
+    "sourceAddedCaseEvidence": {
+      "schemaVersion": "MinimumFlexSlice09AddedCaseFinancialV1",
+      "sha256": "308de0f5313f3fc873f127007efd8fcf3731d8a98c2efbc1e2d290db43eb6a84",
+      "sourceCommit": "2e4867f5fa1817a050fd06029b3298b10342764e"
+    },
+    "sourceCaseCount": 12,
+    "sourceReference": "post-backtest-data-09-v1",
+    "targetCaseCount": 12,
+    "targetReference": "post-backtest-data-10-v1"
+  },
+  "snapshotId": "post-backtest-data-10-v1",
+  "sourceActualSha256": "6303a479fda3eb2802cdc2657f191ac46101eb242732ef8d9b17f8572449cd13",
+  "sourceFixtureSha256": "b3c13e57d3c80997cef1c3515f5f76d7a9a9743019ba98ae219a9685911f94fa",
+  "sourceReference": "post-backtest-data-09-v1",
+  "targetActualSha256": "826108f1b1b07cc626c877eb5a7f3fc271195d405a33f42dfcf41cb5d2acf144",
+  "targetResultDocument": "docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_10_HEUTIGE_STEUERLOGIK.md"
 }

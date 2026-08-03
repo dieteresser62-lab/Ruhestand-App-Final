@@ -2,11 +2,12 @@
 
 **Pruefdatum:** 2026-07-29
 **Pruefer:** Claude (Primary reviewer & Analyst)
-**Status:** Korrekturprogramm in Umsetzung; Slice 01 bis 09 extern technisch
-freigegeben und lokal committed; Slice 10 ist auf Basis des vollstaendigen
-Slice-09-Ergebnisdokuments technisch umgesetzt und CR10-1 bis CR10-12 sowie
-S10-STOP-04 sind im nutzergenehmigten Scope von exakt fuenfzehn produktiven
-Dateien korrigiert und selbstgetestet; externes Re-Review ausstehend
+**Status:** Korrekturprogramm in Umsetzung; Slice 01 bis 10 extern technisch
+freigegeben und lokal committed; Slice 11 verwendet das vollstaendige
+Slice-10-Ergebnisdokument als Eingangsgrenze, CR10-13/14 sind geschlossen und
+Claudes Findings CR11-1 bis CR11-22 aus beiden Reviewrunden sind technisch
+nachgebessert sowie selbstgeprueft; erneutes externes Re-Review, Freigabe und
+Commit stehen aus
 **Pruefgegenstand:** Exportdatei
 `backtest-2000-2025-89fc3e368d64-2026-07-29T10-00-22.287Z.json`
 **Anlass:** Nutzerseitige Verifikation nach Abschluss der Suite-Datenintegritaet-
@@ -69,17 +70,17 @@ Schweregrade: **S** blockierend fuer die Verwendung der Zahlen,
 | D-06 | M | Zinsertraege sind vollstaendig steuerfrei | Zeile 2000 des Exports | Heutige Steuerlogik einschliesslich Zinsen; Slice 10 |
 | D-07 | M | `tqf` 0,30 pauschal auf allen acht Tranchen | `request.inputs.detailledTranches` | Explizite Anlageklasse und TQF je Tranche; Slice 10 |
 | D-08 | M | Drei von vier Altbestandspositionen sind kein Altbestand | `request.inputs.detailledTranches` | Heutiger Steuerzustand je Tranche, keine Namensableitung; Slice 10 |
-| D-09 | M | `flex_reduction_max_pct` ueberzeichnet die tatsaechliche Einbusse | Nachrechnung ueber 26 Jahre | Haushaltsbasis in `HistoricalBacktestMetricsV2` durch Slice 9 technisch korrigiert; weiterer Exportabschluss in Slice 11 |
+| D-09 | M | `flex_reduction_max_pct` ueberzeichnet die tatsaechliche Einbusse | Nachrechnung ueber 26 Jahre | Haushaltsbasis in `HistoricalBacktestMetricsV2` durch Slice 9 korrigiert und in `HistoricalBacktestExportV2` mit Basis/Missingness projiziert; Slice 11 technisch umgesetzt, Review ausstehend |
 | D-10 | M | Pflegelogik, Sterblichkeit und Sicherheitsstufen feuern nie | alle 26 Zeilen | 26-Jahres-Beispiellauf akzeptiert; Daten-/Markerpruefung in Slice 7 |
 | D-11 | M | Widerspruch beim Mindest-Flex zwischen Register und Effektivwert | `app/simulator/simulator-profile-inputs.js:586` | Nutzerentscheidung und Slice 9: additive Profilwerte, fail-closed oberhalb des Haushalts-Flexbedarfs; externes Review ausstehend |
-| D-12 | L | Namens- und Redundanzfallen in den Eingaben | `request.inputs` | Replay-Teil widerlegt; verbleibende Namensfallen in Slice 11 |
-| D-13 | L | Quantisierung steckt unsichtbar in den Kennzahlen | `engine/config.mjs:213` | Quantisierung im Exportvertrag offenlegen; Slice 11 |
+| D-12 | L | Namens- und Redundanzfallen in den Eingaben | `request.inputs` | Replay-Teil widerlegt; Legacy-Aliase, historische Signale, Startbestandteile und Ableitungen in V2 maschinenlesbar getrennt; Slice 11 technisch umgesetzt, Review ausstehend |
+| D-13 | L | Quantisierung steckt unsichtbar in den Kennzahlen | `engine/config.mjs:213` | Aktive Jahres-/Monatsstufen, Rundungsphase und Floor-Schutz direkt aus der Engine-Konfiguration in V2 gebunden; Slice 11 technisch umgesetzt, Review ausstehend |
 | D-14 | L | Zinsreihe ohne einheitliche Stichtagskonvention | `app/simulator/simulator-data.js:361` | Investierbare Geldmarkt-Jahresrendite; Slice 4 |
 | D-15 | S | Aktienrendite 2024 weicht auch vom offiziellen MSCI-Price-Index massiv ab | MSCI-Factsheets und isolierter Replay | Vollstaendige Jahrespruefung und Ersatz; Slice 2 |
-| D-16 | M | End-Snapshot mischt kanonische Endwerte mit unveraenderten Startfeldern | `result.portfolioSnapshots.end` | Snapshot bewusst nicht restartfaehig; Exportgrenze in Slice 11 |
+| D-16 | M | End-Snapshot mischt kanonische Endwerte mit unveraenderten Startfeldern | `result.portfolioSnapshots.end` | Interne Snapshots aus V2 entfernt; nur reconciliierte aggregierte Grenzen mit `restartable: false`; Slice 11 technisch umgesetzt, Review ausstehend |
 | D-17 | M | Mindest-Flex-Jahresbetrag wird in vier aktiven Diagnosezeilen als 0 exportiert | Zeilen 2001, 2005, 2009 und 2010 | Slice-09-Diagnose-/Exportkorrektur technisch umgesetzt und durch eigenen Vierjahreszeugen gepinnt; externes Review ausstehend |
 | D-18 | M | Alle Aktienpositionen erhalten dieselbe Proxy-Rendite | `app/simulator/simulator-year-portfolio.js:22` | Als bewusstes globales Proxy-Modell akzeptiert; kein positionsspezifischer Ausbau |
-| D-19 | L | Engine-Provenienz identifiziert den Quellstand nicht eindeutig | `engine/config.mjs:11` und `request.engine` | Source-Commit und Datenrevision; Slice 11 |
+| D-19 | L | Engine-Provenienz identifiziert den Quellstand nicht eindeutig | `engine/config.mjs:11` und `request.engine` | Laufstart bindet sauberen Source-Commit, Engine-/Konfigurations- und Datenrevision fingerprintwirksam; fehlend/dirty blockiert V2; Slice 11 technisch umgesetzt, Review ausstehend |
 | D-20 | M | Inflations- und Lohnreihe mischen beziehungsweise verfehlen offizielle Vergleichsreihen | Destatis-/DRV-Abgleich | VPI in Slice 3; Lohnidentitaet bei gleicher Funktionsverwendung in Slice 6 |
 
 ## Befunde im Einzelnen
@@ -755,24 +756,17 @@ reine Stressparameter duerfen im Manifest nicht dieselbe Evidenzklasse tragen.
 
 ### Arbeitsstatus und Branch-Regel
 
-- Status: Die Slices 01 bis 09 liegen auf
+- Status: Die Slices 01 bis 10 liegen auf
   `codex/suite-datenintegritaet-hardening` als lokale Commits vor. Slice 08
   ist durch Claudes Reviewrunde 3 technisch freigegeben und als Commit
   `ad08236` vorhanden. Slice 09 ist nach Claude-Review Runde 2 technisch
-  freigegeben und als Commit `2e4867f` vorhanden. Slice 10 verwendet das
-  vollstaendige Slice-09-Ergebnisdokument als Eingangsgrenze; CR09-4 und
-  CR09-14 werden als ausdrueckliche Vorgates behandelt. Preflight und
-  zuerst festgeschriebener Zehn-Dateien-Scope sind dokumentiert. Die Baseline
-  ist gruen. Der Vertragsabgleich erforderte zusaetzlich
-  `app/simulator/simulator-portfolio-init.js` und
-  `app/simulator/simulation-data-inventory.js`; S10-STOP-01 und S10-STOP-02
-  sind durch Nutzerfreigaben vom 2026-08-02 geschlossen. Das Claude-Review
-  Runde 1 erforderte fuer CR10-8 und CR10-11 zwei weitere produktive Dateien;
-  S10-STOP-03 und S10-STOP-04 sowie der Scope von exakt fuenfzehn produktiven
-  Dateien sind durch den Nutzer freigegeben. CR10-1 bis CR10-12 und der
-  anschliessende Browser-Befund zu synthetischen Profiltranchen sind
-  korrigiert. 17.930 von 17.930 Assertions, Coverage- und Browser-Gates sind
-  gruen; Re-Review und Commit stehen aus.
+  freigegeben und als Commit `2e4867f` vorhanden. Slice 10 ist nach
+  Claude-Review Runde 2 freigegeben und als Commit `05ff8c3` vorhanden.
+  Slice 11 verwendet das vollstaendige Slice-10-Ergebnisdokument als
+  Eingangsgrenze. CR10-13/14 sind durch Ergebnisprosa, eine am Slice-09-Commit
+  nachgemessene D-17-Basis und ein vollstaendiges 12/12-Delta-Ledger
+  geschlossen. Preflight, fuenf produktive Dateien und Diff-Risiko sind vor
+  Coding dokumentiert; die Eingangsbaseline mit 160 Testdateien ist gruen.
 - Dokumentierter Ausgangsstand der Nachrechnung: `ca982cf`.
 - Nutzerentscheidung vom 2026-07-29: Die Umsetzung bleibt ausdruecklich auf
   dem vorhandenen Branch `codex/suite-datenintegritaet-hardening`; es wird
@@ -1428,8 +1422,9 @@ Engine-Vertrag, macht Legacy-Steuermigration sichtbar und verhindert
 Flexaggregation ueber gemischte Bezugsbasen. Die Abschlusssuite ist mit
 17.930/17.930 Assertions gruen; Coverage liegt bei 78,40 %
 (39.539/50.430). Alle 28 Browser-Szenarien sowie Architektur-Evidenz- und
-Engine-Build-Gates sind gruen. Codex erteilt keine Selbstfreigabe; externes
-Re-Review und Commit stehen aus.
+Engine-Build-Gates sind gruen. Claude-Review Runde 2 hat Slice 10 freigegeben;
+der lokale Commit ist `05ff8c3`. Die vor Slice 11 auferlegten CR10-13/14 sind
+durch Ergebnisprosa und ein vollstaendiges 12/12-Delta-Ledger geschlossen.
 
 **Abhaengigkeiten:** Slices 1, 2 und 4.
 
@@ -1462,6 +1457,39 @@ und Teilfreistellungen fachlich konsistent.
 - Nicht verkaufte Tranchen erzeugen keine fiktive Verkaufsteuer.
 
 ### Slice 11 - Exportgrenzen, Horizont und Engine-Provenienz
+
+**Slice-Dokument:**
+[`SLICE_BACKTEST_DATENPRUEFUNG_11_EXPORT_PROVENIENZ.md`](SLICE_BACKTEST_DATENPRUEFUNG_11_EXPORT_PROVENIENZ.md)
+
+**Umsetzungsstatus:** am 2026-08-03 auf Basis des freigegebenen und als Commit
+`05ff8c3` vorliegenden Slice-10-Ergebnisdokuments nach Claude-Review Runde 3
+technisch nachgebessert und selbstgeprueft. CR10-13 ist durch die dokumentierte Richtung und
+Groessenordnung der Steuerwirkung geschlossen; CR10-14 durch eine am
+Slice-09-Commit nachgemessene D-17-Basis und ein vollstaendiges
+12/12-Delta-Ledger. `HistoricalBacktestExportV2` weist 2000-2025 als 26 Jahre,
+nicht restartfaehige aggregierte Portfoliogrenzen, Eingabe- und
+Quantisierungssemantik sowie saubere Source-/Engine-/Datenprovenienz aus.
+Der relative, unterpfadfaehige Laufzeitendpunkt wird vor dem Lauf abgewartet;
+Exportzeit und globale Variablen koennen die gebundene Provenienz nicht
+ersetzen. Fehlende oder dirty Source-Provenienz und widerspruechliche
+Endgrenzen stoppen Raw-JSON mit sichtbarem stabilem Code, waehrend
+`HistoricalBacktestCsvV2` mit 34 Spalten unabhaengig bleibt und dieselbe
+kanonische Run-ID traegt. `HistoricalBacktestPortfolioBoundariesV2` benennt
+aktives Portfolio plus Pflegebucket und markiert den separaten Pflegewert als
+bereits in Start-/Endvermoegen enthalten. Ungueltige Live-Rundungskonfiguration
+faellt ohne Batchabbruch auf den freigegebenen Default zurueck und meldet den
+stabilen Diagnosecode `SPENDING_ROUNDING_CONTRACT_FALLBACK`; falsy `ENABLED`
+behaelt die bisherige Abschaltsemantik. D-17 pinnt Windows-bsdtar unabhaengig
+vom PATH. `sync-dist` kopiert nur versionierte Dateien, blockiert normale und
+ignorierte unversionierte Runtime-Quellen und ist in einem isolierten
+Git-Fixture real ausgefuehrt;
+sonstige Scratchdateien bleiben ausgeschlossen. JSON-Dateinamen tragen Run-
+und Result-Fingerprint, CSV-Dateinamen Run- und Byte-Fingerprint. Der
+produktive Scope umfasst exakt zehn Dateien. Standard- und Coverage-Lauf
+bestanden mit 18.063/18.063 Assertions; Coverage liegt bei 78,53 Prozent
+(39.946/50.864). Browser 28/28, Architektur-Evidenz, Engine-Build und
+Syntaxpruefungen sind gruen; `engine.js` blieb byteidentisch. Erneutes externes
+Re-Review, Freigabe und Commit stehen aus.
 
 **Abhaengigkeiten:** Slices 1, 8, 9 und 10.
 

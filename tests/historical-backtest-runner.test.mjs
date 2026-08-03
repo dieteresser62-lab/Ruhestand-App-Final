@@ -265,9 +265,67 @@ function executeCompletedRun() {
         engineProvenance: {
             apiVersion: '31.0',
             buildId: 'runner-build',
-            configFingerprint: { algorithm: 'sha256-canonical-json-v1', value: 'c'.repeat(64) }
+            sourceCommit: 'd'.repeat(40),
+            sourceTreeStatus: 'clean',
+            sourceProvenanceProvider: 'runner_fixture',
+            configFingerprint: { algorithm: 'sha256-canonical-json-v1', value: 'c'.repeat(64) },
+            quantizationContract: {
+                schemaVersion: 'HistoricalBacktestQuantizationContractV1',
+                enabled: true,
+                transactionAnnualTiers: [
+                    { index: 1, upperBoundExclusive: null, unbounded: true, step: 1000 }
+                ],
+                withdrawalMonthlyTiers: [
+                    { index: 1, upperBoundExclusive: null, unbounded: true, step: 50 }
+                ],
+                withdrawalRounding: {
+                    phase: 'after_floor_plus_flex_decision_before_final_annual_withdrawal',
+                    monthlyMode: 'floor',
+                    annualizationFactor: 12,
+                    floorProtection: 'max_floor_annual'
+                },
+                metricDisplayRounding: 'descriptor_only_not_applied_to_raw_metric_values'
+            }
         },
         ...dependencies
+    });
+}
+
+function executeHealthBucketBoundaryRun({ activeTotalOffset = 0 } = {}) {
+    const portfolio = {
+        depotTranchesAktien: [{ marketValue: 1000 }],
+        depotTranchesGold: [],
+        liquiditaet: 500,
+        healthBucketGeldmarkt: 800
+    };
+    return runHistoricalBacktest({
+        inputs: callerInputs,
+        period: { startYear: 2000, endYear: 2000 },
+        historicalDataProvider: createContractProvider(),
+        initializePortfolio: () => structuredClone(portfolio),
+        totalPortfolio: current => current.depotTranchesAktien.reduce((sum, lot) => sum + lot.marketValue, 0)
+            + current.liquiditaet
+            + activeTotalOffset,
+        computeAdjustmentPct: () => 0,
+        resolveHorizon: () => ({ horizonYears: 30, diagnostics: { longevityMode: 'none' } }),
+        simulateYear: state => ({
+            isRuin: false,
+            newState: { ...state, portfolio: structuredClone(portfolio) },
+            totalTaxesThisYear: 0,
+            logData: {
+                entscheidung: { jahresEntnahme: 0, kuerzungProzent: 0 },
+                flex_haushalt_basis: 'static_input',
+                wertAktien: 1000,
+                wertGold: 0,
+                liquiditaet: 500,
+                floor_brutto: 12,
+                renteSum: 0,
+                steuern_gesamt: 0,
+                health_bucket_enabled: true,
+                health_bucket_end: 800,
+                portfolio_total_end: 2300
+            }
+        })
     });
 }
 
@@ -302,6 +360,10 @@ assertEqual(completed.request.dataset.datasetId, 'runner-fixture', 'request reco
 assertEqual(completed.request.dataset.manifestSchemaVersion, 'HistoricalDataManifestV1', 'request records the manifest schema');
 assert(/^[a-f0-9]{64}$/.test(completed.request.dataset.manifestHash.value), 'request fingerprints the full manifest');
 assertEqual(completed.request.engine.buildId, 'runner-build', 'request records the engine build id');
+assertEqual(completed.request.engine.sourceCommit, 'd'.repeat(40), 'request records the source commit');
+assertEqual(completed.request.engine.sourceTreeStatus, 'clean', 'request records the source-tree status');
+assertEqual(completed.request.engine.quantizationContract.schemaVersion, 'HistoricalBacktestQuantizationContractV1',
+    'request records the quantization contract');
 assertEqual(completed.request.engine.configFingerprint.value, 'c'.repeat(64), 'request records the config fingerprint');
 assertEqual(completed.requestedYears, 2, 'requestedYears includes the full inclusive period');
 assertEqual(completed.completedYears, 2, 'completedYears counts successful simulated years');
@@ -309,8 +371,25 @@ assertEqual(completed.firstYear, 2000, 'result records the first requested year'
 assertEqual(completed.rows.length, 2, 'completed run returns one row per simulated year');
 assertEqual(completed.portfolioStart, 100, 'runner records the initial portfolio total');
 assertEqual(completed.portfolioEnd, 120, 'runner records the final portfolio total');
-assertEqual(completed.portfolioSnapshots.start.value, 100, 'runner snapshots the initial portfolio');
-assertEqual(completed.portfolioSnapshots.end.value, 120, 'runner snapshots the terminal portfolio');
+assertEqual(completed.portfolioSnapshots, undefined, 'runner does not expose restart-like internal portfolio snapshots');
+assertEqual(completed.rows[0].row.portfolio_total_start, 100, 'first row independently records the opening portfolio boundary');
+assertEqual(completed.rows.at(-1).row.portfolio_total_end, 120, 'last row independently records the terminal portfolio boundary');
+const healthBucketBoundary = executeHealthBucketBoundaryRun();
+assertEqual(healthBucketBoundary.portfolioStart, 2300,
+    'canonical opening wealth includes the health bucket exactly once');
+assertEqual(healthBucketBoundary.rows[0].row.portfolio_total_start, 2300,
+    'independent opening-row evidence includes the health bucket exactly once');
+assertEqual(healthBucketBoundary.rows[0].row.portfolio_total_end, 2300,
+    'runner preserves the engine-provided terminal total including the health bucket');
+assertEqual(healthBucketBoundary.portfolioEnd, 2300,
+    'canonical terminal wealth includes the health bucket exactly once');
+assertEqual(healthBucketBoundary.metrics.values.wealth_max_drawdown_nominal_end_series_pct, 0,
+    'health-bucket-inclusive drawdown series remains financially unchanged');
+const divergentBoundary = executeHealthBucketBoundaryRun({ activeTotalOffset: -1 });
+assertEqual(divergentBoundary.portfolioStart, 2299,
+    'canonical boundary follows the injected primary total calculation');
+assertEqual(divergentBoundary.rows[0].row.portfolio_total_start, 2300,
+    'row boundary evidence is calculated independently from the primary total function');
 assertEqual(completed.legacyOutcome, 'completed', 'legacy outcome alias follows the canonical V1 kind');
 assertEqual(completed.legacyMetrics.totalWithdrawal, 21, 'runner retains total withdrawals');
 assertEqual(completed.legacyMetrics.totalTaxes, 3, 'runner retains total taxes');
@@ -325,7 +404,6 @@ assertEqual(completed.summary.totalTaxes, completed.metrics.values.tax_total_nom
 assert(Object.isFrozen(completed.metrics.values), 'canonical metric values are immutable');
 assert(Object.isFrozen(completed), 'canonical run result is immutable');
 assert(Object.isFrozen(completed.rows), 'canonical run rows are immutable');
-assert(Object.isFrozen(completed.portfolioSnapshots.end), 'canonical terminal portfolio snapshot is immutable');
 assertEqual(completed.summary.healthBucket.enabled, true, 'canonical summary exposes the enabled health bucket');
 assertClose(completed.summary.healthBucket.end, 4321.09, 1e-9, 'canonical summary reads health bucket end from the nested result row');
 assertClose(completed.summary.healthBucket.realCoveragePct, 76.5, 1e-9, 'canonical summary reads health bucket coverage');

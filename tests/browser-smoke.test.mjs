@@ -122,6 +122,21 @@ function resolveRequestPath(url) {
 function startStaticServer() {
     const server = http.createServer((req, res) => {
         try {
+            const requestUrl = new URL(req.url || '/', 'http://127.0.0.1');
+            if (requestUrl.pathname === '/__build-provenance.json') {
+                const body = JSON.stringify({
+                    schemaVersion: 'RuntimeBuildProvenanceV1',
+                    sourceCommit: 'b'.repeat(40),
+                    sourceTreeStatus: 'clean',
+                    provider: 'browser_static_endpoint'
+                });
+                res.writeHead(200, {
+                    'content-type': 'application/json; charset=utf-8',
+                    'cache-control': 'no-store'
+                });
+                res.end(body);
+                return;
+            }
             const targetPath = resolveRequestPath(req.url || '/');
             if (!targetPath) {
                 res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' });
@@ -969,6 +984,8 @@ async function runSimulatorSmoke(browser, baseUrl) {
     await page.locator('#runBacktestCohorts').check();
     await page.locator('#backtestCohortHorizon').fill('10');
     await page.locator('#btButton').click();
+    await page.waitForFunction(() => ['completed', 'ruin', 'incomplete', 'technical_error', 'validation_error']
+        .includes(document.getElementById('backtestStatus')?.dataset?.status));
     const initialTerminalStatus = await page.locator('#backtestStatus').getAttribute('data-status');
     const initialTerminalText = await page.locator('#backtestStatus').textContent();
     assert(initialTerminalStatus === 'completed', `Default browser backtest must complete: ${JSON.stringify({ initialTerminalStatus, initialTerminalText })}`);
@@ -997,13 +1014,19 @@ async function runSimulatorSmoke(browser, baseUrl) {
     const rawJsonText = await readDownloadText(jsonDownload);
     assert(!/<(?:table|tr|td|th)\b/i.test(rawJsonText), 'Raw JSON download must not contain rendered table HTML');
     const rawDocument = JSON.parse(rawJsonText);
+    assert(rawDocument.request.engine.sourceCommit === 'b'.repeat(40),
+        'Raw JSON binds the commit loaded through the browser provenance endpoint');
+    assert(rawDocument.request.engine.sourceProvenanceProvider === 'browser_static_endpoint',
+        'Raw JSON proves that the browser run consumed the endpoint rather than a mutable global injection');
 
     const [csvDownload] = await Promise.all([
         page.waitForEvent('download'),
         page.locator('#exportBacktestCsv').click()
     ]);
     const rawCsvText = await readDownloadText(csvDownload);
-    assert(rawCsvText.startsWith('simulation_year_calendar_year;outcome_code;'), 'Raw CSV must use the versioned technical header contract');
+    assert(rawCsvText.startsWith('run_id;simulation_year_calendar_year;outcome_code;'), 'Raw CSV must use the versioned technical header contract');
+    assert(rawCsvText.split('\n')[1]?.split(';')[0] === rawDocument.identifiers.runId,
+        'Raw CSV and JSON downloads identify the same canonical browser run');
     assert(!/<(?:table|tr|td|th)\b/i.test(rawCsvText), 'Raw CSV download must not contain rendered table HTML');
 
     const visibleCanonical = await page.evaluate(() => {
@@ -1031,6 +1054,8 @@ async function runSimulatorSmoke(browser, baseUrl) {
         'Visible exact-10-percent reduction metric reconciles with Raw JSON');
     assert(visibleCanonical.healthBucketEnd === String(rawDocument.result.metrics.values.health_bucket_end_nominal_eur),
         'Visible health-bucket end reconciles with Raw JSON');
+    assert((await page.locator('#simulationSummary').textContent()).includes('im Endvermögen enthalten'),
+        'Visible summary states that the health bucket is already included in end wealth');
     assert(visibleCanonical.cohortEligible === String(rawDocument.result.cohortInventory.eligible),
         'Visible cohort inventory reconciles with the Raw JSON snapshot');
 
@@ -1054,6 +1079,10 @@ async function runSimulatorSmoke(browser, baseUrl) {
         await page.locator('#simStartJahr').fill(String(start));
         await page.locator('#simEndJahr').fill(String(end));
         await page.locator('#btButton').click();
+        await page.waitForFunction(expectedFieldId => (
+            document.getElementById('backtestStatus')?.textContent?.includes('BACKTEST_PERIOD_INVALID')
+            && document.activeElement?.id === expectedFieldId
+        ), expectedField);
         assert(await page.locator('#backtestStatus').textContent().then(text => text.includes('BACKTEST_PERIOD_INVALID')), `${label}: stable validation code must be visible`);
         assert(await page.evaluate(() => document.activeElement?.id) === expectedField, `${label}: first invalid field must receive focus`);
         assert(await page.locator(`#${expectedField}`).getAttribute('aria-invalid') === 'true', `${label}: invalid field must expose aria-invalid`);

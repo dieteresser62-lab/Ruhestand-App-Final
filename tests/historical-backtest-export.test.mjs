@@ -4,8 +4,12 @@ import {
     createHistoricalBacktestDownload,
     HISTORICAL_BACKTEST_CSV_COLUMNS,
     HISTORICAL_BACKTEST_CSV_CONTRACT,
+    HISTORICAL_BACKTEST_CSV_SCHEMA_VERSION,
     HISTORICAL_BACKTEST_EXPORT_SCHEMA_ID,
     HISTORICAL_BACKTEST_EXPORT_SCHEMA_VERSION,
+    HISTORICAL_BACKTEST_INPUT_SEMANTICS_SCHEMA_VERSION,
+    HISTORICAL_BACKTEST_PORTFOLIO_BOUNDARY_SCHEMA_VERSION,
+    HISTORICAL_BACKTEST_QUANTIZATION_SCHEMA_VERSION,
     serializeHistoricalBacktestCsv,
     serializeHistoricalBacktestJson
 } from '../app/simulator/historical-backtest-export.js';
@@ -45,7 +49,29 @@ function baseResult(outcomeKind = 'completed') {
             engine: {
                 apiVersion: '31.0',
                 buildId: 'fixture-build',
-                configFingerprint: { algorithm: 'sha256-canonical-json-v1', value: 'c'.repeat(64) }
+                sourceCommit: 'd'.repeat(40),
+                sourceTreeStatus: 'clean',
+                sourceProvenanceProvider: 'test_fixture',
+                configFingerprint: { algorithm: 'sha256-canonical-json-v1', value: 'c'.repeat(64) },
+                quantizationContract: {
+                    schemaVersion: HISTORICAL_BACKTEST_QUANTIZATION_SCHEMA_VERSION,
+                    enabled: true,
+                    transactionAnnualTiers: [
+                        { index: 1, upperBoundExclusive: 10000, unbounded: false, step: 1000 },
+                        { index: 2, upperBoundExclusive: null, unbounded: true, step: 25000 }
+                    ],
+                    withdrawalMonthlyTiers: [
+                        { index: 1, upperBoundExclusive: 2000, unbounded: false, step: 50 },
+                        { index: 2, upperBoundExclusive: null, unbounded: true, step: 250 }
+                    ],
+                    withdrawalRounding: {
+                        phase: 'after_floor_plus_flex_decision_before_final_annual_withdrawal',
+                        monthlyMode: 'floor',
+                        annualizationFactor: 12,
+                        floorProtection: 'max_floor_annual'
+                    },
+                    metricDisplayRounding: 'descriptor_only_not_applied_to_raw_metric_values'
+                }
             },
             inputs: {
                 startFloorBedarf: 24000,
@@ -78,10 +104,6 @@ function baseResult(outcomeKind = 'completed') {
             : null,
         portfolioStart: 100000,
         portfolioEnd: 90234.56,
-        portfolioSnapshots: {
-            start: { depotTranchesAktien: [{ marketValue: 80000 }], liquiditaet: 20000 },
-            end: { depotTranchesAktien: [{ marketValue: 70000 }], liquiditaet: 20234.56 }
-        },
         historicalYearRecords: [{
             schemaVersion: 'HistoricalYearRecordV1',
             simulationYear: 2000,
@@ -114,6 +136,7 @@ function baseResult(outcomeKind = 'completed') {
                 minimumFlexAnnual: 3000,
                 minimumFlexEffectiveFinal: 2500,
                 minimumFlexShortfallAnnual: 500,
+                portfolio_total_start: 100000,
                 portfolio_total_end: 90234.56,
                 steuern_gesamt: 456.78,
                 lossCarryEnd: 12.34,
@@ -127,9 +150,16 @@ function baseResult(outcomeKind = 'completed') {
         }],
         metrics: {
             schemaVersion: 'HistoricalBacktestMetricsV1',
+            flexBasisContract: {
+                allowed: ['gross_household_flex_required'],
+                observed: ['gross_household_flex_required'],
+                effective: 'gross_household_flex_required',
+                consistent: true,
+                decumulationRowCount: 1
+            },
             values: {
-                wealth_start_nominal_eur: 100000,
-                wealth_end_nominal_eur: 90234.56,
+                wealth_start_nominal_eur: ['completed', 'ruin'].includes(outcomeKind) ? 100000 : null,
+                wealth_end_nominal_eur: ['completed', 'ruin'].includes(outcomeKind) ? 90234.56 : null,
                 tax_total_nominal_eur: 456.78
             }
         },
@@ -154,7 +184,7 @@ function baseResult(outcomeKind = 'completed') {
     const result = baseResult();
     const raw = buildHistoricalBacktestRawExport(result, { exportedAt: '2026-07-19T10:00:00.000Z' });
     assertEqual(raw.schemaId, HISTORICAL_BACKTEST_EXPORT_SCHEMA_ID, 'raw JSON uses the stable schema id');
-    assertEqual(raw.schemaVersion, HISTORICAL_BACKTEST_EXPORT_SCHEMA_VERSION, 'raw JSON uses the V1 export schema');
+    assertEqual(raw.schemaVersion, HISTORICAL_BACKTEST_EXPORT_SCHEMA_VERSION, 'raw JSON uses the V2 export schema');
     assert(raw.identifiers.requestId.startsWith('btrq_'), 'raw JSON exposes a request id');
     assert(raw.identifiers.runId.startsWith('btrun_'), 'raw JSON exposes a run id');
     assertEqual(raw.request.executionMode, 'single_path', 'raw JSON retains the execution mode');
@@ -166,7 +196,31 @@ function baseResult(outcomeKind = 'completed') {
     assertEqual(raw.result.completedYears, 2, 'raw JSON retains completion semantics');
     assertEqual(raw.result.provenance.dataset.manifestSchemaVersion, 'HistoricalDataManifestV1', 'raw JSON retains manifest provenance');
     assertEqual(raw.result.provenance.engine.buildId, 'fixture-build', 'raw JSON retains the engine build id');
-    assertEqual(raw.result.portfolioSnapshots.end.liquiditaet, 20234.56, 'raw JSON retains canonical portfolio snapshots');
+    assertEqual(raw.result.period.inclusiveYears, 2, 'raw JSON states the inclusive period length');
+    assertEqual(raw.result.period.projectionClaim, 'observed_requested_calendar_window_not_fixed_30_year_horizon',
+        'raw JSON does not claim a fixed 30-year horizon');
+    assertEqual(raw.result.portfolioBoundaries.schemaVersion, HISTORICAL_BACKTEST_PORTFOLIO_BOUNDARY_SCHEMA_VERSION,
+        'raw JSON uses the non-restartable portfolio-boundary contract');
+    assertEqual(raw.result.portfolioBoundaries.restartable, false, 'historical portfolio boundaries are not restartable');
+    assertEqual(raw.result.portfolioBoundaries.totalComposition.healthBucketRelation,
+        'included_in_total_do_not_add',
+        'portfolio boundary contract states that the health bucket is already included');
+    assert(raw.result.portfolioBoundaries.totalComposition.includes.includes('health_bucket'),
+        'portfolio boundary composition inventories the health bucket');
+    assertEqual(raw.result.portfolioBoundaries.end.totalNominalEur, 90234.56, 'terminal boundary reconciles to the canonical metric');
+    assert(raw.result.portfolioSnapshots === undefined && !JSON.stringify(raw.result.portfolioBoundaries).includes('depotTranchesAktien'),
+        'raw JSON omits internal portfolio snapshots and detail lots');
+    assertEqual(raw.contracts.inputSemantics.schemaVersion, HISTORICAL_BACKTEST_INPUT_SEMANTICS_SCHEMA_VERSION,
+        'raw JSON exposes the input-semantic contract');
+    assertEqual(raw.contracts.inputSemantics.zielLiquiditaet.not, 'strategy_target',
+        'legacy zielLiquiditaet is not presented as the strategy target');
+    assertEqual(raw.contracts.flexReductionMaximum.interpretation, 'maximum_household_flex_reduction_not_person_reduction',
+        'maximum flex reduction remains bound to the household metric');
+    assertEqual(raw.contracts.flexReductionMaximum.basis, 'gross_household_flex_required',
+        'maximum flex reduction exports the effective canonical household basis');
+    assertEqual(raw.request.engine.sourceCommit, 'd'.repeat(40), 'raw JSON binds the exact source commit');
+    assertEqual(raw.request.engine.quantizationContract.schemaVersion, HISTORICAL_BACKTEST_QUANTIZATION_SCHEMA_VERSION,
+        'raw JSON binds the quantization contract');
     assertEqual(raw.result.metrics.values.wealth_end_nominal_eur, result.metrics.values.wealth_end_nominal_eur, 'export consumes the canonical metric raw value');
     assertEqual(raw.result.summary.metrics.wealth_end_nominal_eur, raw.result.metrics.values.wealth_end_nominal_eur, 'raw metric and summary projection reconcile');
     assert(typeof raw.result.metrics.values.wealth_end_nominal_eur === 'number', 'JSON financial values remain numbers');
@@ -222,24 +276,127 @@ function baseResult(outcomeKind = 'completed') {
     changedTemporal.request.temporalConventionId = 'different_temporal_v2';
     const changedTaxExemption = baseResult();
     changedTaxExemption.request.inputs.detailTranches[0].taxExempt = true;
+    const changedSourceCommit = baseResult();
+    changedSourceCommit.request.engine.sourceCommit = 'e'.repeat(40);
+    const changedQuantization = baseResult();
+    changedQuantization.request.engine.quantizationContract.withdrawalMonthlyTiers[0].step = 100;
     assert(first.fingerprint.value !== buildHistoricalBacktestRawExport(changedConfig, { exportedAt: first.exportedAt }).fingerprint.value, 'config changes alter the result fingerprint');
     assert(first.fingerprint.value !== buildHistoricalBacktestRawExport(changedDataset, { exportedAt: first.exportedAt }).fingerprint.value, 'dataset changes alter the result fingerprint');
     assert(first.fingerprint.value !== buildHistoricalBacktestRawExport(changedTemporal, { exportedAt: first.exportedAt }).fingerprint.value, 'temporal convention changes alter the result fingerprint');
     assert(first.fingerprint.value !== buildHistoricalBacktestRawExport(changedTaxExemption, { exportedAt: first.exportedAt }).fingerprint.value,
         'Explicit start-lot tax exemption participates in the replay fingerprint');
+    assert(first.fingerprint.value !== buildHistoricalBacktestRawExport(changedSourceCommit, { exportedAt: first.exportedAt }).fingerprint.value,
+        'source commit participates in the replay fingerprint');
+    assert(first.fingerprint.value !== buildHistoricalBacktestRawExport(changedQuantization, { exportedAt: first.exportedAt }).fingerprint.value,
+        'quantization contract participates in the replay fingerprint');
     const withCohorts = buildHistoricalBacktestRawExport(result, {
         exportedAt: first.exportedAt,
         cohortInventory: { schemaVersion: 'HistoricalBacktestCohortsV1', inventory: { eligible: 2 } }
     });
     assertEqual(withCohorts.result.cohortInventory.inventory.eligible, 2, 'optional cohort inventory is exported without recalculation');
     assert(first.fingerprint.value !== withCohorts.fingerprint.value, 'optional cohort inventory participates in the result fingerprint');
-    assertEqual(first.fingerprint.value, 'd9037523d64dbb431c17b7cd230e8df6ddf941bed9859c350108cf3a324bfc7f', 'canonical fixture fingerprint remains golden');
+    assertEqual(first.fingerprint.value, '00a3f3aa4b5b735beb868e8cfb0bb5d856e64150c2ba8d3297980660fdfdc506',
+        'canonical V2 fixture fingerprint remains byte-for-byte stable');
+}
+
+{
+    const missingSource = baseResult();
+    delete missingSource.request.engine.sourceCommit;
+    let missingError = null;
+    try {
+        buildHistoricalBacktestRawExport(missingSource);
+    } catch (error) {
+        missingError = error;
+    }
+    assertEqual(missingError?.code, 'HISTORICAL_EXPORT_SOURCE_COMMIT_REQUIRED',
+        'missing source commit blocks the Raw export fail-closed');
+
+    const dirtySource = baseResult();
+    dirtySource.request.engine.sourceTreeStatus = 'dirty';
+    let dirtyError = null;
+    try {
+        buildHistoricalBacktestRawExport(dirtySource);
+    } catch (error) {
+        dirtyError = error;
+    }
+    assertEqual(dirtyError?.code, 'HISTORICAL_EXPORT_SOURCE_TREE_DIRTY',
+        'dirty source tree blocks the Raw export fail-closed');
+
+    const unavailableAtRun = baseResult();
+    unavailableAtRun.request.engine.sourceCommit = 'a'.repeat(40);
+    unavailableAtRun.request.engine.sourceTreeStatus = 'unavailable';
+    let unavailableError = null;
+    try {
+        buildHistoricalBacktestRawExport(unavailableAtRun, {
+            runtimeBuildProvenance: {
+                schemaVersion: 'RuntimeBuildProvenanceV1',
+                sourceCommit: 'f'.repeat(40),
+                sourceTreeStatus: 'clean',
+                provider: 'must_not_override'
+            }
+        });
+    } catch (error) {
+        unavailableError = error;
+    }
+    assertEqual(unavailableError?.code, 'HISTORICAL_EXPORT_SOURCE_TREE_DIRTY',
+        'unknown run-time tree status remains fail-closed instead of accepting export-time provenance');
+    assertEqual(unavailableError?.details?.sourceTreeStatus, 'unavailable',
+        'unknown captured tree status reaches the stable export error details');
+    assertEqual(unavailableAtRun.request.engine.sourceCommit, 'a'.repeat(40),
+        'export validation never mutates or replaces the commit captured at run start');
+
+    const incompleteQuantization = baseResult();
+    incompleteQuantization.request.engine.quantizationContract = {
+        schemaVersion: HISTORICAL_BACKTEST_QUANTIZATION_SCHEMA_VERSION,
+        enabled: true
+    };
+    let quantizationError = null;
+    try {
+        buildHistoricalBacktestRawExport(incompleteQuantization);
+    } catch (error) {
+        quantizationError = error;
+    }
+    assertEqual(quantizationError?.code, 'HISTORICAL_EXPORT_QUANTIZATION_CONTRACT_REQUIRED',
+        'schema-only quantization contracts fail closed without tiers and rounding semantics');
+
+    const mismatchedBoundary = baseResult();
+    mismatchedBoundary.rows[0].row.portfolio_total_end = 1;
+    let boundaryError = null;
+    try {
+        buildHistoricalBacktestRawExport(mismatchedBoundary);
+    } catch (error) {
+        boundaryError = error;
+    }
+    assertEqual(boundaryError?.code, 'HISTORICAL_EXPORT_PORTFOLIO_BOUNDARY_MISMATCH',
+        'mismatched canonical metric and independent terminal row block the export');
+    const mismatchedStartBoundary = baseResult();
+    mismatchedStartBoundary.rows[0].row.portfolio_total_start = 99999;
+    let startBoundaryError = null;
+    try {
+        buildHistoricalBacktestRawExport(mismatchedStartBoundary);
+    } catch (error) {
+        startBoundaryError = error;
+    }
+    assertEqual(startBoundaryError?.code, 'HISTORICAL_EXPORT_PORTFOLIO_BOUNDARY_MISMATCH',
+        'mismatched canonical metric and independently calculated opening row block the export');
+
+    const partialTechnical = baseResult('technical_error');
+    partialTechnical.rows = [structuredClone(baseResult().rows[0])];
+    const partialTechnicalExport = buildHistoricalBacktestRawExport(partialTechnical);
+    assertEqual(partialTechnicalExport.result.portfolioBoundaries.start, null,
+        'partial technical results do not claim a financially reconciled start boundary');
+    assertEqual(partialTechnicalExport.result.portfolioBoundaries.end, null,
+        'partial technical results do not claim a financially reconciled end boundary');
 }
 
 {
     const result = baseResult();
     const csv = serializeHistoricalBacktestCsv(result);
     const lines = csv.split('\n');
+    assertEqual(HISTORICAL_BACKTEST_CSV_SCHEMA_VERSION, 'HistoricalBacktestCsvV2',
+        'leading run identity is explicitly versioned as CSV V2');
+    assertEqual(HISTORICAL_BACKTEST_CSV_COLUMNS.length, 34,
+        'CSV V2 fixes the 34-column contract');
     assertEqual(lines[0], HISTORICAL_BACKTEST_CSV_COLUMNS.map(column => column.id).join(';'), 'CSV uses stable technical headers');
     assert(lines[0].includes('portfolio_total_end_nominal_eur'), 'CSV headers expose units');
     assert(csv.includes('-0.125'), 'CSV retains raw signed ratios with a dot decimal separator');
@@ -273,31 +430,90 @@ function baseResult(outcomeKind = 'completed') {
 }
 
 {
+    const quantization = {
+        ANTI_PSEUDO_ACCURACY: {
+            ENABLED: true,
+            QUANTIZATION_TIERS: [{ limit: 10000, step: 1000 }, { limit: Infinity, step: 25000 }],
+            QUANTIZATION_TIERS_MONTHLY: [{ limit: 2000, step: 50 }, { limit: Infinity, step: 250 }],
+            WITHDRAWAL_ROUNDING: {
+                phase: 'after_floor_plus_flex_decision_before_final_annual_withdrawal',
+                monthlyMode: 'floor',
+                annualizationFactor: 12,
+                floorProtection: 'max_floor_annual'
+            },
+            METRIC_DISPLAY_ROUNDING: 'descriptor_only_not_applied_to_raw_metric_values'
+        }
+    };
     const engineApi = {
         getVersion: () => ({ api: '31.0', build: 'build-1' }),
-        getConfig: () => ({ z: 2, a: 1, upperBound: Infinity })
+        getConfig: () => ({ z: 2, a: 1, upperBound: Infinity, ...quantization })
     };
-    const first = captureHistoricalBacktestEngineProvenance(engineApi);
+    const runtime = {
+        schemaVersion: 'RuntimeBuildProvenanceV1',
+        sourceCommit: 'f'.repeat(40),
+        sourceTreeStatus: 'clean',
+        provider: 'test_fixture'
+    };
+    const first = captureHistoricalBacktestEngineProvenance(engineApi, runtime);
     const sameDifferentOrder = captureHistoricalBacktestEngineProvenance({
         getVersion: () => ({ api: '31.0', build: 'build-1' }),
-        getConfig: () => ({ upperBound: Infinity, a: 1, z: 2 })
-    });
+        getConfig: () => ({ upperBound: Infinity, ...quantization, a: 1, z: 2 })
+    }, runtime);
     const changed = captureHistoricalBacktestEngineProvenance({
         ...engineApi,
-        getConfig: () => ({ z: 3, a: 1, upperBound: Infinity })
-    });
+        getConfig: () => ({ z: 3, a: 1, upperBound: Infinity, ...quantization })
+    }, runtime);
     assertEqual(first.configFingerprint.value, sameDifferentOrder.configFingerprint.value, 'config fingerprint is key-order independent');
     assert(first.configFingerprint.value !== changed.configFingerprint.value, 'config fingerprint detects config changes');
     assertEqual(first.buildId, 'build-1', 'engine provenance captures the build id');
+    assertEqual(first.sourceCommit, 'f'.repeat(40), 'engine provenance captures the runtime source commit');
+    assertEqual(first.quantizationContract.withdrawalMonthlyTiers.at(-1).unbounded, true,
+        'engine provenance serializes the unbounded monthly tier without Infinity');
+    assertEqual(first.quantizationContract.withdrawalRounding.monthlyMode, 'floor',
+        'engine provenance copies the rounding mode consumed by calculateFinalWithdrawal');
+    const malformedQuantization = captureHistoricalBacktestEngineProvenance({
+        ...engineApi,
+        getConfig: () => ({
+            ANTI_PSEUDO_ACCURACY: {
+                ENABLED: true,
+                QUANTIZATION_TIERS: [{ limit: Number.NaN, step: 1000 }],
+                QUANTIZATION_TIERS_MONTHLY: [{ limit: Infinity, step: 50 }]
+            }
+        })
+    }, runtime);
+    assertEqual(malformedQuantization.quantizationContract, null,
+        'invalid non-finite tier limits fail closed instead of masquerading as unbounded');
 }
 
 {
     const download = createHistoricalBacktestDownload(baseResult(), 'json', { exportedAt: '2026-07-19T10:00:00.000Z' });
-    assert(/^backtest-2000-2001-[a-f0-9]{12}-2026-07-19T10-00-00\.000Z\.json$/.test(download.filename), 'download filename carries period, fingerprint and timestamp');
+    assert(/^backtest-2000-2001-run-[a-f0-9]{12}-result-[a-f0-9]{12}-2026-07-19T10-00-00\.000Z\.json$/.test(download.filename),
+        'JSON filename carries period, run identity, result fingerprint and timestamp');
     assertEqual(download.mimeType, 'application/json', 'JSON download uses the JSON MIME type');
     const csvDownload = createHistoricalBacktestDownload(baseResult(), 'csv', { exportedAt: '2026-07-19T10:00:00.000Z' });
     assert(csvDownload.filename.endsWith('.csv'), 'CSV download uses the CSV extension');
-    assertEqual(csvDownload.fingerprint.value, download.fingerprint.value, 'JSON and CSV identify the same canonical run');
+    assertEqual(csvDownload.fingerprint.algorithm, 'sha256-csv-utf8-v1', 'CSV identifies its own byte projection');
+    assert(csvDownload.fingerprint.value !== download.fingerprint.value, 'CSV and Raw JSON use format-specific fingerprints');
+    const rawDocument = JSON.parse(download.content);
+    assertEqual(csvDownload.content.split('\n')[1].split(';')[0], rawDocument.identifiers.runId,
+        'CSV embeds the same canonical run identity as Raw JSON');
+    const sharedRunToken = rawDocument.identifiers.runId.slice(-64, -52);
+    assert(download.filename.includes(`-run-${sharedRunToken}-`)
+        && csvDownload.filename.includes(`-run-${sharedRunToken}-`),
+    'JSON and CSV filenames identify the same canonical run');
+    assert(download.filename.includes(`-result-${download.fingerprint.value.slice(0, 12)}-`),
+        'JSON filename remains traceable to the Raw result fingerprint');
+    assert(csvDownload.filename.includes(`-csv-${csvDownload.fingerprint.value.slice(0, 12)}-`),
+        'CSV filename remains traceable to its byte fingerprint');
+
+    const missingAtRun = baseResult();
+    delete missingAtRun.request.engine.sourceCommit;
+    missingAtRun.request.engine.sourceTreeStatus = 'unavailable';
+    const csvWithoutSource = createHistoricalBacktestDownload(missingAtRun, 'csv', {
+        exportedAt: '2026-07-19T10:00:00.000Z'
+    });
+    assert(csvWithoutSource.content.startsWith('run_id;simulation_year_calendar_year;'),
+        'technical CSV remains available when Raw JSON source provenance is unavailable');
 }
 
 {
@@ -312,10 +528,18 @@ function baseResult(outcomeKind = 'completed') {
     let clickCount = 0;
     let capturedBlob = null;
     const toastContainer = { appendChild() {} };
+    const backtestStatus = {
+        dataset: {},
+        className: '',
+        hidden: true,
+        innerHTML: '',
+        setAttribute() {},
+        focus() {}
+    };
     try {
         globalThis.window = { globalBacktestData: { result: baseResult() } };
         globalThis.document = {
-            getElementById: id => (id === 'toastContainer' ? toastContainer : null),
+            getElementById: id => ({ toastContainer, backtestStatus }[id] || null),
             createElement: tag => (tag === 'a'
                 ? {
                     href: '',
@@ -347,6 +571,20 @@ function baseResult(outcomeKind = 'completed') {
         assertEqual(clickCount, 1, 'explicit JSON export action triggers exactly one download');
         const downloaded = JSON.parse(await capturedBlob.text());
         assertEqual(downloaded.schemaVersion, HISTORICAL_BACKTEST_EXPORT_SCHEMA_VERSION, 'UI download uses the versioned raw serializer');
+
+        const dirtyResult = baseResult();
+        dirtyResult.request.engine.sourceTreeStatus = 'dirty';
+        globalThis.window.globalBacktestData = { result: dirtyResult };
+        exportBacktestLogData('json');
+        assertEqual(clickCount, 1, 'blocked Raw JSON export does not trigger a download');
+        assert(backtestStatus.innerHTML.includes('HISTORICAL_EXPORT_SOURCE_TREE_DIRTY'),
+            'stable Raw JSON provenance error code reaches the visible UI status');
+        assert(backtestStatus.innerHTML.includes('dirty'), 'Raw JSON UI status names the actionable dirty-tree cause');
+
+        exportBacktestLogData('csv');
+        assertEqual(clickCount, 2, 'CSV export remains available when only Raw JSON provenance is blocked');
+        assert((await capturedBlob.text()).startsWith('run_id;simulation_year_calendar_year;'),
+            'UI CSV download remains the technical row projection');
     } finally {
         for (const [key, value] of Object.entries(previous)) {
             if (value === undefined) delete globalThis[key];

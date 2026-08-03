@@ -1,4 +1,7 @@
-import { runBacktest } from '../app/simulator/simulator-backtest.js';
+import {
+    runBacktest,
+    runBacktestWithRuntimeProvenance
+} from '../app/simulator/simulator-backtest.js';
 import { GERMAN_CASH_MONEY_MARKET_ANNUAL_RETURNS } from '../app/simulator/german-cash-money-market-chain.js';
 import { HISTORICAL_DATA } from '../app/simulator/simulator-data.js';
 import { EngineAPI } from '../engine/index.mjs';
@@ -133,6 +136,8 @@ try {
         assertEqual(window.globalBacktestData?.rows?.at(-1)?.jahr, 2025, 'Last backtest year should be 2025');
         assert(window.globalBacktestData?.result?.rows === window.globalBacktestData?.rows, 'UI and export state share the same canonical row array');
         assert(Object.isFrozen(window.globalBacktestData?.result), 'UI retains an immutable canonical BacktestRunResultV1');
+        assertEqual(window.globalBacktestData?.result?.portfolioSnapshots, undefined,
+            'UI state does not retain restart-like internal portfolio snapshots');
         assertEqual(window.globalBacktestData?.result?.request?.engine?.buildId, EngineAPI.getVersion().build, 'UI captures the engine build used by the run');
         assert(/^[a-f0-9]{64}$/.test(window.globalBacktestData?.result?.request?.engine?.configFingerprint?.value), 'UI captures a deterministic engine config fingerprint');
         assertCashRateMarker(
@@ -432,6 +437,32 @@ try {
         assertCashRateMarker(row2020, 2020, 'EURSTR negative-rate marker');
         assert(row2019.row?.cashInterestEarned < 0, '2019 transition-year cash interest should retain its negative sign');
         assert(row2020.row?.cashInterestEarned < 0, '2020 EURSTR cash interest should retain its negative sign');
+    }
+
+    // --- TEST 10: Browser entry point awaits endpoint provenance before the run ---
+    {
+        global.document = createMockDocument({ ...baseInputs, simStartJahr: 2000, simEndJahr: 2001 });
+        global.window.globalBacktestData = null;
+        let releaseProvenance;
+        const provenancePromise = new Promise(resolve => { releaseProvenance = resolve; });
+        const pendingRun = runBacktestWithRuntimeProvenance({
+            loadRuntimeBuildProvenance: () => provenancePromise
+        });
+        assertEqual(global.window.globalBacktestData, null,
+            'browser entry point does not start the backtest while provenance is unresolved');
+        assertEqual(global.document.getElementById('btButton').disabled, true,
+            'browser entry point disables the start button while provenance is loading');
+        releaseProvenance({
+            schemaVersion: 'RuntimeBuildProvenanceV1',
+            sourceCommit: 'e'.repeat(40),
+            sourceTreeStatus: 'clean',
+            provider: 'awaited_test_endpoint'
+        });
+        const result = await pendingRun;
+        assertEqual(result.request.engine.sourceCommit, 'e'.repeat(40),
+            'awaited endpoint commit is captured before the run request is frozen');
+        assertEqual(result.request.engine.sourceProvenanceProvider, 'awaited_test_endpoint',
+            'awaited endpoint provider remains bound to the run request');
     }
 
     console.log('✅ Simulator backtest tests passed');

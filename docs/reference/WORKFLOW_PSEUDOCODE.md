@@ -148,7 +148,9 @@ Funktion runBacktest() in simulator-backtest.js:
   6. Rendering und expliziter Export
      - Rendere fokussierbaren Status, Datenqualitaet, Summary und
        semantische Tabelle ohne zweite wirtschaftliche Berechnung
-     - JSON -> HistoricalBacktestExportV1 mit Request/Result/Fingerprints
+     - JSON -> HistoricalBacktestExportV2 mit inklusiver Periode,
+       clean Source-Commit, Quantisierungs-/Eingabesemantik,
+       nicht restartfaehigen Portfolio-Grenzen und Request/Result/Fingerprints
      - CSV -> feste technische Rohspalten ohne HTML/Lokalisierung
      - Export nur auf Nutzerklick; Realbestand/Persistenz bleiben unveraendert
 ```

@@ -35,6 +35,45 @@ $script:MimeTypes = @{
     ".pdf"   = "application/pdf"
 }
 
+function Get-RuntimeBuildProvenanceBytes {
+    param([string]$RepositoryRoot)
+
+    $sourceCommit = $null
+    $sourceTreeStatus = 'dirty'
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        # Native Git-Warnungen auf stderr duerfen bei Exitcode 0 nicht durch
+        # den globalen Stop-Modus als fehlende Provenienz fehlklassifiziert werden.
+        $ErrorActionPreference = 'Continue'
+        $commitOutput = & git -C $RepositoryRoot rev-parse HEAD 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            $candidate = ([string]$commitOutput).Trim().ToLowerInvariant()
+            if ($candidate -match '^[0-9a-f]{40}$') {
+                $sourceCommit = $candidate
+                $statusOutput = @(& git -C $RepositoryRoot status --porcelain --untracked-files=normal 2>$null)
+                if ($LASTEXITCODE -eq 0 -and $statusOutput.Count -eq 0) {
+                    $sourceTreeStatus = 'clean'
+                }
+            }
+        }
+    }
+    catch {
+        $sourceCommit = $null
+        $sourceTreeStatus = 'dirty'
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+
+    $payload = [ordered]@{
+        schemaVersion = 'RuntimeBuildProvenanceV1'
+        sourceCommit = $sourceCommit
+        sourceTreeStatus = $sourceTreeStatus
+        provider = 'local_powershell_server'
+    } | ConvertTo-Json -Compress
+    return [System.Text.Encoding]::UTF8.GetBytes($payload)
+}
+
 # --- HELPER FUNCTIONS ---
 
 function Stop-ZombiesOnPort {
@@ -184,7 +223,16 @@ try {
             
             Write-Host "[$($request.HttpMethod)] $urlPath" -NoNewline
             
-            if (Test-Path $localPath -PathType Leaf) {
+            if ($urlPath -eq '__build-provenance.json') {
+                $runtimeBuildProvenanceBytes = Get-RuntimeBuildProvenanceBytes -RepositoryRoot $Root
+                $response.ContentType = 'application/json; charset=utf-8'
+                $response.AddHeader("Cache-Control", "no-store, no-cache, must-revalidate")
+                $response.ContentLength64 = $runtimeBuildProvenanceBytes.Length
+                $response.OutputStream.Write($runtimeBuildProvenanceBytes, 0, $runtimeBuildProvenanceBytes.Length)
+                $response.StatusCode = 200
+                Write-Host " -> 200 OK ($($runtimeBuildProvenanceBytes.Length) bytes)" -ForegroundColor Green
+            }
+            elseif (Test-Path $localPath -PathType Leaf) {
                 $bytes = [System.IO.File]::ReadAllBytes($localPath)
                 $extension = [System.IO.Path]::GetExtension($localPath).ToLower()
                 

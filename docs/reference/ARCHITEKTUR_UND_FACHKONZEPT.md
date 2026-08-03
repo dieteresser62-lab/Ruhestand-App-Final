@@ -2484,7 +2484,8 @@ persistenzfrei mit eigenen kanonischen Laufkopien aus. Sein tief eingefrorenes
 
 `BacktestRequestV1` und Resultat fuehren unter anderem `breakOnRuin`,
 `requestedYears`, `completedYears`, `lastCompletedYear`, Dataset-/Temporal-/
-Engineprovenienz, Portfolio-Snapshots und sichere Fehlerdaten. Technische
+Engineprovenienz, interne Portfolio-Snapshots und sichere Fehlerdaten. Diese
+internen Snapshots werden nicht ueber die Raw-Exportgrenze getragen. Technische
 Fehlerpfade erzeugen keine scheinbar gueltigen Finanzmetriken. Caller-Inputs,
 Profiltranchen und Realbestand bleiben unveraendert.
 
@@ -2525,16 +2526,20 @@ durch 0 ersetzt.
 
 | Format | Inhalt |
 |--------|--------|
-| **Raw-JSON** | `HistoricalBacktestExportV1` mit vollstaendigem Request, diskriminiertem Outcome, Daten-/Temporal-/Engineprovenienz, Portfolio-Snapshots, Records, Rohzeilen, Metriken, Summary und optional identischem Cohort-Inventar |
-| **Technische CSV** | `HistoricalBacktestCsvV1` mit 25 festen Rohspalten, Semikolon, Punktdezimalen, LF, leeren Missingness-Zellen sowie Formel-/Quote-/Delimiter-/Zeilenumbruchschutz |
+| **Raw-JSON** | `HistoricalBacktestExportV2` mit vollstaendigem Request, inklusiver Periode, diskriminiertem Outcome, Daten-/Temporal-/Engine-/Source-Commit-Provenienz, Quantisierungs-/Eingabesemantik, nicht restartfaehigen aggregierten Portfolio-Grenzen, Records, Rohzeilen, Metriken, Summary und optional identischem Cohort-Inventar |
+| **Technische CSV** | `HistoricalBacktestCsvV2` mit 34 festen Rohspalten einschliesslich der neuen fuehrenden, mit Raw-JSON geteilten `run_id`, Semikolon, Punktdezimalen, LF, leeren Missingness-Zellen sowie Formel-/Quote-/Delimiter-/Zeilenumbruchschutz |
 
 Request- und Result-Fingerprints verwenden kanonisches JSON und SHA-256.
 `exportedAt`, generierte IDs, Exportmetadaten und interne Diagnostik gehoeren
-nicht zum Result-Fingerprint. Der Detailtoggle aendert weder Raw-Rows noch
-Fingerprint. Downloads entstehen nur nach explizitem Nutzerklick, enthalten
-die vollstaendigen lokalen Finanzannahmen und werden nicht automatisch
-persistiert oder uebertragen. Das Runmanifest ist kein vollstaendiges Trial-Log
-und kein Holdout-Nachweis.
+nicht zum Result-Fingerprint. `HistoricalBacktestPortfolioBoundariesV2` nennt
+die Zusammensetzung der Start-/Endsumme explizit: aktives Portfolio plus
+Pflegebucket; der separat ausgewiesene Pflegebucket ist bereits enthalten und
+darf nicht addiert werden. Der Detailtoggle aendert weder Raw-Rows noch
+Fingerprint. JSON-Dateinamen tragen neben dem Run-Token den Result-Fingerprint,
+CSV-Dateinamen den eigenen CSV-Byte-Fingerprint. Downloads entstehen nur nach
+explizitem Nutzerklick, enthalten die vollstaendigen lokalen Finanzannahmen und
+werden nicht automatisch persistiert oder uebertragen. Das Runmanifest ist
+kein vollstaendiges Trial-Log und kein Holdout-Nachweis.
 
 ---
 
