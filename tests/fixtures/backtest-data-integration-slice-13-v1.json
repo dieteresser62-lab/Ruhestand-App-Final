@@ -1,0 +1,106 @@
+{
+  "attributionEvidence": [
+    { "filename": "global-equity-research-chain-backtest-delta-v1.json", "sha256": "209e70b7929d17118e7f4d16b0a02b7bb46ab09801fed52e3d81f7daa8b0cc94", "slice": 2 },
+    { "filename": "german-cpi-chain-backtest-delta-v1.json", "sha256": "54ffac73a9079d09459cc27b32b91e2573b0751d488fd94dad647b29ba24e38a", "slice": 3 },
+    { "filename": "german-cash-money-market-backtest-delta-v1.json", "sha256": "b31eb93264a8ee60589b3a778e595afc42609e062778674eea667652f0b89ab3", "slice": 4 },
+    { "filename": "gold-german-investor-backtest-delta-v2.json", "sha256": "30835556c5fe2758c36da8296b902a3704f6d39da9b1adbdb80719b6924f0a2a", "slice": 5 },
+    { "filename": "cape-wage-backtest-delta-v3.json", "sha256": "71bad07c8f09b4a41829a315055ee54bcbdf3f6d74c2f943ac50469bc92f8097", "slice": 6 },
+    { "filename": "demography-care-survivor-backtest-delta-v1.json", "sha256": "956a353927d36f256649350777bff7455458b64c6b89476c717a508f29825ba3", "slice": 7 },
+    { "filename": "liquidity-runway-slice-08-measurement-v1.json", "sha256": "6642194525836a0c886d091001131d994625040159984618a95cace4d4279b49", "slice": 8 },
+    { "filename": "minimum-flex-slice-09-measurement-v1.json", "sha256": "b3c13e57d3c80997cef1c3515f5f76d7a9a9743019ba98ae219a9685911f94fa", "slice": 9 },
+    { "filename": "tax-logic-slice-10-backtest-measurement-v1.json", "sha256": "13d6f6cff7aa3e0f6ee109601f8951620c9f908505bd109513f8d8487f491eb5", "slice": 10 }
+  ],
+  "dataset": {
+    "contentHash": { "algorithm": "sha256-canonical-json-v1", "value": "c79350c5abf2dee2feeaae65c88ed5e58487f878cb598fdffc132fbf48d01e79" },
+    "datasetId": "ruhestandsapp-historical-data-v1",
+    "manifestHash": { "algorithm": "sha256-canonical-json-v1", "value": "7ee83d2c04ece133903fb8617f9da4448979b602c3b03649eefe4cd0d2ff62fb" },
+    "revision": "2026-08-01.4"
+  },
+  "exportFinalizationGate": {
+    "observedErrorCode": "$MEASURED_EXPORT_GATE_ERROR",
+    "requiredPeriod": { "endYear": 2025, "inclusiveYears": 26, "startYear": 2000 },
+    "requiredSourceTreeStatus": "clean",
+    "resultFingerprint": "$MEASURED_EXPORT_FINGERPRINT",
+    "status": "$MEASURED_EXPORT_GATE_STATUS"
+  },
+  "financialNeutralityEvidence": {
+    "baseline": {
+      "canonicalRowsHash": "9de469d6dff25a9a9b93ad8c51285b6db945561a54ec1a9538f4375904b753ff",
+      "caseId": "integrated_reference_2000_2025",
+      "sourceCommit": "43d78483b1416d38d179cdb8de823aec15d9e261"
+    },
+    "coveredSlices": [11, 12, 13],
+    "current": {
+      "canonicalRowsHash": "9de469d6dff25a9a9b93ad8c51285b6db945561a54ec1a9538f4375904b753ff"
+    },
+    "rationale": {
+      "11": "export_and_provenance_contract_only",
+      "12": "monte_carlo_stress_and_regime_contract_only",
+      "13": "integration_gates_and_reference_evidence_only"
+    },
+    "unchanged": true
+  },
+  "referenceCases": [
+    {
+      "canonicalRowsHash": "8d3aa861b6cb96f4678b6b38ff9e6dc04293fc560ff716210c718aeed06ff2f4",
+      "id": "wage_indexed_pension_jst_1930_1940", "maxAbsolutePortfolioFlowDelta": 0,
+      "observedRowCount": 11, "outcome": "completed",
+      "period": { "endYear": 1940, "requestedYears": 11, "startYear": 1930 },
+      "summaryEndWealth": 2666766.45, "totalTax": 3664.49, "totalWithdrawal": 92400
+    },
+    {
+      "canonicalRowsHash": "99cc97be1522d9bec15a400428ec78d08d00f90a6b0d4b787991cd64dd847ca9",
+      "id": "completed_numeraire_seam_1949_1952", "maxAbsolutePortfolioFlowDelta": 0,
+      "observedRowCount": 4, "outcome": "completed",
+      "period": { "endYear": 1952, "requestedYears": 4, "startYear": 1949 },
+      "summaryEndWealth": 5150616.27, "totalTax": 29808.5, "totalWithdrawal": 121200
+    },
+    {
+      "canonicalRowsHash": "0adcc3f6fc8438cc362859bcd8fbd6deb4911039341f0bbeb1e2b8a65b7d1838",
+      "id": "completed_1960_2020", "maxAbsolutePortfolioFlowDelta": 0,
+      "observedRowCount": 61, "outcome": "completed",
+      "period": { "endYear": 2020, "requestedYears": 61, "startYear": 1960 },
+      "summaryEndWealth": 172455313.47, "totalTax": 1337373.44, "totalWithdrawal": 4093414.61
+    },
+    {
+      "canonicalRowsHash": "f72fffe300260f3bbbdc73facbc62d37a623c8464a5ee51cdbfc447faafb8a51",
+      "id": "three_bucket_minimum_flex_2005_2014", "maxAbsolutePortfolioFlowDelta": 0,
+      "observedRowCount": 10, "outcome": "completed",
+      "period": { "endYear": 2014, "requestedYears": 10, "startYear": 2005 },
+      "summaryEndWealth": 368753.59, "totalTax": 42005.48, "totalWithdrawal": 328800
+    },
+    {
+      "canonicalRowsHash": "27daf1b0f980c1582392a2e2038259b5a646a3770cf60d75763a15ffc0532fe4",
+      "id": "dynamic_flex_cape_legacy_step_2018_2025", "maxAbsolutePortfolioFlowDelta": 0,
+      "observedRowCount": 8, "outcome": "completed",
+      "period": { "endYear": 2025, "requestedYears": 8, "startYear": 2018 },
+      "summaryEndWealth": 2666371.13, "totalTax": 144840.94, "totalWithdrawal": 777000
+    },
+    {
+      "canonicalRowsHash": "9de469d6dff25a9a9b93ad8c51285b6db945561a54ec1a9538f4375904b753ff",
+      "id": "integrated_reference_2000_2025", "maxAbsolutePortfolioFlowDelta": 0,
+      "observedRowCount": 26, "outcome": "completed",
+      "period": { "endYear": 2025, "requestedYears": 26, "startYear": 2000 },
+      "summaryEndWealth": 5829580.79, "totalTax": 114306.75, "totalWithdrawal": 805112.51
+    },
+    {
+      "canonicalRowsHash": "faf771729129f351e2faae7838050e174a599612bf75cd4388950d83c5fef7de",
+      "id": "integrated_stagflation_1970_1982", "maxAbsolutePortfolioFlowDelta": 0,
+      "observedRowCount": 13, "outcome": "completed",
+      "period": { "endYear": 1982, "requestedYears": 13, "startYear": 1970 },
+      "summaryEndWealth": 3064740.16, "totalTax": 69388.69, "totalWithdrawal": 495600
+    },
+    {
+      "canonicalRowsHash": "55dc5d57190acff712638b6c79553f71161dd39531518ebd02bc05a174288b33",
+      "id": "integrated_crash_2007_2010", "maxAbsolutePortfolioFlowDelta": 0,
+      "observedRowCount": 4, "outcome": "completed",
+      "period": { "endYear": 2010, "requestedYears": 4, "startYear": 2007 },
+      "summaryEndWealth": 1774992.29, "totalTax": 4128.86, "totalWithdrawal": 115200
+    }
+  ],
+  "schemaVersion": "BacktestDataIntegrationSlice13V1",
+  "sourceCommit": "$GIT_HEAD",
+  "sourceResultDocument": "docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_12_STRESS_REGIME_FALLBACKS.md",
+  "sourceTreeStatus": "$GIT_STATUS",
+  "status": "candidate_pending_external_review_and_commit"
+}

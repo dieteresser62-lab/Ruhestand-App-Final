@@ -92,7 +92,7 @@ try {
         buildAutoOptimizeModelStatus,
         runAutoOptimize
     } = await import('../app/simulator/auto_optimize.js');
-    const { formatAutoOptimizeError } = await import('../app/simulator/auto_optimize_ui.js');
+    const { formatAutoOptimizeError, handleRunAutoOptimize } = await import('../app/simulator/auto_optimize_ui.js');
     const createVersionedMetricResult = (overrides = {}) => ({
         metricContract: { schemaVersion: AUTO_OPTIMIZE_METRIC_RESULT_VERSION },
         medianEndWealth: 500000,
@@ -113,6 +113,45 @@ try {
         }).includes('gespeicherte Preset'),
         'Auto-Optimize uses the shared German simulator contract error mapping'
     );
+
+    {
+        const previousAlert = global.alert;
+        const previousConsoleError = console.error;
+        const previousHandlerDocument = global.document;
+        const alerts = [];
+        const elements = {
+            ao_run_btn: { disabled: false },
+            ao_progress: { textContent: '', style: {} },
+            ao_result: { innerHTML: '', style: {} },
+            ao_apply_btn: { style: {} }
+        };
+        global.document = { getElementById: id => elements[id] || null };
+        global.alert = message => alerts.push(message);
+        console.error = () => {};
+        try {
+            await handleRunAutoOptimize({
+                readConfig: () => {
+                    const error = new Error('SIMULATOR_STRESS_PRESET_UNKNOWN: raw English');
+                    error.code = 'SIMULATOR_STRESS_PRESET_UNKNOWN';
+                    throw error;
+                },
+                run: async () => { throw new Error('optimizer must not start after config failure'); }
+            });
+        } finally {
+            global.document = previousHandlerDocument;
+            global.alert = previousAlert;
+            console.error = previousConsoleError;
+        }
+        assert(alerts.length === 1 && alerts[0].includes('Fehler bei der Auto-Optimierung'),
+            'Auto-Optimize handler reaches its real catch path');
+        assert(alerts[0].includes('gespeicherte Preset') && !alerts[0].includes('raw English'),
+            'Auto-Optimize catch path maps a coded error instead of exposing raw English');
+        assert(elements.ao_progress.textContent.includes('gespeicherte Preset')
+            && !elements.ao_progress.textContent.includes('raw English'),
+        'Auto-Optimize catch path writes the mapped German error into the status line');
+        assert(elements.ao_run_btn.disabled === false,
+            'Auto-Optimize catch path restores the run button in finally');
+    }
 
     // Test 0a: Presets bleiben DOM-frei importierbar
     console.log('Test 0a: UI presets importierbar');

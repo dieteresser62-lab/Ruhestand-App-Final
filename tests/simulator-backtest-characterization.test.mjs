@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { runBacktest } from '../app/simulator/simulator-backtest.js';
@@ -16,6 +17,7 @@ import { EngineAPI } from '../engine/index.mjs';
 import { CONFIG } from '../engine/config.mjs';
 import { formatPercentValue } from '../app/simulator/simulator-formatting.js';
 import { formatCurrency } from '../app/simulator/simulator-utils.js';
+import { buildHistoricalBacktestRawExport } from '../app/simulator/historical-backtest-export.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,6 +29,7 @@ const slice08MeasurementFixturePath = path.join(__dirname, 'fixtures', 'liquidit
 const slice09MeasurementFixturePath = path.join(__dirname, 'fixtures', 'minimum-flex-slice-09-measurement-v1.json');
 const slice09AddedCaseFinancialFixturePath = path.join(__dirname, 'fixtures', 'minimum-flex-slice-09-added-case-financial-v1.json');
 const slice10MeasurementFixturePath = path.join(__dirname, 'fixtures', 'tax-logic-slice-10-backtest-measurement-v1.json');
+const slice13IntegrationFixturePath = path.join(__dirname, 'fixtures', 'backtest-data-integration-slice-13-v1.json');
 const backtestSourcePath = path.join(__dirname, '..', 'app', 'simulator', 'simulator-backtest.js');
 const backtestRunnerSourcePath = path.join(__dirname, '..', 'app', 'simulator', 'historical-backtest-runner.js');
 const UPDATE_TARGET = process.env.UPDATE_BACKTEST_TARGET === '1';
@@ -621,7 +624,8 @@ function runScenario({
     projectionOverride = null,
     notes = [],
     oracleClass = 'legacy_observed',
-    detailLevel = 'normal'
+    detailLevel = 'normal',
+    runOptions = null
 }) {
     const doc = createMockDocument(values, checkedIds);
     global.document = doc;
@@ -642,7 +646,10 @@ function runScenario({
     const getCaptured = installBacktestDataCapture(onAssign);
     const restoreHistorical = historicalMutation ? historicalMutation() : () => {};
     try {
-        runBacktest(historicalDataProvider ? { historicalDataProvider } : {});
+        runBacktest({
+            ...(runOptions && typeof runOptions === 'object' ? runOptions : {}),
+            ...(historicalDataProvider ? { historicalDataProvider } : {})
+        });
     } finally {
         restoreHistorical();
     }
@@ -1492,6 +1499,71 @@ try {
         notes: ['Legacy || 0 normalization silently turns a non-finite mandatory gold return into 0%.']
     });
 
+    const repositoryRoot = path.join(__dirname, '..');
+    const measuredGitCommit = execFileSync('git', ['rev-parse', 'HEAD'], {
+        cwd: repositoryRoot,
+        encoding: 'utf8'
+    }).trim().toLowerCase();
+    const measuredGitStatus = execFileSync('git', ['status', '--porcelain'], {
+        cwd: repositoryRoot,
+        encoding: 'utf8'
+    }).trim();
+    const measuredSourceTreeStatus = measuredGitStatus === '' ? 'clean' : 'dirty';
+    const runtimeBuildProvenance = {
+        schemaVersion: 'RuntimeBuildProvenanceV1',
+        sourceCommit: measuredGitCommit,
+        sourceTreeStatus: measuredSourceTreeStatus,
+        provider: 'slice_13_git_preflight'
+    };
+    let integrated2000To2025Result = null;
+    const integrated2000To2025 = runScenario({
+        id: 'integrated_reference_2000_2025',
+        values: { simStartJahr: 2000, simEndJahr: 2025 },
+        expectedRowCount: 26,
+        onAssign: data => { integrated2000To2025Result = data?.result || null; },
+        oracleClass: 'slice_13_integration_candidate',
+        notes: ['Inclusive 26-year integration reference; final clean-tree export is a post-review commit gate.'],
+        runOptions: { engineApi: EngineAPI, runtimeBuildProvenance }
+    });
+    const integratedStagflation1970To1982 = runScenario({
+        id: 'integrated_stagflation_1970_1982',
+        values: { simStartJahr: 1970, simEndJahr: 1982 },
+        expectedRowCount: 13,
+        oracleClass: 'slice_13_integration_candidate',
+        notes: ['Dedicated 1970s stagflation and recovery window.']
+    });
+    const integratedCrash2007To2010 = runScenario({
+        id: 'integrated_crash_2007_2010',
+        values: { simStartJahr: 2007, simEndJahr: 2010 },
+        expectedRowCount: 4,
+        oracleClass: 'slice_13_integration_candidate',
+        notes: ['Dedicated global-financial-crisis and immediate recovery window.']
+    });
+    let integratedRawExport = null;
+    let integrationExportGateError = null;
+    try {
+        integratedRawExport = buildHistoricalBacktestRawExport(integrated2000To2025Result, {
+            exportedAt: '2026-08-03T00:00:00.000Z'
+        });
+    } catch (error) {
+        integrationExportGateError = error;
+    }
+    if (measuredSourceTreeStatus === 'dirty') {
+        assertEqual(integrationExportGateError?.code, 'HISTORICAL_EXPORT_SOURCE_TREE_DIRTY',
+            'Dirty Git tree blocks the final Slice-13 export with its actual tree-state code');
+        assertEqual(integratedRawExport, null,
+            'Dirty Git tree must not produce a provenance-bound raw export');
+    } else {
+        assertEqual(integrationExportGateError, null,
+            'Clean reviewed Slice-13 commit passes the export gate without an error');
+        assert(integratedRawExport?.fingerprint?.value,
+            'Clean reviewed Slice-13 commit produces the final provenance-bound raw export');
+    }
+    assertEqual(integrated2000To2025Result?.request?.engine?.sourceCommit, measuredGitCommit,
+        'Reference result source commit is measured from git rev-parse HEAD');
+    assertEqual(integrated2000To2025Result?.request?.engine?.sourceTreeStatus, measuredSourceTreeStatus,
+        'Reference result source-tree status is measured from git status');
+
     const backtestSource = [backtestSourcePath, backtestRunnerSourcePath]
         .map(sourcePath => fs.readFileSync(sourcePath, 'utf8'))
         .join('\n');
@@ -1643,6 +1715,19 @@ try {
     assert(actual.cases.every(testCase => testCase.observedRowCount === testCase.expectedRowCount), 'positive runtime row counts should match the frozen contract');
     assert(actual.cases.every(testCase => testCase.values.maxAbsolutePortfolioFlowDelta < 1), 'positive baselines must keep FlowDelta below one euro');
     assert(actual.detailToggleOracle.payloadStable, 'normal and detailed rendering must retain the same canonical row payload');
+    assertEqual(integrated2000To2025.period.requestedYears, 26,
+        '2000-2025 integration reference is explicitly an inclusive 26-year run');
+    assertEqual(integrated2000To2025.observedRowCount, 26,
+        '2000-2025 integration reference emits all 26 requested years');
+    assert(integrated2000To2025.values.maxAbsolutePortfolioFlowDelta < 1,
+        '2000-2025 integration reference keeps FlowDelta below one euro');
+    assertEqual(integratedStagflation1970To1982.observedRowCount, 13,
+        'dedicated 1970-1982 stagflation reference emits all requested years');
+    assertEqual(integratedCrash2007To2010.observedRowCount, 4,
+        'dedicated 2007-2010 crash reference emits all requested years');
+    assert(integratedStagflation1970To1982.values.maxAbsolutePortfolioFlowDelta < 1
+        && integratedCrash2007To2010.values.maxAbsolutePortfolioFlowDelta < 1,
+    'dedicated stagflation and crash references keep FlowDelta below one euro');
     assert(ruin.outcomeObservation === 'ruin', 'capital-poor case must reach the canonical ruin outcome');
     assertClose(ruin.values.summaryEndWealth, ruin.values.lastWrapperPortfolio, 0.01, 'ruin summary must reconcile to terminal ruin-row wealth');
     assertClose(ruin.values.summaryEndWealth, ruin.values.lastRowPortfolioTotalEnd, 0.01, 'ruin summary must reconcile to the nested terminal total');
@@ -1657,6 +1742,105 @@ try {
         assert(witness.status && witness.status !== 'inactive_zero', `D-17 ${year} must retain an active minimum-flex status`);
         assert(Number.isFinite(witness.effectiveFinal), `D-17 ${year} must export final effective minimum flex`);
         assert(Number.isFinite(witness.shortfallAnnual), `D-17 ${year} must export the nominal minimum-flex shortfall`);
+    }
+
+    const integrationEvidenceFiles = [
+        'global-equity-research-chain-backtest-delta-v1.json',
+        'german-cpi-chain-backtest-delta-v1.json',
+        'german-cash-money-market-backtest-delta-v1.json',
+        'gold-german-investor-backtest-delta-v2.json',
+        'cape-wage-backtest-delta-v3.json',
+        'demography-care-survivor-backtest-delta-v1.json',
+        'liquidity-runway-slice-08-measurement-v1.json',
+        'minimum-flex-slice-09-measurement-v1.json',
+        'tax-logic-slice-10-backtest-measurement-v1.json'
+    ];
+    const integrationReferenceCases = [
+        actual.cases.find(entry => entry.id === 'wage_indexed_pension_jst_1930_1940'),
+        actual.cases.find(entry => entry.id === 'completed_numeraire_seam_1949_1952'),
+        actual.cases.find(entry => entry.id === 'completed_1960_2020'),
+        actual.cases.find(entry => entry.id === 'three_bucket_minimum_flex_2005_2014'),
+        actual.cases.find(entry => entry.id === 'dynamic_flex_cape_legacy_step_2018_2025'),
+        integrated2000To2025,
+        integratedStagflation1970To1982,
+        integratedCrash2007To2010
+    ].map(entry => ({
+        id: entry.id,
+        period: entry.period,
+        outcome: entry.outcomeObservation,
+        observedRowCount: entry.observedRowCount,
+        summaryEndWealth: entry.values.summaryEndWealth,
+        totalWithdrawal: entry.values.totalWithdrawal,
+        totalTax: entry.values.totalTax,
+        maxAbsolutePortfolioFlowDelta: entry.values.maxAbsolutePortfolioFlowDelta,
+        canonicalRowsHash: entry.canonicalRowsHash
+    }));
+    const slice13Integration = {
+        schemaVersion: 'BacktestDataIntegrationSlice13V1',
+        status: 'candidate_pending_external_review_and_commit',
+        sourceResultDocument: 'docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_12_STRESS_REGIME_FALLBACKS.md',
+        sourceCommit: measuredGitCommit,
+        sourceTreeStatus: measuredSourceTreeStatus,
+        dataset: {
+            datasetId: HISTORICAL_DATA_MANIFEST.datasetId,
+            revision: HISTORICAL_DATA_MANIFEST.revision,
+            contentHash: HISTORICAL_DATA_MANIFEST.contentHash,
+            manifestHash: integrated2000To2025Result?.request?.dataset?.manifestHash || null
+        },
+        exportFinalizationGate: {
+            status: measuredSourceTreeStatus === 'clean'
+                ? 'final_export_ready'
+                : 'blocked_until_reviewed_slice_13_commit_exists',
+            observedErrorCode: integrationExportGateError?.code || null,
+            resultFingerprint: integratedRawExport?.fingerprint?.value || null,
+            requiredSourceTreeStatus: 'clean',
+            requiredPeriod: { startYear: 2000, endYear: 2025, inclusiveYears: 26 }
+        },
+        referenceCases: integrationReferenceCases,
+        attributionEvidence: integrationEvidenceFiles.map((filename, index) => {
+            const bytes = fs.readFileSync(path.join(__dirname, 'fixtures', filename));
+            return {
+                slice: index + 2,
+                filename,
+                sha256: createHash('sha256').update(bytes).digest('hex')
+            };
+        }),
+        financialNeutralityEvidence: {
+            coveredSlices: [11, 12, 13],
+            baseline: {
+                sourceCommit: '43d78483b1416d38d179cdb8de823aec15d9e261',
+                caseId: 'integrated_reference_2000_2025',
+                canonicalRowsHash: '9de469d6dff25a9a9b93ad8c51285b6db945561a54ec1a9538f4375904b753ff'
+            },
+            current: {
+                canonicalRowsHash: integrated2000To2025.canonicalRowsHash
+            },
+            unchanged: integrated2000To2025.canonicalRowsHash
+                === '9de469d6dff25a9a9b93ad8c51285b6db945561a54ec1a9538f4375904b753ff',
+            rationale: {
+                11: 'export_and_provenance_contract_only',
+                12: 'monte_carlo_stress_and_regime_contract_only',
+                13: 'integration_gates_and_reference_evidence_only'
+            }
+        }
+    };
+    assert(slice13Integration.financialNeutralityEvidence.unchanged,
+        'Slices 11-13 financial neutrality is measured against the preserved 26-year row hash');
+    if (process.env.PRINT_BACKTEST_DATA_13 === '1') {
+        console.log('__BACKTEST_DATA_13_INTEGRATION_START__');
+        console.log(stableStringify(slice13Integration, 2));
+        console.log('__BACKTEST_DATA_13_INTEGRATION_END__');
+    } else {
+        const expectedSlice13Integration = JSON.parse(fs.readFileSync(slice13IntegrationFixturePath, 'utf8'));
+        expectedSlice13Integration.sourceCommit = measuredGitCommit;
+        expectedSlice13Integration.sourceTreeStatus = measuredSourceTreeStatus;
+        expectedSlice13Integration.exportFinalizationGate.status = slice13Integration.exportFinalizationGate.status;
+        expectedSlice13Integration.exportFinalizationGate.observedErrorCode = slice13Integration.exportFinalizationGate.observedErrorCode;
+        expectedSlice13Integration.exportFinalizationGate.resultFingerprint = slice13Integration.exportFinalizationGate.resultFingerprint;
+        const integrationDiffs = collectDiffs(expectedSlice13Integration, slice13Integration);
+        if (integrationDiffs.length > 0) console.error(stableStringify(integrationDiffs.slice(0, 20), 2));
+        assertEqual(integrationDiffs.length, 0,
+            'Slice-13 integration reference must reproduce exactly with field-level diagnostics');
     }
 
     const legacyExpected = JSON.parse(fs.readFileSync(legacyFixturePath, 'utf8'));

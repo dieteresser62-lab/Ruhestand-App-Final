@@ -90,6 +90,7 @@ export function validateSimulatorInputs(inputs = {}) {
 }
 
 export const SIMULATOR_CONTRACT_ERROR_MESSAGES_DE = Object.freeze({
+    SIMULATOR_HISTORICAL_DATA_UNAVAILABLE: 'Historische Marktdaten sind nicht verfügbar: Laden oder prüfen Sie den kanonischen Datenbestand, bevor Sie die Simulation erneut starten.',
     SIMULATOR_STRESS_PRESET_UNKNOWN: 'Unbekanntes Stressszenario: Das gespeicherte Preset ist nicht mehr verfügbar. Öffnen Sie das Profil, wählen Sie ein vorhandenes Stressszenario und speichern Sie erneut.',
     SIMULATOR_STRESS_POOL_EMPTY: 'Historisches Stressszenario nicht ausführbar: Der zugehörige historische Rohpool ist leer. Wählen Sie ein synthetisches Stressszenario oder prüfen Sie den Datenbestand.',
     SIMULATOR_STRESS_SEQUENCE_INVALID: 'Stresssequenz unvollständig: Für mindestens ein Stressjahr fehlt eine gültige Rendite. Wählen Sie ein anderes Szenario oder prüfen Sie den Presetvertrag.',
@@ -101,7 +102,17 @@ export const SIMULATOR_CONTRACT_ERROR_MESSAGES_DE = Object.freeze({
     SIMULATOR_REGIME_DISTRIBUTION_DRIFT: 'Historischer Regimevertrag geändert: Die beobachtete Verteilung weicht vom geprüften Datenstand ab. Prüfen und aktualisieren Sie den Regimevertrag vor der Simulation.',
     SIMULATOR_REGIME_TRANSITIONS_INVALID: 'Regime-Sampling nicht möglich: Die Übergangsdaten des aktuellen Marktregimes fehlen oder sind ungültig. Prüfen Sie den Regimevertrag.',
     SIMULATOR_REGIME_TRANSITION_SELECTION_FAILED: 'Regime-Sampling abgebrochen: Die Übergangszähler ergeben keine gültige Auswahl. Prüfen Sie die Transitionsmatrix.',
+    MC_SAMPLING_DATA_EMPTY: 'Monte-Carlo-Sampling nicht ausführbar: Der historische Jahresdatenbestand ist leer. Prüfen oder laden Sie die kanonischen Marktdaten und starten Sie erneut.',
+    MC_SAMPLING_METHOD_INVALID: 'Monte-Carlo-Sampling nicht ausführbar: Die gewählte Sampling-Methode ist unbekannt. Wählen Sie eine verfügbare Methode und starten Sie erneut.',
+    MC_SAMPLING_NO_START_CANDIDATES: 'Monte-Carlo-Sampling nicht ausführbar: Der aktive Startjahrfilter liefert keine geeigneten Startjahre. Setzen Sie die Grenze früher oder lockern Sie den Datenfilter.',
+    MC_SAMPLING_NO_BLOCK_START_CANDIDATES: 'Blockbootstrap nicht ausführbar: Für Filter und Blocklänge bleibt kein vollständiger Startblock. Setzen Sie die Startjahrgrenze früher oder verkürzen Sie den Block.',
+    MC_SAMPLING_REGIME_TRANSITIONS_INVALID: 'Regime-Sampling nicht ausführbar: Für mindestens ein erreichbares Regime fehlen gültige Übergänge. Prüfen Sie die Transitionsmatrix.',
     MC_SAMPLING_REGIME_POOL_EMPTY: 'Regime-Sampling nicht ausführbar: Der aktive Startjahrfilter enthält nicht alle erreichbaren Marktregime. Setzen Sie die Grenze früher oder wählen Sie eine andere Sampling-Methode.',
+    MC_SAMPLING_RUNTIME_CONTRACT_MISMATCH: 'Sampling-Lauf abgebrochen: Vorprüfung und Laufzeit verwenden unterschiedliche Methoden. Starten Sie den Lauf mit unveränderten Einstellungen erneut.',
+    MC_SAMPLING_YEAR_OUTSIDE_EFFECTIVE_UNIVERSE: 'Sampling-Lauf abgebrochen: Ein gezogenes Jahr liegt außerhalb des vorgeprüften Datenbereichs. Prüfen Sie Filter und Datenbestand.',
+    MC_SAMPLING_RUNTIME_STATE_INVALID: 'Sampling-Lauf abgebrochen: Der interne Samplingzustand ist unvollständig. Starten Sie den Lauf neu; bleibt der Fehler bestehen, melden Sie ihn zur Diagnose.',
+    MC_SAMPLING_RUNTIME_DELEGATE_INVALID: 'Sampling-Lauf abgebrochen: Die kanonische Jahresauswahl ist technisch nicht verfügbar. Starten Sie die Anwendung neu.',
+    MC_SAMPLING_RUNTIME_DISPATCH_INVALID: 'Sampling-Lauf abgebrochen: Für die gewählte Methode existiert kein gültiger Laufzeitpfad. Wählen Sie eine verfügbare Methode.',
     SIMULATOR_REGIME_POOL_EMPTY: 'Regime-Sampling abgebrochen: Im wirksamen Jahresbereich fehlt das gezogene Marktregime. Setzen Sie die Startjahrgrenze früher oder wählen Sie eine andere Sampling-Methode.'
 });
 

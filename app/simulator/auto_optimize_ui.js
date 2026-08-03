@@ -179,7 +179,7 @@ function updateRunButtonState() {
     runBtn.disabled = !validateAutoOptimizeInputs();
 }
 
-async function handleRunAutoOptimize() {
+export async function handleRunAutoOptimize(dependencies = {}) {
     const runBtn = el('ao_run_btn');
     const progressEl = el('ao_progress');
     const resultEl = el('ao_result');
@@ -193,13 +193,13 @@ async function handleRunAutoOptimize() {
     applyBtn.style.display = 'none';
 
     try {
-        const config = readAutoOptimizeConfigFromUI();
+        const config = (dependencies.readConfig || readAutoOptimizeConfigFromUI)();
         config.onProgress = (status) => {
             const message = formatAutoOptimizeProgress(status);
             if (message) progressEl.textContent = message;
         };
 
-        const result = await runAutoOptimize(config);
+        const result = await (dependencies.run || runAutoOptimize)(config);
         window.aoChampionResult = result;
         renderAutoOptimizeResult({ resultEl, result, objective: config.objective });
         applyBtn.style.display = 'inline-block';

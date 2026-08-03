@@ -11,6 +11,7 @@ import {
     resolveMonteCarloWorkerCountV1
 } from '../app/simulator/monte-carlo-parameters.js';
 import { runMonteCarloSimulation } from '../app/simulator/monte-carlo-runner.js';
+import { runMonteCarlo } from '../app/simulator/simulator-monte-carlo.js';
 import {
     createMonteCarloUI,
     initMonteCarloResourceControls,
@@ -18,6 +19,64 @@ import {
 } from '../app/simulator/monte-carlo-ui.js';
 
 console.log('--- MonteCarloParametersV1 Contract Tests ---');
+
+{
+    const calls = {
+        workerConfig: 0,
+        confirmation: 0,
+        progress: 0,
+        serial: 0,
+        workers: 0,
+        errors: []
+    };
+    const ui = {
+        bindCancel() {}, beginRun() {}, disableStart() {}, hideError() {}, clearRunExport() {},
+        readUseCapeSampling: () => false,
+        readWorkerConfig: () => { calls.workerConfig++; return { workerCount: 1, timeBudgetMs: 50 }; },
+        requireLargeRunConfirmation: () => { calls.confirmation++; },
+        showProgress: () => { calls.progress++; },
+        updateProgress() {}, hideCompareResults() {},
+        showError: message => calls.errors.push(message),
+        finishProgress: async () => {}, unbindCancel() {}, finishRun() {}, enableStart() {}
+    };
+    const originalConsoleError = console.error;
+    console.error = () => {};
+    try {
+        await runMonteCarlo({
+            createUI: () => ui,
+            prepareHistoricalData: () => {},
+            getInputs: () => ({ startAlter: 65, partner: { aktiv: false }, stressPreset: 'NONE' }),
+            validateInputs: inputs => inputs,
+            readParameters: () => ({
+                anzahl: 100001,
+                maxDauer: 35,
+                blockSize: 5,
+                seed: 12345,
+                methode: 'block',
+                rngMode: 'per-run-seed',
+                startYearMode: 'FILTER',
+                startYearFilter: 2025,
+                startYearHalfLife: 20,
+                excludeEstimatedHistory: false
+            }),
+            annualData: [],
+            runSerial: async () => { calls.serial++; },
+            runWorkers: async () => { calls.workers++; }
+        });
+    } finally {
+        console.error = originalConsoleError;
+    }
+    assertEqual(calls.workerConfig, 0,
+        'real runMonteCarlo path rejects sampling before reading worker configuration');
+    assertEqual(calls.confirmation, 0,
+        'real runMonteCarlo path does not consume large-run confirmation before sampling preflight');
+    assertEqual(calls.progress, 0,
+        'real runMonteCarlo path does not show progress before sampling preflight');
+    assertEqual(calls.serial + calls.workers, 0,
+        'real runMonteCarlo path cannot dispatch serial or worker execution after failed preflight');
+    assert(calls.errors[0]?.includes('historische Jahresdatenbestand'),
+        'real runMonteCarlo path localizes the coded sampling failure');
+}
 
 function expectRejected(action, message) {
     let rejected = false;

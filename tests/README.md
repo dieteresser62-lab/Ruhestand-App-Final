@@ -4,7 +4,7 @@
 
 This directory contains the comprehensive testing infrastructure for the Ruhestand-App-Final project. The tests are designed to be zero-dependency, using native Node.js ESM and a custom test runner, avoiding the need for heavy frameworks like Jest or Mocha.
 
-**Test-Statistik:** 162 entdeckte Testdateien mit 18.039 von 18.039 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (Slice-11-Nachbesserung Runde 2 mit `npm test` und `npm run test:coverage` am 2026-08-03 verifiziert). Das separate Browser-Pflichtgate bestand mit 28/28 Workflows. Der Coverage-Lauf erreichte 78,52 Prozent Zeilenabdeckung (39.925/50.844); die obligatorischen Dateigates bestanden.
+**Test-Statistik:** 163 entdeckte Testdateien mit 18.191 von 18.191 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (Slice-13-Nachbesserung nach Claude-Review Runde 1 mit `npm test` und `npm run test:coverage` am 2026-08-03 verifiziert). Das separate Browser-Pflichtgate bestand mit 28/28 Workflows. Der Coverage-Lauf erreichte 78,97 Prozent Zeilenabdeckung (40.302/51.035); die obligatorischen Dateigates bestanden.
 
 Die Zahl beschreibt nur die Node-Standardsuite. `npm run test:browser`, `npm run test:coverage` und ein echter Tauri-Build sind getrennte Gates und in den Assertions nicht enthalten.
 
@@ -942,6 +942,19 @@ Pflege-/Todes-/Hinterbliebenenpfade werden getrennt geprueft.
 - **Messvertrag:** kanonische Input- und Row-Hashes, Non-Mutation, Metrikwoerterbuch, 2000/2001-Alignment sowie kontrollierte Abloesung von `legacy_schema_v0` durch `backtest_ui_state_v1`; Detailtoggle-Paritaet bleibt erhalten.
 - **Delta-Gate:** `BacktestTemporalDeltaReportV1` benennt jede geaenderte Metrik samt Ursache und berichtet Endvermoegens-, Ruinfall- sowie Downstream-Consumer-Auswirkungen; nicht gespeicherte Zieldeltas schlagen fehl. `CapeWageBacktestDeltaEvidenceV3` bleibt als bytegehashtes Slice-06-Archiv erhalten. `DemographyCareSurvivorBacktestDeltaEvidenceV1` bindet den neuen Sterbetafelhash, den Lohnnahtzeugen und fuer aktiven sowie CAPE-inaktiven Arm den direkten Slice-06-zu-Slice-07-Vergleich mit zehn exakten Kennzahlen. `Slice07To08LiquidityRunwayBacktestDeltaV1` misst davon getrennt die echte Runway-Slice-Wirkung; der CAPE-an/aus-Effekt innerhalb des aktuellen Laufs bleibt ein drittes separates Orakel. Pflege/Hinterbliebene sind im deterministischen Backtest inaktiv.
 - **Fixtures:** `fixtures/simulator-backtest-baseline-v1.json` und die bytegehashte Slice-06-V3-Evidenz bleiben read-only; `fixtures/simulator-backtest-target-v1.json` darf kontrolliert mit `UPDATE_BACKTEST_TARGET=1 node tests/run-single.mjs tests/simulator-backtest-characterization.test.mjs` erzeugt werden. Die Slice-07-Evidenz wird einmalig mit `CREATE_BACKTEST_DATA_07_DELTA=1` angelegt und danach nicht ueberschrieben. `fixtures/liquidity-runway-slice-08-measurement-v1.json` bleibt der unveraenderliche Slice-09-Eingang; `fixtures/minimum-flex-slice-09-measurement-v1.json` speichert getrennt das Slice-08-zu-09-Ledger und den D-17-Zeugen. Fuer CR10-14 belegt `minimum-flex-slice-09-added-case-financial-v1.json` die am Commit `2e4867f` nachgemessene Finanzbasis des zwoelften Falls; `node tests/reconstruct-slice09-d17.mjs` rekonstruiert diese Messung aus dem archivierten Commit. Das einzige autoritative 12/12-Ledger liegt als `Slice09To10FinancialDeltaLedgerV2` in `tax-logic-slice-10-backtest-measurement-v1.json` und kann kontrolliert mit `UPDATE_BACKTEST_DATA_10=1 node tests/run-single.mjs tests/simulator-backtest-characterization.test.mjs` aktualisiert werden.
+- **Slice-13-Integration:** `fixtures/backtest-data-integration-slice-13-v1.json`
+  pinnt acht echte Referenzfenster ab 1930, darunter ein dediziertes
+  Stagflationsfenster 1970-1982 und ein Crashfenster 2007-2010, die
+  SHA-256-Kette der Slice-2-bis-10-Deltaevidenzen und den inklusiven
+  26-Jahres-Lauf 2000-2025. Die Finanzneutralitaet der Slices 11 bis 13 wird
+  als Gleichheit des kanonischen 26-Jahres-Rowhashes gegen die Slice-12-Basis
+  gemessen.
+  Alle Referenzen muessen `portfolio_flow_delta < 1 EUR` halten. Der finale
+  Raw-JSON-Export bleibt bis zum extern geprueften Slice-13-Commit gesperrt.
+  Der Test misst Git-HEAD und Git-Status, bindet sie in die Runtime-Provenienz
+  und erwartet im Dirty-Tree `HISTORICAL_EXPORT_SOURCE_TREE_DIRTY`; auf einem
+  sauberen Commit muss dasselbe Gate in den erfolgreichen Exportzweig
+  umschlagen und einen Result-Fingerprint liefern.
 
 #### `simulator-real-withdrawal-contract.test.mjs`
 **Zweck:** Testet den Simulatorvertrag für echte Realentnahmen.

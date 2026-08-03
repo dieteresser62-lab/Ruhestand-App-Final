@@ -307,7 +307,7 @@ async function runMonteCarloWithWorkers({
  * @returns {Promise<void>} Promise, das nach Abschluss der Simulation aufgelöst wird
  * @throws {Error} Bei Validierungs- oder Berechnungsfehlern
  */
-export function runMonteCarlo() {
+export function runMonteCarlo(dependencies = {}) {
     if (activeMonteCarloRun) return activeMonteCarloRun.promise;
 
     const runState = {
@@ -316,7 +316,8 @@ export function runMonteCarlo() {
         status: 'running',
         ui: null,
         promise: null,
-        cancelPromise: null
+        cancelPromise: null,
+        dependencies: dependencies && typeof dependencies === 'object' ? dependencies : {}
     };
     activeMonteCarloRun = runState;
     runState.promise = executeMonteCarloRun(runState).finally(() => {
@@ -343,7 +344,8 @@ export function cancelMonteCarlo() {
 async function executeMonteCarloRun(runState) {
     const { generationId, controller } = runState;
     const { signal } = controller;
-    const ui = createMonteCarloUI();
+    const dependencies = runState.dependencies || {};
+    const ui = (dependencies.createUI || createMonteCarloUI)();
     runState.ui = ui;
     ui.bindCancel?.(() => cancelMonteCarlo());
     ui.beginRun?.();
@@ -358,8 +360,10 @@ async function executeMonteCarloRun(runState) {
 
     try {
         throwIfRunCancelled(signal, generationId);
-        prepareHistoricalDataOnce();
-        const inputs = validateSimulatorInputs(getCommonInputs());
+        (dependencies.prepareHistoricalData || prepareHistoricalDataOnce)();
+        const inputs = (dependencies.validateInputs || validateSimulatorInputs)(
+            (dependencies.getInputs || getCommonInputs)()
+        );
         const widowOptions = normalizeWidowOptions(inputs.widowOptions);
         const {
             anzahl,
@@ -372,7 +376,7 @@ async function executeMonteCarloRun(runState) {
             startYearFilter,
             startYearHalfLife,
             excludeEstimatedHistory
-        } = readMonteCarloParameters(inputs);
+        } = (dependencies.readParameters || readMonteCarloParameters)(inputs);
         const monteCarloParams = {
             anzahl,
             maxDauer,
@@ -386,10 +390,11 @@ async function executeMonteCarloRun(runState) {
             excludeEstimatedHistory
         };
         const useCapeSampling = ui.readUseCapeSampling();
-        resolveMonteCarloSamplingContractV1({
+        const effectiveAnnualData = dependencies.annualData || annualData;
+        (dependencies.resolveSamplingContract || resolveMonteCarloSamplingContractV1)({
             method: methode,
             inputs,
-            annualData,
+            annualData: effectiveAnnualData,
             useCapeSampling,
             startYearMode,
             startYearFilter,
@@ -397,7 +402,6 @@ async function executeMonteCarloRun(runState) {
             blockSize,
             excludeEstimatedHistory
         });
-
         const workerConfig = ui.readWorkerConfig();
         ui.requireLargeRunConfirmation(monteCarloParams);
         ui.showProgress();
@@ -412,7 +416,7 @@ async function executeMonteCarloRun(runState) {
 
         if (compareMode) {
             const serialStart = performance.now();
-            const serialResults = await runMonteCarloSimulation({
+            const serialResults = await (dependencies.runSerial || runMonteCarloSimulation)({
                 inputs,
                 widowOptions,
                 monteCarloParams,
@@ -429,7 +433,7 @@ async function executeMonteCarloRun(runState) {
             } else {
                 const workerStart = performance.now();
                 try {
-                    results = await runMonteCarloWithWorkers({
+                    results = await (dependencies.runWorkers || runMonteCarloWithWorkers)({
                         inputs,
                         widowOptions,
                         monteCarloParams,
@@ -453,7 +457,7 @@ async function executeMonteCarloRun(runState) {
             }
         } else if (useWorkers) {
             try {
-                results = await runMonteCarloWithWorkers({
+                results = await (dependencies.runWorkers || runMonteCarloWithWorkers)({
                     inputs,
                     widowOptions,
                     monteCarloParams,
@@ -474,7 +478,7 @@ async function executeMonteCarloRun(runState) {
 
         if (!results) {
             throwIfRunCancelled(signal, generationId);
-            results = await runMonteCarloSimulation({
+            results = await (dependencies.runSerial || runMonteCarloSimulation)({
                 inputs,
                 widowOptions,
                 monteCarloParams,

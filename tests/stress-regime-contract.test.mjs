@@ -17,6 +17,7 @@ import {
     formatSimulatorValidationError,
     SIMULATOR_CONTRACT_ERROR_MESSAGES_DE
 } from '../app/simulator/simulator-input-validation.js';
+import fs from 'node:fs';
 
 console.log('--- Stress And Regime Contract Tests ---');
 
@@ -111,23 +112,20 @@ assert(formatSimulatorValidationError({ code: 'SIMULATOR_STRESS_EFFECTIVE_POOL_E
     'Empty effective stress pools have a German filter-specific action message');
 assert(formatSimulatorValidationError({ code: 'SIMULATOR_STRESS_EFFECTIVE_POOL_TOO_SMALL' }).includes('synthetisches Stressszenario'),
     'Degenerate effective stress pools recommend a viable alternative');
-const expectedLocalizedCodes = [
-    'SIMULATOR_STRESS_PRESET_UNKNOWN',
-    'SIMULATOR_STRESS_POOL_EMPTY',
-    'SIMULATOR_STRESS_SEQUENCE_INVALID',
-    'SIMULATOR_STRESS_INPUT_INVALID',
-    'SIMULATOR_STRESS_EFFECTIVE_POOL_EMPTY',
-    'SIMULATOR_STRESS_EFFECTIVE_POOL_TOO_SMALL',
-    'SIMULATOR_REGIME_INPUT_INVALID',
-    'SIMULATOR_REGIME_TRANSITIONS_EMPTY',
-    'SIMULATOR_REGIME_DISTRIBUTION_DRIFT',
-    'SIMULATOR_REGIME_TRANSITIONS_INVALID',
-    'SIMULATOR_REGIME_TRANSITION_SELECTION_FAILED',
-    'MC_SAMPLING_REGIME_POOL_EMPTY',
-    'SIMULATOR_REGIME_POOL_EMPTY'
-];
+const simulatorSourceRoot = new URL('../app/simulator/', import.meta.url);
+const contractCodeSourceFiles = fs.readdirSync(simulatorSourceRoot, { recursive: true, withFileTypes: true })
+    .filter(entry => entry.isFile() && entry.name.endsWith('.js')
+        && entry.name !== 'simulator-input-validation.js')
+    .map(entry => `${entry.parentPath}/${entry.name}`);
+const expectedLocalizedCodes = [...new Set(contractCodeSourceFiles.flatMap(sourcePath => {
+    const source = fs.readFileSync(sourcePath, 'utf8');
+    return [...source.matchAll(/['`](SIMULATOR_(?:HISTORICAL|STRESS|REGIME)_[A-Z0-9_]+|MC_SAMPLING_[A-Z0-9_]+)['`]/g)]
+        .map(match => match[1]);
+}))].sort();
+assert(expectedLocalizedCodes.includes('SIMULATOR_HISTORICAL_DATA_UNAVAILABLE'),
+    'Thrown-code inventory is derived from the actual historical data failure sites');
 assertEqual(JSON.stringify(Object.keys(SIMULATOR_CONTRACT_ERROR_MESSAGES_DE).sort()),
-    JSON.stringify([...expectedLocalizedCodes].sort()),
+    JSON.stringify(expectedLocalizedCodes),
     'Every stress and regime contract code has one German UI message');
 for (const code of expectedLocalizedCodes) {
     const message = formatSimulatorValidationError({ code, message: `${code}: raw English` });

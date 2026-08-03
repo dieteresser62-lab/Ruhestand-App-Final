@@ -2,10 +2,11 @@
 
 **Pruefdatum:** 2026-07-29
 **Pruefer:** Claude (Primary reviewer & Analyst)
-**Status:** Korrekturprogramm in Umsetzung; Slice 01 bis 11 extern technisch
-freigegeben und lokal committed. Slice 12 verwendet das vollstaendige
-Slice-11-Ergebnisdokument als Eingangsgrenze, ist technisch umgesetzt und
-selbstgeprueft; externes Review, Freigabe und Commit stehen aus
+**Status:** Korrekturprogramm in Umsetzung; Slice 01 bis 12 extern technisch
+freigegeben und lokal committed. Slice 13 verwendet das vollstaendige
+Slice-12-Ergebnisdokument als Eingangsgrenze und ist bis zum externen
+Review-/Commit- und Exportfinalisierungsgate technisch umgesetzt; Freigabe,
+Commit und finaler provenance-korrekter Export stehen aus
 **Pruefgegenstand:** Exportdatei
 `backtest-2000-2025-89fc3e368d64-2026-07-29T10-00-22.287Z.json`
 **Anlass:** Nutzerseitige Verifikation nach Abschluss der Suite-Datenintegritaet-
@@ -1563,6 +1564,25 @@ Fallbacks bleiben sichtbar und fachlich begrenzt.
 - Vorhandene Preset-Namen versprechen keine historische Exaktheit ohne Beleg.
 
 ### Slice 13 - Gesamtintegration und neue Referenz-Backtests
+
+**Slice-Dokument:**
+[`SLICE_BACKTEST_DATENPRUEFUNG_13_GESAMTINTEGRATION_REFERENZBACKTESTS.md`](SLICE_BACKTEST_DATENPRUEFUNG_13_GESAMTINTEGRATION_REFERENZBACKTESTS.md)
+
+**Umsetzungsstatus:** am 2026-08-03 auf Basis des vollstaendigen
+Slice-12-Ergebnisdokuments begonnen und bis zum externen Review-/Commit-Gate
+technisch umgesetzt. Claudes erste Slice-13-Pruefung fand die Blocker CR13-1
+und CR13-2 sowie CR13-3 bis CR13-9; alle neun Findings sind technisch
+nachgebessert und warten auf das externe Re-Review. Acht feste
+Referenzfenster einschliesslich 1970-1982 und 2007-2010 sowie die
+Slice-2-bis-10-Evidenzhashes sind im
+`BacktestDataIntegrationSlice13V1` gepinnt. Der inklusive 26-Jahres-Lauf
+2000-2025 endet im Kandidaten bei 5.829.580,79 EUR, 805.112,51 EUR Entnahmen,
+114.306,75 EUR Steuern und 0 EUR maximalem FlowDelta. Git-HEAD und Git-Status
+werden fuer den Lauf gemessen; im Dirty-Tree wird
+`HISTORICAL_EXPORT_SOURCE_TREE_DIRTY` verlangt, auf einem sauberen Commit muss
+dasselbe Gate den fingerprintgebundenen Raw-Export erzeugen. Die erneuten
+Pflichtgate-Ergebnisse werden nach Abschluss der Nachbesserung eingetragen;
+Re-Review, Freigabe und Commit stehen aus.
 
 **Abhaengigkeiten:** Slices 2 bis 12.
 
