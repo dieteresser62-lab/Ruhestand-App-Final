@@ -89,11 +89,83 @@ const crashYear = {
 function makeStubEngine({
     monthlyWithdrawal,
     actionTax,
-    actionTaxableRaw = 1000,
-    actionSources = [{ kind: 'aktien_alt', brutto: 1000, steuer: actionTax, netto: 1000 - actionTax }]
+    actionTaxableRaw = 0,
+    actionSources = null
 }) {
     return {
-        simulateSingleYear: (_engineInput, lastState) => ({
+        simulateSingleYear: (engineInput, lastState) => {
+            const generatedSources = (() => {
+                const lot = engineInput.detailledTranches?.find(item => item.type === 'aktien_alt');
+                if (!lot) return [];
+                const gainQuote = lot.marketValue > 0
+                    ? (lot.marketValue - lot.costBasis) / lot.marketValue
+                    : 0;
+                const taxableFactor = lot.taxExempt ? 0 : (1 - lot.tqf);
+                const taxablePerGross = gainQuote * taxableFactor;
+                const keSt = 0.25 * (1 + 0.055 + (Number(engineInput.kirchensteuerSatz) || 0));
+                const lossCarry = Math.max(0, Number(lastState?.taxState?.lossCarry) || 0);
+                const spb = Math.max(0, Number(engineInput.sparerPauschbetrag) || 0);
+                const desiredTaxable = actionTax > 0
+                    ? lossCarry + spb + (actionTax / keSt)
+                    : 0;
+                const grossForTargetTax = actionTax > 0 && taxablePerGross > 0
+                    ? desiredTaxable / taxablePerGross
+                    : 1000;
+                const brutto = Math.min(grossForTargetTax, lot.marketValue);
+                const realizedGainSigned = brutto * gainQuote;
+                const taxableAfterTqfSigned = realizedGainSigned * taxableFactor;
+                return [{
+                    kind: lot.type,
+                    trancheId: lot.trancheId,
+                    ...(lot.sourceProfileId ? { sourceProfileId: lot.sourceProfileId } : {}),
+                    brutto,
+                    steuer: 0,
+                    netto: brutto,
+                    realizedGainSigned,
+                    taxableAfterTqfSigned
+                }];
+            })();
+            const plannedSources = actionSources === null ? generatedSources : actionSources;
+            const hasSale = plannedSources.length > 0;
+            const realizedAggregate = hasSale
+                ? plannedSources.reduce((total, source) => total + source.realizedGainSigned, 0)
+                : actionTaxableRaw;
+            const taxableAggregate = hasSale
+                ? plannedSources.reduce((total, source) => total + source.taxableAfterTqfSigned, 0)
+                : actionTaxableRaw;
+            const taxRawAggregate = {
+                sumRealizedGainSigned: realizedAggregate,
+                sumTaxableAfterTqfSigned: taxableAggregate
+            };
+            const taxSettlement = settleTaxYear({
+                taxStatePrev: lastState?.taxState,
+                rawAggregate: taxRawAggregate,
+                sparerPauschbetrag: engineInput.sparerPauschbetrag,
+                kirchensteuerSatz: engineInput.kirchensteuerSatz
+            });
+            const positiveTaxableTotal = plannedSources.reduce(
+                (total, source) => total + Math.max(0, Number(source.taxableAfterTqfSigned) || 0),
+                0
+            );
+            let allocatedTax = 0;
+            const positiveSourceIndices = plannedSources
+                .map((source, index) => ((Number(source.taxableAfterTqfSigned) || 0) > 0 ? index : -1))
+                .filter(index => index >= 0);
+            const lastPositiveSourceIndex = positiveSourceIndices.at(-1);
+            const resolvedSources = plannedSources.map((source, index) => {
+                const taxable = Math.max(0, Number(source.taxableAfterTqfSigned) || 0);
+                const sourceTax = index === lastPositiveSourceIndex
+                    ? taxSettlement.taxDue - allocatedTax
+                    : (positiveTaxableTotal > 0 ? taxSettlement.taxDue * (taxable / positiveTaxableTotal) : 0);
+                allocatedTax += sourceTax;
+                return {
+                    ...source,
+                    steuer: sourceTax,
+                    netto: source.brutto - sourceTax
+                };
+            });
+            const actionNet = resolvedSources.reduce((total, source) => total + source.netto, 0);
+            return ({
             ui: {
                 spending: {
                     monatlicheEntnahme: monthlyWithdrawal,
@@ -101,26 +173,18 @@ function makeStubEngine({
                     details: { flexRate: 1 }
                 },
                 action: {
-                    type: 'TRANSACTION',
+                    type: hasSale ? 'TRANSACTION' : 'NONE',
                     title: 'Test Transaction',
                     anweisungKlasse: 'anweisung-gelb',
-                    quellen: actionSources,
-                    verwendungen: {},
-                    nettoErlös: 1000 - actionTax,
-                    steuer: actionTax,
+                    quellen: resolvedSources,
+                    verwendungen: hasSale
+                        ? { liquiditaet: actionNet, gold: 0, aktien: 0 }
+                        : {},
+                    nettoErlös: actionNet,
+                    steuer: taxSettlement.taxDue,
                     pauschbetragVerbraucht: 0,
-                    taxRawAggregate: {
-                        sumRealizedGainSigned: actionTaxableRaw,
-                        sumTaxableAfterTqfSigned: actionTaxableRaw
-                    },
-                    taxSettlement: {
-                        sumTaxableAfterTqfSigned: actionTaxableRaw,
-                        lossCarryStart: Number(lastState?.taxState?.lossCarry) || 0,
-                        taxBeforeLossCarry: actionTax,
-                        taxAfterLossCarry: actionTax,
-                        taxSavedByLossCarry: 0,
-                        spbUsedThisYear: 0
-                    },
+                    taxRawAggregate,
+                    taxSettlement: taxSettlement.details,
                     transactionDiagnostics: { blockReason: 'none' }
                 },
                 market: { szenarioText: 'test' },
@@ -133,9 +197,10 @@ function makeStubEngine({
                 alarmActive: false,
                 lastMarketSKey: 'BULL',
                 cumulativeInflationFactor: 1,
-                taxState: { lossCarry: Number(lastState?.taxState?.lossCarry) || 0 }
+                taxState: taxSettlement.taxStateNext
             }
-        })
+            });
+        }
     };
 }
 
@@ -507,7 +572,26 @@ function makeStubEngine({
 // 1) Forced sale path: settlement must be recomputed with combined raw aggregate.
 {
     const inputs = buildInputs();
-    const state = buildState();
+    const state = buildState({
+        portfolio: {
+            depotTranchesAktien: [
+                {
+                    marketValue: 10000,
+                    costBasis: 3000,
+                    type: 'aktien_alt',
+                    purchaseDate: '1990-01-01'
+                },
+                {
+                    marketValue: 590000,
+                    costBasis: 900000,
+                    type: 'aktien_alt',
+                    purchaseDate: '2000-01-01'
+                }
+            ],
+            depotTranchesGold: [],
+            liquiditaet: 0
+        }
+    });
     const engine = makeStubEngine({ monthlyWithdrawal: 10000, actionTax: 100 });
     const result = simulateOneYear(state, inputs, crashYear, 0, null, 0, null, 1, engine);
 
@@ -546,8 +630,8 @@ function makeStubEngine({
 
     assert(!result.isRuin, 'No-forced-sale scenario should return a valid result');
     assert(result.ui?.action?.taxSettlement?.recomputedWithForcedSales === false, 'No-forced-sale scenario must keep recompute=false');
-    assert(result.ui?.action?.steuer === 77, 'No-forced-sale scenario should keep engine settlement tax');
-    assert(result.totalTaxesThisYear === 77, 'Year tax should come from action.steuer directly');
+    assertClose(result.ui?.action?.steuer, 77, 1e-9, 'No-forced-sale scenario should keep engine settlement tax');
+    assertClose(result.totalTaxesThisYear, 77, 1e-9, 'Year tax should come from action.steuer directly');
     assertClose(result.ui.action.taxSettlement.taxCashAdjustment, 0, 1e-9,
         'Scale-1 year without forced sale should not run simulator cash reconciliation');
 }

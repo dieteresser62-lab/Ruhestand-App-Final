@@ -2,12 +2,21 @@ import { simulateOneYear } from '../app/simulator/simulator-engine-direct.js';
 import { applyBondRefillPostprocessing } from '../app/simulator/simulator-bond-refill.js';
 import { buildTaxRawAggregate } from '../app/simulator/simulator-tax-recompute.js';
 import { sumDepot } from '../app/simulator/simulator-portfolio.js';
+import { settleTaxYear } from '../engine/tax-settlement.mjs';
 
 console.log('--- 3-Bucket Refill Tests ---');
 
 function createMockEngine({ spending, action, marketSKey = 'hot_neutral' }) {
     return {
-        simulateSingleYear() {
+        simulateSingleYear(engineInput, lastState) {
+            const taxRawAggregate = action?.taxRawAggregate
+                || { sumRealizedGainSigned: 0, sumTaxableAfterTqfSigned: 0 };
+            const taxSettlement = settleTaxYear({
+                taxStatePrev: lastState?.taxState,
+                rawAggregate: taxRawAggregate,
+                sparerPauschbetrag: engineInput?.sparerPauschbetrag,
+                kirchensteuerSatz: engineInput?.kirchensteuerSatz
+            });
             return {
                 ui: {
                     spending: {
@@ -17,12 +26,13 @@ function createMockEngine({ spending, action, marketSKey = 'hot_neutral' }) {
                         details: {}
                     },
                     action: {
-                        type: action?.type || 'HOLD',
+                        type: action?.type || 'NONE',
                         quellen: action?.quellen || [],
                         nettoErlös: action?.nettoErlös || 0,
                         steuer: action?.steuer || 0,
                         verwendungen: action?.verwendungen || { gold: 0, aktien: 0 },
-                        taxRawAggregate: action?.taxRawAggregate || { sumRealizedGainSigned: 0, sumTaxableAfterTqfSigned: 0 }
+                        taxRawAggregate,
+                        taxSettlement: taxSettlement.details
                     },
                     market: { sKey: marketSKey, szenarioText: marketSKey },
                     zielLiquiditaet: 0,
@@ -34,7 +44,7 @@ function createMockEngine({ spending, action, marketSKey = 'hot_neutral' }) {
                     alarmActive: false,
                     lastMarketSKey: marketSKey,
                     cumulativeInflationFactor: 1,
-                    taxState: { lossCarry: 0 }
+                    taxState: taxSettlement.taxStateNext
                 }
             };
         }
@@ -216,8 +226,24 @@ function baseState(portfolio) {
 {
     const state = baseState({
         depotTranchesAktien: [
-            { type: 'aktien_neu', category: 'equity', marketValue: 100000, costBasis: 100000, tqf: 0.3 },
-            { type: 'anleihe', category: 'bonds', marketValue: 20000, costBasis: 20000, tqf: 0.0 }
+            {
+                trancheId: 'eq-bad-year',
+                type: 'aktien_neu',
+                category: 'equity',
+                marketValue: 100000,
+                costBasis: 100000,
+                tqf: 0.3,
+                taxExempt: false
+            },
+            {
+                trancheId: 'bond-bad-year',
+                type: 'anleihe',
+                category: 'bonds',
+                marketValue: 20000,
+                costBasis: 20000,
+                tqf: 0.0,
+                taxExempt: false
+            }
         ],
         depotTranchesGold: [],
         depotTranchesGeldmarkt: [],
@@ -230,9 +256,22 @@ function baseState(portfolio) {
         spending: { monatlicheEntnahme: 0 },
         action: {
             type: 'TRANSACTION',
-            quellen: [{ kind: 'aktien_neu', brutto: 10000, steuer: 100, netto: 9900 }],
-            nettoErlös: 9900,
-            steuer: 100
+            quellen: [{
+                kind: 'aktien_neu',
+                trancheId: 'eq-bad-year',
+                brutto: 10000,
+                steuer: 0,
+                netto: 10000,
+                realizedGainSigned: -4285.714285714286,
+                taxableAfterTqfSigned: -3000
+            }],
+            nettoErlös: 10000,
+            steuer: 0,
+            verwendungen: { liquiditaet: 10000, gold: 0, aktien: 0 },
+            taxRawAggregate: {
+                sumRealizedGainSigned: -4285.714285714286,
+                sumTaxableAfterTqfSigned: -3000
+            }
         }
     });
     const yearData = { rendite: -0.3, gold_eur_perf: 0, zinssatz: 0, inflation: 2, jahr: 2008 };
@@ -245,6 +284,29 @@ function baseState(portfolio) {
     assert(result.logData.threeBucket.isBadYear === true, 'bad year marker should be logged');
     assert(result.logData.threeBucket.bondSaleAmount > 0, 'bond sale amount should be logged in bad year');
     assert(result.logData.threeBucket.equityPreserved >= 10000, 'blocked equity sale should be tracked as preserved');
+    assert(result.ui.action.taxSettlement.recomputedAfterActionTransform === true,
+        'bad-year 3-bucket replacement must centrally settle the transformed action');
+    assertClose(result.newState.lastState.taxState.lossCarry, 0, 1e-9,
+        'final bond-sale aggregate must replace the blocked equity-loss aggregate in tax state');
+    const executedTaxContract = result.ui.action.taxSettlement.executedTaxContract;
+    const plannedSourceTax = result.ui.action.plannedActionFlow.quellen.reduce(
+        (total, source) => total + source.steuer,
+        0
+    );
+    assert(executedTaxContract.schemaVersion === 'SimulatorExecutedTaxContractV1',
+        'post-execution action must expose its versioned annual-tax reconciliation');
+    assert(executedTaxContract.status === 'reconciled',
+        'post-execution action must report a reconciled reserve-to-settlement contract');
+    assertClose(plannedSourceTax, result.ui.action.plannedActionFlow.steuer, 1e-9,
+        'nested pre-execution plan must retain source/action tax consistency');
+    assertClose(executedTaxContract.finalAnnualTax, result.ui.action.steuer, 1e-9,
+        'legacy top-level action tax must be identified and reconciled as final annual tax');
+    assertClose(
+        executedTaxContract.rawTaxCashAdjustment,
+        executedTaxContract.taxReservedTotal - executedTaxContract.finalAnnualTax,
+        1e-9,
+        'executed contract must explain the reserve-to-final-tax cash adjustment'
+    );
 }
 
 {
@@ -261,7 +323,7 @@ function baseState(portfolio) {
     const inputs = baseInputs();
     const engine = createMockEngine({
         spending: { monatlicheEntnahme: 1000 },
-        action: { type: 'HOLD', quellen: [], nettoErlös: 0, steuer: 0 }
+        action: { type: 'NONE', quellen: [], nettoErlös: 0, steuer: 0 }
     });
     const yearData = { rendite: 0.1, gold_eur_perf: 0, zinssatz: 0, inflation: 2, jahr: 2010 };
     const result = simulateOneYear(state, inputs, yearData, 0, null, 0, null, 1, engine);
@@ -294,7 +356,7 @@ function baseState(portfolio) {
     });
     const engine = createMockEngine({
         spending: { monatlicheEntnahme: 0 },
-        action: { type: 'HOLD', quellen: [], nettoErlös: 0, steuer: 0 }
+        action: { type: 'NONE', quellen: [], nettoErlös: 0, steuer: 0 }
     });
     const yearData = { rendite: -0.3, gold_eur_perf: 0, zinssatz: 3, inflation: 2, jahr: 2015 };
     const result = simulateOneYear(state, inputs, yearData, 0, null, 0, null, 1, engine);
@@ -307,8 +369,24 @@ function baseState(portfolio) {
 {
     const state = baseState({
         depotTranchesAktien: [
-            { type: 'aktien_neu', category: 'equity', marketValue: 200000, costBasis: 180000, tqf: 0.3 },
-            { type: 'anleihe', category: 'bonds', marketValue: 50000, costBasis: 50000, tqf: 0.0 }
+            {
+                trancheId: 'eq-standard-sale',
+                type: 'aktien_neu',
+                category: 'equity',
+                marketValue: 200000,
+                costBasis: 200000,
+                tqf: 0.3,
+                taxExempt: false
+            },
+            {
+                trancheId: 'bond-standard-sale',
+                type: 'anleihe',
+                category: 'bonds',
+                marketValue: 50000,
+                costBasis: 50000,
+                tqf: 0.0,
+                taxExempt: false
+            }
         ],
         depotTranchesGold: [],
         depotTranchesGeldmarkt: [],
@@ -328,10 +406,22 @@ function baseState(portfolio) {
         spending: { monatlicheEntnahme: 0 },
         action: {
             type: 'TRANSACTION',
-            quellen: [{ kind: 'aktien_neu', brutto: 50000, steuer: 0, netto: 50000 }],
+            quellen: [{
+                kind: 'aktien_neu',
+                trancheId: 'eq-standard-sale',
+                brutto: 50000,
+                steuer: 0,
+                netto: 50000,
+                realizedGainSigned: 0,
+                taxableAfterTqfSigned: 0
+            }],
             nettoErlös: 50000,
             steuer: 0,
-            verwendungen: { gold: 0, aktien: 0 }
+            verwendungen: { liquiditaet: 50000, gold: 0, aktien: 0 },
+            taxRawAggregate: {
+                sumRealizedGainSigned: 0,
+                sumTaxableAfterTqfSigned: 0
+            }
         }
     });
     const yearData = { rendite: 0, gold_eur_perf: 0, zinssatz: 0, inflation: 0, jahr: 2021 };

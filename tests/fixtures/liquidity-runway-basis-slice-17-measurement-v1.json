@@ -1,0 +1,106 @@
+{
+  "schemaVersion": "LiquidityRunwayBasisSlice17MeasurementV1",
+  "snapshotId": "post-backtest-data-17-v1",
+  "sourceCommit": "54c055fbab5eb9884e1142e0158bbfade95e063e",
+  "targetResultDocument": "docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_17_RUNWAY_BASIS_BUGFIX.md",
+  "reviewStatus": "pending_external_review",
+  "personalReplayDataIncluded": false,
+  "contract": {
+    "annualNeedBasis": "post_policy_final_quantized_net_portfolio_withdrawal",
+    "prePolicyRunwayRole": "spending_planner_and_dynamic_flex_safety",
+    "dynamicFlexSafetyBasis": "pre_policy_annual_net_need",
+    "grossEmergencyBufferRole": "separate_target_lower_bound",
+    "historicalBacktestInputSemantics": "HistoricalBacktestInputSemanticsV2"
+  },
+  "backtest": {
+    "caseCount": 12,
+    "integratedReferenceDelta": {
+      "delta": {
+        "canonicalRowsHashChanged": true,
+        "cause": "planned_withdrawal_controls_liquidity_while_safety_retains_pre_policy_need",
+        "observedRowCount": 0,
+        "outcomeChanged": false,
+        "summaryEndWealth": 61216.21,
+        "totalTax": -4728.92,
+        "totalWithdrawal": -1562.2
+      },
+      "id": "integrated_reference_2000_2025",
+      "source": {
+        "canonicalRowsHash": "9de469d6dff25a9a9b93ad8c51285b6db945561a54ec1a9538f4375904b753ff",
+        "observedRowCount": 26,
+        "outcome": "completed",
+        "summaryEndWealth": 5829580.79,
+        "totalTax": 114306.75,
+        "totalWithdrawal": 805112.51
+      },
+      "target": {
+        "canonicalRowsHash": "49aada4625b1992db0e45a29d8e16b03934fe32fe5c9a36cd0e573df0f52b0c3",
+        "maxAbsolutePortfolioFlowDelta": 0,
+        "observedRowCount": 26,
+        "outcome": "completed",
+        "summaryEndWealth": 5890797,
+        "totalTax": 109577.83,
+        "totalWithdrawal": 803550.31
+      }
+    },
+    "maxAbsolutePortfolioFlowDelta": 0,
+    "negativeCaseCount": 5,
+    "preservedCrossSliceRuntimeBinding": {
+      "crossSliceOracleProjectionSha256": "efff8eb80137348c4566ed870acbfb67a9781f2894cadd82f886ae283c810142",
+      "slice09To10DeltaLedgerSha256": "30a2c212ae75c72e974132b16f617f7fd6e03c1b1fd040f87918bbb3bba4b621",
+      "sourceFixtureSha256": "13d6f6cff7aa3e0f6ee109601f8951620c9f908505bd109513f8d8487f491eb5",
+      "sourceReference": "post-backtest-data-10-v1"
+    },
+    "referenceCaseCount": 8,
+    "reviewStatus": "pending_external_review",
+    "ruinCaseCount": 1,
+    "schemaVersion": "LiquidityRunwayBasisSlice17BacktestMeasurementV1",
+    "sourceFixtureSha256": "49ab47b46c844bc32db3a07cf1b9bbc53b2635e5290168afce93bab6d9e33ffa",
+    "sourceReference": "BacktestDataIntegrationSlice13V1",
+    "targetActualSha256": "47b325c50727cd8ab5efe75b5980385a1b2a7647dd3863c1e369066dc02085f8",
+    "targetResultDocument": "docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_17_RUNWAY_BASIS_BUGFIX.md"
+  },
+  "monteCarlo": {
+    "schemaVersion": "LiquidityRunwayBasisSlice17MonteCarloMeasurementV1",
+    "sourceReference": "post-backtest-data-10-v1",
+    "sourceFixtureSha256": "f6d0b4fab497d63d9a7a12eaaeda307b9ee01163585ebc97bbb48569d82935ba",
+    "targetResultDocument": "docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_17_RUNWAY_BASIS_BUGFIX.md",
+    "reviewStatus": "pending_external_review",
+    "sourceProjectionHashes": {
+      "carResultSha256": "a0285fd9db124002c1d0b19df0a291a529d7597077223c00febdde5694f04a7a",
+      "autoOptimizeResultSha256": "6bdae6a888f953d5883e7282ebaab52ac950a1e7d8181230507f3afe01e7505c",
+      "finalResultSha256": "ce35cc8ed7ebfec25ed4c3ba44b66bf2c074bc6685b735628dd2780615459ff9"
+    },
+    "targetProjectionHashes": {
+      "carResultSha256": "ff9233e3142eb78e9e8eefb3c426778c8a8b8899106c09a60cfd719b120085fc",
+      "autoOptimizeResultSha256": "18fc45b4466d3b0027600ab43b2795143bc287b98e99581fd970cb043b207da3",
+      "finalResultSha256": "3184117cc52b6e1a50c0752fb166ecfbc75070b1684cc8454ec60b6a327f8b1a"
+    },
+    "measuredProjectionCount": 3,
+    "cause": "planned_withdrawal_controls_liquidity_while_safety_retains_pre_policy_need"
+  },
+  "demography": {
+    "schemaVersion": "LiquidityRunwayBasisSlice17DemographyMeasurementV1",
+    "sourceReference": "post-backtest-data-10-v1",
+    "sourceFixtureSha256": "72e4325425b37415b2ad8e4eea52103e42b4d01b7926b6049421a1560118b153",
+    "sourceMeasurementSha256": "10e50f9e6aa72716df3d4a4f7e1ede0a25936fe8594c22bca69f5e6ad600ce06",
+    "targetMeasurementSha256": "53f0378427ef955d3b3bfdf49ea59773765c2573bb1a2509d7e34d1fb04fd60c",
+    "cause": "planned_withdrawal_controls_liquidity_while_safety_retains_pre_policy_need"
+  },
+  "historicalExport": {
+    "sourceInputSemantics": "HistoricalBacktestInputSemanticsV1",
+    "targetInputSemantics": "HistoricalBacktestInputSemanticsV2",
+    "sourceSyntheticFingerprint": "00a3f3aa4b5b735beb868e8cfb0bb5d856e64150c2ba8d3297980660fdfdc506",
+    "targetSyntheticFingerprint": "62d59323d6375bcad1821a62a9385950c3a6cb15562f1444f349fc84be75a3b4"
+  },
+  "syntheticWitness": {
+    "rawVpwAnnualNeed": 430124.75266668544,
+    "finalPlannedAnnualWithdrawal": 153000,
+    "sourceRawVpwTarget": 2150700,
+    "targetPostPolicyLiquidity": 765000,
+    "surplusInvestedInEquity": 35000,
+    "postTransactionRunwayMonths": 60,
+    "dynamicFlexSafetyRunwayMonths": 21.342645228124816,
+    "dynamicFlexSafetyBasis": "pre_policy_annual_net_need"
+  }
+}

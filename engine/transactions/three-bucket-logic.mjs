@@ -64,10 +64,41 @@ function nonLiquidSaleSources(action) {
         .filter(source => source?.kind && !isLiquiditySource(source) && (Number(source.brutto) || 0) > 0);
 }
 
+function reconcileUsesToAchievedNet(verwendungen, achievedNet) {
+    if (!verwendungen || typeof verwendungen !== 'object' || Array.isArray(verwendungen)) {
+        return verwendungen;
+    }
+    const entries = Object.entries(verwendungen);
+    if (entries.some(([, value]) => typeof value !== 'number' || !Number.isFinite(value) || value < 0)) {
+        return verwendungen;
+    }
+    const target = Math.max(0, Number(achievedNet) || 0);
+    const requested = entries.reduce((total, [, value]) => total + value, 0);
+    if (requested <= target + 0.01) return { ...verwendungen };
+    if (target === 0) {
+        return Object.fromEntries(entries.map(([key]) => [key, 0]));
+    }
+
+    const positiveIndices = entries
+        .map(([, value], index) => (value > 0 ? index : -1))
+        .filter(index => index >= 0);
+    const lastPositiveIndex = positiveIndices.at(-1);
+    const factor = target / requested;
+    let allocated = 0;
+    return Object.fromEntries(entries.map(([key, value], index) => {
+        if (value <= 0) return [key, 0];
+        const scaled = index === lastPositiveIndex
+            ? Math.max(0, target - allocated)
+            : value * factor;
+        allocated += scaled;
+        return [key, scaled];
+    }));
+}
+
 function lotReservationKey(entry) {
     const trancheId = String(entry?.trancheId || '').trim();
     if (!trancheId) return null;
-    return `${String(entry?.sourceProfileId || '').trim()}:${trancheId}`;
+    return JSON.stringify([String(entry?.sourceProfileId || '').trim(), trancheId]);
 }
 
 function threeBucketContractError(message, context = {}) {
@@ -286,6 +317,10 @@ export function applyThreeBucketLogic(
 
             updatedAction.nettoErlös = bondSale.achievedRefill || 0;
             updatedAction.steuer = bondSale.steuerGesamt || 0;
+            updatedAction.verwendungen = reconcileUsesToAchievedNet(
+                updatedAction.verwendungen,
+                updatedAction.nettoErlös
+            );
             updatedAction.taxRawAggregate = {
                 sumRealizedGainSigned: Number(bondSale.taxRawAggregate?.sumRealizedGainSigned) || 0,
                 sumTaxableAfterTqfSigned: Number(bondSale.taxRawAggregate?.sumTaxableAfterTqfSigned) || 0
@@ -300,6 +335,11 @@ export function applyThreeBucketLogic(
             updatedAction.quellen = [];
             updatedAction.nettoErlös = 0;
             updatedAction.steuer = 0;
+            updatedAction.verwendungen = reconcileUsesToAchievedNet(updatedAction.verwendungen, 0);
+            updatedAction.taxRawAggregate = {
+                sumRealizedGainSigned: 0,
+                sumTaxableAfterTqfSigned: 0
+            };
             threeBucketState.unmetLiquidity = requestedNetto;
         } else {
             // No sales requested

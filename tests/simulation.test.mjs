@@ -625,6 +625,7 @@ try {
     assert(result.logData.RunwayTargetSmoothingApplied === true, 'Year result should expose runway smoothing applied flag');
     assert(result.logData.RunwayTargetSeverityPct === 50, 'Year result should expose runway smoothing severity');
     assert(result.logData.RunwayTargetHardMinMonths === 24, 'Year result should expose hard minimum runway');
+    assertEqual(result.logData.entscheidung.runwayMonths, 20, 'Post-payout runway should use the final planned annual withdrawal');
     assert(result.logData.balance_trace[0].phase === 'after_payout', 'Year result should expose raw balance trace phases');
     assert(result.logData.health_bucket_end === 30000, 'Year result should expose locked health bucket at year end');
     assert(result.logData.health_bucket_warning.includes('gekappt'), 'Year result should expose health bucket warnings');
@@ -657,12 +658,56 @@ try {
     assertEqual(zeroMetricResult.logData.FlexRatePct, 0, 'Observed flex-rate zero should remain zero');
     assertEqual(zeroMetricResult.logData.RunwayCoveragePct, 0, 'Observed runway coverage zero should remain zero');
 
+    const postPolicyRunwayResult = buildSimulatorYearResult({
+        ...yearResultArgs,
+        fullResult: {
+            ...yearResultArgs.fullResult,
+            ui: {
+                ...yearResultArgs.fullResult.ui,
+                neuerBedarf: 120000
+            }
+        }
+    });
+    assertEqual(postPolicyRunwayResult.logData.entscheidung.runwayMonths, 20, 'Post-payout runway must ignore the raw pre-policy need when the final plan is lower');
+
+    let conflictingWithdrawalSourcesError = null;
+    try {
+        buildSimulatorYearResult({
+            ...yearResultArgs,
+            jahresEntnahmePlan: 12000,
+            spendingResult: {
+                ...yearResultArgs.spendingResult,
+                monatlicheEntnahme: 1000,
+                details: {
+                    ...yearResultArgs.spendingResult.details,
+                    endgueltigeEntnahme: 24000
+                }
+            }
+        });
+    } catch (error) {
+        conflictingWithdrawalSourcesError = error;
+    }
+    assertEqual(conflictingWithdrawalSourcesError?.context?.contract, 'planned_annual_withdrawal',
+        'Conflicting annual withdrawal sources must fail closed instead of choosing an opposite priority');
+
+    let nullAnnualPlanError = null;
+    try {
+        buildSimulatorYearResult({
+            ...yearResultArgs,
+            jahresEntnahmePlan: null
+        });
+    } catch (error) {
+        nullAnnualPlanError = error;
+    }
+    assertEqual(nullAnnualPlanError?.context?.contract, 'planned_annual_withdrawal',
+        'An explicit null annual plan must not be treated as a missing representation');
+    assertEqual(nullAnnualPlanError?.context?.status, 'invalid',
+        'An explicit null annual plan must retain its invalid reconciliation status');
+
     const missingMetricResult = buildSimulatorYearResult({
         ...yearResultArgs,
-        spendingResult: {
-            ...yearResultArgs.spendingResult,
-            details: {}
-        },
+        jahresEntnahmePlan: undefined,
+        spendingResult: { details: {} },
         fullResult: {
             ...yearResultArgs.fullResult,
             ui: {
@@ -680,6 +725,15 @@ try {
         ...yearResultArgs,
         liquiditaet: 0,
         zielLiquiditaet: 0,
+        jahresEntnahmePlan: 0,
+        spendingResult: {
+            ...yearResultArgs.spendingResult,
+            monatlicheEntnahme: 0,
+            details: {
+                ...yearResultArgs.spendingResult.details,
+                endgueltigeEntnahme: 0
+            }
+        },
         fullResult: {
             ...yearResultArgs.fullResult,
             ui: {
@@ -695,6 +749,14 @@ try {
         ...yearResultArgs,
         jahresEntnahmePlan: 30000,
         jahresEntnahmeEffektiv: 26000,
+        spendingResult: {
+            ...yearResultArgs.spendingResult,
+            monatlicheEntnahme: 2500,
+            details: {
+                ...yearResultArgs.spendingResult.details,
+                endgueltigeEntnahme: 30000
+            }
+        },
         fullResult: {
             ...yearResultArgs.fullResult,
             input: { flexBedarf: 6000 },
@@ -723,6 +785,14 @@ try {
         pensionAnnual: 26000,
         jahresEntnahmePlan: 27000,
         jahresEntnahmeEffektiv: 26500,
+        spendingResult: {
+            ...yearResultArgs.spendingResult,
+            monatlicheEntnahme: 2250,
+            details: {
+                ...yearResultArgs.spendingResult.details,
+                endgueltigeEntnahme: 27000
+            }
+        },
         fullResult: {
             ...yearResultArgs.fullResult,
             input: { flexBedarf: 6000 },
@@ -859,7 +929,588 @@ try {
     throw e;
 }
 
-// Test 1b: Health bucket covers eligible care shortfall before forced sale
+// Test 1a: conflicting injected Engine shape stays a technical outcome
+try {
+    const invalidShapeState = JSON.parse(JSON.stringify(state));
+    const equityBefore = invalidShapeState.portfolio.depotTranchesAktien[0].marketValue;
+    const conflictingEngine = {
+        simulateSingleYear: () => ({
+            ui: {
+                spending: {
+                    monatlicheEntnahme: 1000,
+                    details: { endgueltigeEntnahme: 24000 }
+                },
+                action: {},
+                market: {},
+                zielLiquiditaet: 0
+            },
+            newState: {}
+        })
+    };
+    const result = simulateOneYear(
+        invalidShapeState,
+        inputs,
+        yearDataNormal,
+        0,
+        null,
+        0,
+        null,
+        1,
+        conflictingEngine
+    );
+    assertEqual(result.kind, 'technical_error',
+        'Conflicting injected withdrawal sources must stay inside the stable technical-outcome contract');
+    assertEqual(result.error?.code, 'SIM_ENGINE_RESULT_SHAPE_INVALID',
+        'Conflicting injected withdrawal sources must identify the invalid Engine result shape');
+    assertEqual(result.error?.details?.contract, 'planned_annual_withdrawal',
+        'Technical outcome must expose the violated withdrawal contract');
+    assertEqual(result.error?.details?.status, 'conflict',
+        'Technical outcome must preserve the reconciliation status');
+    assertEqual(invalidShapeState.portfolio.depotTranchesAktien[0].marketValue, equityBefore,
+        'Invalid Engine output must restore the portfolio at the Engine boundary');
+    console.log('✅ Engine withdrawal-shape technical outcome passed');
+} catch (e) {
+    console.error('Test 1a Failed', e);
+    throw e;
+}
+
+// Test 1b: a source-less positive adapter transaction stays a technical outcome
+try {
+    const invalidActionState = JSON.parse(JSON.stringify(state));
+    const equityBefore = invalidActionState.portfolio.depotTranchesAktien[0].marketValue;
+    const hadTrancheIdBefore = Object.prototype.hasOwnProperty.call(
+        invalidActionState.portfolio.depotTranchesAktien[0],
+        'trancheId'
+    );
+    const trancheIdBefore = invalidActionState.portfolio.depotTranchesAktien[0].trancheId;
+    const sourceLessEngine = {
+        simulateSingleYear(engineInput, lastState) {
+            const realResult = EngineAPI.simulateSingleYear(engineInput, lastState);
+            return {
+                ...realResult,
+                ui: {
+                    ...realResult.ui,
+                    action: {
+                        type: 'TRANSACTION',
+                        title: 'Source-less adapter sale',
+                        diagnosisEntries: [],
+                        quellen: [],
+                        verwendungen: { liquiditaet: 10000, gold: 0, aktien: 0 },
+                        nettoErlös: 10000,
+                        steuer: 0,
+                        taxRawAggregate: {
+                            sumRealizedGainSigned: 0,
+                            sumTaxableAfterTqfSigned: 0
+                        }
+                    }
+                }
+            };
+        }
+    };
+    const result = simulateOneYear(
+        invalidActionState,
+        inputs,
+        yearDataNormal,
+        0,
+        null,
+        0,
+        null,
+        1,
+        sourceLessEngine
+    );
+    assertEqual(result.kind, 'technical_error',
+        'A source-less positive adapter transaction must stay inside the technical-outcome contract');
+    assertEqual(result.error?.code, 'SIM_ENGINE_RESULT_SHAPE_INVALID',
+        'An invalid adapter action must identify the invalid Engine result shape');
+    assertEqual(result.error?.details?.contract, 'planned_action_flow',
+        'An invalid adapter action must expose the shared planned-action contract');
+    assertEqual(result.error?.details?.reason, 'liquidity_inflow_without_asset_source',
+        'The adapter boundary must retain the exact source/use reconciliation reason');
+    assertEqual(invalidActionState.portfolio.depotTranchesAktien[0].marketValue, equityBefore,
+        'An invalid adapter action must restore the portfolio at the Engine boundary');
+    assertEqual(
+        Object.prototype.hasOwnProperty.call(invalidActionState.portfolio.depotTranchesAktien[0], 'trancheId'),
+        hadTrancheIdBefore,
+        'Technical outcomes must restore whether a simulation lot identifier existed'
+    );
+    assertEqual(invalidActionState.portfolio.depotTranchesAktien[0].trancheId, trancheIdBefore,
+        'Technical outcomes must restore the prior simulation lot identifier value');
+    console.log('✅ Engine action-shape technical outcome passed');
+} catch (e) {
+    console.error('Test 1b Failed', e);
+    throw e;
+}
+
+// Test 1b2: a 3-bucket override must not launder an invalid raw adapter action
+try {
+    const invalidThreeBucketState = JSON.parse(JSON.stringify(state));
+    const equityBefore = invalidThreeBucketState.portfolio.depotTranchesAktien[0].marketValue;
+    const sourceLessThreeBucketEngine = {
+        simulateSingleYear(engineInput, lastState) {
+            const realResult = EngineAPI.simulateSingleYear(engineInput, lastState);
+            return {
+                ...realResult,
+                ui: {
+                    ...realResult.ui,
+                    action: {
+                        type: 'TRANSACTION',
+                        title: 'Source-less 3-bucket adapter sale',
+                        diagnosisEntries: [],
+                        quellen: [],
+                        verwendungen: { liquiditaet: 10000, gold: 0, aktien: 0 },
+                        nettoErlös: 10000,
+                        steuer: 0,
+                        taxRawAggregate: {
+                            sumRealizedGainSigned: 0,
+                            sumTaxableAfterTqfSigned: 0
+                        }
+                    }
+                }
+            };
+        }
+    };
+    const result = simulateOneYear(
+        invalidThreeBucketState,
+        {
+            ...inputs,
+            decumulation: {
+                mode: '3_bucket_jilge',
+                drawdownTrigger: -15,
+                bondTargetFactor: 5
+            }
+        },
+        { ...yearDataNormal, rendite: -0.30 },
+        0,
+        null,
+        0,
+        null,
+        1,
+        sourceLessThreeBucketEngine
+    );
+    assertEqual(result.kind, 'technical_error',
+        'A 3-bucket override must not turn an invalid raw adapter action into success');
+    assertEqual(result.error?.details?.phase, 'engine_output',
+        'The invalid action must fail before the 3-bucket transformation');
+    assertEqual(result.error?.details?.reason, 'liquidity_inflow_without_asset_source',
+        'The pre-transform boundary must retain the source-less inflow reason');
+    assertEqual(invalidThreeBucketState.portfolio.depotTranchesAktien[0].marketValue, equityBefore,
+        'A rejected 3-bucket adapter action must restore the portfolio boundary');
+    console.log('✅ Engine pre-3-bucket action boundary passed');
+} catch (e) {
+    console.error('Test 1b2 Failed', e);
+    throw e;
+}
+
+// Test 1b2a: a balanced adapter action cannot bypass the central annual settlement
+try {
+    const forgedTaxState = JSON.parse(JSON.stringify(state));
+    const equityBefore = forgedTaxState.portfolio.depotTranchesAktien[0].marketValue;
+    const forgedTaxEngine = {
+        simulateSingleYear(engineInput, lastState) {
+            const realResult = EngineAPI.simulateSingleYear(engineInput, lastState);
+            const lot = engineInput.detailledTranches[0];
+            const gross = Math.min(1000, lot.marketValue);
+            const gainQuote = (lot.marketValue - lot.costBasis) / lot.marketValue;
+            const realizedGainSigned = gross * gainQuote;
+            const taxableAfterTqfSigned = realizedGainSigned
+                * (lot.taxExempt ? 0 : (1 - lot.tqf));
+            const forgedTax = Math.min(1, taxableAfterTqfSigned / 2);
+            return {
+                ...realResult,
+                ui: {
+                    ...realResult.ui,
+                    action: {
+                        type: 'TRANSACTION',
+                        title: 'Forged annual tax settlement',
+                        diagnosisEntries: [],
+                        quellen: [{
+                            kind: lot.type,
+                            trancheId: lot.trancheId,
+                            ...(lot.sourceProfileId ? { sourceProfileId: lot.sourceProfileId } : {}),
+                            brutto: gross,
+                            steuer: forgedTax,
+                            netto: gross - forgedTax,
+                            realizedGainSigned,
+                            taxableAfterTqfSigned
+                        }],
+                        verwendungen: { liquiditaet: gross - forgedTax, gold: 0, aktien: 0 },
+                        nettoErlös: gross - forgedTax,
+                        steuer: forgedTax,
+                        taxRawAggregate: {
+                            sumRealizedGainSigned: realizedGainSigned,
+                            sumTaxableAfterTqfSigned: taxableAfterTqfSigned
+                        },
+                        taxSettlement: realResult.ui.action.taxSettlement
+                    }
+                }
+            };
+        }
+    };
+    const result = simulateOneYear(
+        forgedTaxState,
+        inputs,
+        yearDataNormal,
+        0,
+        null,
+        0,
+        null,
+        1,
+        forgedTaxEngine
+    );
+    assertEqual(result.kind, 'technical_error',
+        'A balanced action with forged tax must stay inside the technical-outcome contract');
+    assertEqual(result.error?.details?.contract, 'annual_tax_settlement',
+        'Forged tax must expose the central annual-settlement contract');
+    assertEqual(result.error?.details?.phase, 'engine_output',
+        'Forged tax must fail before any 3-bucket transformation');
+    assertEqual(result.error?.details?.reason, 'action_tax_mismatch',
+        'Forged tax must retain the exact central-settlement mismatch reason');
+    assertEqual(forgedTaxState.portfolio.depotTranchesAktien[0].marketValue, equityBefore,
+        'A rejected tax settlement must restore the portfolio boundary');
+    console.log('✅ Engine annual-tax-settlement boundary passed');
+} catch (e) {
+    console.error('Test 1b2a Failed', e);
+    throw e;
+}
+
+// Test 1b3: the Direct boundary rejects a formally balanced overbooked lot sale
+try {
+    const overbookedState = JSON.parse(JSON.stringify(state));
+    const equityBefore = overbookedState.portfolio.depotTranchesAktien[0].marketValue;
+    const trancheIdBefore = overbookedState.portfolio.depotTranchesAktien[0].trancheId;
+    const overbookedEngine = {
+        simulateSingleYear(engineInput, lastState) {
+            const realResult = EngineAPI.simulateSingleYear(engineInput, lastState);
+            const lot = engineInput.detailledTranches[0];
+            const gross = lot.marketValue + 1000;
+            return {
+                ...realResult,
+                ui: {
+                    ...realResult.ui,
+                    action: {
+                        type: 'TRANSACTION',
+                        title: 'Overbooked Direct lot sale',
+                        diagnosisEntries: [],
+                        quellen: [{
+                            kind: lot.type,
+                            trancheId: lot.trancheId,
+                            ...(lot.sourceProfileId ? { sourceProfileId: lot.sourceProfileId } : {}),
+                            brutto: gross,
+                            netto: gross,
+                            steuer: 0,
+                            realizedGainSigned: 0,
+                            taxableAfterTqfSigned: 0
+                        }],
+                        verwendungen: { liquiditaet: gross, gold: 0, aktien: 0 },
+                        nettoErlös: gross,
+                        steuer: 0,
+                        taxRawAggregate: {
+                            sumRealizedGainSigned: 0,
+                            sumTaxableAfterTqfSigned: 0
+                        }
+                    }
+                }
+            };
+        }
+    };
+    const result = simulateOneYear(
+        overbookedState,
+        inputs,
+        yearDataNormal,
+        0,
+        null,
+        0,
+        null,
+        1,
+        overbookedEngine
+    );
+    assertEqual(result.kind, 'technical_error',
+        'An overbooked Direct lot sale must stay inside the technical-outcome contract');
+    assertEqual(result.error?.details?.phase, 'engine_output',
+        'The overbooked sale must fail at the raw Engine boundary');
+    assertEqual(result.error?.details?.reason, 'source_inventory_overbooked',
+        'The Direct boundary must expose the exact inventory-capacity reason');
+    assertEqual(overbookedState.portfolio.depotTranchesAktien[0].marketValue, equityBefore,
+        'An overbooked Direct action must restore the portfolio boundary');
+    assertEqual(overbookedState.portfolio.depotTranchesAktien[0].trancheId, trancheIdBefore,
+        'An overbooked Direct action must restore the prior lot identifier');
+    console.log('✅ Engine Direct inventory-capacity boundary passed');
+} catch (e) {
+    console.error('Test 1b3 Failed', e);
+    throw e;
+}
+
+// Test 1b4: a positive Direct asset source requires an actual inventory lot
+try {
+    const emptyInventoryState = {
+        ...JSON.parse(JSON.stringify(state)),
+        portfolio: {
+            depotTranchesAktien: [],
+            depotTranchesGold: [],
+            liquiditaet: 1000
+        },
+        baseFloor: 0,
+        baseFlex: 0
+    };
+    const phantomSourceEngine = {
+        simulateSingleYear(engineInput, lastState) {
+            const realResult = EngineAPI.simulateSingleYear(engineInput, lastState);
+            return {
+                ...realResult,
+                ui: {
+                    ...realResult.ui,
+                    action: {
+                        type: 'TRANSACTION',
+                        title: 'Phantom Direct asset source',
+                        diagnosisEntries: [],
+                        quellen: [{
+                            kind: 'aktien_alt',
+                            brutto: 1000,
+                            netto: 1000,
+                            steuer: 0,
+                            realizedGainSigned: 0,
+                            taxableAfterTqfSigned: 0
+                        }],
+                        verwendungen: { liquiditaet: 1000, gold: 0, aktien: 0 },
+                        nettoErlös: 1000,
+                        steuer: 0,
+                        taxRawAggregate: {
+                            sumRealizedGainSigned: 0,
+                            sumTaxableAfterTqfSigned: 0
+                        }
+                    }
+                }
+            };
+        }
+    };
+    const result = simulateOneYear(
+        emptyInventoryState,
+        { ...inputs, startFloorBedarf: 0, startFlexBedarf: 0 },
+        yearDataNormal,
+        0,
+        null,
+        0,
+        null,
+        1,
+        phantomSourceEngine
+    );
+    assertEqual(result.kind, 'technical_error',
+        'A positive Direct asset source without inventory must not be silently scaled to zero');
+    assertEqual(result.error?.details?.reason, 'source_inventory_missing',
+        'A phantom Direct asset source must expose the missing-inventory reason');
+    assertEqual(emptyInventoryState.portfolio.liquiditaet, 1000,
+        'A rejected phantom source must preserve the portfolio boundary');
+    console.log('✅ Engine Direct missing-inventory boundary passed');
+} catch (e) {
+    console.error('Test 1b4 Failed', e);
+    throw e;
+}
+
+// Test 1c: the Direct adapter must not accept a Core-only bonds use
+try {
+    const invalidBondsState = JSON.parse(JSON.stringify(state));
+    const equityBefore = invalidBondsState.portfolio.depotTranchesAktien[0].marketValue;
+    const bondsUseEngine = {
+        simulateSingleYear(engineInput, lastState) {
+            const realResult = EngineAPI.simulateSingleYear(engineInput, lastState);
+            return {
+                ...realResult,
+                ui: {
+                    ...realResult.ui,
+                    action: {
+                        type: 'TRANSACTION',
+                        title: 'Unsupported Direct bonds use',
+                        diagnosisEntries: [],
+                        quellen: [{
+                            kind: 'aktien_alt',
+                            brutto: 10000,
+                            steuer: 0,
+                            netto: 10000,
+                            realizedGainSigned: 0,
+                            taxableAfterTqfSigned: 0
+                        }],
+                        verwendungen: { liquiditaet: 0, gold: 0, aktien: 0, bonds: 10000 },
+                        nettoErlös: 10000,
+                        steuer: 0,
+                        taxRawAggregate: {
+                            sumRealizedGainSigned: 0,
+                            sumTaxableAfterTqfSigned: 0
+                        }
+                    }
+                }
+            };
+        }
+    };
+    const result = simulateOneYear(
+        invalidBondsState,
+        inputs,
+        yearDataNormal,
+        0,
+        null,
+        0,
+        null,
+        1,
+        bondsUseEngine
+    );
+    assertEqual(result.kind, 'technical_error',
+        'A Core-only bonds use must not be accepted by the Direct adapter boundary');
+    assertEqual(result.error?.details?.contract, 'planned_action_flow',
+        'An unsupported Direct bonds use must expose the shared planned-action contract');
+    assertEqual(result.error?.details?.reason, 'use_key_unknown',
+        'The Direct boundary must retain the unsupported-use reason');
+    assertEqual(invalidBondsState.portfolio.depotTranchesAktien[0].marketValue, equityBefore,
+        'An unsupported Direct bonds use must restore the portfolio at the Engine boundary');
+    console.log('✅ Engine Direct-use technical outcome passed');
+} catch (e) {
+    console.error('Test 1c Failed', e);
+    throw e;
+}
+
+// Test 1c2: a valid read-only adapter action is copied before local transformation
+try {
+    const frozenActionState = JSON.parse(JSON.stringify(state));
+    const frozenActionEngine = {
+        simulateSingleYear(engineInput, lastState) {
+            const realResult = EngineAPI.simulateSingleYear(engineInput, lastState);
+            const action = realResult.ui.action;
+            const frozenAction = Object.freeze({
+                ...action,
+                quellen: Object.freeze((action.quellen || []).map(source => Object.freeze({ ...source }))),
+                verwendungen: Object.freeze({ ...(action.verwendungen || {}) }),
+                taxRawAggregate: Object.freeze({ ...(action.taxRawAggregate || {}) })
+            });
+            return {
+                ...realResult,
+                ui: {
+                    ...realResult.ui,
+                    action: frozenAction
+                }
+            };
+        }
+    };
+    const result = simulateOneYear(
+        frozenActionState,
+        inputs,
+        yearDataNormal,
+        0,
+        null,
+        0,
+        null,
+        1,
+        frozenActionEngine
+    );
+    assertEqual(result.kind, 'success',
+        'A valid frozen adapter action must remain executable through a mutable boundary copy');
+    assert(!result.isRuin, 'A valid frozen adapter action must not be converted into ruin');
+    console.log('✅ Engine read-only adapter action boundary passed');
+} catch (e) {
+    console.error('Test 1c2 Failed', e);
+    throw e;
+}
+
+// Test 1c3: hostile accessors stay inside the stable technical-outcome contract
+try {
+    const accessorState = JSON.parse(JSON.stringify(state));
+    const accessorEngine = {
+        simulateSingleYear(engineInput, lastState) {
+            const realResult = EngineAPI.simulateSingleYear(engineInput, lastState);
+            const action = {
+                type: 'TRANSACTION',
+                nettoErlös: 0,
+                steuer: 0,
+                verwendungen: { liquiditaet: 0, gold: 0, aktien: 0 },
+                taxRawAggregate: {
+                    sumRealizedGainSigned: 0,
+                    sumTaxableAfterTqfSigned: 0
+                }
+            };
+            Object.defineProperty(action, 'quellen', {
+                enumerable: true,
+                get() {
+                    throw new Error('hostile adapter getter');
+                }
+            });
+            return {
+                ...realResult,
+                ui: {
+                    ...realResult.ui,
+                    action
+                }
+            };
+        }
+    };
+    const result = simulateOneYear(
+        accessorState,
+        inputs,
+        yearDataNormal,
+        0,
+        null,
+        0,
+        null,
+        1,
+        accessorEngine
+    );
+    assertEqual(result.kind, 'technical_error',
+        'A throwing action accessor must not escape the stable technical-outcome contract');
+    assertEqual(result.error?.details?.reason, 'contract_evaluation_failed',
+        'A throwing action accessor must expose the contract-evaluation reason');
+    console.log('✅ Engine hostile-accessor boundary passed');
+} catch (e) {
+    console.error('Test 1c3 Failed', e);
+    throw e;
+}
+
+// Test 1c4: tax-aggregate accessors are evaluated only inside the safe boundary
+try {
+    const taxAccessorState = JSON.parse(JSON.stringify(state));
+    const taxAccessorEngine = {
+        simulateSingleYear(engineInput, lastState) {
+            const realResult = EngineAPI.simulateSingleYear(engineInput, lastState);
+            const action = {
+                type: 'NONE',
+                quellen: [],
+                nettoErlös: 0,
+                steuer: 0,
+                verwendungen: {},
+                taxSettlement: { ...realResult.ui.action.taxSettlement }
+            };
+            Object.defineProperty(action, 'taxRawAggregate', {
+                enumerable: true,
+                get() {
+                    throw new Error('hostile tax aggregate getter');
+                }
+            });
+            return {
+                ...realResult,
+                ui: {
+                    ...realResult.ui,
+                    action
+                }
+            };
+        }
+    };
+    const result = simulateOneYear(
+        taxAccessorState,
+        inputs,
+        yearDataNormal,
+        0,
+        null,
+        0,
+        null,
+        1,
+        taxAccessorEngine
+    );
+    assertEqual(result.kind, 'technical_error',
+        'A throwing tax aggregate accessor must not escape the stable technical-outcome contract');
+    assertEqual(result.error?.details?.reason, 'contract_evaluation_failed',
+        'A throwing tax aggregate accessor must expose the contract-evaluation reason');
+    console.log('✅ Engine hostile-tax-aggregate boundary passed');
+} catch (e) {
+    console.error('Test 1c4 Failed', e);
+    throw e;
+}
+
+// Test 1d: Health bucket covers eligible care shortfall before forced sale
 try {
     const careState = {
         portfolio: {

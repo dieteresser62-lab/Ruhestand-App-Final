@@ -76,7 +76,10 @@ function runGoldDriftTest() {
         depotwertGesamt,
         zielLiquiditaet,
         market,
-        spending: {},
+        spending: {
+            monatlicheEntnahme: 10000 / 3,
+            details: { endgueltigeEntnahme: 40000 }
+        },
         minGold,
         profil,
         input

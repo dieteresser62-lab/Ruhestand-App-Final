@@ -30,9 +30,22 @@ import {
     deriveLiquidityRunwayPolicy,
     resolveLiquidityRunwayYears
 } from '../types/liquidity-runway-contract.js';
+import { resolvePlannedAnnualWithdrawal } from '../types/planned-withdrawal-contract.js';
+import {
+    PLANNED_ACTION_FLOW_EPSILON,
+    resolvePlannedAction
+} from '../types/planned-action-contract.js';
 
 const DYNAMIC_FLEX_ALLOWED_HORIZON_METHODS = new Set(['mean', 'survival_quantile']);
 const LEGACY_STANDARD_MODES = new Set(['dynamic_flex', 'vpw', 'guardrails', 'fixed_real', 'none']);
+const ACTION_SOURCE_KINDS = new Set([
+    'liquiditaet',
+    'aktien_alt',
+    'aktien_neu',
+    'anleihe',
+    'gold'
+]);
+const ACTION_USE_KEYS = new Set(['liquiditaet', 'gold', 'aktien', 'bonds']);
 const VPW_SAFETY_STAGE_LABELS = {
     0: 'normal',
     1: 'gogo_off',
@@ -294,18 +307,21 @@ export function _allocateFinalTaxToActionSources(sources, finalTax) {
     });
 }
 
-function _assertFinalTaxActionReconciliation(action) {
-    const sources = Array.isArray(action?.quellen) ? action.quellen : [];
+function _assertFinalActionReconciliation(action) {
+    const sources = action.quellen;
     const invalidAssetSource = sources.find(source => (
-        source?.kind
-        && source.kind !== 'liquiditaet'
+        source.kind !== 'liquiditaet'
         && (
-            !Number.isFinite(Number(source?.brutto))
-            || !Number.isFinite(Number(source?.steuer))
-            || !Number.isFinite(Number(source?.netto))
-            || Number(source.netto) < -0.01
-            || Number(source.steuer) < -0.01
-            || Number(source.steuer) > Number(source.brutto) + 0.01
+            typeof source.brutto !== 'number'
+            || !Number.isFinite(source.brutto)
+            || source.brutto < 0
+            || typeof source.steuer !== 'number'
+            || !Number.isFinite(source.steuer)
+            || typeof source.netto !== 'number'
+            || !Number.isFinite(source.netto)
+            || source.netto < -0.01
+            || source.steuer < -0.01
+            || source.steuer > source.brutto + 0.01
         )
     ));
     if (invalidAssetSource) {
@@ -315,17 +331,133 @@ function _assertFinalTaxActionReconciliation(action) {
         );
     }
 
-    const sourceNet = sources
-        .reduce((total, source) => total + (Number(source?.netto) || 0), 0);
-    const useTotal = Object.values(action?.verwendungen || {})
-        .reduce((total, value) => total + (Number(value) || 0), 0);
-    const actionNet = Number(action?.nettoErlös) || 0;
-    if (Math.abs(sourceNet - useTotal) > 0.01 || Math.abs(sourceNet - actionNet) > 0.01) {
+    const invalidCashSource = sources.find(source => (
+        source.kind === 'liquiditaet'
+        && (
+            typeof source.brutto !== 'number'
+            || !Number.isFinite(source.brutto)
+            || source.brutto < 0
+        )
+    ));
+    if (invalidCashSource) {
         throw new FinancialCalculationError(
-            `Die finale Transaktion ist nicht ausgeglichen: Quellen-Netto ${sourceNet.toFixed(2)} EUR, Verwendungen ${useTotal.toFixed(2)} EUR, Action-Netto ${actionNet.toFixed(2)} EUR. Bitte pruefen Sie die Depot-Tranchen und Transaktionsbudgets.`,
-            { contract: 'final_action_reconciliation', sourceNet, useTotal, actionNet }
+            'Eine finale Liquiditätsquelle besitzt einen ungültigen Bruttowert.',
+            { contract: 'planned_liquidity_flow', source: invalidCashSource }
         );
     }
+
+    const assetSourceNet = sources
+        .filter(source => source.kind !== 'liquiditaet')
+        .reduce((total, source) => total + source.netto, 0);
+    const cashSourceGross = sources
+        .filter(source => source.kind === 'liquiditaet')
+        .reduce((total, source) => total + source.brutto, 0);
+    const sourceFundingTotal = assetSourceNet + cashSourceGross;
+    const useTotal = Object.values(action?.verwendungen || {})
+        .reduce((total, value) => total + value, 0);
+    const actionNet = action.nettoErlös;
+    if (typeof actionNet !== 'number' || !Number.isFinite(actionNet) || actionNet < 0) {
+        throw new FinancialCalculationError(
+            'Der Netto-Gesamtbetrag der finalen Transaktion ist ungültig.',
+            { contract: 'planned_action_flow', actionNet }
+        );
+    }
+    if (
+        action.type === 'NONE'
+        && (sourceFundingTotal > 0.01 || useTotal > 0.01 || actionNet > 0.01)
+    ) {
+        throw new FinancialCalculationError(
+            'Eine Nichttransaktions-Aktion darf keine finanziellen Quellen oder Verwendungen enthalten.',
+            {
+                contract: 'planned_action_flow',
+                sourceFundingTotal,
+                useTotal,
+                actionNet
+            }
+        );
+    }
+    if (action.verwendungen.liquiditaet > assetSourceNet + 0.01) {
+        throw new FinancialCalculationError(
+            'Der geplante Liquiditätszufluss ist nicht durch Netto-Assetverkäufe gedeckt.',
+            {
+                contract: 'planned_liquidity_flow',
+                plannedLiquidityInflow: action.verwendungen.liquiditaet,
+                assetSourceNet
+            }
+        );
+    }
+    if (
+        Math.abs(sourceFundingTotal - useTotal) > 0.01
+        || Math.abs(sourceFundingTotal - actionNet) > 0.01
+    ) {
+        throw new FinancialCalculationError(
+            `Die finale Transaktion ist nicht ausgeglichen: Quellen-Finanzierung ${sourceFundingTotal.toFixed(2)} EUR, Verwendungen ${useTotal.toFixed(2)} EUR, Action-Netto ${actionNet.toFixed(2)} EUR. Bitte pruefen Sie die Depot-Tranchen und Transaktionsbudgets.`,
+            {
+                contract: 'final_action_reconciliation',
+                assetSourceNet,
+                cashSourceGross,
+                sourceFundingTotal,
+                useTotal,
+                actionNet
+            }
+        );
+    }
+}
+
+function _assertPlannedActionContract(action, input, availableLiquidity, phase) {
+    const normalizeTqf = value => {
+        const normalized = Number(value);
+        return Number.isFinite(normalized) ? normalized : 0;
+    };
+    const plannedActionResolution = resolvePlannedAction({
+        action,
+        availableLiquidity,
+        detailedTranches: input.detailledTranches,
+        legacyCapacities: {
+            aktien_alt: input.depotwertAlt,
+            aktien_neu: input.depotwertNeu,
+            gold: input.goldWert
+        },
+        legacyTaxMetadata: {
+            aktien_alt: {
+                costBasis: input.costBasisAlt,
+                tqf: normalizeTqf(input.tqfAlt),
+                taxExempt: input.taxExemptAlt === true
+            },
+            aktien_neu: {
+                costBasis: input.costBasisNeu,
+                tqf: normalizeTqf(input.tqfNeu),
+                taxExempt: input.taxExemptNeu === true
+            },
+            gold: {
+                costBasis: input.goldCost,
+                tqf: 0,
+                taxExempt: input.goldSteuerfrei === true
+            }
+        }
+    });
+    if (plannedActionResolution.status === 'resolved') return plannedActionResolution;
+
+    const liquidityContractReasons = new Set([
+        'cash_source_overbooked',
+        'liquidity_inflow_without_asset_source'
+    ]);
+    const contract = liquidityContractReasons.has(plannedActionResolution.reason)
+        || (
+            plannedActionResolution.reason === 'use_amount_invalid'
+            && plannedActionResolution.context?.key === 'liquiditaet'
+        )
+        ? 'planned_liquidity_flow'
+        : 'planned_action_flow';
+    throw new FinancialCalculationError(
+        'Die Transaktionsplanung verletzt den gemeinsamen Action-Vertrag.',
+        {
+            contract,
+            phase,
+            reason: plannedActionResolution.reason,
+            ...plannedActionResolution.context
+        }
+    );
 }
 
 const _berechneEntnahmeRate = (realeRendite, horizontJahre) => {
@@ -748,10 +880,10 @@ function _internal_calculateModel(input, lastState) {
     }
     const neuerBedarf = inflatedBedarf.floor + inflatedBedarf.flex;
 
-    // 6. Runway berechnen (Liquiditäts-Reichweite in Monaten)
-    // Wie lange reicht die aktuelle Liquidität bei aktuellem Bedarf?
-    // Runway: Wie viele Monate deckt die Liquidität den aktuellen Bedarf?
-    const reichweiteMonate = (inflatedBedarf.floor + inflatedBedarf.flex) > 0
+    // 6. Vorläufige Runway für den SpendingPlanner berechnen.
+    // Diese Schätzung muss den noch ungekürzten Bedarf verwenden, weil der
+    // SpendingPlanner seine Guardrails erst daraus ableitet.
+    const prePolicyRunwayMonths = (inflatedBedarf.floor + inflatedBedarf.flex) > 0
         ? (aktuelleLiquiditaet / ((inflatedBedarf.floor + inflatedBedarf.flex) / 12))
         : Infinity;
 
@@ -765,7 +897,7 @@ function _internal_calculateModel(input, lastState) {
         market,
         lastState,
         inflatedBedarf,
-        runwayMonate: reichweiteMonate,
+        runwayMonate: prePolicyRunwayMonths,
         profil,
         depotwertGesamt,
         gesamtwert,
@@ -773,14 +905,32 @@ function _internal_calculateModel(input, lastState) {
         input: normalizedInput
     });
 
-    // 8. Ziel-Liquidität berechnen
-    // Bestimmt die optimale Liquiditätshöhe basierend auf Profil und Marktsituation
-    // Im Bärenmarkt: höhere Liquidität (z.B. 60 Monate)
-    // Im Bullenmarkt: niedrigere Liquidität (z.B. 36 Monate)
+    // Ab hier ist die final geplante, nach Policies gekürzte und quantisierte
+    // Netto-Entnahme die kanonische Basis für Liquiditätsziel, Transaktion und
+    // operativen Runway. Fehlende oder widersprüchliche Planner-Ausgaben dürfen
+    // nicht auf den Rohbedarf zurückfallen, weil das den Ausgangsfehler reaktiviert.
+    const plannedWithdrawalResolution = resolvePlannedAnnualWithdrawal({ spendingResult });
+    if (plannedWithdrawalResolution.status !== 'resolved') {
+        throw new FinancialCalculationError(
+            'Das Ergebnis der Ausgabenplanung enthält keine eindeutige geplante Jahresentnahme.',
+            {
+                contract: 'planned_annual_withdrawal',
+                status: plannedWithdrawalResolution.status,
+                candidates: plannedWithdrawalResolution.candidates
+            }
+        );
+    }
+    const plannedAnnualNetNeed = plannedWithdrawalResolution.annualWithdrawal;
+    const preTransactionRunwayMonths = plannedAnnualNetNeed > 0
+        ? aktuelleLiquiditaet / (plannedAnnualNetNeed / 12)
+        : Infinity;
+
+    // 8. Ziel-Liquidität aus der final geplanten Netto-Entnahme berechnen.
+    // Der separate Brutto-Mindestpuffer bleibt in TransactionEngine erhalten.
     const targetLiquidityDetails = TransactionEngine.calculateTargetLiquidityDetails(
         profil,
         market,
-        inflatedBedarf,
+        plannedAnnualNetNeed,
         normalizedInput
     );
     const zielLiquiditaet = targetLiquidityDetails.targetLiquidity;
@@ -800,6 +950,12 @@ function _internal_calculateModel(input, lastState) {
         profil,
         input: normalizedInput
     });
+    _assertPlannedActionContract(
+        action,
+        normalizedInput,
+        aktuelleLiquiditaet,
+        'transaction_engine_output'
+    );
     let threeBucketDiagnosis = null;
     if (
         normalizedInput.finalizeThreeBucketAction === true
@@ -814,14 +970,131 @@ function _internal_calculateModel(input, lastState) {
             market,
             pendingAction: action,
             realReturnEq: market.realReturnEq,
-            annualWithdrawalTarget: Math.max(
-                0,
-                (Number(spendingResult?.monatlicheEntnahme) || 0) * 12
-            ),
+            annualWithdrawalTarget: plannedAnnualNetNeed,
             currentBondValuation: sumBondBucketValuation(detailedTranches)
         });
         action = finalized.updatedAction;
         threeBucketDiagnosis = finalized.threeBucketState;
+    }
+
+    _assertPlannedActionContract(
+        action,
+        normalizedInput,
+        aktuelleLiquiditaet,
+        'three_bucket_final'
+    );
+
+    if (!action || typeof action !== 'object' || Array.isArray(action)) {
+        throw new FinancialCalculationError(
+            'Die Transaktionsplanung hat kein gültiges Action-Objekt geliefert.',
+            { contract: 'planned_action_flow', actionType: Array.isArray(action) ? 'array' : typeof action }
+        );
+    }
+    if (action.type !== 'TRANSACTION' && action.type !== 'NONE') {
+        throw new FinancialCalculationError(
+            'Die Transaktionsplanung hat einen unbekannten Action-Typ geliefert.',
+            { contract: 'planned_action_flow', actionType: action.type }
+        );
+    }
+    const hasRawSourcesProperty = Object.prototype.hasOwnProperty.call(action, 'quellen');
+    if (
+        (action.type === 'TRANSACTION' || hasRawSourcesProperty)
+        && !Array.isArray(action.quellen)
+    ) {
+        throw new FinancialCalculationError(
+            'Die Quellen der geplanten Transaktion besitzen keinen gültigen Array-Vertrag.',
+            {
+                contract: 'planned_action_flow',
+                rawSourcesType: action.quellen === null ? 'null' : typeof action.quellen
+            }
+        );
+    }
+    const invalidRawSourceIndex = Array.isArray(action.quellen)
+        ? action.quellen.findIndex(source => (
+            !source
+            || typeof source !== 'object'
+            || Array.isArray(source)
+            || !ACTION_SOURCE_KINDS.has(source.kind)
+            || typeof source.brutto !== 'number'
+            || !Number.isFinite(source.brutto)
+            || source.brutto < 0
+            || typeof source.steuer !== 'number'
+            || !Number.isFinite(source.steuer)
+            || source.steuer < 0
+            || source.steuer > source.brutto + 0.01
+            || typeof source.netto !== 'number'
+            || !Number.isFinite(source.netto)
+            || source.netto < 0
+            || Math.abs((source.brutto - source.steuer) - source.netto) > 0.01
+            || (
+                source.kind === 'liquiditaet'
+                && (
+                    Math.abs(source.steuer) > 0.01
+                    || Math.abs(source.netto - source.brutto) > 0.01
+                )
+            )
+        ))
+        : -1;
+    if (invalidRawSourceIndex >= 0) {
+        throw new FinancialCalculationError(
+            'Eine Quelle der geplanten Transaktion ist ungültig.',
+            {
+                contract: 'planned_action_flow',
+                sourceIndex: invalidRawSourceIndex,
+                source: action.quellen[invalidRawSourceIndex]
+            }
+        );
+    }
+    const rawAssetSources = Array.isArray(action.quellen)
+        ? action.quellen.filter(source => source.kind !== 'liquiditaet')
+        : [];
+    const rawCashSources = Array.isArray(action.quellen)
+        ? action.quellen.filter(source => source.kind === 'liquiditaet')
+        : [];
+    const hasAssetSale = rawAssetSources.length > 0;
+    const rawSourcePlanTax = rawAssetSources.reduce((total, source) => total + source.steuer, 0);
+    const rawSourcePlanFunding = rawAssetSources.reduce((total, source) => total + source.netto, 0)
+        + rawCashSources.reduce((total, source) => total + source.brutto, 0);
+    if (
+        action.type === 'TRANSACTION'
+        && (
+            typeof action.nettoErlös !== 'number'
+            || !Number.isFinite(action.nettoErlös)
+            || action.nettoErlös < 0
+        )
+    ) {
+        throw new FinancialCalculationError(
+            'Der geplante Netto-Gesamtbetrag der Transaktion ist ungültig.',
+            {
+                contract: 'planned_action_flow',
+                field: 'nettoErlös',
+                value: action.nettoErlös
+            }
+        );
+    }
+    const hasRawActionTax = Object.prototype.hasOwnProperty.call(action, 'steuer');
+    if (
+        action.type === 'TRANSACTION'
+        && (
+            (hasRawActionTax && (
+                typeof action.steuer !== 'number'
+                || !Number.isFinite(action.steuer)
+                || action.steuer < 0
+            ))
+            || (hasAssetSale && !hasRawActionTax)
+            || (hasAssetSale && Math.abs(action.steuer - rawSourcePlanTax) > 0.01)
+            || (!hasAssetSale && hasRawActionTax && action.steuer > 0.01)
+        )
+    ) {
+        throw new FinancialCalculationError(
+            'Die geplante Gesamtsteuer der Transaktion ist ungültig oder nicht mit den Quellen reconciliert.',
+            {
+                contract: 'planned_action_flow',
+                field: 'steuer',
+                value: action.steuer,
+                rawSourcePlanTax
+            }
+        );
     }
 
     // Diagnose-Einträge von Transaktion hinzufügen
@@ -833,13 +1106,37 @@ function _internal_calculateModel(input, lastState) {
         diagnosis.transactionDiagnostics = action.transactionDiagnostics;
     }
 
+    const rawTaxAggregate = action?.taxRawAggregate;
+    const rawTaxAggregatePrototype = rawTaxAggregate && typeof rawTaxAggregate === 'object'
+        ? Object.getPrototypeOf(rawTaxAggregate)
+        : null;
+    const hasPlainTaxAggregate = rawTaxAggregate !== null
+        && typeof rawTaxAggregate === 'object'
+        && !Array.isArray(rawTaxAggregate)
+        && (rawTaxAggregatePrototype === Object.prototype || rawTaxAggregatePrototype === null);
+    const hasValidTaxAggregateValues = hasPlainTaxAggregate
+        && typeof rawTaxAggregate.sumRealizedGainSigned === 'number'
+        && Number.isFinite(rawTaxAggregate.sumRealizedGainSigned)
+        && typeof rawTaxAggregate.sumTaxableAfterTqfSigned === 'number'
+        && Number.isFinite(rawTaxAggregate.sumTaxableAfterTqfSigned);
+    if (hasAssetSale && !hasValidTaxAggregateValues) {
+        throw new FinancialCalculationError(
+            'Eine geplante Asset-Transaktion besitzt kein gültiges Rohsteueraggregat.',
+            {
+                contract: 'planned_action_flow',
+                field: 'taxRawAggregate',
+                taxRawAggregate: rawTaxAggregate ?? null
+            }
+        );
+    }
     const actionRawAggregate = {
-        sumRealizedGainSigned: Number(action?.taxRawAggregate?.sumRealizedGainSigned) || 0,
-        sumTaxableAfterTqfSigned: Number(action?.taxRawAggregate?.sumTaxableAfterTqfSigned) || 0
+        sumRealizedGainSigned: hasValidTaxAggregateValues
+            ? rawTaxAggregate.sumRealizedGainSigned
+            : 0,
+        sumTaxableAfterTqfSigned: hasValidTaxAggregateValues
+            ? rawTaxAggregate.sumTaxableAfterTqfSigned
+            : 0
     };
-    const hasAssetSale = Array.isArray(action?.quellen) && action.quellen.some(
-        source => source?.kind && source.kind !== 'liquiditaet'
-    );
     const steuerPlanGesamt = hasAssetSale ? (Number(action.steuer) || 0) : 0;
     const nettoErloesPlan = hasAssetSale ? (Number(action.nettoErlös) || 0) : 0;
     const bruttoVerkaufGesamt = hasAssetSale
@@ -868,21 +1165,98 @@ function _internal_calculateModel(input, lastState) {
             sparerPauschbetrag: normalizedInput.sparerPauschbetrag,
             kirchensteuerSatz: normalizedInput.kirchensteuerSatz
         });
-    const taxCashAdjustment = hasAssetSale
+    const rawTaxCashAdjustment = hasAssetSale
         ? steuerPlanGesamt - taxSettlement.taxDue
         : 0;
 
-    if (taxCashAdjustment < -0.01) {
+    if (rawTaxCashAdjustment < -0.01) {
         throw new FinancialCalculationError(
-            `Die finale Steuer uebersteigt die eingeplante Steuerreserve um ${Math.abs(taxCashAdjustment).toFixed(2)} EUR. Bitte pruefen Sie die Steuerparameter und Depot-Tranchen.`,
-            { contract: 'tax_reserve', taxCashAdjustment, steuerPlanGesamt, finalTax: taxSettlement.taxDue }
+            `Die finale Steuer uebersteigt die eingeplante Steuerreserve um ${Math.abs(rawTaxCashAdjustment).toFixed(2)} EUR. Bitte pruefen Sie die Steuerparameter und Depot-Tranchen.`,
+            {
+                contract: 'tax_reserve',
+                taxCashAdjustment: rawTaxCashAdjustment,
+                steuerPlanGesamt,
+                finalTax: taxSettlement.taxDue
+            }
+        );
+    }
+    // Dieselbe Subcent-Regel wie im Simulator-Recompute: negatives
+    // Rundungsrauschen bis einschließlich 0,01 EUR darf keine negative
+    // Verwendung und damit keinen falschen Liquiditätsfehler erzeugen.
+    const taxCashAdjustment = rawTaxCashAdjustment < 0 && rawTaxCashAdjustment >= -0.01
+        ? 0
+        : rawTaxCashAdjustment;
+    const rawVerwendungen = action?.verwendungen;
+    const rawUsesPrototype = rawVerwendungen && typeof rawVerwendungen === 'object'
+        ? Object.getPrototypeOf(rawVerwendungen)
+        : null;
+    const hasPlainUses = rawVerwendungen !== null
+        && typeof rawVerwendungen === 'object'
+        && !Array.isArray(rawVerwendungen)
+        && (rawUsesPrototype === Object.prototype || rawUsesPrototype === null);
+    const hasRawUsesProperty = Object.prototype.hasOwnProperty.call(action, 'verwendungen');
+    if ((action.type === 'TRANSACTION' || hasRawUsesProperty) && !hasPlainUses) {
+        throw new FinancialCalculationError(
+            'Die geplanten Verwendungen der Transaktion besitzen keinen gültigen Objektvertrag.',
+            {
+                contract: 'planned_action_flow',
+                rawUsesType: Array.isArray(rawVerwendungen) ? 'array' : typeof rawVerwendungen
+            }
+        );
+    }
+    const invalidRawUse = hasPlainUses
+        ? Object.entries(rawVerwendungen).find(([, value]) => (
+            typeof value !== 'number' || !Number.isFinite(value) || value < 0
+        ))
+        : null;
+    const invalidRawUseKey = hasPlainUses
+        ? Object.keys(rawVerwendungen).find(key => !ACTION_USE_KEYS.has(key))
+        : null;
+    if (invalidRawUseKey) {
+        throw new FinancialCalculationError(
+            'Die geplante Transaktion besitzt einen unbekannten Verwendungsschlüssel.',
+            {
+                contract: 'planned_action_flow',
+                key: invalidRawUseKey
+            }
+        );
+    }
+    if (invalidRawUse) {
+        const [key, value] = invalidRawUse;
+        throw new FinancialCalculationError(
+            'Eine geplante Verwendung der Transaktion ist ungültig.',
+            {
+                contract: key === 'liquiditaet' ? 'planned_liquidity_flow' : 'planned_action_flow',
+                key,
+                value
+            }
+        );
+    }
+    const rawUseTotal = hasPlainUses
+        ? Object.values(rawVerwendungen).reduce((total, value) => total + value, 0)
+        : 0;
+    if (
+        action.type === 'TRANSACTION'
+        && (
+            Math.abs(rawSourcePlanFunding - rawUseTotal) > 0.01
+            || Math.abs(rawSourcePlanFunding - action.nettoErlös) > 0.01
+        )
+    ) {
+        throw new FinancialCalculationError(
+            'Die geplante Transaktion ist bereits vor dem Steuer-Settlement nicht ausgeglichen.',
+            {
+                contract: 'planned_action_flow',
+                rawSourcePlanFunding,
+                rawUseTotal,
+                actionNet: action.nettoErlös
+            }
         );
     }
     action.quellen = _allocateFinalTaxToActionSources(action?.quellen, taxSettlement.taxDue);
 
     const verwendungen = Object.fromEntries(
-        Object.entries(action?.verwendungen || {})
-            .map(([key, value]) => [key, Number(value) || 0])
+        Object.entries(hasPlainUses ? rawVerwendungen : {})
+            .map(([key, value]) => [key, value])
     );
     verwendungen.liquiditaet = Number(verwendungen.liquiditaet) || 0;
     verwendungen.gold = Number(verwendungen.gold) || 0;
@@ -905,19 +1279,56 @@ function _internal_calculateModel(input, lastState) {
     // NOTE: action is passed by reference to the UI payload below.
     // We intentionally override steuer with the final annual settlement tax.
     action.steuer = taxSettlement.taxDue;
-    if (hasAssetSale) {
-        _assertFinalTaxActionReconciliation(action);
-    }
+    _assertFinalActionReconciliation(action);
     diagnosis.keyParams = diagnosis.keyParams || {};
     diagnosis.keyParams.taxSettlement = taxSettlement.details;
     if (threeBucketDiagnosis) {
         diagnosis.keyParams.threeBucket = threeBucketDiagnosis;
     }
 
-    // 10. Liquidität nach Transaktion berechnen
-    // Berücksichtigt Depot-Verkäufe zur Liquiditäts-Auffüllung
-    const liqNachTransaktion = aktuelleLiquiditaet + (action.verwendungen?.liquiditaet || 0);
-    const jahresGesamtbedarf = inflatedBedarf.floor + inflatedBedarf.flex;
+    // 10. Liquidität nach Transaktion berechnen.
+    // Zuflüsse aus Depotverkäufen und Abflüsse bei Überschussinvestitionen
+    // müssen beide in die nachgelagerte Runway eingehen.
+    const plannedLiquidityInflow = Number(action.verwendungen?.liquiditaet ?? 0);
+    const cashFundingSources = Array.isArray(action?.quellen)
+        ? action.quellen.filter(source => source?.kind === 'liquiditaet')
+        : [];
+    const invalidCashFundingSource = cashFundingSources.find(source => (
+        typeof source?.brutto !== 'number' || !Number.isFinite(source.brutto) || source.brutto < 0
+    ));
+    if (!Number.isFinite(plannedLiquidityInflow) || plannedLiquidityInflow < 0 || invalidCashFundingSource) {
+        throw new FinancialCalculationError(
+            'Die geplanten Liquiditätsflüsse der Transaktion sind ungültig.',
+            {
+                contract: 'planned_liquidity_flow',
+                plannedLiquidityInflow,
+                invalidCashFundingSource: invalidCashFundingSource || null
+            }
+        );
+    }
+    const plannedLiquidityOutflow = cashFundingSources.reduce(
+        (sum, source) => sum + source.brutto,
+        0
+    );
+    const rawLiqNachTransaktion = aktuelleLiquiditaet
+        + plannedLiquidityInflow
+        - plannedLiquidityOutflow;
+    if (
+        !Number.isFinite(rawLiqNachTransaktion)
+        || rawLiqNachTransaktion < -PLANNED_ACTION_FLOW_EPSILON
+    ) {
+        throw new FinancialCalculationError(
+            'Die geplante Transaktion überbucht die verfügbare Liquidität.',
+            {
+                contract: 'planned_liquidity_flow',
+                aktuelleLiquiditaet,
+                plannedLiquidityInflow,
+                plannedLiquidityOutflow,
+                liqNachTransaktion: rawLiqNachTransaktion
+            }
+        );
+    }
+    const liqNachTransaktion = rawLiqNachTransaktion < 0 ? 0 : rawLiqNachTransaktion;
 
     // KPI: Liquiditätsdeckung relativ zum Zielwert vor/nach Transaktion
     // Wird als Diagnose-KPI und für die UI wiederverwendet, deshalb einmalig berechnet
@@ -928,8 +1339,14 @@ function _internal_calculateModel(input, lastState) {
     const deckungNachher = computeCoverage(liqNachTransaktion);
 
     // Neue Runway nach Transaktion berechnen
-    const runwayMonths = (jahresGesamtbedarf > 0)
-        ? (liqNachTransaktion / (jahresGesamtbedarf / 12))
+    const runwayMonths = (plannedAnnualNetNeed > 0)
+        ? (liqNachTransaktion / (plannedAnnualNetNeed / 12))
+        : Infinity;
+    // Die Dynamic-Flex-Safety behält bewusst die vor Slice 17 kalibrierte
+    // Rohbedarfsbasis. Eine Policy-Kürzung darf ihr eigenes Erholungssignal
+    // nicht durch einen kleineren Nenner erzeugen.
+    const safetyRunwayMonths = (neuerBedarf > 0)
+        ? (liqNachTransaktion / (neuerBedarf / 12))
         : Infinity;
 
     const safetyUpdate = _updateVpwSafetyState({
@@ -939,7 +1356,7 @@ function _internal_calculateModel(input, lastState) {
             alarmActive: diagnosis?.general?.alarmActive === true,
             entnahmequoteDepot: diagnosis?.keyParams?.entnahmequoteDepot,
             realerDepotDrawdown: diagnosis?.keyParams?.realerDepotDrawdown,
-            runwayMonate: runwayMonths,
+            runwayMonate: safetyRunwayMonths,
             minRunwayMonths: liquidityRunwayPolicy.hardMinimumMonths,
             kuerzungProzent: spendingResult?.kuerzungProzent,
             safetyStage: vpwEffectiveSettings.stage,
@@ -966,8 +1383,11 @@ function _internal_calculateModel(input, lastState) {
     diagnosis.general.dynamicFlexSafetyStableStreak = safetyUpdate.stableStreak;
     diagnosis.general.dynamicFlexSafetyTransition = safetyUpdate.transition;
     diagnosis.general.dynamicFlexSafetyReentryRemaining = nextReentryRemaining;
-    diagnosis.general.dynamicFlexSafetyRunwayMonate = runwayMonths;
-    diagnosis.general.runwayMonateVorTransaktion = reichweiteMonate;
+    diagnosis.general.dynamicFlexSafetyRunwayMonate = safetyRunwayMonths;
+    diagnosis.general.dynamicFlexSafetyRunwayBasis = 'pre_policy_annual_net_need';
+    diagnosis.general.dynamicFlexSafetyAnnualNeed = neuerBedarf;
+    diagnosis.general.plannedAnnualWithdrawalSource = plannedWithdrawalResolution.source;
+    diagnosis.general.runwayMonateVorTransaktion = preTransactionRunwayMonths;
     diagnosis.general.dynamicFlexGoGoSuppressed = vpwEffectiveSettings.goGoSuppressed;
     diagnosis.general.dynamicFlexSuppressed = vpwEffectiveSettings.dynamicFlexSuppressed;
     if (safetyUpdate.transition === 'up') {

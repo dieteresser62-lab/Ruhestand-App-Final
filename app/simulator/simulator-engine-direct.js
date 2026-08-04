@@ -33,6 +33,12 @@ import {
     buildHealthBucketDiagnostics
 } from './simulator-health-bucket.js';
 import { resolveSimulatorCumulativeInflationFactor } from './simulator-engine-helpers.js';
+import { resolvePlannedAnnualWithdrawal } from '../../types/planned-withdrawal-contract.js';
+import {
+    PLANNED_ACTION_FLOW_EPSILON,
+    resolvePlannedAction
+} from '../../types/planned-action-contract.js';
+import { settleTaxYear } from '../../engine/tax-settlement.mjs';
 
 const formatInteger = (value) => Number.isFinite(value) ? Math.round(value) : 0;
 
@@ -62,6 +68,127 @@ function buildTechnicalErrorOutcome(code, message, cause = null, details = null)
     };
 }
 
+function resolvePlannedActionSafely(options) {
+    try {
+        const resolution = resolvePlannedAction(options);
+        if (resolution.status !== 'resolved') return resolution;
+        const action = resolution.action;
+        const materializedAction = {
+            ...action,
+            quellen: resolution.sources.map(source => ({ ...source })),
+            verwendungen: { ...resolution.uses },
+            ...(action.taxRawAggregate && typeof action.taxRawAggregate === 'object'
+                && !Array.isArray(action.taxRawAggregate)
+                ? { taxRawAggregate: { ...action.taxRawAggregate } }
+                : {}),
+            ...(action.taxSettlement && typeof action.taxSettlement === 'object'
+                && !Array.isArray(action.taxSettlement)
+                ? { taxSettlement: { ...action.taxSettlement } }
+                : {})
+        };
+        return { ...resolution, action: materializedAction };
+    } catch (cause) {
+        return {
+            status: 'invalid',
+            reason: 'contract_evaluation_failed',
+            context: {
+                cause: cause instanceof Error ? cause.message : String(cause)
+            }
+        };
+    }
+}
+
+function createPlannedActionFlowSnapshot(resolution) {
+    const action = resolution.action;
+    const snapshot = {
+        schemaVersion: 'PlannedActionFlowV1',
+        contractStatus: 'resolved_pre_execution',
+        type: action.type,
+        quellen: resolution.sources.map(source => Object.freeze({ ...source })),
+        verwendungen: Object.freeze({ ...resolution.uses }),
+        nettoErlös: action.nettoErlös,
+        steuer: action.steuer,
+        taxRawAggregate: Object.freeze({ ...action.taxRawAggregate })
+    };
+    Object.freeze(snapshot.quellen);
+    return Object.freeze(snapshot);
+}
+
+function isPlainRecord(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null;
+}
+
+function matchesSettlementNumber(actual, expected) {
+    return typeof actual === 'number'
+        && Number.isFinite(actual)
+        && Math.abs(actual - expected) <= PLANNED_ACTION_FLOW_EPSILON;
+}
+
+function resolveAnnualTaxSettlementSafely({
+    action,
+    newState,
+    taxStatePrev,
+    sparerPauschbetrag,
+    kirchensteuerSatz
+}) {
+    try {
+        const expected = settleTaxYear({
+            taxStatePrev,
+            rawAggregate: action?.taxRawAggregate,
+            sparerPauschbetrag,
+            kirchensteuerSatz
+        });
+        if (action?.taxSettlementDeferred === true) {
+            return { status: 'invalid', reason: 'tax_settlement_deferred' };
+        }
+        if (!matchesSettlementNumber(action?.steuer, expected.taxDue)) {
+            return {
+                status: 'invalid',
+                reason: 'action_tax_mismatch',
+                context: { expectedTax: expected.taxDue, actualTax: action?.steuer }
+            };
+        }
+        if (!isPlainRecord(action?.taxSettlement)) {
+            return { status: 'invalid', reason: 'tax_settlement_shape_invalid' };
+        }
+        for (const [field, expectedValue] of Object.entries(expected.details)) {
+            if (!matchesSettlementNumber(action.taxSettlement[field], expectedValue)) {
+                return {
+                    status: 'invalid',
+                    reason: 'tax_settlement_detail_mismatch',
+                    context: {
+                        field,
+                        expectedValue,
+                        actualValue: action.taxSettlement[field]
+                    }
+                };
+            }
+        }
+        if (!isPlainRecord(newState?.taxState)
+            || !matchesSettlementNumber(newState.taxState.lossCarry, expected.taxStateNext.lossCarry)) {
+            return {
+                status: 'invalid',
+                reason: 'tax_state_mismatch',
+                context: {
+                    expectedLossCarry: expected.taxStateNext.lossCarry,
+                    actualLossCarry: newState?.taxState?.lossCarry
+                }
+            };
+        }
+        return { status: 'resolved', expected };
+    } catch (cause) {
+        return {
+            status: 'invalid',
+            reason: 'tax_settlement_evaluation_failed',
+            context: {
+                cause: cause instanceof Error ? cause.message : String(cause)
+            }
+        };
+    }
+}
+
 function validateRequiredYearReturns(yearData) {
     const requiredFields = ['rendite', 'gold_eur_perf', 'zinssatz'];
     const invalidFields = requiredFields.filter(field => !Number.isFinite(yearData?.[field]));
@@ -76,12 +203,17 @@ function validateRequiredYearReturns(yearData) {
 }
 
 function captureEngineBoundaryPortfolio(portfolio) {
-    const captureValues = tranches => Array.isArray(tranches)
-        ? tranches.map(tranche => tranche?.marketValue)
+    const captureTranches = tranches => Array.isArray(tranches)
+        ? tranches.map(tranche => ({
+            marketValue: tranche?.marketValue,
+            hasTrancheId: Object.prototype.hasOwnProperty.call(tranche || {}, 'trancheId'),
+            trancheId: tranche?.trancheId
+        }))
         : [];
     return {
-        equityValues: captureValues(portfolio?.depotTranchesAktien),
-        goldValues: captureValues(portfolio?.depotTranchesGold),
+        equityTranches: captureTranches(portfolio?.depotTranchesAktien),
+        goldTranches: captureTranches(portfolio?.depotTranchesGold),
+        moneyMarketTranches: captureTranches(portfolio?.depotTranchesGeldmarkt),
         hasSimulationDate: Object.prototype.hasOwnProperty.call(portfolio || {}, 'simulationDate'),
         simulationDate: portfolio?.simulationDate,
         hasSourceProfileId: Object.prototype.hasOwnProperty.call(portfolio || {}, 'simulationSourceProfileId'),
@@ -90,14 +222,18 @@ function captureEngineBoundaryPortfolio(portfolio) {
 }
 
 function restoreEngineBoundaryPortfolio(portfolio, snapshot) {
-    const restoreValues = (tranches, values) => {
+    const restoreTranches = (tranches, trancheSnapshots) => {
         if (!Array.isArray(tranches)) return;
-        for (let i = 0; i < tranches.length && i < values.length; i++) {
-            tranches[i].marketValue = values[i];
+        for (let i = 0; i < tranches.length && i < trancheSnapshots.length; i++) {
+            const trancheSnapshot = trancheSnapshots[i];
+            tranches[i].marketValue = trancheSnapshot.marketValue;
+            if (trancheSnapshot.hasTrancheId) tranches[i].trancheId = trancheSnapshot.trancheId;
+            else delete tranches[i].trancheId;
         }
     };
-    restoreValues(portfolio?.depotTranchesAktien, snapshot.equityValues);
-    restoreValues(portfolio?.depotTranchesGold, snapshot.goldValues);
+    restoreTranches(portfolio?.depotTranchesAktien, snapshot.equityTranches);
+    restoreTranches(portfolio?.depotTranchesGold, snapshot.goldTranches);
+    restoreTranches(portfolio?.depotTranchesGeldmarkt, snapshot.moneyMarketTranches);
     if (snapshot.hasSimulationDate) portfolio.simulationDate = snapshot.simulationDate;
     else delete portfolio.simulationDate;
     if (snapshot.hasSourceProfileId) portfolio.simulationSourceProfileId = snapshot.simulationSourceProfileId;
@@ -475,16 +611,94 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         );
     }
 
+    const plannedWithdrawalResolution = resolvePlannedAnnualWithdrawal({
+        spendingResult: fullResult.ui.spending
+    });
+    if (plannedWithdrawalResolution.status !== 'resolved') {
+        restoreEngineBoundaryPortfolio(portfolio, engineBoundaryPortfolio);
+        return buildTechnicalErrorOutcome(
+            SIMULATOR_TECHNICAL_ERROR_CODES.ENGINE_RESULT_SHAPE_INVALID,
+            `Die Simulations-Engine lieferte keine eindeutige geplante Jahresentnahme (${SIMULATOR_TECHNICAL_ERROR_CODES.ENGINE_RESULT_SHAPE_INVALID}).`,
+            null,
+            {
+                contract: 'planned_annual_withdrawal',
+                status: plannedWithdrawalResolution.status,
+                candidates: plannedWithdrawalResolution.candidates
+            }
+        );
+    }
+
     alignEngineInflationContract(fullResult, cumulativeInflationFactor);
 
     // Extrahiere Ergebnisse direkt aus fullResult
     const spendingResult = fullResult.ui.spending;
-    const actionResult = fullResult.ui.action;
+    const rawActionResult = fullResult.ui.action;
     const market = fullResult.ui.market;
     const zielLiquiditaet = fullResult.ui.zielLiquiditaet;
     const spendingNewState = fullResult.newState;
-    const actionRawAggregate = buildTaxRawAggregate(actionResult?.taxRawAggregate);
+
+    // Die Engine-Grenze wird vor jeder 3-Bucket-Transformation validiert.
+    // Andernfalls koennte ein Override einen fehlerhaften Adaptervertrag durch
+    // Nullsetzen oder Ersetzen seiner Quellen scheinbar reparieren.
+    const rawPlannedActionResolution = resolvePlannedActionSafely({
+        action: rawActionResult,
+        availableLiquidity: liquiditaet,
+        detailedTranches,
+        requireAssetInventory: true,
+        allowedUseKeys: ['liquiditaet', 'gold', 'aktien']
+    });
+    if (rawPlannedActionResolution.status !== 'resolved') {
+        restoreEngineBoundaryPortfolio(portfolio, engineBoundaryPortfolio);
+        return buildTechnicalErrorOutcome(
+            SIMULATOR_TECHNICAL_ERROR_CODES.ENGINE_RESULT_SHAPE_INVALID,
+            `Die Simulations-Engine lieferte keine ausgeglichene geplante Transaktion (${SIMULATOR_TECHNICAL_ERROR_CODES.ENGINE_RESULT_SHAPE_INVALID}).`,
+            null,
+            {
+                contract: 'planned_action_flow',
+                phase: 'engine_output',
+                reason: rawPlannedActionResolution.reason,
+                ...rawPlannedActionResolution.context
+            }
+        );
+    }
+    const rawActionSnapshot = rawPlannedActionResolution.action;
+    const rawTaxSettlementResolution = resolveAnnualTaxSettlementSafely({
+        action: rawActionSnapshot,
+        newState: spendingNewState,
+        taxStatePrev,
+        sparerPauschbetrag: engineInput.sparerPauschbetrag,
+        kirchensteuerSatz: engineInput.kirchensteuerSatz
+    });
+    if (rawTaxSettlementResolution.status !== 'resolved') {
+        restoreEngineBoundaryPortfolio(portfolio, engineBoundaryPortfolio);
+        return buildTechnicalErrorOutcome(
+            SIMULATOR_TECHNICAL_ERROR_CODES.ENGINE_RESULT_SHAPE_INVALID,
+            `Die Simulations-Engine lieferte keine zentral reconciliierte Jahressteuer (${SIMULATOR_TECHNICAL_ERROR_CODES.ENGINE_RESULT_SHAPE_INVALID}).`,
+            null,
+            {
+                contract: 'annual_tax_settlement',
+                phase: 'engine_output',
+                reason: rawTaxSettlementResolution.reason,
+                ...rawTaxSettlementResolution.context
+            }
+        );
+    }
+    const actionRawAggregate = buildTaxRawAggregate(rawActionSnapshot.taxRawAggregate);
     combinedTaxRawAggregate = { ...actionRawAggregate };
+    const actionResult = {
+        ...rawActionSnapshot,
+        ...(Array.isArray(rawActionSnapshot.quellen)
+            ? { quellen: rawActionSnapshot.quellen.map(source => ({ ...source })) }
+            : {}),
+        ...(rawActionSnapshot.verwendungen && typeof rawActionSnapshot.verwendungen === 'object'
+            && !Array.isArray(rawActionSnapshot.verwendungen)
+            ? { verwendungen: { ...rawActionSnapshot.verwendungen } }
+            : {}),
+        ...(rawActionSnapshot.taxRawAggregate && typeof rawActionSnapshot.taxRawAggregate === 'object'
+            && !Array.isArray(rawActionSnapshot.taxRawAggregate)
+            ? { taxRawAggregate: { ...rawActionSnapshot.taxRawAggregate } }
+            : {})
+    };
 
     // 3-Bucket Override
     const { updatedAction, threeBucketState } = applyThreeBucketLogic(
@@ -497,6 +711,28 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     );
 
     Object.assign(actionResult, updatedAction);
+    const plannedActionResolution = resolvePlannedActionSafely({
+        action: actionResult,
+        availableLiquidity: liquiditaet,
+        detailedTranches,
+        requireAssetInventory: true,
+        allowedUseKeys: ['liquiditaet', 'gold', 'aktien']
+    });
+    if (plannedActionResolution.status !== 'resolved') {
+        restoreEngineBoundaryPortfolio(portfolio, engineBoundaryPortfolio);
+        return buildTechnicalErrorOutcome(
+            SIMULATOR_TECHNICAL_ERROR_CODES.ENGINE_RESULT_SHAPE_INVALID,
+            `Die Simulations-Engine lieferte keine ausgeglichene geplante Transaktion (${SIMULATOR_TECHNICAL_ERROR_CODES.ENGINE_RESULT_SHAPE_INVALID}).`,
+            null,
+            {
+                contract: 'planned_action_flow',
+                phase: 'three_bucket_final',
+                reason: plannedActionResolution.reason,
+                ...plannedActionResolution.context
+            }
+        );
+    }
+    const plannedActionFlow = createPlannedActionFlowSnapshot(plannedActionResolution);
     combinedTaxRawAggregate = buildTaxRawAggregate(actionResult?.taxRawAggregate);
 
     const allQuellen = Array.isArray(actionResult.quellen) ? actionResult.quellen : [];
@@ -519,25 +755,6 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         (actionResult.verwendungen?.gold > 0 || actionResult.verwendungen?.aktien > 0);
 
     // Wende Transaktionen auf Portfolio an
-    // FIX: Only infer sales from nettoErlös if this is NOT a cash-funded purchase
-    // (Surplus Rebalancing uses liquidity to BUY assets, not sell them)
-    if (actionResult.type === 'TRANSACTION' && !hasSales && actionResult.nettoErlös > 0 && !isCashFundedPurchase) {
-        const inferredBrutto = (actionResult.nettoErlös || 0) + (actionResult.steuer || 0);
-        if (inferredBrutto > 0) {
-            saleQuellen = [{
-                kind: (is3Bucket && isBadYear) ? 'anleihe' : 'aktien_alt',
-                brutto: inferredBrutto,
-                steuer: actionResult.steuer || 0,
-                trancheId: null,
-                name: null,
-                isin: null,
-                netto: actionResult.nettoErlös || 0
-            }];
-            plannedSaleBrutto = inferredBrutto;
-            hasSales = true;
-        }
-    }
-
     if (actionResult.type === 'TRANSACTION' && hasSales) {
         const saleResult = {
             steuerGesamt: actionResult.steuer || 0,
@@ -591,6 +808,9 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         buyEqAmount = (actionResult.verwendungen?.aktien || 0) * regularSaleScale;
         liquiditaet += Math.max(0, actualNettoErlos - actualReinvested);
     }
+    if (liquiditaet < 0 && liquiditaet >= -PLANNED_ACTION_FLOW_EPSILON) {
+        liquiditaet = 0;
+    }
     snapshotBalance('after_action_sales', {
         plannedSaleBrutto: euros(plannedSaleBrutto),
         nettoErlos: euros(actionResult.nettoErlös),
@@ -599,8 +819,11 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         buyGoldAmount: euros(buyGoldAmount)
     });
 
-    const jahresEntnahme = spendingResult.monatlicheEntnahme * 12;
-    const jahresEntnahmePlan = jahresEntnahme;
+    // Auch injizierbare Engine-Adapter dürfen nur die Monatsdarstellung
+    // liefern. Derselbe Vertrag wie im Core reconciliert alle vorhandenen
+    // Darstellungen; fehlende oder widersprüchliche Shapes scheitern sichtbar.
+    const jahresEntnahmePlan = plannedWithdrawalResolution.annualWithdrawal;
+    const jahresEntnahme = jahresEntnahmePlan;
 
     // RUIN-Check: Können wir zumindest den Floor decken?
     // Berechnung des Netto-Floors (Floor - Rente)
@@ -803,7 +1026,9 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
 
     const taxReconciliation = applySimulatorTaxRecompute({
         didForcedSale,
+        forceRecompute: threeBucketState.is3Bucket && threeBucketState.isBadYear,
         actionResult,
+        plannedActionFlow,
         spendingNewState,
         taxStatePrev,
         combinedTaxRawAggregate,

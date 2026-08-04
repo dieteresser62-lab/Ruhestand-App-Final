@@ -2,6 +2,8 @@ import { sumDepot } from './simulator-portfolio.js';
 import { euros, signedEuros } from './simulator-engine-direct-utils.js';
 import { shortenReasonText } from './simulator-utils.js';
 import { sumBondBucketValuation } from '../../engine/transactions/three-bucket-logic.mjs';
+import { FinancialCalculationError } from '../../engine/errors.mjs';
+import { resolvePlannedAnnualWithdrawal } from '../../types/planned-withdrawal-contract.js';
 import {
     advanceSimulatorCumulativeInflationFactor,
     resolveSimulatorCumulativeInflationFactor
@@ -149,9 +151,25 @@ export function buildSimulatorYearResult({
     const runwayCoveragePct = zielLiquiditaet > 0
         ? (liquiditaet / zielLiquiditaet) * 100
         : null;
-    const annualRunwayNeedRaw = Number(fullResult.ui.neuerBedarf);
-    const runwayMonths = Number.isFinite(annualRunwayNeedRaw)
-        ? (annualRunwayNeedRaw > 0 ? liquiditaet / (annualRunwayNeedRaw / 12) : null)
+    const plannedWithdrawalResolution = resolvePlannedAnnualWithdrawal({
+        spendingResult,
+        ...(jahresEntnahmePlan === undefined ? {} : { annualPlan: jahresEntnahmePlan })
+    });
+    if (plannedWithdrawalResolution.status === 'invalid' || plannedWithdrawalResolution.status === 'conflict') {
+        throw new FinancialCalculationError(
+            'Die Jahresentnahme des Simulatorergebnisses ist nicht eindeutig reconciliert.',
+            {
+                contract: 'planned_annual_withdrawal',
+                status: plannedWithdrawalResolution.status,
+                candidates: plannedWithdrawalResolution.candidates
+            }
+        );
+    }
+    const annualRunwayNeed = plannedWithdrawalResolution.status === 'resolved'
+        ? plannedWithdrawalResolution.annualWithdrawal
+        : null;
+    const runwayMonths = Number.isFinite(annualRunwayNeed)
+        ? (annualRunwayNeed > 0 ? liquiditaet / (annualRunwayNeed / 12) : null)
         : null;
     const pensionFlexCapacity = Math.max(0, pensionAnnual - effectiveBaseFloor);
     const dynamicPortfolioFlex = vpw?.enabled === true && Number.isFinite(vpw?.dynamicFlex)

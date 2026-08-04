@@ -506,4 +506,109 @@ function vpwRate(r, n) {
     assertEqual(runs[2].ui.vpw.status, 'active', 'VPW should reactivate after 3-bucket protected recovery');
 }
 
+// Test 18: Runway target must use the final post-policy withdrawal, not raw VPW flex.
+{
+    const input = {
+        ...baseInput,
+        depotwertAlt: 3600000,
+        depotwertNeu: 0,
+        tagesgeld: 800000,
+        floorBedarf: 24000,
+        flexBedarf: 12000,
+        dynamicFlex: true,
+        horizonYears: 12,
+        marketCapeRatio: 32,
+        goGoActive: false,
+        liquidityRunwayYears: 5,
+        endeVJ: 100,
+        endeVJ_1: 100,
+        endeVJ_2: 100,
+        endeVJ_3: 100,
+        ath: 100,
+        jahreSeitAth: 0
+    };
+    const priorState = {
+        initialized: true,
+        flexRate: 20,
+        alarmActive: false,
+        cumulativeInflationFactor: 1,
+        peakRealVermoegen: 4400000,
+        lastMarketSKey: 'hot_neutral',
+        lastTotalBudget: 100000,
+        lastEntnahmeReal: 100000
+    };
+
+    const result = EngineAPI.simulateSingleYear(input, priorState);
+    const rawVpwTarget = Math.ceil((result.ui.vpw.vpwTotal * input.liquidityRunwayYears) / 100) * 100;
+
+    assertClose(result.ui.vpw.vpwTotal, 430124.75266668544, 1e-6, 'Fixture should retain a high raw VPW budget');
+    assertEqual(result.ui.spending.details.endgueltigeEntnahme, 153000, 'Fixture should retain the final post-policy annual withdrawal');
+    assertEqual(result.ui.zielLiquiditaet, 765000, 'Runway target must use final withdrawal times five years');
+    assert(result.ui.zielLiquiditaet !== rawVpwTarget, 'Runway target must not use the raw VPW budget');
+    assertEqual(result.ui.action.title, 'Runway-Überschuss investieren', 'Corrected target should turn the raw-VPW refill into a surplus investment');
+    assertEqual(result.ui.action.verwendungen.aktien, 35000, 'Only the quantized surplus above the corrected target should be invested');
+    assertEqual(result.ui.action.verwendungen.liquiditaet, 0, 'Corrected target must not request a liquidity refill');
+    assertClose(result.diagnosis.general.runwayMonateVorTransaktion, 800000 / (153000 / 12), 1e-9, 'Canonical pre-transaction runway must use final planned need');
+    assertClose(result.ui.runway.months, 60, 1e-9, 'Post-transaction runway must reflect the surplus cash outflow and final planned need');
+    assertClose(
+        result.diagnosis.general.dynamicFlexSafetyRunwayMonate,
+        765000 / (result.ui.neuerBedarf / 12),
+        1e-9,
+        'Dynamic-Flex Safety must retain its calibrated pre-policy need basis after the surplus action'
+    );
+    assertEqual(result.diagnosis.general.dynamicFlexSafetyRunwayBasis, 'pre_policy_annual_net_need',
+        'Safety diagnostics must expose the deliberately separate pre-policy basis');
+}
+
+// Test 19: A spending cut must not create its own false Safety recovery signal.
+{
+    const input = {
+        ...baseInput,
+        depotwertAlt: 2000000,
+        depotwertNeu: 0,
+        tagesgeld: 100000,
+        floorBedarf: 24000,
+        flexBedarf: 12000,
+        dynamicFlex: true,
+        horizonYears: 20,
+        marketCapeRatio: 32,
+        goGoActive: false,
+        liquidityRunwayYears: 5,
+        endeVJ: 100,
+        endeVJ_1: 100,
+        endeVJ_2: 100,
+        endeVJ_3: 100,
+        ath: 100,
+        jahreSeitAth: 0
+    };
+    const priorState = {
+        initialized: true,
+        flexRate: 50,
+        alarmActive: false,
+        cumulativeInflationFactor: 1,
+        peakRealVermoegen: 2100000,
+        lastMarketSKey: 'hot_neutral',
+        lastTotalBudget: 100000,
+        lastEntnahmeReal: 100000,
+        vpwSafetyStage: 1,
+        vpwSafetyStableStreak: 1,
+        vpwSafetyRiskStreak: 0
+    };
+
+    const result = EngineAPI.simulateSingleYear(input, priorState);
+
+    assert(result.ui.spending.kuerzungProzent >= 35 && result.ui.spending.kuerzungProzent <= 45,
+        'Safety witness must retain a strong but recovery-eligible spending cut');
+    assert(result.ui.runway.months >= 27,
+        'Post-policy UI runway should cross hard minimum plus recovery headroom');
+    assert(result.diagnosis.general.dynamicFlexSafetyRunwayMonate < 24,
+        'Pre-policy Safety runway must remain below the calibrated hard minimum');
+    assertEqual(result.newState.vpwSafetyStage, 1,
+        'A cut-induced post-policy runway increase must not de-escalate Safety from stage 1');
+    assertEqual(result.newState.vpwSafetyStableStreak, 0,
+        'A pre-policy runway crisis must reset the false recovery streak');
+    assertEqual(result.newState.vpwSafetyRiskStreak, 1,
+        'The calibrated pre-policy runway crisis must count as a risk year');
+}
+
 console.log('--- VPW Dynamic Flex Tests Completed ---');

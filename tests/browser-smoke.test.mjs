@@ -710,8 +710,8 @@ async function runBalanceFiveYearRunwayForcedSale(browser, baseUrl) {
         `Runway forced-sale witness must execute without engine errors: ${JSON.stringify(witness)}`);
     assert(Math.abs(witness.oneYear.grossSale - 50000) <= 0.01,
         `One-year runway control arm must pin the documented 50,000 EUR gross sale: ${JSON.stringify(witness)}`);
-    assert(Math.abs(witness.fiveYears.grossSale - 90000) <= 0.01,
-        `Five-year runway arm must pin the documented 90,000 EUR gross sale: ${JSON.stringify(witness)}`);
+    assert(Math.abs(witness.fiveYears.grossSale - 80000) <= 0.01,
+        `Five-year runway arm must pin the Slice-17 post-policy 80,000 EUR gross sale: ${JSON.stringify(witness)}`);
     assert(witness.oneYear.configuredRunwayYears === 1 && witness.fiveYears.configuredRunwayYears === 5,
         `Forced-sale witness must preserve both configured runway arms end to end: ${JSON.stringify(witness)}`);
     smoke.assertNoErrors();

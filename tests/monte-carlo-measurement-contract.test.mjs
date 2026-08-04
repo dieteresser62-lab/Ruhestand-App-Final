@@ -88,6 +88,7 @@ const consumerInventory = readFixture('consumer-inventory-v1.json');
 const slice08MeasurementPath = path.join(fixtureDir, 'liquidity-runway-slice-08-v1.json');
 const slice09MeasurementPath = path.join(fixtureDir, 'minimum-flex-slice-09-v1.json');
 const slice10MeasurementPath = path.join(fixtureDir, 'tax-logic-slice-10-v1.json');
+const slice17MeasurementPath = path.join(fixtureDir, '..', 'liquidity-runway-basis-slice-17-measurement-v1.json');
 
 function getGolden(id) {
     return goldenFixture.cases.find(entry => entry.id === id);
@@ -1658,17 +1659,47 @@ if (process.env.MC_PRINT_SLICE_10 === '1') {
     console.log(JSON.stringify(currentSlice10Measurement, null, 2));
     console.log('__POST_BACKTEST_DATA_10_CAPTURE_END__');
 } else {
-    const slice10ExpectedFixture = JSON.parse(fs.readFileSync(slice10MeasurementPath, 'utf8'));
+    const slice10FixtureBytes = fs.readFileSync(slice10MeasurementPath);
+    assertEqual(
+        createHash('sha256').update(slice10FixtureBytes).digest('hex'),
+        'f6d0b4fab497d63d9a7a12eaaeda307b9ee01163585ebc97bbb48569d82935ba',
+        'Immutable Slice-10 Monte Carlo measurement must remain byte-identical'
+    );
+}
+const slice10FixtureBytes = fs.readFileSync(slice10MeasurementPath);
+const slice10ExpectedFixture = JSON.parse(slice10FixtureBytes.toString('utf8'));
+assertEqual(slice10ExpectedFixture.changedProjectionCount, 3,
+    'Archived Slice 10 tax logic must retain its three changed Monte Carlo/Sweep projections');
+const slice17TargetProjectionHashes = {
+    carResultSha256: sha256Json(actualSlice07Result),
+    autoOptimizeResultSha256: sha256Json(actualAutoOptimizeProjection),
+    finalResultSha256: sha256Json(actualFinalProjection)
+};
+const currentSlice17Measurement = {
+    schemaVersion: 'LiquidityRunwayBasisSlice17MonteCarloMeasurementV1',
+    sourceReference: slice10ExpectedFixture.snapshotId,
+    sourceFixtureSha256: createHash('sha256').update(slice10FixtureBytes).digest('hex'),
+    targetResultDocument: 'docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_17_RUNWAY_BASIS_BUGFIX.md',
+    reviewStatus: 'pending_external_review',
+    sourceProjectionHashes: slice10ExpectedFixture.targetProjectionHashes,
+    targetProjectionHashes: slice17TargetProjectionHashes,
+    measuredProjectionCount: Object.keys(slice17TargetProjectionHashes).length,
+    cause: 'planned_withdrawal_controls_liquidity_while_safety_retains_pre_policy_need'
+};
+if (process.env.MC_PRINT_SLICE_17 === '1') {
+    console.log('__POST_BACKTEST_DATA_17_CAPTURE_START__');
+    console.log(JSON.stringify(currentSlice17Measurement, null, 2));
+    console.log('__POST_BACKTEST_DATA_17_CAPTURE_END__');
+} else {
+    const expectedSlice17 = JSON.parse(fs.readFileSync(slice17MeasurementPath, 'utf8')).monteCarlo;
     compareSnapshotNode(
-        currentSlice10Measurement,
-        slice10ExpectedFixture,
-        'postBacktestData10.measurement',
+        currentSlice17Measurement,
+        expectedSlice17,
+        'postBacktestData17.measurement',
         sameRuntime,
         activeSnapshot.metadata.numericTolerance
     );
 }
-assertEqual(currentSlice10Measurement.changedProjectionCount, 3,
-    'Slice 10 tax logic should change all three measured Monte Carlo/Sweep aggregate projections');
 assertEqual(MONTE_CARLO_SNAPSHOT_POLICY.finalCandidate, finalCandidate.snapshotId, 'Public snapshot policy must name the integrated final candidate');
 assertEqual(
     MONTE_CARLO_SNAPSHOT_POLICY.currentReference,

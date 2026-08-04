@@ -433,6 +433,76 @@ function saleInput(detailledTranches, overrides = {}) {
         'Single-profile final source must not exceed its bond lot inventory');
 }
 
+// A bad-year 3-bucket action with no bond inventory must expose the uncovered
+// amount diagnostically without retaining the blocked equity sale as a source,
+// use, or taxable transaction.
+{
+    const result = EngineAPI.simulateSingleYear({
+        depotwertAlt: 0,
+        depotwertNeu: 100000,
+        costBasisAlt: 0,
+        costBasisNeu: 90000,
+        tqfAlt: 0,
+        tqfNeu: 0.3,
+        goldWert: 0,
+        tagesgeld: 0,
+        geldmarktEtf: 0,
+        inflation: 2,
+        renteAktiv: false,
+        renteMonatlich: 0,
+        floorBedarf: 12000,
+        flexBedarf: 0,
+        startAlter: 65,
+        aktuellesAlter: 65,
+        goldAktiv: false,
+        goldFloorProzent: 0,
+        goldZielProzent: 0,
+        runwayTargetMonths: 36,
+        runwayMinMonths: 24,
+        risikoprofil: 'sicherheits-dynamisch',
+        sparerPauschbetrag: 0,
+        kirchensteuerSatz: 0,
+        marketCapeRatio: 20,
+        endeVJ: 70,
+        endeVJ_1: 100,
+        endeVJ_2: 100,
+        endeVJ_3: 100,
+        ath: 100,
+        jahreSeitAth: 1,
+        finalizeThreeBucketAction: true,
+        decumulation: {
+            mode: '3_bucket_jilge',
+            drawdownTrigger: -0.15,
+            bondTargetFactor: 5,
+            bondRefillThreshold: 0
+        },
+        detailledTranches: [{
+            trancheId: 'equity-1',
+            schemaVersion: 2,
+            type: 'aktien_neu',
+            category: 'equity',
+            marketValue: 100000,
+            costBasis: 90000,
+            tqf: 0.3,
+            taxExempt: false
+        }]
+    }, { taxState: { lossCarry: 0 } });
+    const useTotal = Object.values(result.ui?.action?.verwendungen || {})
+        .reduce((total, value) => total + value, 0);
+
+    assert(!result.error, 'Missing bad-year bond inventory must stay a valid uncovered 3-bucket outcome');
+    assertEqual(result.ui.action.quellen.length, 0,
+        'Blocked equity sources must not survive when no bond replacement can be sold');
+    assertClose(result.ui.action.nettoErlös, 0, 1e-12,
+        'No bond source must produce no transaction proceeds');
+    assertClose(useTotal, 0, 1e-12,
+        'No bond source must not retain unfunded transaction uses');
+    assertClose(result.ui.action.steuer, 0, 1e-12,
+        'Blocked equity sales must not retain a taxable aggregate');
+    assert(result.ui.threeBucket.unmetLiquidity > 0,
+        'The uncovered amount must remain visible in 3-bucket diagnostics');
+}
+
 // O-04: The household action starts with a 10,000 EUR bond blueprint. The
 // profile-aware finalization must gross it up to 11,519.08 EUR, settle the
 // owner's 777 EUR loss carry exactly once and finance the unchanged use.

@@ -30,6 +30,7 @@ const slice09MeasurementFixturePath = path.join(__dirname, 'fixtures', 'minimum-
 const slice09AddedCaseFinancialFixturePath = path.join(__dirname, 'fixtures', 'minimum-flex-slice-09-added-case-financial-v1.json');
 const slice10MeasurementFixturePath = path.join(__dirname, 'fixtures', 'tax-logic-slice-10-backtest-measurement-v1.json');
 const slice13IntegrationFixturePath = path.join(__dirname, 'fixtures', 'backtest-data-integration-slice-13-v1.json');
+const slice17MeasurementFixturePath = path.join(__dirname, 'fixtures', 'liquidity-runway-basis-slice-17-measurement-v1.json');
 const backtestSourcePath = path.join(__dirname, '..', 'app', 'simulator', 'simulator-backtest.js');
 const backtestRunnerSourcePath = path.join(__dirname, '..', 'app', 'simulator', 'historical-backtest-runner.js');
 const UPDATE_TARGET = process.env.UPDATE_BACKTEST_TARGET === '1';
@@ -44,9 +45,13 @@ function runGitCommand(args, repositoryRoot, label) {
         `${label} must succeed: ${result.stderr || result.stdout || result.error?.message || 'unknown git error'}`);
     return String(result.stdout || '').trim();
 }
-const UPDATE_SLICE10_MEASUREMENT = process.env.UPDATE_BACKTEST_DATA_10 === '1';
-
 console.log('--- Simulator Backtest Characterization Tests ---');
+
+if (process.env.UPDATE_BACKTEST_DATA_10 === '1') {
+    throw new Error(
+        'Die Slice-10-Backtestfixture ist unveraenderlich. Verwenden Sie PRINT_BACKTEST_DATA_10=1 nur fuer eine lesende Diagnose.'
+    );
+}
 
 const METRIC_DICTIONARY_V1 = Object.freeze({
     startWealth: {
@@ -1837,23 +1842,68 @@ try {
             }
         }
     };
-    assert(slice13Integration.financialNeutralityEvidence.unchanged,
-        'Slices 11-13 financial neutrality is measured against the preserved 26-year row hash');
+    const archivedSlice13Bytes = fs.readFileSync(slice13IntegrationFixturePath);
+    const archivedSlice13Sha256 = createHash('sha256').update(archivedSlice13Bytes).digest('hex');
+    const archivedSlice13Integration = JSON.parse(archivedSlice13Bytes.toString('utf8'));
+    assertEqual(
+        archivedSlice13Sha256,
+        '49ab47b46c844bc32db3a07cf1b9bbc53b2635e5290168afce93bab6d9e33ffa',
+        'Immutable Slice-13 integration evidence must remain byte-identical'
+    );
+    assert(archivedSlice13Integration.financialNeutralityEvidence.unchanged,
+        'Archived Slices 11-13 evidence must retain its original financial-neutrality statement');
+    const archivedIntegratedReference = archivedSlice13Integration.referenceCases.find(
+        entry => entry.id === 'integrated_reference_2000_2025'
+    );
+    const slice17BacktestMeasurement = {
+        schemaVersion: 'LiquidityRunwayBasisSlice17BacktestMeasurementV1',
+        sourceReference: archivedSlice13Integration.schemaVersion,
+        sourceFixtureSha256: archivedSlice13Sha256,
+        targetResultDocument: 'docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_17_RUNWAY_BASIS_BUGFIX.md',
+        reviewStatus: 'pending_external_review',
+        targetActualSha256: stableHash(actual),
+        caseCount: actual.cases.length,
+        negativeCaseCount: actual.negativeCases.length,
+        ruinCaseCount: actual.cases.filter(entry => entry.outcomeObservation === 'ruin').length,
+        maxAbsolutePortfolioFlowDelta: round(
+            Math.max(...actual.cases.map(entry => entry.values.maxAbsolutePortfolioFlowDelta)),
+            6
+        ),
+        integratedReferenceDelta: {
+            id: integrated2000To2025.id,
+            source: {
+                outcome: archivedIntegratedReference.outcome,
+                observedRowCount: archivedIntegratedReference.observedRowCount,
+                summaryEndWealth: archivedIntegratedReference.summaryEndWealth,
+                totalWithdrawal: archivedIntegratedReference.totalWithdrawal,
+                totalTax: archivedIntegratedReference.totalTax,
+                canonicalRowsHash: archivedIntegratedReference.canonicalRowsHash
+            },
+            target: {
+                outcome: integrated2000To2025.outcomeObservation,
+                observedRowCount: integrated2000To2025.observedRowCount,
+                summaryEndWealth: integrated2000To2025.values.summaryEndWealth,
+                totalWithdrawal: integrated2000To2025.values.totalWithdrawal,
+                totalTax: integrated2000To2025.values.totalTax,
+                maxAbsolutePortfolioFlowDelta: integrated2000To2025.values.maxAbsolutePortfolioFlowDelta,
+                canonicalRowsHash: integrated2000To2025.canonicalRowsHash
+            },
+            delta: {
+                outcomeChanged: archivedIntegratedReference.outcome !== integrated2000To2025.outcomeObservation,
+                observedRowCount: integrated2000To2025.observedRowCount - archivedIntegratedReference.observedRowCount,
+                summaryEndWealth: round(integrated2000To2025.values.summaryEndWealth - archivedIntegratedReference.summaryEndWealth),
+                totalWithdrawal: round(integrated2000To2025.values.totalWithdrawal - archivedIntegratedReference.totalWithdrawal),
+                totalTax: round(integrated2000To2025.values.totalTax - archivedIntegratedReference.totalTax),
+                canonicalRowsHashChanged: archivedIntegratedReference.canonicalRowsHash !== integrated2000To2025.canonicalRowsHash,
+                cause: 'planned_withdrawal_controls_liquidity_while_safety_retains_pre_policy_need'
+            }
+        },
+        referenceCaseCount: integrationReferenceCases.length
+    };
     if (process.env.PRINT_BACKTEST_DATA_13 === '1') {
         console.log('__BACKTEST_DATA_13_INTEGRATION_START__');
         console.log(stableStringify(slice13Integration, 2));
         console.log('__BACKTEST_DATA_13_INTEGRATION_END__');
-    } else {
-        const expectedSlice13Integration = JSON.parse(fs.readFileSync(slice13IntegrationFixturePath, 'utf8'));
-        expectedSlice13Integration.sourceCommit = measuredGitCommit;
-        expectedSlice13Integration.sourceTreeStatus = measuredSourceTreeStatus;
-        expectedSlice13Integration.exportFinalizationGate.status = slice13Integration.exportFinalizationGate.status;
-        expectedSlice13Integration.exportFinalizationGate.observedErrorCode = slice13Integration.exportFinalizationGate.observedErrorCode;
-        expectedSlice13Integration.exportFinalizationGate.resultFingerprint = slice13Integration.exportFinalizationGate.resultFingerprint;
-        const integrationDiffs = collectDiffs(expectedSlice13Integration, slice13Integration);
-        if (integrationDiffs.length > 0) console.error(stableStringify(integrationDiffs.slice(0, 20), 2));
-        assertEqual(integrationDiffs.length, 0,
-            'Slice-13 integration reference must reproduce exactly with field-level diagnostics');
     }
 
     const legacyExpected = JSON.parse(fs.readFileSync(legacyFixturePath, 'utf8'));
@@ -2106,21 +2156,34 @@ try {
         crossSliceOracleProjection,
         slice09To10DeltaLedger: slice09To10CompleteLedger
     };
-    if (UPDATE_SLICE10_MEASUREMENT) {
-        fs.writeFileSync(slice10MeasurementFixturePath, stableStringify(slice10Measurement, 2), 'utf8');
-        console.log(`Updated Slice-10 measurement fixture: ${slice10MeasurementFixturePath}`);
-    } else if (process.env.PRINT_BACKTEST_DATA_10 === '1') {
+    slice17BacktestMeasurement.preservedCrossSliceRuntimeBinding = {
+        sourceReference: slice10Measurement.snapshotId,
+        sourceFixtureSha256: '13d6f6cff7aa3e0f6ee109601f8951620c9f908505bd109513f8d8487f491eb5',
+        crossSliceOracleProjectionSha256: stableHash(crossSliceOracleProjection),
+        slice09To10DeltaLedgerSha256: stableHash(slice09To10CompleteLedger)
+    };
+    if (process.env.PRINT_BACKTEST_DATA_17 === '1') {
+        console.log('__BACKTEST_DATA_17_MEASUREMENT_START__');
+        console.log(stableStringify(slice17BacktestMeasurement, 2));
+        console.log('__BACKTEST_DATA_17_MEASUREMENT_END__');
+    } else {
+        const expectedSlice17 = JSON.parse(fs.readFileSync(slice17MeasurementFixturePath, 'utf8')).backtest;
+        const slice17Diffs = collectDiffs(expectedSlice17, slice17BacktestMeasurement);
+        if (slice17Diffs.length > 0) console.error(stableStringify(slice17Diffs.slice(0, 20), 2));
+        assertEqual(slice17Diffs.length, 0,
+            'Slice-17 backtest measurement and preserved cross-slice oracles must reproduce exactly');
+    }
+    if (process.env.PRINT_BACKTEST_DATA_10 === '1') {
         console.log('__BACKTEST_DATA_10_MEASUREMENT_START__');
         console.log(stableStringify(slice10Measurement, 2));
         console.log('__BACKTEST_DATA_10_MEASUREMENT_END__');
     } else {
-        const expectedSlice10Measurement = JSON.parse(fs.readFileSync(slice10MeasurementFixturePath, 'utf8'));
-        const unexpected = collectDiffs(expectedSlice10Measurement, slice10Measurement);
-        if (unexpected.length > 0) {
-            console.error('Unexpected Slice-10 backtest measurement deltas:');
-            console.error(stableStringify(unexpected.slice(0, 20), 2));
-        }
-        assertEqual(unexpected.length, 0, 'Slice-10 backtest measurement should reproduce exactly with field-level diagnostics');
+        const archivedSlice10MeasurementBytes = fs.readFileSync(slice10MeasurementFixturePath);
+        assertEqual(
+            createHash('sha256').update(archivedSlice10MeasurementBytes).digest('hex'),
+            '13d6f6cff7aa3e0f6ee109601f8951620c9f908505bd109513f8d8487f491eb5',
+            'Immutable Slice-10 backtest measurement must remain byte-identical'
+        );
     }
     assertEqual(
         archivedSlice07Evidence.schemaVersion,

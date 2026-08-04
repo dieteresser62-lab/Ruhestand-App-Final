@@ -61,6 +61,11 @@ const slice10FixturePath = path.join(
     'fixtures',
     'tax-logic-slice-10-demography-measurement-v1.json'
 );
+const slice17FixturePath = path.join(
+    testDir,
+    'fixtures',
+    'liquidity-runway-basis-slice-17-measurement-v1.json'
+);
 
 function runtimeModule(relativePath) {
     return import(pathToFileURL(path.join(runtimeRoot, relativePath)).href);
@@ -392,7 +397,9 @@ if (captureMode) {
     );
     const fixture = JSON.parse(fixtureBytes.toString('utf8'));
     const slice08Fixture = JSON.parse(fs.readFileSync(slice08FixturePath, 'utf8'));
-    const slice10Fixture = JSON.parse(fs.readFileSync(slice10FixturePath, 'utf8'));
+    const slice10FixtureBytes = fs.readFileSync(slice10FixturePath);
+    const slice10Fixture = JSON.parse(slice10FixtureBytes.toString('utf8'));
+    const slice17Fixture = JSON.parse(fs.readFileSync(slice17FixturePath, 'utf8')).demography;
     assert.equal(fixture.schemaVersion, 'DemographyCareSurvivorRuntimeMeasurementV1');
     assert.equal(fixture.snapshotId, 'post-backtest-data-07-v1');
     assert.equal(fixture.sourceReference, 'post-backtest-data-06-v2');
@@ -401,14 +408,29 @@ if (captureMode) {
     assert.equal(slice10Fixture.sourceReference, 'post-backtest-data-09-v1');
     assert.equal(slice10Fixture.reviewStatus, 'pending');
     assert.equal(
+        crypto.createHash('sha256').update(slice10FixtureBytes).digest('hex'),
+        '72e4325425b37415b2ad8e4eea52103e42b4d01b7926b6049421a1560118b153',
+        'Immutable Slice-10 demography measurement must remain byte-identical'
+    );
+    assert.equal(
         crypto.createHash('sha256').update(fs.readFileSync(slice08FixturePath)).digest('hex'),
         slice10Fixture.sourceRuntimeFixtureSha256,
         'Slice-10 runtime measurement must retain its immutable Slice-08 projection source'
     );
     assert.equal(
-        sha256(actualMeasurement),
+        slice17Fixture.sourceMeasurementSha256,
         slice10Fixture.targetMeasurementSha256,
-        'Current runtime must reproduce the pending Slice-10 tax-logic projection'
+        'Slice-17 evidence must reference the exact archived Slice-10 runtime hash'
+    );
+    assert.equal(
+        slice17Fixture.sourceFixtureSha256,
+        crypto.createHash('sha256').update(slice10FixtureBytes).digest('hex'),
+        'Slice-17 evidence must bind the byte-identical Slice-10 demography fixture'
+    );
+    assert.equal(
+        sha256(actualMeasurement),
+        slice17Fixture.targetMeasurementSha256,
+        'Current runtime must reproduce the pending Slice-17 runway-basis projection'
     );
     assert.deepEqual(
         {

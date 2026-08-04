@@ -6,12 +6,14 @@
  * Dependencies: transaction-opportunistic.mjs, transaction-surplus.mjs, config.mjs
  */
 import { CONFIG } from '../config.mjs';
+import { FinancialCalculationError } from '../errors.mjs';
 import { buildOpportunisticRefill } from './transaction-opportunistic.mjs';
 import { trySurplusRebalance } from './transaction-surplus.mjs';
 import {
     deriveLiquidityRunwayPolicy,
     resolveLiquidityRunwayYears
 } from '../../types/liquidity-runway-contract.js';
+import { resolvePlannedAnnualWithdrawal } from '../../types/planned-withdrawal-contract.js';
 
 export function determineAction(p, helpers) {
     const {
@@ -63,6 +65,30 @@ export function determineAction(p, helpers) {
 
     const renteJahr = input.renteAktiv ? input.renteMonatlich * 12 : 0;
     const floorBedarfNetto = Math.max(0, input.floorBedarf - renteJahr);
+    const fallbackAnnualNetNeed = floorBedarfNetto + Math.max(0, Number(input.flexBedarf) || 0);
+    const hasSpendingResult = spending !== undefined && spending !== null;
+    const plannedWithdrawalResolution = hasSpendingResult
+        ? resolvePlannedAnnualWithdrawal({ spendingResult: spending })
+        : null;
+    if (hasSpendingResult && plannedWithdrawalResolution.status !== 'resolved') {
+        throw new FinancialCalculationError(
+            'Die Transaktionsplanung benötigt eine eindeutige geplante Jahresentnahme.',
+            {
+                contract: 'planned_annual_withdrawal',
+                status: plannedWithdrawalResolution.status,
+                candidates: plannedWithdrawalResolution.candidates
+            }
+        );
+    }
+    const effectiveAnnualNetNeed = hasSpendingResult
+        ? plannedWithdrawalResolution.annualWithdrawal
+        : fallbackAnnualNetNeed;
+    transactionDiagnostics.plannedAnnualWithdrawal = {
+        amount: effectiveAnnualNetNeed,
+        source: hasSpendingResult
+            ? plannedWithdrawalResolution.source
+            : 'legacy_raw_input_without_spending_result'
+    };
 
     // Strukturales Runway-Mindestmaß ableiten: Bevorzugt das Profil-Minimum, fällt sonst auf Input/Strategie zurück.
     // Design-Entscheidung: Die neutrale Notfüllung soll nur bei echter Runway-Unterschreitung auslösen –
@@ -110,7 +136,10 @@ export function determineAction(p, helpers) {
     }
 
     if (!isPufferSchutzAktiv) {
-        const gesamtjahresbedarf = floorBedarfNetto + input.flexBedarf;
+        // Nach Abschluss der Ausgabenplanung muss auch der Guardrail die final
+        // geplante Netto-Entnahme verwenden. Nur ein tatsächlich fehlendes
+        // Spending-Ergebnis markiert den konservativen Legacy-Rohbedarf.
+        const gesamtjahresbedarf = effectiveAnnualNetNeed;
         const currentRunwayMonths = (gesamtjahresbedarf > 0)
             ? (aktuelleLiquiditaet / (gesamtjahresbedarf / 12))
             : Infinity;

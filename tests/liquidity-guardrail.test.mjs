@@ -1,5 +1,6 @@
 
 import { TransactionEngine } from '../engine/transactions/TransactionEngine.mjs';
+import { FinancialCalculationError } from '../engine/errors.mjs';
 
 console.log('--- Liquidity Guardrail Tests ---');
 
@@ -16,7 +17,11 @@ function getBaseParams() {
         depotwertGesamt: 500000,
         zielLiquiditaet: 60000,
         market: { sKey: 'hot_neutral', szenarioText: 'Normal' },
-        spending: { monatlicheEntnahme: 2000 },
+        // Der Produktivpfad liefert immer das finale SpendingPlanner-Ergebnis.
+        spending: {
+            monatlicheEntnahme: 2000,
+            details: { endgueltigeEntnahme: 24000 }
+        },
         minGold: 0,
         profil: mockProfile,
         input: {
@@ -86,64 +91,31 @@ function getBaseParams() {
     // Scenario: Bear Market. Cash is Safe for Floor but Thin for Total.
     // Needs Notfüllung, but Capped.
 
-    // Floor Need: 12k (1k/mo). Min Runway 24. Puffer = 24k.
-    // Total Need: 36k (3k/mo). Trigger = 72k.
-    // Cash: 30k. (>24k Puffer OK. <72k Guardrail BAD).
+    // Floor Need: 12k (1k/mo). Finaler Spending-Plan: 24k (2k/mo).
+    // Bei 24 Monaten liegt das Guardrail-Ziel damit bei 48k; Cash startet
+    // bei 36k und liegt oberhalb des separaten Floor-Puffers.
 
     const params = getBaseParams();
     params.market.sKey = 'bear_deep';
     params.market.szenarioText = 'Bärenmarkt';
     params.input.floorBedarf = 12000;
     params.input.flexBedarf = 24000;
-    params.aktuelleLiquiditaet = 30000;
-    params.input.tagesgeld = 30000;
+    params.aktuelleLiquiditaet = 36000;
+    params.input.tagesgeld = 36000;
+    params.zielLiquiditaet = 48000;
 
-    // Result should be "Runway-Notfüllung (Bär) (Cap aktiv)"
-
+    // Finaler Spending-Bedarf: 24k/Jahr. 36k Cash entsprechen 18 Monaten;
+    // die 24-Monats-Untergrenze verlangt 12k Auffüllung. Das normale
+    // Bären-Cap begrenzt den quantisierten Bruttoverkauf auf 10k.
     const result = TransactionEngine.determineAction(params);
 
     assert(result.title.includes('Cap aktiv'), `Should indicate Cap Active in Bear. Title: ${result.title}`);
 
-    const refillAmount = result.verwendungen.liquiditaet;
     const equity = params.depotwertGesamt; // 500k
     const capPct = params.input.maxBearRefillPctOfEq; // 2.5
     let expectedRefill = equity * (capPct / 100); // 12500
     // Anti-Pseudo-Accuracy: Cap is now quantized (floor) to nearest step (5000 for <50k)
     expectedRefill = Math.floor(expectedRefill / 5000) * 5000; // 10000
-
-    // Not critical liquidity (30k > 24k isn't critical enough for emergency override? 
-    // Critical is < Puffer * 1.5 = 36k. 30k < 36k.
-    // logic: const isCriticalLiquidityBear = aktuelleLiquiditaet < (sicherheitsPuffer * 1.5);
-    // So 30k IS critical.
-    // Then computeCappedRefill uses:
-    // const effectiveMaxCap = isCriticalLiquidity ? Math.max(maxCapEuro, aktienwert * 0.10) : maxCapEuro;
-    // Emergency Cap = 10% = 50k.
-    // Standard Cap = 2.5% = 12.5k.
-    // So it allows up to 50k. 
-    // Gap = 72k - 30k = 42k.
-    // 42k < 50k. So FULL Refill allowed?
-    // Wait, if full refill allowed, then Cap IS NOT ACTIVE.
-
-    // I want to test CAP active.
-    // So I need Gap > 50k? Or `isCriticalLiquidity` to be False.
-    // Make `aktuelleLiquiditaet` > 36k.
-    // Puffer 24k. Critical < 36k.
-    // Set Cash = 40k.
-    // Puffer OK. Critical False.
-    // Gap: Target 72k - 40k = 32k.
-    // Standard Cap: 12.5k.
-    // Refill limited to 12.5k. Cap Active.
-
-    console.log(`Debug Check: Current=${params.aktuelleLiquiditaet}, Puffer=24000, CriticalBoundary=36000, Coverage=<75%→critical`);
-
-    const paramsSafe = JSON.parse(JSON.stringify(params));
-    // Mit 46k Cash ist die Deckung 46/60 = 76.7% > 75% (runwayCoverageThreshold).
-    // Dadurch bleibt isCriticalLiquidityBear=false und das Standard-Cap greift.
-    // Gap: 72k (24mo * 3k/mo) - 46k = 26k. Cap 12.5k (quantized to 10k). Result 10k.
-    paramsSafe.aktuelleLiquiditaet = 46000;
-    paramsSafe.input.tagesgeld = 46000;
-
-    const resultSafe = TransactionEngine.determineAction(paramsSafe);
 
     // Calculate expected Net Refill: Cap applies to Gross Sale.
     // Gain Ratio = (250k - 100k) / 250k = 0.6.
@@ -152,12 +124,68 @@ function getBaseParams() {
     const expectedTax = expectedRefill * 0.6 * 0.26375;
     const expectedNet = expectedRefill - expectedTax;
 
-    console.log(`   RefillSafe: ${resultSafe.verwendungen.liquiditaet} (Std Cap Gross: ${expectedRefill}, Net: ${expectedNet})`);
+    console.log(`   Refill: ${result.verwendungen.liquiditaet} (Std Cap Gross: ${expectedRefill}, Net: ${expectedNet})`);
 
-    assert(resultSafe.title.includes('Cap aktiv'), `Should satisfy Cap Active. Title: ${resultSafe.title}`);
-    assertClose(resultSafe.verwendungen.liquiditaet, expectedNet, 10, 'Should use Standard Cap (Net after Tax)');
+    assertClose(result.verwendungen.liquiditaet, expectedNet, 10, 'Should use Standard Cap (Net after Tax)');
 
     console.log('✅ Bear Refill Cap passed');
+}
+
+// --- TEST 2b: Bear emergency cap switches exactly below 75% target coverage ---
+{
+    const makeBearBoundaryParams = (cash) => {
+        const params = getBaseParams();
+        params.market.sKey = 'bear_deep';
+        params.market.szenarioText = 'Bärenmarkt';
+        params.zielLiquiditaet = 200000;
+        params.aktuelleLiquiditaet = cash;
+        params.input.tagesgeld = cash;
+        params.input.floorBedarf = 12000;
+        params.input.flexBedarf = 88000;
+        params.input.liquidityRunwayYears = 2;
+        params.input.startVermoegen = 650000;
+        params.input.depotwertAlt = 250000;
+        params.input.costBasisAlt = 250000;
+        params.input.depotwertNeu = 250000;
+        params.input.costBasisNeu = 250000;
+        params.spending = {
+            monatlicheEntnahme: 100000 / 12,
+            details: { endgueltigeEntnahme: 100000 }
+        };
+        return params;
+    };
+
+    const standardResult = TransactionEngine.determineAction(makeBearBoundaryParams(150000));
+    const emergencyResult = TransactionEngine.determineAction(makeBearBoundaryParams(149999));
+    const standardGross = standardResult.quellen.reduce((sum, source) => sum + source.brutto, 0);
+    const emergencyGross = emergencyResult.quellen.reduce((sum, source) => sum + source.brutto, 0);
+
+    assertEqual(standardResult.type, 'TRANSACTION', 'Exactly 75% target coverage should retain a capped bear refill');
+    assertEqual(emergencyResult.type, 'TRANSACTION', 'Coverage below 75% should trigger a capped bear emergency refill');
+    assertClose(standardGross, 10000, 1e-7, 'Exactly 75% coverage must retain the quantized 2.5% standard cap');
+    assertClose(emergencyGross, 50000, 1e-7, 'Coverage one euro below 75% must activate the quantized 10% emergency cap');
+    assertClose(standardResult.verwendungen.liquiditaet, 10000, 1e-7, 'Standard-cap sale must fund exactly 10,000 EUR liquidity');
+    assertClose(emergencyResult.verwendungen.liquiditaet, 50000, 1e-7, 'Emergency-cap sale must fund exactly 50,000 EUR liquidity');
+    assertClose(standardResult.steuer, 0, 1e-7, 'Zero-gain standard-cap witness must remain tax-neutral');
+    assertClose(emergencyResult.steuer, 0, 1e-7, 'Zero-gain emergency-cap witness must remain tax-neutral');
+    assert(
+        standardResult.diagnosisEntries.some(entry => (
+            entry.step === 'Cap wirksam (Bär)'
+            && entry.impact.includes('10000€')
+            && entry.impact.includes('(2.5%)')
+        )),
+        'Standard-cap witness must expose its 10,000 EUR cap and configured 2.5% policy as a named diagnosis entry'
+    );
+    assert(
+        emergencyResult.diagnosisEntries.some(entry => (
+            entry.step === 'Cap wirksam (Bär)'
+            && entry.impact.includes('50000€')
+            && entry.impact.includes('(10% Notfall-Cap)')
+        )),
+        'Emergency-cap witness must expose its 50,000 EUR cap and effective 10% emergency policy as a named diagnosis entry'
+    );
+
+    console.log('✅ Bear standard/emergency cap boundary passed');
 }
 
 // --- TEST 3: Runway Coverage Gap (<75%) ---
@@ -197,6 +225,10 @@ function getBaseParams() {
     params.input.flexBedarf = 25000;
     params.input.renteAktiv = true;
     params.input.renteMonatlich = 3000; // 36k pension covers the 30k floor.
+    params.spending = {
+        monatlicheEntnahme: 19000 / 12,
+        details: { endgueltigeEntnahme: 19000 }
+    };
 
     const result = TransactionEngine.determineAction(params);
 
@@ -204,6 +236,52 @@ function getBaseParams() {
     assert(!result.title.includes('Runway-Notfüllung'), `Should not label optional flex runway as crisis refill. Title: ${result.title}`);
 
     console.log('✅ Pension-covered floor suppresses optional flex crisis refill passed');
+}
+
+// --- TEST 5: Guardrail runway uses the final spending need, not raw input flex ---
+{
+    const params = getBaseParams();
+    params.market.sKey = 'recovery';
+    params.market.szenarioText = 'Erholung';
+    params.aktuelleLiquiditaet = 80000;
+    params.zielLiquiditaet = 72000;
+    params.input.tagesgeld = 80000;
+    params.input.floorBedarf = 12000;
+    params.input.flexBedarf = 120000;
+    params.input.liquidityRunwayYears = 3;
+    params.spending = { monatlicheEntnahme: 2000, details: { endgueltigeEntnahme: 24000 } };
+
+    const result = TransactionEngine.determineAction(params);
+
+    assert(result.type === 'NONE', `Effective 40-month runway should not trigger a refill. Title: ${result.title}`);
+    assert(!result.title.includes('Runway-Notfüllung'), `Effective spending need must suppress the raw-flex guardrail refill. Title: ${result.title}`);
+
+    const legacyFallbackParams = JSON.parse(JSON.stringify(params));
+    delete legacyFallbackParams.spending;
+    const legacyFallbackResult = TransactionEngine.determineAction(legacyFallbackParams);
+
+    assert(legacyFallbackResult.type === 'TRANSACTION', 'Direct legacy callers without spending data should retain the conservative raw-need fallback');
+    assert(legacyFallbackResult.title.includes('Runway-Notfüllung'), 'Legacy fallback should remain explicitly visible as a runway refill');
+    assertEqual(
+        legacyFallbackResult.transactionDiagnostics?.plannedAnnualWithdrawal?.source,
+        'legacy_raw_input_without_spending_result',
+        'The direct-call legacy fallback must be explicitly diagnosed instead of remaining silent'
+    );
+
+    const invalidProductParams = JSON.parse(JSON.stringify(params));
+    invalidProductParams.spending = {};
+    let invalidProductError = null;
+    try {
+        TransactionEngine.determineAction(invalidProductParams);
+    } catch (error) {
+        invalidProductError = error;
+    }
+    assert(invalidProductError instanceof FinancialCalculationError,
+        'A present but incomplete SpendingPlanner result must fail instead of silently selecting the legacy raw-need branch');
+    assertEqual(invalidProductError.context?.contract, 'planned_annual_withdrawal',
+        'Incomplete product spending should expose the violated withdrawal contract');
+
+    console.log('✅ Effective spending need and legacy fallback passed');
 }
 
 console.log('--- Liquidity Guardrail Tests Completed ---');

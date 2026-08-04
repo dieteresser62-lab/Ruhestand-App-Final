@@ -4,7 +4,7 @@
 
 This directory contains the comprehensive testing infrastructure for the Ruhestand-App-Final project. The tests are designed to be zero-dependency, using native Node.js ESM and a custom test runner, avoiding the need for heavy frameworks like Jest or Mocha.
 
-**Test-Statistik:** 163 entdeckte Testdateien mit 18.191 von 18.191 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (Slice-13-Nachbesserung nach Claude-Review Runde 1 mit `npm test` und `npm run test:coverage` am 2026-08-03 verifiziert). Das separate Browser-Pflichtgate bestand mit 28/28 Workflows. Der Coverage-Lauf erreichte 78,97 Prozent Zeilenabdeckung (40.302/51.035); die obligatorischen Dateigates bestanden.
+**Test-Statistik:** 166 entdeckte Testdateien mit 18.822 von 18.822 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien, einem bestandenen separaten Gate und 0 offenen Handles (Slice-17-Nachbearbeitung nach Claude-Runde 2 mit `npm test` am 2026-08-04 verifiziert). Das separate Browser-Pflichtgate bestand mit 28/28 Workflows. Der letzte gesonderte Coverage-Lauf stammt aus der Slice-13-Nachbesserung und erreichte 78,97 Prozent Zeilenabdeckung (40.302/51.035); Coverage wurde fuer Slice 17 nicht erneut gemessen.
 
 Die Zahl beschreibt nur die Node-Standardsuite. `npm run test:browser`, `npm run test:coverage` und ein echter Tauri-Build sind getrennte Gates und in den Assertions nicht enthalten.
 
@@ -228,6 +228,7 @@ Inventar liegen bewusst in den jeweiligen Fachtests.
 #### `liquidity-guardrail.test.mjs`
 **Zweck:** Validiert operative Guardrails.
 - **Bear Market Refill Caps:** Begrenzt Nachfüllung in Bärenmärkten
+- **Benannter Bear-Cap-Grenzzeuge:** Bei exakt 75 Prozent Zieldeckung bleibt das quantisierte Standard-Cap aktiv; einen Euro darunter aktiviert `isCriticalLiquidityBear` das 10-Prozent-Notfall-Cap. Nullgewinn-Lots isolieren dabei Verkaufs- und Liquiditaetswirkung von der Steuer; die Diagnose muss die tatsaechlich wirksame Standard- beziehungsweise Notfall-Prozentgrenze ausweisen.
 - **Runway Coverage Triggers:** Aktiviert bei kritischer Liquiditätsdeckung
 - Minimum-Runway-Enforcement
 
@@ -266,10 +267,14 @@ Inventar liegen bewusst in den jeweiligen Fachtests.
 #### `simulator-tax-settlement.test.mjs`
 **Zweck:** Simulator-Integration mit Gesamt-Settlement-Recompute.
 - **Notfallverkauf-Recompute:** Bei Forced Sales werden reguläre + Notfall-Aggregate kombiniert und Settlement neu berechnet
+- **3-Bucket-Recompute:** Eine Bad-Year-Ersetzung durch Bondquellen wird auf ihrem finalen Rohaggregat zentral abgerechnet; der blockierte Aktienplan darf weder Steuer noch Verlustvortrag fortschreiben
 - **Kein-Notfall-Regression:** Ohne Forced Sale bleibt Engine-Settlement unverändert
 - **Steuerkonsistenz:** `totalTaxesThisYear` kommt aus Settlement
 - **Ausfuehrungsskalierung:** Regulaere Reserve und Rohaggregate verwenden denselben `regularSaleScale`; Forced-Sale-Plansteuer wird ohne zweiten SPB skaliert reserviert
 - **Cash-Reconciliation:** `taxReservedTotal - taxDueFinal` wird genau einmal als `taxCashAdjustment` gebucht
+- **Zwei Action-Phasen:** `plannedActionFlow` bleibt vor Ausfuehrung quellen-/verwendungskonsistent; `SimulatorExecutedTaxContractV1` prueft dessen Reserve gegen finale Verkaufssteuer, Zinssteuer, Jahressteuer und Cash-Anpassung
+- **Adaptergrenze:** Formal ausgeglichene, aber zentral falsch abgerechnete Engine-Steuer sowie werfende Action-/Steueraggregat-Getter enden kontrolliert als technischer Vertragsfehler
+- **Steuer-Inventarmodell V1:** `proportional_market_value_v1` bindet die internen signierten Lot-Rohwerte mit absolut `1e-7` an die proportionale Marktwert-/Cost-Basis-Reduktion. Nichtproportionale Auswahl oder centgerundete Fremdadapter sind bewusst kein V1-Kompatibilitaetsfall.
 - **Mehrjahresinvariante:** Zehn deterministische Gewinn-/Verlustjahre mit regulaeren und erzwungenen Verkaeufen zeigen keine kumulative Steuer-/Cash-Drift
 
 #### `transaction-engine-ath.test.mjs`
@@ -375,6 +380,18 @@ Inventar liegen bewusst in den jeweiligen Fachtests.
   gemessenen MC-/Sweep-Aggregatprojektionen drei unveraenderte Hashes und null
   Projektdeltas aus. Aktive Soll/Ist/Fehlbetrag-Rowparitaet wird getrennt im
   Worker-Vertrag belegt und nicht als Aggregatmessung ausgegeben.
+- **Slice-17-Messung:**
+  `fixtures/liquidity-runway-basis-slice-17-measurement-v1.json` bindet die
+  wertveraendernde Korrektur der Runway-Bedarfsbasis als neuen Pending-
+  Kandidaten. Die Datei referenziert die byteidentischen Slice-10-/13-
+  Eingangsfixtures und pinnt getrennte Zielhashes fuer Backtest,
+  Monte-Carlo/Sweep, Demografie/Pflege sowie den synthetischen
+  Export-Fingerprint. Sie bindet zusaetzlich den lebenden
+  `crossSliceOracleProjection`, das vollstaendige Slice-09-nach-10-Deltaledger
+  und einen Safety-Gegenzeugen mit post-policy operativem sowie pre-policy
+  Dynamic-Flex-Safety-Runway. Persoenliche Daten des Nutzer-Replays sind nicht
+  enthalten. Die historischen Fixtures werden nicht ueberschrieben; der alte
+  Slice-10-Updatepfad ist absichtlich blockiert.
 - **Historische Fixture-Kompatibilitaet:** Vergleichsausnahmen fuer
   unveraenderliche Pending-Fixtures stehen ausschliesslich in
   `snapshot-policy-v1.json`. Der produktive Runtime-Vertrag enthaelt weder
@@ -912,7 +929,8 @@ zweiten Original nachgerechnet.
 Seed in jedem Lauf live. Der Test kann weiterhin einen Vergleichsstand ueber
 `DEMOGRAPHY_MEASUREMENT_RUNTIME_ROOT` laden, aktiviert Pflege, Partner und
 55-Prozent-Hinterbliebenen-Cashflow und vergleicht Monte Carlo sowie zwei
-Sweep-Kombinationen vollstaendig mit der Slice-08-Zielfixture. Das
+Sweep-Kombinationen vollstaendig mit der Slice-17-Zielfixture. Die
+Slice-17-Datei bindet dabei den unveraenderten Slice-10-Eingang per SHA-256. Das
 bytegeschuetzte `post-backtest-data-07-v1` bleibt eine unabhaengige Quelle fuer
 die stabilen Slice-07-Demografieinvarianten; Runtime, Hashkette und aktive
 Pflege-/Todes-/Hinterbliebenenpfade werden getrennt geprueft.
@@ -930,7 +948,7 @@ Pflege-/Todes-/Hinterbliebenenpfade werden getrennt geprueft.
 - **Aussagegrenze:** Keine Erfolgswahrscheinlichkeit oder Unabhaengigkeitsbehauptung; Null-Eligible-Raten bleiben `null`.
 
 #### `historical-backtest-export.test.mjs`
-**Zweck:** Testet `HistoricalBacktestExportV2` und die feste technische CSV-Projektion.
+**Zweck:** Testet `HistoricalBacktestExportV2`, `HistoricalBacktestInputSemanticsV2` und die feste technische CSV-Projektion.
 - **Reproduktion:** Request-/Result-Fingerprint, inklusive Periode, Dataset-/Manifest-/Temporal-/Engine-/Source-Commit-Provenienz, nicht restartfaehige aggregierte Portfolio-Grenzen, Quantisierungs-/Eingabesemantik, Records, Rows, Metriken und optionales Cohort-Inventar.
 - **Stabilitaet:** Exportzeitpunkt und Detailtoggle aendern den Result-Fingerprint nicht; Source-Commit, Datenrevision, Quantisierung und kanonische Endsumme sind fingerprintwirksam. Fehlende/dirty Provenienz und widerspruechliche Endsumme scheitern fail-closed.
 - **CSV/Sicherheit:** `HistoricalBacktestCsvV2` mit 34 festen Spalten einschliesslich der neuen fuehrenden, mit Raw-JSON geteilten kanonischen `run_id`, getrennte Haushalts-/Renten-/Depot-Flexbasis, finaler Mindest-Flex samt Fehlbetrag, Pflegebucket-inclusive Portfoliogrenzen, Punktdezimalen, LF, leere Missingness, keine HTML-/Displayformatter und Schutz gegen Formel-, Quote-, Delimiter- und Zeilenumbruchinjektion.
@@ -941,7 +959,7 @@ Pflege-/Todes-/Hinterbliebenenpfade werden getrennt geprueft.
 - **Negative Cases:** Einjahreslauf, NaN-/rueckwaertige Periode, mittlere Datenluecke und nicht-finite Goldrendite.
 - **Messvertrag:** kanonische Input- und Row-Hashes, Non-Mutation, Metrikwoerterbuch, 2000/2001-Alignment sowie kontrollierte Abloesung von `legacy_schema_v0` durch `backtest_ui_state_v1`; Detailtoggle-Paritaet bleibt erhalten.
 - **Delta-Gate:** `BacktestTemporalDeltaReportV1` benennt jede geaenderte Metrik samt Ursache und berichtet Endvermoegens-, Ruinfall- sowie Downstream-Consumer-Auswirkungen; nicht gespeicherte Zieldeltas schlagen fehl. `CapeWageBacktestDeltaEvidenceV3` bleibt als bytegehashtes Slice-06-Archiv erhalten. `DemographyCareSurvivorBacktestDeltaEvidenceV1` bindet den neuen Sterbetafelhash, den Lohnnahtzeugen und fuer aktiven sowie CAPE-inaktiven Arm den direkten Slice-06-zu-Slice-07-Vergleich mit zehn exakten Kennzahlen. `Slice07To08LiquidityRunwayBacktestDeltaV1` misst davon getrennt die echte Runway-Slice-Wirkung; der CAPE-an/aus-Effekt innerhalb des aktuellen Laufs bleibt ein drittes separates Orakel. Pflege/Hinterbliebene sind im deterministischen Backtest inaktiv.
-- **Fixtures:** `fixtures/simulator-backtest-baseline-v1.json` und die bytegehashte Slice-06-V3-Evidenz bleiben read-only; `fixtures/simulator-backtest-target-v1.json` darf kontrolliert mit `UPDATE_BACKTEST_TARGET=1 node tests/run-single.mjs tests/simulator-backtest-characterization.test.mjs` erzeugt werden. Die Slice-07-Evidenz wird einmalig mit `CREATE_BACKTEST_DATA_07_DELTA=1` angelegt und danach nicht ueberschrieben. `fixtures/liquidity-runway-slice-08-measurement-v1.json` bleibt der unveraenderliche Slice-09-Eingang; `fixtures/minimum-flex-slice-09-measurement-v1.json` speichert getrennt das Slice-08-zu-09-Ledger und den D-17-Zeugen. Fuer CR10-14 belegt `minimum-flex-slice-09-added-case-financial-v1.json` die am Commit `2e4867f` nachgemessene Finanzbasis des zwoelften Falls; `node tests/reconstruct-slice09-d17.mjs` rekonstruiert diese Messung aus dem archivierten Commit. Das einzige autoritative 12/12-Ledger liegt als `Slice09To10FinancialDeltaLedgerV2` in `tax-logic-slice-10-backtest-measurement-v1.json` und kann kontrolliert mit `UPDATE_BACKTEST_DATA_10=1 node tests/run-single.mjs tests/simulator-backtest-characterization.test.mjs` aktualisiert werden.
+- **Fixtures:** `fixtures/simulator-backtest-baseline-v1.json` und die bytegehashte Slice-06-V3-Evidenz bleiben read-only; `fixtures/simulator-backtest-target-v1.json` darf kontrolliert mit `UPDATE_BACKTEST_TARGET=1 node tests/run-single.mjs tests/simulator-backtest-characterization.test.mjs` erzeugt werden. Die Slice-07-Evidenz wird einmalig mit `CREATE_BACKTEST_DATA_07_DELTA=1` angelegt und danach nicht ueberschrieben. `fixtures/liquidity-runway-slice-08-measurement-v1.json` bleibt der unveraenderliche Slice-09-Eingang; `fixtures/minimum-flex-slice-09-measurement-v1.json` speichert getrennt das Slice-08-zu-09-Ledger und den D-17-Zeugen. Fuer CR10-14 belegt `minimum-flex-slice-09-added-case-financial-v1.json` die am Commit `2e4867f` nachgemessene Finanzbasis des zwoelften Falls; `node tests/reconstruct-slice09-d17.mjs` rekonstruiert diese Messung aus dem archivierten Commit. Das einzige autoritative 12/12-Ledger liegt als `Slice09To10FinancialDeltaLedgerV2` in `tax-logic-slice-10-backtest-measurement-v1.json` und ist unveraenderlich. `PRINT_BACKTEST_DATA_10=1` erlaubt nur eine lesende Diagnose; `UPDATE_BACKTEST_DATA_10=1` wird absichtlich blockiert.
 - **Slice-13-Integration:** `fixtures/backtest-data-integration-slice-13-v1.json`
   pinnt acht echte Referenzfenster ab 1930, darunter ein dediziertes
   Stagflationsfenster 1970-1982 und ein Crashfenster 2007-2010, die
@@ -955,6 +973,15 @@ Pflege-/Todes-/Hinterbliebenenpfade werden getrennt geprueft.
   und erwartet im Dirty-Tree `HISTORICAL_EXPORT_SOURCE_TREE_DIRTY`; auf einem
   sauberen Commit muss dasselbe Gate in den erfolgreichen Exportzweig
   umschlagen und einen Result-Fingerprint liefern.
+- **Slice-17-Runway-Basis:** Die neue Fixture
+  `fixtures/liquidity-runway-basis-slice-17-measurement-v1.json` bindet den
+  aktuellen vollstaendigen Charakterisierungshash und den erwarteten Delta-
+  Zeugen des inklusiven 2000-2025-Integrationsfalls. Die Slice-13-Aussage zur
+  damaligen Finanzneutralitaet bleibt in ihrer byteidentischen Eingangsfixture
+  unveraendert. Aus der Slice-10-Grenze bleiben sowohl
+  `crossSliceOracleProjection` als auch das vollstaendige Deltaledger durch
+  exakte Runtime-Hashes gebunden; der aktuelle Runtimepfad darf sich nicht als
+  die alte neutrale Grenze ausgeben.
 - **Slice-14-Ergebnisvalidierung:**
   `backtest-data-validation-slice-14.test.mjs` verwendet das vollstaendige
   Slice-13-Ergebnisdokument als Eingangsgrenze. Die Fixture

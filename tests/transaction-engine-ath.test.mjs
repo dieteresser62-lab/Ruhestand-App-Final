@@ -64,7 +64,10 @@ function runAthRegimeGapTest() {
         depotwertGesamt,
         zielLiquiditaet,
         market,
-        spending: {},
+        spending: {
+            monatlicheEntnahme: 3000,
+            details: { endgueltigeEntnahme: 36000 }
+        },
         minGold,
         profil,
         input
@@ -134,7 +137,10 @@ function runGuardrailCliffTest() {
         depotwertGesamt,
         zielLiquiditaet,
         market,
-        spending: {},
+        spending: {
+            monatlicheEntnahme: 3000,
+            details: { endgueltigeEntnahme: 36000 }
+        },
         minGold,
         profil,
         input

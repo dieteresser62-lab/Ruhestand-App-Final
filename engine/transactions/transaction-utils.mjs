@@ -12,12 +12,19 @@ import {
 } from '../../types/liquidity-runway-contract.js';
 
 /**
- * Berechnet Ziel-Liquidität und Diagnose-Metadaten basierend auf Profil und Markt.
+ * Berechnet Ziel-Liquidität und Diagnose-Metadaten aus dem vom Aufrufer
+ * gelieferten Netto-Bedarf. Neue Entnahmepfade liefern direkt den geplanten
+ * Jahresbetrag; Objektkomponenten bleiben für bestehende API-Aufrufer erhalten.
  */
-export function calculateTargetLiquidityDetails(profil, market, inflatedBedarf, input = null) {
+export function calculateTargetLiquidityDetails(profil, market, annualNeedInput, input = null) {
     const runwayPolicy = deriveLiquidityRunwayPolicy(resolveLiquidityRunwayYears(input || {}).years);
-    const annualNeed = Math.max(0, Number(inflatedBedarf?.floor) || 0)
-        + Math.max(0, Number(inflatedBedarf?.flex) || 0);
+    if (typeof annualNeedInput === 'number' && (!Number.isFinite(annualNeedInput) || annualNeedInput < 0)) {
+        throw new RangeError('annualNeedInput must be a finite non-negative annual amount');
+    }
+    const annualNeed = typeof annualNeedInput === 'number'
+        ? annualNeedInput
+        : Math.max(0, Number(annualNeedInput?.floor) || 0)
+            + Math.max(0, Number(annualNeedInput?.flex) || 0);
     let calculatedTarget = (annualNeed / 12) * runwayPolicy.targetMonths;
     const runwayTargetDiagnostics = {
         contractVersion: 'LiquidityRunwayContractV1',
@@ -44,12 +51,12 @@ export function calculateTargetLiquidityDetails(profil, market, inflatedBedarf, 
     // Auch wenn durch Rente monatliche Entnahme 0 ist.
     const minBufferMonths = (input && input.minCashBufferMonths !== undefined)
         ? input.minCashBufferMonths
-        : 2; // Default 2 Monate
+        : CONFIG.THRESHOLDS.STRATEGY.minCashBufferMonths;
 
-    // FIX: inflatedBedarf ist bereits um die Rente reduziert (Netto).
+    // annualNeedInput ist bereits um die Rente reduziert (Netto).
     // Wir brauchen hier aber den Brutto-Bedarf für den "Waschmaschinen-Puffer".
     // Daher nutzen wir die Werte aus dem Input, falls verfügbar.
-    let bruttoJahresbedarf = inflatedBedarf.floor + inflatedBedarf.flex;
+    let bruttoJahresbedarf = annualNeed;
 
     if (input && (input.floorBedarf !== undefined || input.flexBedarf !== undefined)) {
         const fBedarf = Number(input.floorBedarf) || 0;
@@ -73,8 +80,8 @@ export function calculateTargetLiquidityDetails(profil, market, inflatedBedarf, 
 /**
  * Berechnet Ziel-Liquidität basierend auf Profil und Markt.
  */
-export function calculateTargetLiquidity(profil, market, inflatedBedarf, input = null) {
-    return calculateTargetLiquidityDetails(profil, market, inflatedBedarf, input).targetLiquidity;
+export function calculateTargetLiquidity(profil, market, annualNeedInput, input = null) {
+    return calculateTargetLiquidityDetails(profil, market, annualNeedInput, input).targetLiquidity;
 }
 
 /**
@@ -139,12 +146,16 @@ export function computeCappedRefill({
     // Wenn keine Aktien vorhanden (nur Gold), Cap auf Liquiditätsbedarf setzen,
     // um Verkauf aus Gold zu ermöglichen
     let effectiveMaxCap;
+    let effectiveCapLabel = `${capConfig.pct}%`;
     if (isCriticalLiquidity) {
         if (aktienwert > 0) {
-            effectiveMaxCap = Math.max(maxCapEuro, aktienwert * 0.10);
+            const effectiveEmergencyCapPct = Math.max(capConfig.pct, 10);
+            effectiveMaxCap = (effectiveEmergencyCapPct / 100) * aktienwert;
+            effectiveCapLabel = `${effectiveEmergencyCapPct}% Notfall-Cap`;
         } else {
             // Kein Aktienbestand - Cap auf Bedarf setzen um Gold-Verkauf zu erlauben
             effectiveMaxCap = liquiditaetsbedarf;
+            effectiveCapLabel = 'Liquiditaetsbedarf ohne Aktienbasis';
         }
     } else {
         effectiveMaxCap = maxCapEuro;
@@ -187,7 +198,7 @@ export function computeCappedRefill({
     const diagnosisEntries = isCapped
         ? [{
             step: capConfig.diagStep,
-            impact: `Auffüllen auf ${nettoBedarf.toFixed(0)}€ (${capConfig.pct}%) begrenzt.`,
+            impact: `Auffüllen auf ${nettoBedarf.toFixed(0)}€ (${effectiveCapLabel}) begrenzt.`,
             status: 'active',
             severity: 'guardrail'
         }]

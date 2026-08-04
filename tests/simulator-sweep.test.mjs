@@ -10,6 +10,7 @@
  */
 
 import { EngineAPI } from '../engine/index.mjs';
+import { settleTaxYear } from '../engine/tax-settlement.mjs';
 import { prepareHistoricalDataOnce } from '../app/simulator/simulator-engine-helpers.js';
 import {
     ESTIMATED_HISTORY_CUTOFF_YEAR,
@@ -1949,7 +1950,16 @@ console.log('Test 45: D-07 Common Random Numbers');
 console.log('Test 46: O-14 Terminaler Ruin-Drawdown');
 {
     const ruinEngine = {
-        simulateSingleYear() {
+        simulateSingleYear(engineInput, lastState) {
+            const taxSettlement = settleTaxYear({
+                taxStatePrev: lastState?.taxState,
+                rawAggregate: {
+                    sumRealizedGainSigned: 0,
+                    sumTaxableAfterTqfSigned: 0
+                },
+                sparerPauschbetrag: engineInput?.sparerPauschbetrag,
+                kirchensteuerSatz: engineInput?.kirchensteuerSatz
+            });
             return {
                 ui: {
                     spending: {
@@ -1959,7 +1969,7 @@ console.log('Test 46: O-14 Terminaler Ruin-Drawdown');
                         details: {}
                     },
                     action: {
-                        type: 'HOLD',
+                        type: 'NONE',
                         quellen: [],
                         nettoErlös: 0,
                         steuer: 0,
@@ -1967,7 +1977,8 @@ console.log('Test 46: O-14 Terminaler Ruin-Drawdown');
                         taxRawAggregate: {
                             sumRealizedGainSigned: 0,
                             sumTaxableAfterTqfSigned: 0
-                        }
+                        },
+                        taxSettlement: taxSettlement.details
                     },
                     market: { sKey: 'hot_neutral', szenarioText: 'hot_neutral' },
                     zielLiquiditaet: 0,
@@ -1979,7 +1990,7 @@ console.log('Test 46: O-14 Terminaler Ruin-Drawdown');
                     alarmActive: false,
                     lastMarketSKey: 'hot_neutral',
                     cumulativeInflationFactor: 1,
-                    taxState: { lossCarry: 0 }
+                    taxState: taxSettlement.taxStateNext
                 }
             };
         }

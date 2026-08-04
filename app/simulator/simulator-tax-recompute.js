@@ -1,5 +1,87 @@
 import { settleTaxYear } from '../../engine/tax-settlement.mjs';
 
+const EXECUTED_TAX_CONTRACT_VERSION = 'SimulatorExecutedTaxContractV1';
+const EXECUTED_TAX_EPSILON = 1e-7;
+
+function assertExecutedTaxClose(actual, expected, field) {
+    if (!Number.isFinite(actual)
+        || !Number.isFinite(expected)
+        || Math.abs(actual - expected) > EXECUTED_TAX_EPSILON) {
+        throw new Error(
+            `Simulator-Steuerabschluss-Contract verletzt: ${field} (${actual}) stimmt nicht mit ${expected} ueberein.`
+        );
+    }
+}
+
+function attachExecutedTaxContract({
+    actionResult,
+    plannedActionFlow,
+    regularSaleScale,
+    regularTaxReserved,
+    forcedTaxReserved,
+    taxReservedTotal,
+    saleTaxDue,
+    cashInterestTaxDelta,
+    finalAnnualTax,
+    rawTaxCashAdjustment,
+    taxCashAdjustment,
+    recomputedWithForcedSales,
+    recomputedAfterActionTransform
+}) {
+    if (!plannedActionFlow) return;
+    const plannedSourceTax = plannedActionFlow.quellen.reduce(
+        (total, source) => total + (Number(source?.steuer) || 0),
+        0
+    );
+    assertExecutedTaxClose(plannedSourceTax, plannedActionFlow.steuer, 'plannedSourceTax');
+    assertExecutedTaxClose(
+        regularTaxReserved,
+        plannedActionFlow.steuer * regularSaleScale,
+        'regularTaxReserved'
+    );
+    assertExecutedTaxClose(taxReservedTotal, regularTaxReserved + forcedTaxReserved, 'taxReservedTotal');
+    assertExecutedTaxClose(finalAnnualTax, saleTaxDue + cashInterestTaxDelta, 'finalAnnualTax');
+    assertExecutedTaxClose(
+        rawTaxCashAdjustment,
+        taxReservedTotal - finalAnnualTax,
+        'rawTaxCashAdjustment'
+    );
+    const adjustmentWasNormalized = rawTaxCashAdjustment < 0
+        && rawTaxCashAdjustment >= -0.01
+        && taxCashAdjustment === 0;
+    if (!adjustmentWasNormalized) {
+        assertExecutedTaxClose(taxCashAdjustment, rawTaxCashAdjustment, 'taxCashAdjustment');
+    }
+    assertExecutedTaxClose(Number(actionResult?.steuer), finalAnnualTax, 'actionResult.steuer');
+
+    actionResult.plannedActionFlow = plannedActionFlow;
+    actionResult.actionContractPhase = 'post_execution_annual_settlement';
+    actionResult.taxSettlement = {
+        ...actionResult.taxSettlement,
+        executedTaxContract: {
+            schemaVersion: EXECUTED_TAX_CONTRACT_VERSION,
+            status: 'reconciled',
+            plannedActionFlowStatus: plannedActionFlow.contractStatus,
+            topLevelActionTaxRole: 'final_annual_tax_after_simulator_effects',
+            plannedSourceTaxRole: 'pre_settlement_sale_tax_reserve',
+            plannedActionTaxReserved: plannedActionFlow.steuer,
+            plannedSourceTaxReserved: plannedSourceTax,
+            regularSaleScale,
+            cashEffectiveRegularTaxReserved: regularTaxReserved,
+            forcedTaxReserved,
+            taxReservedTotal,
+            saleTaxDue,
+            cashInterestTaxDelta,
+            finalAnnualTax,
+            rawTaxCashAdjustment,
+            taxCashAdjustment,
+            taxCashAdjustmentNormalized: adjustmentWasNormalized,
+            recomputedWithForcedSales,
+            recomputedAfterActionTransform
+        }
+    };
+}
+
 export function buildTaxRawAggregate(source = {}) {
     return {
         sumRealizedGainSigned: Number(source?.sumRealizedGainSigned) || 0,
@@ -16,7 +98,9 @@ export function addTaxRawAggregate(target, source = {}, scale = 1) {
 
 export function applySimulatorTaxRecompute({
     didForcedSale,
+    forceRecompute = false,
     actionResult,
+    plannedActionFlow = null,
     spendingNewState,
     taxStatePrev,
     combinedTaxRawAggregate,
@@ -40,7 +124,8 @@ export function applySimulatorTaxRecompute({
         sumTaxableAfterTqfSigned: saleOnlyRawAggregate.sumTaxableAfterTqfSigned
             + normalizedCashInterestIncomeSigned
     };
-    const shouldRecompute = didForcedSale
+    const shouldRecompute = forceRecompute
+        || didForcedSale
         || normalizedRegularSaleScale < 1 - 1e-9
         || Math.abs(normalizedCashInterestIncomeSigned) > 1e-9;
 
@@ -77,6 +162,7 @@ export function applySimulatorTaxRecompute({
         actionResult.taxSettlement = {
             ...recomputedSettlement.details,
             recomputedWithForcedSales: Boolean(didForcedSale),
+            recomputedAfterActionTransform: Boolean(forceRecompute),
             forcedSaleScaleApplied,
             regularSaleScale: normalizedRegularSaleScale,
             regularTaxReserved,
@@ -96,6 +182,21 @@ export function applySimulatorTaxRecompute({
         if (spendingNewState && typeof spendingNewState === 'object') {
             spendingNewState.taxState = recomputedSettlement.taxStateNext;
         }
+        attachExecutedTaxContract({
+            actionResult,
+            plannedActionFlow,
+            regularSaleScale: normalizedRegularSaleScale,
+            regularTaxReserved,
+            forcedTaxReserved: normalizedForcedTaxReserved,
+            taxReservedTotal,
+            saleTaxDue: saleOnlySettlement.taxDue,
+            cashInterestTaxDelta: recomputedSettlement.taxDue - saleOnlySettlement.taxDue,
+            finalAnnualTax: recomputedSettlement.taxDue,
+            rawTaxCashAdjustment,
+            taxCashAdjustment,
+            recomputedWithForcedSales: Boolean(didForcedSale),
+            recomputedAfterActionTransform: Boolean(forceRecompute)
+        });
         return {
             totalTaxesThisYear: Number(actionResult?.steuer) || 0,
             recomputedSettlement,
@@ -107,6 +208,7 @@ export function applySimulatorTaxRecompute({
         actionResult.taxSettlement = {
             ...actionResult.taxSettlement,
             recomputedWithForcedSales: false,
+            recomputedAfterActionTransform: false,
             forcedSaleScaleApplied: null,
             regularSaleScale: normalizedRegularSaleScale,
             regularTaxReserved,
@@ -120,6 +222,22 @@ export function applySimulatorTaxRecompute({
             taxCashAdjustment: 0
         };
     }
+    const finalAnnualTax = Number(actionResult?.steuer) || 0;
+    attachExecutedTaxContract({
+        actionResult,
+        plannedActionFlow,
+        regularSaleScale: normalizedRegularSaleScale,
+        regularTaxReserved,
+        forcedTaxReserved: 0,
+        taxReservedTotal: regularTaxReserved,
+        saleTaxDue: finalAnnualTax,
+        cashInterestTaxDelta: 0,
+        finalAnnualTax,
+        rawTaxCashAdjustment: 0,
+        taxCashAdjustment: 0,
+        recomputedWithForcedSales: false,
+        recomputedAfterActionTransform: false
+    });
 
     return {
         totalTaxesThisYear: Number(actionResult?.steuer) || 0,

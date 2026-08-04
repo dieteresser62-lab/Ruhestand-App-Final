@@ -2,12 +2,16 @@
 
 **Pruefdatum:** 2026-07-29
 **Pruefer:** Claude (Primary reviewer & Analyst)
-**Status:** Korrekturprogramm in Umsetzung; Slice 01 bis 15 liegen lokal
-committed vor. Slice 16 verwendet das vollstaendige Slice-15-Ergebnisdokument
-als Eingangsgrenze und prueft den ausgefuehrten Post-Commit-Binaervertrag,
-die eingefrorene Ergebnisgrenze und die kanonischen Datenhashes nachgelagert;
-Slice 16 ist technisch umgesetzt und selbstgeprueft, externes Review und
-Nutzerfreigabe stehen aus
+**Status:** Korrekturprogramm in Umsetzung; Slice 01 bis 16 liegen lokal
+committed vor. Ein neuer Nutzerlauf auf Source-Commit `54c055f` hat mit D-21
+eine fehlerhafte Pre-Policy-Bedarfsbasis im Liquiditaets-Runway offengelegt.
+Slice 17 repariert diesen bestehenden Vertrag auf dem aktuellen Branch.
+Claude-Runde 2 hat CR17-1 bis CR17-8 geschlossen und den Slice ohne Blocker
+unter der Scope-Auflage CR17-9 freigegeben. Der Nutzer hat die gemeinsame
+Erweiterung um Aktions-, Bestands- und Steuervertraege am 2026-08-04
+ausdruecklich genehmigt; CR17-9 ist erfuellt. CR17-10 bis CR17-12 sind
+technisch nachgebessert und benoetigen die externe Abschlussbestaetigung.
+CR17-13 bleibt als akzeptiertes Restrisiko im vorgemerkten Slice 18 offen
 **Pruefgegenstand:** Exportdatei
 `backtest-2000-2025-89fc3e368d64-2026-07-29T10-00-22.287Z.json`
 **Anlass:** Nutzerseitige Verifikation nach Abschluss der Suite-Datenintegritaet-
@@ -82,6 +86,7 @@ Schweregrade: **S** blockierend fuer die Verwendung der Zahlen,
 | D-18 | M | Alle Aktienpositionen erhalten dieselbe Proxy-Rendite | `app/simulator/simulator-year-portfolio.js:22` | Als bewusstes globales Proxy-Modell akzeptiert; kein positionsspezifischer Ausbau |
 | D-19 | L | Engine-Provenienz identifiziert den Quellstand nicht eindeutig | `engine/config.mjs:11` und `request.engine` | Laufstart bindet sauberen Source-Commit, Engine-/Konfigurations- und Datenrevision fingerprintwirksam; fehlend/dirty blockiert V2; Slice 11 technisch umgesetzt, Review ausstehend |
 | D-20 | M | Inflations- und Lohnreihe mischen beziehungsweise verfehlen offizielle Vergleichsreihen | Destatis-/DRV-Abgleich | VPI in Slice 3; Lohnidentitaet bei gleicher Funktionsverwendung in Slice 6 |
+| D-21 | S | Runway-Ziel und -KPI verwenden bei Dynamic Flex die rohe VPW-Flex-Basis vor den Spending-Policies | `engine/core.mjs:749`, `engine/transactions/transaction-utils.mjs:17`, lokaler Nutzerlauf auf Source-Commit `54c055f` | Slice 17 durch Claude-Runde 2 ohne Blocker unter CR17-9 freigegeben; Nutzer hat den erweiterten gemeinsamen Scope genehmigt; CR17-10 bis CR17-12 technisch nachgezogen und externe Commit-Pruefung ausstehend; CR17-13 in Slice 18 uebernommen |
 
 ## Befunde im Einzelnen
 
@@ -617,6 +622,69 @@ Isolierte Wirkung in diesem Lauf:
 Die geringe Wirkung in diesem konkreten Pfad mindert nicht das
 Provenienzproblem fuer andere Startjahre, Rentenhoehen oder Floor-Bedarfe.
 
+### D-21 (S) Runway verwendet Pre-Policy-VPW statt effektiver Auszahlung
+
+Ein neuer lokaler Nutzerlauf 2000 bis 2025 auf Source-Commit `54c055f` endet
+mit einer im Verhaeltnis zur tatsaechlichen Auszahlung extrem hohen
+Liquiditaet. Die Finanzdaten des Exports werden nicht in dieses Repository
+uebernommen. Die technische Nachrechnung zeigt jedoch eindeutig den
+Mechanismus:
+
+- Dynamic Flex ersetzt `inflatedBedarf.flex` zunaechst durch den rohen
+  VPW-Flex.
+- Der SpendingPlanner wendet danach Guardrails, Mindest-Flex, Flex-Budget,
+  finale Glaettung und Monatsquantisierung an.
+- Ziel-Liquiditaet, Post-Transaktions-Runway und Jahresend-Runway verwenden
+  weiterhin das unveraenderte `inflatedBedarf` statt der final geplanten
+  Portfolioauszahlung.
+- Die Transaktionslogik fuellt deshalb einen Puffer fuer Ausgaben auf, die
+  dieselbe Engine im selben Jahr nicht freigibt.
+
+Verkaufs-, Steuer- und Liquiditaetsfluss des untersuchten Laufs sind
+rechnerisch geschlossen. Der Fehler liegt in der fachlichen Bezugsphase. Er
+wird von vorhandenen Tests nicht erkannt, weil diese `Bedarf * Monate` und die
+Spending-Policies getrennt pruefen, aber keinen Dynamic-Flex-Zeugen mit
+anschliessendem Final-Guardrail an das Liquiditaetsziel binden.
+
+Der dokumentierte Vertrag ist bereits eindeutig: Runway verwendet
+Netto-Floor plus **effektivem** Flex. Slice 17 ist daher ein Bugfix des
+bestehenden Vollzugs und keine neue Nutzerpolicy.
+
+Die Umsetzung trennt nun drei Rollen: Der SpendingPlanner erhaelt vor seiner
+Entscheidung den ungekürzten Runway; Ziel, Transaktion sowie operative
+Post-Transaktions- und Post-Payout-Runways verwenden die nach allen Policies
+final quantisierte Netto-Portfolioentnahme; die Dynamic-Flex-Safety behaelt
+ihren kalibrierten Rohbedarfsnenner nach der Transaktion. So erzeugt eine
+Kuerzung kein eigenes Entspannungssignal. Der konfigurierbare Brutto-
+Notfallpuffer bleibt als getrennte Untergrenze erhalten.
+
+Der vertrauliche Request wurde nach der Korrektur zweimal deterministisch im
+Speicher reproduziert: 26/26 Jahre, `completed`, kein Ruin und maximaler
+absoluter `FlowDelta` `9,31e-10` EUR. Seine Finanzdaten wurden nicht in das
+Repository uebernommen. Synthetische Regressionen und die neue Fixture
+`liquidity-runway-basis-slice-17-measurement-v1.json` sichern stattdessen die
+technische Wirkung. Alte Slice-10-/13-Evidenz bleibt byteidentisch. Wegen des
+ehrlich als `dirty` gebundenen Quellbaums blockiert der Raw-Export bis zum
+extern geprueften Commit weiterhin korrekt fail-closed.
+
+Die Nachbesserung nach dem ersten externen Review haertet dabei nicht nur die
+Entnahmebasis, sondern auch die unmittelbar betroffene Transaktionsgrenze:
+Core und Direct akzeptieren nur inventargebundene, ausgeglichene Planned-
+Actions. Direct prueft die rohe Engine-Jahressteuer gegen das zentrale
+Settlement, validiert eine 3-Bucket-Ersetzung erneut und rechnet deren finales
+Rohaggregat vor der Zustandsfortschreibung neu ab. Der gepruefte Vorabplan und
+der spaetere Simulator-Jahressteuerabschluss sind versioniert getrennt, sodass
+eine Steuerreserve nicht mehr still als finale Quellensteuer missverstanden
+werden muss.
+
+Claude-Runde 2 hat diese gemeinsame Erweiterung nicht technisch blockiert,
+aber mit CR17-9 an eine ausdrueckliche Nutzerentscheidung gebunden. Der Nutzer
+hat am 2026-08-04 entschieden, Runway-Fix und Vertragsschicht in Slice 17 und
+einem spaeteren gemeinsamen Commit zusammenzuhalten. Die proportionale
+Lot-Steuerbindung `proportional_market_value_v1` bleibt fuer Slice 17 als
+akzeptiertes Restrisiko sichtbar; ihre Versionierung und kuenftige
+nichtproportionale Erweiterbarkeit werden in Slice 18 behandelt.
+
 ### Konsolidiertes Datenurteil von Codex
 
 Die technische Rechen- und Exportkette ist fuer den vorliegenden Request
@@ -661,6 +729,7 @@ Umsetzung eine erneute Nutzerentscheidung.
 | Liquiditaet | Liquiditaet soll nur die gesondert konfigurierte Runway-Zeitspanne abdecken; eine dadurch steigende Aktienquote ist beabsichtigt |
 | Rebalancing | Kein Rebalancing auf eine feste Aktien-/Liquiditaetsquote |
 | Runway-Parameter | Eigener Parameter `liquidityRunwayYears`; er ist nicht mit `flexBudgetYears` gleichzusetzen. Initialer Default: 5 Jahre |
+| Runway-Bedarfsbasis | Ziel, Transaktion und operative KPIs verwenden die finale Netto-Portfolioentnahme; roher VPW-Flex ist kein aufzufuellender Jahresbedarf, bleibt aber Basis des Planner-Eingangs und der Dynamic-Flex-Safety |
 | Runway-Ausweis | Runway vor und nach Transaktionen getrennt speichern; fuer Warnungen und Minimum ist der Stand nach allen Jahrestransaktionen massgeblich |
 | Floor | Der Floor-Bedarf darf nie unterschritten werden |
 | Mindest-Flex | Weicher Stabilisator gegen schnelle Ausschlaege in Richtung Floor; nach laengerem Baerenmarkt beziehungsweise bei erschoepftem Flex-Budget unterschreitbar |
@@ -772,12 +841,19 @@ reine Stressparameter duerfen im Manifest nicht dieselbe Evidenzklasse tragen.
   dem vorhandenen Branch `codex/suite-datenintegritaet-hardening`; es wird
   kein neuer Branch angelegt.
 - **Dauerhafte Branch-Ausnahme fuer dieses Korrekturprogramm:** Diese
-  Nutzerentscheidung gilt fuer Slice 02 bis einschliesslich Slice 13 und ist
-  bei jedem Folgeslice aus diesem Abschnitt als bereits erteilt zu behandeln.
-  Codex und Folgeagenten fragen nicht erneut nach einem eigenen Feature-Branch,
-  solange der Nutzer diese Entscheidung nicht ausdruecklich widerruft oder
-  einen anderen Branch vorgibt. Der tatsaechlich aktive Branch und
-  Arbeitsbaumstatus werden weiterhin vor jedem Slice dokumentiert.
+  Nutzerentscheidung galt fuer Slice 02 bis einschliesslich Slice 13. Der
+  Nutzer hat am 2026-08-03 Slice 17 erneut ausdruecklich auf dem aktuellen
+  Branch beauftragt; diese Entscheidung ist fuer Slice 17 als erteilt zu
+  behandeln. Codex und Folgeagenten fragen fuer diesen Bugfix nicht erneut
+  nach einem eigenen Feature-Branch, solange der Nutzer die Entscheidung nicht
+  ausdruecklich widerruft oder einen anderen Branch vorgibt. Der tatsaechlich
+  aktive Branch und Arbeitsbaumstatus werden weiterhin dokumentiert.
+- Separate Scopeentscheidung vom 2026-08-04: Der Nutzer hat fuer Slice 17 die
+  reviewbedingte Erweiterung von fuenf auf zehn Produktivdateien um
+  Aktions-/Bestandsvertrag, direkte Simulatorgrenze, 3-Bucket-Revalidierung und
+  zentrale Steuerrueckrechnung als gemeinsamen Slice und spaeteren gemeinsamen
+  Commit genehmigt. Diese Entscheidung ist keine Commit-, Push- oder
+  Selbstfreigabe durch Codex.
 - Fuer jeden Slice wird vor Coding der Branch- und Arbeitsbaumstatus sowie das
   erwartete Diff-Risiko dokumentiert.
 - Die nachstehenden Abschnitte sind das Master-Geruest. Vor Beginn eines
@@ -1766,6 +1842,123 @@ Fingerprintbasis geprueft.
 - Offene Aussagegrenzen und Restrisiken bleiben sichtbar.
 - Pflichtgates bestehen; externe Freigabe bleibt erforderlich.
 
+### Slice 17 - Bugfix der effektiven Runway-Basis
+
+**Slice-Dokument:**
+[`SLICE_BACKTEST_DATENPRUEFUNG_17_RUNWAY_BASIS_BUGFIX.md`](SLICE_BACKTEST_DATENPRUEFUNG_17_RUNWAY_BASIS_BUGFIX.md)
+
+**Umsetzungsstatus:** am 2026-08-03 durch den Nutzer auf dem aktuellen Branch
+beauftragt und technisch umgesetzt. Preflight, vorbestehende
+`RuheStandSuite.exe`-Aenderung, Diff-Risiko, fachlicher Vertrag,
+Pfadwirkungen und neue versionierte Messgrenze sind dokumentiert. Claude-
+Runde 1 blockierte CR17-1 bis CR17-3 und dokumentierte CR17-4 bis CR17-8 als
+Risiken. Claude-Runde 2 hat alle acht Punkte geschlossen und den Slice ohne
+Blocker unter CR17-9 freigegeben. Der Nutzer hat die damit verbundene
+Erweiterung um Aktions-, Bestands- und Steuervertraege am 2026-08-04 als
+gemeinsamen Slice und spaeteren gemeinsamen Commit genehmigt. CR17-10 bis
+CR17-12 sind technisch nachgezogen und benoetigen die externe
+Abschlussbestaetigung. CR17-13 bleibt als akzeptiertes Restrisiko in Slice 18
+offen.
+
+**Abhaengigkeit:** Slice 08 als urspruenglicher Runway-Vertrag, Slice 09 als
+Owner der finalen Spending-Policy-Reihenfolge und Source-Commit `54c055f` als
+reproduzierbare Fehlergrenze.
+
+**Ziel**
+
+Ziel-Liquiditaet, Transaktionsentscheidung und kanonische Runway-Kennzahlen
+verwenden die final geplante Netto-Portfolioauszahlung nach allen
+Spending-Policies. Die vor der Spending-Entscheidung benoetigte interne
+Runway-Schaetzung und die kalibrierte Dynamic-Flex-Safety bleiben davon auf
+Rohbedarfsbasis getrennt.
+
+**Scope**
+
+Urspruenglicher Runway-Scope:
+
+- effektive Bedarfsbasis in Engine-Core und Transaktionsentscheidung;
+- konsistente Ziel-, Transaktions-, Post-Transaktions- und Post-Payout-
+  Runway-Diagnose.
+
+Reviewbedingt hinzugekommener und am 2026-08-04 genehmigter Vertragsscope:
+
+- gemeinsamer fail-closed Vertrag fuer alle Darstellungen der geplanten
+  Jahresentnahme und absent-only Legacy-Fallback;
+- restaurierte Rohbedarfsbasis und Gegenzeuge fuer Dynamic-Flex-Safety;
+- strikter Cash-Flow-Vertrag ohne Normalisierung oder Nullklammer;
+- gemeinsamer Aktionsvertrag mit Quellen-, Bestands-, Lot-Steuer- und
+  Erhaltungspruefung vor und nach 3-Bucket;
+- zentrale Validierung der rohen Jahressteuer und versionierter
+  Ausfuehrungs-Steuervertrag an der direkten Simulatorgrenze;
+
+Gemeinsame Evidenz:
+
+- synthetische Dynamic-Flex-/Final-Guardrail-Regression;
+- erwartete Delta-Messung ohne Aenderung historischer Daten;
+- Referenz- und Hauptplandokumentation.
+
+**Technischer Nachweis**
+
+- synthetischer Dynamic-Flex-Zeuge: 430.124,75 EUR roher VPW-Bedarf,
+  153.000 EUR finaler Entnahmeplan, 765.000 EUR Ziel statt 2.150.700 EUR und
+  exakt 60 Monate operativer Post-Transaktions-Runway; die getrennte Safety-
+  Reichweite bleibt bei 21,342645 Monaten und deeskaliert nicht;
+- direkter Guardrail-Zeuge: keine Notfuellung bei 40 Monaten effektiver
+  Reichweite; konservativer Legacy-Fallback ohne Spending-Daten bleibt aktiv;
+- benannter Bear-Cap-Grenzzeuge: exakt 75 Prozent Zieldeckung halten das
+  10.000-EUR-Standard-Cap, einen Euro darunter greift das
+  50.000-EUR-Notfall-Cap; beide Arme sind steuerneutral isoliert und die
+  Diagnose benennt das tatsaechlich wirksame 10-Prozent-Notfall-Cap;
+- neue Slice-17-Fixture bindet Backtest-, Monte-Carlo/Sweep-, Demografie/
+  Pflege- und Export-Zielhashes an byteidentische Vorgaengerfixtures sowie
+  `crossSliceOracleProjection` und das vollstaendige Slice-09-nach-10-Ledger;
+- Negativzeugen fuer Produktiv-/Legacy-Zweig, Missingness, Konflikt, `null`,
+  NaN/Infinity/String, Cash-Ueberbuchung, malformed Verwendungen, Phantom- und
+  Doppelquellen, Bestandsueberschreitung, falsche Lot-Steuern, hostile Getter,
+  eingefrorene Aktionen und stabilen technischen Simulator-Outcome;
+- `npm test`: 166 Dateien, 18.822/18.822 Assertions, 0 Fehler, 0 offene
+  Handles; `npm run test:browser`: 28/28;
+- `npm run build:engine`, `npm run docs:evidence` und `git diff --check`:
+  erfolgreich;
+- vertraulicher Originalrequest: zweimal identisch, 26/26 Jahre,
+  `FlowDelta < 1 EUR`; kein persoenlicher Rohwert als Fixture persistiert.
+
+**Abnahmekriterien**
+
+- Bei abweichendem rohem VPW-Flex und finaler Auszahlung folgt das
+  Liquiditaetsziel ausschliesslich der finalen Auszahlung.
+- Zieldeckung, operative Runway-Monate und Transaktions-Refill verwenden die
+  finale Entnahmebasis; Dynamic-Flex-Safety bleibt explizit auf Rohbedarf.
+- Vorhandene ungueltige Spending- oder Cash-Flows scheitern fail-closed; nur
+  ein tatsaechlich fehlendes Spending-Ergebnis aktiviert den markierten
+  Legacy-Fallback.
+- Bestehender Brutto-Notfallpuffer bleibt getrennt und transparent.
+- FlowDelta bleibt unauffaellig; Pflichtgates bestehen.
+- Codex erteilt keine eigene Freigabe.
+
+### Slice 18 - Robustheit und Versionierung des Lot-Steuervertrags
+
+**Status:** durch die Nutzerentscheidung zu CR17-13 am 2026-08-04 vorgemerkt;
+Umsetzung nicht begonnen. Vor jeder Umsetzung sind ein eigener Preflight,
+konkreter Scope, eine eigene Slice-MD und die nach Projektregel erforderliche
+Branchentscheidung zu dokumentieren.
+
+**Ziel und vorgemerkter Scope**
+
+- explizite Vertrags-/Policyversion fuer proportionale und kuenftig moegliche
+  nichtproportionale Lotauswahl;
+- begruendete absolute, relative und Cent-Toleranzen an internen und externen
+  Serialisierungsgrenzen;
+- Provenienz und Fehlerdiagnostik fuer Legacy-, Import- und zusammengefuehrte
+  Tranchenstammdaten;
+- positive Zeugen fuer die aktuelle proportionale Policy und negative
+  beziehungsweise zukuenftige Zeugen fuer andere Lotauswahlmodelle;
+- keine Steuer-, TQF- oder 3-Bucket-Neukalibrierung und keine stille
+  Abschwaechung der bestehenden Inventar- und Steuerpruefungen.
+
+Bis zu einer gesonderten Entscheidung darf eine nichtproportionale Lotauswahl
+nicht still unter `proportional_market_value_v1` eingefuehrt werden.
+
 ## Priorisierung und Startreihenfolge
 
 Die technische Reihenfolge ist:
@@ -1780,6 +1973,10 @@ Die technische Reihenfolge ist:
 8. Slice 15 als nachgelagerte Datenketten- und Evidenzpruefung.
 9. Slice 16 als nachgelagerte Pruefung des ausgefuehrten Slice-15-Commit- und
    Binaervertrags.
+10. Slice 17 als wertveraendernder Bugfix der in einem neuen Nutzerlauf
+    offengelegten effektiven Runway-Bedarfsbasis.
+11. Slice 18 als noch nicht begonnener Folgeslice fuer Robustheit und
+    Versionierung des Lot-Steuervertrags nach CR17-13.
 
 Innerhalb der Datenersetzung besitzt Slice 2 wegen des bereits quantifizierten
 2024-Aktienfehlers die hoechste Ergebnisprioritaet. Ein Quellen- oder

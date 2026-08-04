@@ -219,11 +219,34 @@ console.log('--- Regime Signals Contract Tests ---');
         assert(smoothedDetails.runwayTargetDiagnostics.severityPct === 0, 'Target-liquidity details do not mix market severity into the target');
         assert(smoothedDetails.runwayTargetDiagnostics.hardMinimumMonths === 24, 'Target-liquidity details expose hard minimum runway');
 
+        const scalarPlannedTarget = TransactionEngine.calculateTargetLiquidity(profil, market, 12000, input);
+        assertClose(scalarPlannedTarget, 24000, 1e-12,
+            'Decumulation target accepts the canonical planned annual amount without an invented floor/flex split');
+
         const explicitTarget = TransactionEngine.calculateTargetLiquidity(profil, market, inflatedBedarf, {
             ...input,
             liquidityRunwayYears: 5
         });
         assertClose(explicitTarget, 60000, 1e-12, 'Explicit user target bypasses target smoothing');
+
+        const grossEmergencyBufferTarget = TransactionEngine.calculateTargetLiquidity(
+            profil,
+            market,
+            { floor: 0, flex: 1000 },
+            {
+                ...input,
+                liquidityRunwayYears: 5,
+                floorBedarf: 24000,
+                flexBedarf: 12000,
+                minCashBufferMonths: 2
+            }
+        );
+        assertClose(
+            grossEmergencyBufferTarget,
+            6000,
+            1e-12,
+            'Separate two-month gross emergency buffer must remain the lower bound for a small post-policy need'
+        );
 
         const fallbackDetails = TransactionEngine.calculateTargetLiquidityDetails(
             { isDynamic: true, minRunwayMonths: 24, runway: { hot_neutral: { total: 36 } } },

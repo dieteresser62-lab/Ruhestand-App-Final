@@ -13,7 +13,7 @@ export const HISTORICAL_BACKTEST_CSV_SCHEMA_VERSION = 'HistoricalBacktestCsvV2';
 export const HISTORICAL_BACKTEST_FINGERPRINT_ALGORITHM = 'sha256-canonical-json-v1';
 export const HISTORICAL_BACKTEST_RUN_ID_ALGORITHM = 'sha256-canonical-run-identity-v1';
 export const HISTORICAL_BACKTEST_PORTFOLIO_BOUNDARY_SCHEMA_VERSION = 'HistoricalBacktestPortfolioBoundariesV2';
-export const HISTORICAL_BACKTEST_INPUT_SEMANTICS_SCHEMA_VERSION = 'HistoricalBacktestInputSemanticsV1';
+export const HISTORICAL_BACKTEST_INPUT_SEMANTICS_SCHEMA_VERSION = 'HistoricalBacktestInputSemanticsV2';
 export const HISTORICAL_BACKTEST_QUANTIZATION_SCHEMA_VERSION = 'HistoricalBacktestQuantizationContractV1';
 export const HISTORICAL_BACKTEST_CSV_CONTRACT = Object.freeze({
     delimiter: ';',
@@ -30,7 +30,7 @@ export const HISTORICAL_BACKTEST_INPUT_SEMANTICS = Object.freeze({
         role: 'legacy_start_liquidity_alias',
         value: 'tagesgeld_plus_geldmarktEtf_at_run_start',
         not: 'strategy_target',
-        strategyTargetSource: 'liquidityRunwayYears_and_year_specific_floor_flex_need'
+        strategyTargetSource: 'liquidityRunwayYears_and_year_specific_post_policy_planned_annual_net_withdrawal'
     }),
     capeRatio: Object.freeze({
         role: 'non_historical_ui_fallback',

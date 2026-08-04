@@ -105,8 +105,10 @@ function assertSaleContract(action, messagePrefix) {
         'Core should expose final net proceeds after tax reconciliation');
     assertClose(result.ui.action.verwendungen.liquiditaet, 27626.25, 0.001,
         'Core should add the tax saving only to liquidity use');
-    assertClose(result.ui.runway.months, 6.9065625, 0.000001,
-        'Core runway should use reconciled liquidity');
+    assertClose(result.ui.spending.details.endgueltigeEntnahme, 45600, 0.001,
+        'Core witness should retain the final post-policy annual withdrawal');
+    assertClose(result.ui.runway.months, 27626.25 / (45600 / 12), 0.000001,
+        'Core runway should use reconciled liquidity over the final post-policy withdrawal');
     assertSaleContract(result.ui.action, 'Partial loss carry');
     assertClose(result.newState.taxState.lossCarry, 0, 0.001,
         'Core should deplete loss carry when annual taxable base is sufficient');

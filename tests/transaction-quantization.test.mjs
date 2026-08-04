@@ -31,6 +31,10 @@ const MOCK_INPUT = {
     depotwertAlt: 500000, depotwertNeu: 0,
     renteMonatlich: 0
 };
+const MOCK_SPENDING = {
+    monatlicheEntnahme: 3500,
+    details: { endgueltigeEntnahme: 42000 }
+};
 
 // --- TEST 1: Core Quantization Logic ---
 {
@@ -65,7 +69,7 @@ const MOCK_INPUT = {
         depotwertGesamt: 500000,
         market: { sKey: 'peak_stable', seiATH: 1.0, abstandVomAthProzent: 0, szenarioText: 'Test' },
         profil: MOCK_PROFIL,
-        spending: {}, minGold: 0, input: MOCK_INPUT
+        spending: MOCK_SPENDING, minGold: 0, input: MOCK_INPUT
     };
 
     const result = TransactionEngine.determineAction(smallGapParams);
@@ -88,7 +92,7 @@ const MOCK_INPUT = {
         depotwertGesamt: 500000,
         market: { sKey: 'hot_neutral', seiATH: 1.0, abstandVomAthProzent: 0, szenarioText: 'Test' }, // Uses Opportunistic Rebalancing
         profil: MOCK_PROFIL,
-        spending: {}, minGold: 0,
+        spending: MOCK_SPENDING, minGold: 0,
         input: { ...MOCK_INPUT } // Canonical two-year runway keeps the hard floor satisfied.
     };
 
@@ -130,7 +134,7 @@ const MOCK_INPUT = {
         depotwertGesamt: 140000,
         market: { sKey: 'peak_hot', seiATH: 1.0, abstandVomAthProzent: 0, szenarioText: 'Test' }, // Good market for investing
         profil: MOCK_PROFIL,
-        spending: {}, minGold: 0,
+        spending: MOCK_SPENDING, minGold: 0,
         input: { ...MOCK_INPUT, depotwertAlt: 140000 }
     };
 
@@ -165,7 +169,7 @@ const MOCK_INPUT = {
         },
         market: { sKey: 'peak_stable', seiATH: 1.0, abstandVomAthProzent: 0, szenarioText: 'Test' },
         profil: MOCK_PROFIL,
-        spending: {}, minGold: 0
+        spending: MOCK_SPENDING, minGold: 0
     };
 
     const result = TransactionEngine.determineAction(params);
@@ -201,7 +205,7 @@ const MOCK_INPUT = {
         depotwertGesamt: 2500000, // Large portfolio
         market: { sKey: 'hot_neutral', seiATH: 1.0, abstandVomAthProzent: 0, szenarioText: 'Test' },
         profil: MOCK_PROFIL,
-        spending: {}, minGold: 0,
+        spending: MOCK_SPENDING, minGold: 0,
         input: { ...MOCK_INPUT }
     };
 

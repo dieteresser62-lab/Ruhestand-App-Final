@@ -2,7 +2,7 @@
 
 **Technische Dokumentation der DIY-Software für Ruhestandsplanung**
 
-**Dokumentstand:** 2026-07-22 (integrierter Abschlusskandidat nach Simulator-Monte-Carlo-Hardening Slice 12)
+**Dokumentstand:** 2026-07-22 (integrierter Abschlusskandidat nach Simulator-Monte-Carlo-Hardening Slice 12; Runway-Vertragsabschnitte am 2026-08-04 fuer den extern noch nicht freigegebenen Slice 17 nachgezogen)
 **Inhaltlicher Codeabgleich:** Architekturabschnitt B, Monte-Carlo-Fachkonzept C.3, Backtest-Fachkonzept C.8 sowie Rechenkonventions- und Modellgrenzen gegen Commit `4cd9eeb` und die lokale Slice-12-Arbeitskopie vom 2026-07-22
 **Reproduzierbarer Inventarstand:** Commit `4cd9eeb` plus getrenntem, extern noch nicht freigegebenem Kandidaten `monte-carlo-v1-final`; Ermittlungsweg siehe Release-Checkliste
 **Engine API:** v31.0, Build-ID `2025-12-22_16-35`; acht exponierte Methoden, davon fünf unterstützte operative Methoden und drei deprecated No-op-Kompatibilitäts-Stubs
@@ -986,7 +986,8 @@ Wichtige Verträge:
 
 - Die Engine entscheidet über Entnahme, Guardrails, Marktregime, Ziel-Liquidität und reguläre Transaktionen.
 - Der Simulator führt danach reale Simulationsmechanik aus: Auszahlung, Portfoliofortschreibung, Notverkäufe, Bonds-Puffer, Pflege-/Rentenstatus und Logs.
-- Wenn nach dem Engine-Call zusätzliche Verkäufe nötig werden, wird die Steuer aggregiert neu berechnet, damit Sparer-Pauschbetrag und Verlusttopf nicht doppelt verbraucht werden.
+- Der rohe Engine-Plan muss vor jeder Ausfuehrung den gemeinsamen `planned-action`-Vertrag erfuellen: Quellen, Verwendungen, Brutto/Steuer/Netto, Lot-Kapazitaet und Rohsteuerwerte sind an das kanonische Inventar gebunden. Das aktuelle V1-Steuer-Inventarmodell `proportional_market_value_v1` entspricht der bestehenden proportionalen Marktwert-/Cost-Basis-Reduktion innerhalb eines Lots und prueft interne Rohwerte mit absolut `1e-7`. Eine nichtproportionale Lotauswahl oder centgerundete Fremdadapter erfordern einen neuen Vertragsstand statt einer stillen Toleranzaufweichung. Eine 3-Bucket-Ersetzung wird danach erneut geprueft. Auch die von der Engine gelieferte Jahressteuer, deren Detailaufschluesselung und der neue Verlustvortrag muessen exakt zum zentralen `settleTaxYear()` passen.
+- Wenn nach dem Engine-Call zusätzliche Verkäufe nötig werden oder 3-Bucket den steuerrelevanten Plan ersetzt, wird die Steuer aggregiert neu berechnet, damit Sparer-Pauschbetrag und Verlusttopf nicht doppelt verbraucht werden. Der gepruefte Vorabplan bleibt als `plannedActionFlow` erhalten; `SimulatorExecutedTaxContractV1` reconciliert Planreserve, erzwungene Reserve, Verkaufs- und Zinssteuer sowie die einmalige Cash-Anpassung zur finalen Jahressteuer. Das kompatible Top-Level-Actionobjekt ist danach ein Post-Execution-Jahresabschluss und kein erneut ausfuehrbarer Plan.
 - Der Jahreslog enthält additive Erklärfelder zu Entnahme, Payout, Liquidität, VPW, Steuer und 3-Bucket, ohne die Normalansicht zu überfrachten.
 
 ### B.3.4 Monte Carlo, Sampling und Workers
@@ -1408,10 +1409,11 @@ Die technische Modulzuordnung steht in Teil B. Zur schnellen Orientierung:
 | **Bedarf** | Für das jeweilige Modelljahr eingegebener beziehungsweise fortgeschriebener nominaler Jahresbetrag. | Kein statistisch geschätzter Lebensbedarf und keine automatische Ist-Ausgabe. |
 | **Floor** | Nicht verhandelbarer Jahresbedarf. Im Simulator kann der Pflegezusatz den Floor erhöhen. Nach Rentenverrechnung bezeichnet `inflatedBedarf.floor` trotz des historischen Feldnamens den aktuellen nominalen **Netto-Floor**. | Nicht mit freier Liquidität, Mindestreserve oder Gesamtentnahme gleichsetzen. |
 | **Flex-Basis** | Verhandelbarer Jahresbedarf vor Anwendung der Flex-Rate. Bei Dynamic Flex kann VPW diese Basis ersetzen; ein Rentenüberschuss oberhalb des Floor reduziert sie. | Noch nicht der tatsächlich freigegebene Flex-Betrag. |
-| **Effektiver Flex** | Flex-Basis multipliziert mit der nach Policies wirksamen Flex-Rate. | Mindest-Flex, Budgets und Glättung können den Policy-Wert anheben oder begrenzen. |
+| **Effektiver Flex** | Flex-Basis multipliziert mit der nach allen Spending-Policies wirksamen Flex-Rate; die final quantisierte Portfolioauszahlung bestimmt den tatsächlich geplanten Eurobetrag. | Mindest-Flex, Budgets, Glättung und Monatsquantisierung können den Policy-Wert anheben, begrenzen oder runden. |
 | **Nominal** | Geldbetrag in Preisen des betrachteten Modelljahres. | Die Engine erwartet den aktuellen Jahreswert; sie inflationsindexiert den Bedarf nicht nochmals intern. |
 | **Real** | Auf ein Basisjahr deflationierter Betrag. | Im Simulator ist das erste Simulatorjahr das Basisjahr; der aktuelle kumulierte Inflationsfaktor wird auch während einer Ansparphase fortgeschrieben. |
-| **Runway** | Frei verfügbare Liquidität geteilt durch den aktuellen jährlichen Netto-Bedarf aus Floor und effektivem Flex, ausgedrückt in Monaten. | Keine Überlebenswahrscheinlichkeit und keine garantierte Mindestreichweite des Gesamtvermögens. |
+| **Operativer Runway** | Frei verfügbare Liquidität geteilt durch die nach allen Spending-Policies final quantisierte jährliche Netto-Portfolioentnahme, ausgedrückt in Monaten. | Bestimmt Ziel, Transaktions-Guardrail und Jahresend-KPI; keine Überlebenswahrscheinlichkeit und keine garantierte Mindestreichweite des Gesamtvermögens. |
+| **Dynamic-Flex-Safety-Runway** | Liquidität nach der Transaktion geteilt durch den ungekürzten nominalen Nettojahresbedarf vor den Spending-Policies. | Bleibt wegen der bestehenden Schwellenkalibrierung getrennt; eine Policy-Kürzung darf nicht ihr eigenes Entspannungssignal erzeugen. |
 | **Reserve** | Sammelbegriff, der nur zusammen mit seinem Typ verwendet werden soll: freie Liquidität, Runway-Ziel, Gold-Floor oder Pflegebucket. | Die vier Größen haben unterschiedliche Verfügbarkeit und Rechenwirkung. |
 | **Aktives Gesamtvermögen** | Aktien-, Gold- und freie Liquiditätsbestände, die der Entnahmeplanung zur Verfügung stehen; ein aktivierter Pflegebucket ist herausgerechnet. | Kein vollständiger Haushalts-Net-Worth und kein frei erweiterbares Multi-Asset-Portfolio. |
 | **Erfolg** | Monte-Carlo-Lauf ohne `isRuin` bis zum fachlichen Laufende. Ein Lauf, der wegen Tod aller modellierten Personen endet, gilt ohne vorherigen Ruin als erfolgreich. | Keine Garantie für eine reale Ruhestandsplanung und keine Aussage, dass alle Wunschentnahmen vollständig erfüllt wurden. |
@@ -2222,12 +2224,26 @@ den Bereich 1 bis 10 und die Schrittweite 0,5. Das Ziel in Euro ist exakt:
 
 ```javascript
 targetMonths = liquidityRunwayYears * 12;
-targetLiquidity = effectiveAnnualNetNeed * targetMonths / 12;
+effectiveAnnualNetNeed = finalQuantizedNetPortfolioWithdrawal;
+netRunwayTarget = effectiveAnnualNetNeed * targetMonths / 12;
+grossEmergencyBuffer = currentGrossAnnualNeed * minCashBufferMonths / 12;
+targetLiquidity = roundUp100(Math.max(netRunwayTarget, grossEmergencyBuffer));
 hardMinimumMonths = Math.min(targetMonths, 24);
+dynamicFlexSafetyRunwayMonths = cashAfterTransaction / (rawAnnualNetNeed / 12);
 ```
 
-Die harte Mindestgrenze ist abgeleitete Engine-Policy und keine zweite
-Nutzereingabe. Ziel und Jahresend-KPI werden nicht regimeabhaengig geglaettet.
+`currentGrossAnnualNeed` ist Floor plus Flex vor Rentenverrechnung;
+`minCashBufferMonths` ist von 0 bis 12 konfigurierbar und hat Default 2. Diese
+Brutto-Untergrenze ist weder ein zweiter Runway noch ein separater
+Vermoegenstopf. Die harte Mindestgrenze ist abgeleitete Engine-Policy auf der
+Netto-Basis und keine zweite Nutzereingabe. Ziel und Jahresend-KPI werden nicht
+regimeabhaengig geglaettet. Vor dem SpendingPlanner berechnet der Core einen
+Runway aus dem ungekürzten Bedarf als Policy-Eingang. Nach der Transaktion wird
+derselbe Rohbedarfsnenner fuer die separat kalibrierte Dynamic-Flex-Safety
+verwendet; `dynamicFlexSafetyRunwayBasis = pre_policy_annual_net_need` macht
+dies sichtbar. `safety_runway_pre_months` bezeichnet dagegen den post-policy,
+pre-transaction Runway; `safety_runway_post_months` behaelt aus
+Kompatibilitaetsgruenden den Dynamic-Flex-Safety-Wert.
 Legacy-Daten migrieren in der Prioritaet kanonischer Wert,
 `runwayTargetMonths`, `runwayMinMonths`, Default. Ganzzahlige Monatswerte aus
 den alten UI-Domains werden auf das naechste Sechsmonatsraster aufgerundet und

@@ -214,6 +214,11 @@ function baseResult(outcomeKind = 'completed') {
         'raw JSON exposes the input-semantic contract');
     assertEqual(raw.contracts.inputSemantics.zielLiquiditaet.not, 'strategy_target',
         'legacy zielLiquiditaet is not presented as the strategy target');
+    assertEqual(
+        raw.contracts.inputSemantics.zielLiquiditaet.strategyTargetSource,
+        'liquidityRunwayYears_and_year_specific_post_policy_planned_annual_net_withdrawal',
+        'strategy target provenance identifies the post-policy annual need basis'
+    );
     assertEqual(raw.contracts.flexReductionMaximum.interpretation, 'maximum_household_flex_reduction_not_person_reduction',
         'maximum flex reduction remains bound to the household metric');
     assertEqual(raw.contracts.flexReductionMaximum.basis, 'gross_household_flex_required',
@@ -295,8 +300,8 @@ function baseResult(outcomeKind = 'completed') {
     });
     assertEqual(withCohorts.result.cohortInventory.inventory.eligible, 2, 'optional cohort inventory is exported without recalculation');
     assert(first.fingerprint.value !== withCohorts.fingerprint.value, 'optional cohort inventory participates in the result fingerprint');
-    assertEqual(first.fingerprint.value, '00a3f3aa4b5b735beb868e8cfb0bb5d856e64150c2ba8d3297980660fdfdc506',
-        'canonical V2 fixture fingerprint remains byte-for-byte stable');
+    assertEqual(first.fingerprint.value, '62d59323d6375bcad1821a62a9385950c3a6cb15562f1444f349fc84be75a3b4',
+        'canonical V2 export with InputSemanticsV2 remains byte-for-byte stable');
 }
 
 {

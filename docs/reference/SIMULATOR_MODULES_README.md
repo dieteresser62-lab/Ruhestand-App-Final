@@ -2,11 +2,12 @@
 
 Die Simulator-App ist inzwischen in mehrere spezialisierte ES6-Module zerlegt. Die zentralen Abläufe (Monte-Carlo, Sweep, Backtests, Pflege-UI) leben nicht mehr als Monolith in `simulator-main.js`, sondern wurden in klar abgegrenzte Dateien ausgelagert. Dieses Dokument beschreibt Zweck, Haupt-Exports, Einbindungspunkte und die gewünschte Aufteilung neuer Features.
 
-**Stand:** 2026-07-29 (einschliesslich offener globaler
+**Stand:** 2026-08-04 (einschliesslich offener globaler
 Aktien-Forschungsproxykette, Langlebigkeit, Stationary Bootstrap,
 Tail-Risk-Overlay, Realentnahmevertrag, getrennter Pflege-KPI-Semantik,
 vollstaendigem historischen Backtest-Contract, SimulationDataInventoryV1
-sowie verlustfreier Profilasset-/Goldzielaggregation)
+sowie verlustfreier Profilasset-/Goldzielaggregation und technisch
+nachgebesserter, extern noch nicht freigegebener Slice-17-Runway-Semantik)
 
 **Pfadkonvention:** Simulator-Module liegen unter `app/simulator/`, Profilmodule unter `app/profile/`, Shared-Utilities unter `app/shared/`, Tranchen-Status unter `app/tranches/`. Im Dokument werden Dateinamen aus Lesbarkeit meist ohne Präfix genannt.
 
@@ -329,7 +330,7 @@ DOM-freier, versionierter Exportadapter fuer genau eine kanonische `BacktestRunR
 - `captureHistoricalBacktestEngineProvenance()` – erfasst Engine-API-/Build-ID, den explizit vor dem Lauf geladenen sauberen Source-Commit, kanonischen SHA-256-Config-Fingerprint und den von der Entnahmelogik konsumierten Quantisierungsvertrag zum Laufzeitpunkt.
 - `createHistoricalBacktestDownload()` – liefert Dateiname, Inhalt, MIME-Typ und Fingerprint; schreibt oder uebertraegt selbst nichts.
 
-Der Runner entfernt interne Portfolio-Snapshots bereits aus dem kanonischen Resultat; V2 liefert stattdessen nur gegen einen zweiten, von der primaeren Totalfunktion unabhaengigen Jahreszeilen-Rechenweg reconciliierte, explizit nicht restartfaehige `HistoricalBacktestPortfolioBoundariesV2`. Dessen `totalComposition` nennt aktives Portfolio plus Pflegebucket und markiert den separat sichtbaren Pflegebucket als bereits in Start-/Endvermoegen enthalten. Pflegebucketwerte sind in kanonischer Grenze, Jahreszeile, CSV und Drawdownreihe genau einmal enthalten. `HistoricalBacktestInputSemanticsV1` erklaert die Legacy-/Ableitungsfelder. `RuntimeBuildProvenanceV1` wird vor dem Lauf ausschliesslich ueber den relativen Same-Origin-Endpunkt `./__build-provenance.json` geladen; der Export kann die dabei gebundene Provenienz nicht ersetzen, und Unterpfad-Auslieferungen bleiben funktionsfaehig. Fehlender/dirty Source-Commit, ein unvollstaendiger Quantisierungsvertrag oder widerspruechliche Portfolio-Grenzen stoppen Raw-JSON fail-closed mit sichtbarem Fehlercode; CSV bleibt als eigenstaendige technische Projektion verfuegbar und traegt dieselbe kanonische Run-ID wie JSON. `sync-dist` verlangt einen sauberen Stand der versionierten Quellen, blockiert unversionierte Runtime-Quelldateien, kopiert ausschliesslich das gefilterte `git ls-files`-Inventar und ignoriert sonstige unversionierte Scratchdateien sowohl fuer die Clean-Pruefung als auch fuer `dist/`. Ein isolierter Test fuehrt das Skript in einem echten Git-Fixture aus und pinnt Pflichtmodul, Scratch-Ausschluss, Provenienz und Rejectpfad. Der Result-Fingerprint umfasst Schema, Request, kanonisches Ergebnis und Semantikvertraege. `exportedAt`, generierte IDs, Exportmetadaten und interne Diagnostik sind ausgeschlossen. Beide Downloadnamen enthalten Zeitraum, denselben 12-stelligen Run-Hashkern und den Exportzeitpunkt; JSON traegt zusaetzlich den Result-Fingerprint, CSV ihren getrennten Byte-Fingerprint.
+Der Runner entfernt interne Portfolio-Snapshots bereits aus dem kanonischen Resultat; V2 liefert stattdessen nur gegen einen zweiten, von der primaeren Totalfunktion unabhaengigen Jahreszeilen-Rechenweg reconciliierte, explizit nicht restartfaehige `HistoricalBacktestPortfolioBoundariesV2`. Dessen `totalComposition` nennt aktives Portfolio plus Pflegebucket und markiert den separat sichtbaren Pflegebucket als bereits in Start-/Endvermoegen enthalten. Pflegebucketwerte sind in kanonischer Grenze, Jahreszeile, CSV und Drawdownreihe genau einmal enthalten. `HistoricalBacktestInputSemanticsV2` erklaert die Legacy-/Ableitungsfelder und bindet das Strategie-Liquiditaetsziel an `liquidityRunwayYears` plus die jahresspezifische, post-policy geplante Netto-Portfoliojahresentnahme. `RuntimeBuildProvenanceV1` wird vor dem Lauf ausschliesslich ueber den relativen Same-Origin-Endpunkt `./__build-provenance.json` geladen; der Export kann die dabei gebundene Provenienz nicht ersetzen, und Unterpfad-Auslieferungen bleiben funktionsfaehig. Fehlender/dirty Source-Commit, ein unvollstaendiger Quantisierungsvertrag oder widerspruechliche Portfolio-Grenzen stoppen Raw-JSON fail-closed mit sichtbarem Fehlercode; CSV bleibt als eigenstaendige technische Projektion verfuegbar und traegt dieselbe kanonische Run-ID wie JSON. `sync-dist` verlangt einen sauberen Stand der versionierten Quellen, blockiert unversionierte Runtime-Quelldateien, kopiert ausschliesslich das gefilterte `git ls-files`-Inventar und ignoriert sonstige unversionierte Scratchdateien sowohl fuer die Clean-Pruefung als auch fuer `dist/`. Ein isolierter Test fuehrt das Skript in einem echten Git-Fixture aus und pinnt Pflichtmodul, Scratch-Ausschluss, Provenienz und Rejectpfad. Der Result-Fingerprint umfasst Schema, Request, kanonisches Ergebnis und Semantikvertraege. `exportedAt`, generierte IDs, Exportmetadaten und interne Diagnostik sind ausgeschlossen. Beide Downloadnamen enthalten Zeitraum, denselben 12-stelligen Run-Hashkern und den Exportzeitpunkt; JSON traegt zusaetzlich den Result-Fingerprint, CSV ihren getrennten Byte-Fingerprint.
 
 ### `historical-backtest-ui.js`
 
@@ -417,10 +418,11 @@ Kernlogik für Jahr-für-Jahr-Simulation (Direct Engine).
 - `simulator-year-portfolio.js` – DOM-freie Markt-/Portfoliofortschreibung, Renditen und Marktfenster.
 - `simulator-household-pension.js` – DOM-freie Renten-/Haushaltsberechnung inklusive Witwenrente.
 - `simulator-engine-input.js` – DOM-freies Mapping von Simulator-Jahreswerten auf den `EngineAPI.simulateSingleYear()`-Input.
-- `minimumFlexAnnual` wird wie `startFlexBedarf` als nominal fortgeschriebener Jahreswert in den Engine-Input gemappt und im Jahresstate inflationiert. Die Policy laeuft nach Guardrails und vor Flex-Budget und finaler Glaettung; sie rechnet den Rentenueberschuss nach Floor-Deckung auf das Haushaltsziel an. Erst nach der finalen Monatsquantisierung werden `minimumFlexEffectiveFinal` als Rentenueberschuss plus Depotflex, `minimumFlexShortfallAnnual` und `minimumFlexFulfilled` festgeschrieben.
+- `minimumFlexAnnual` wird wie `startFlexBedarf` als nominal fortgeschriebener Jahreswert in den Engine-Input gemappt und im Jahresstate inflationiert. Die Policy laeuft nach Guardrails und vor Flex-Budget und finaler Glaettung; sie rechnet den Rentenueberschuss nach Floor-Deckung auf das Haushaltsziel an. Erst nach der finalen Monatsquantisierung werden `minimumFlexEffectiveFinal` als Rentenueberschuss plus Depotflex, `minimumFlexShortfallAnnual` und `minimumFlexFulfilled` festgeschrieben. Dieselbe final quantisierte Portfolioauszahlung ist die kanonische Basis fuer Liquiditaetsziel und operative Runway-KPIs; die Dynamic-Flex-Safety behaelt bewusst ihren Rohbedarfsnenner.
 - `simulator-accumulation-year.js` – DOM-freier frueher Rueckgabepfad fuer Ansparjahre inklusive Sparrate, Cash-Zins, Anspar-Rebalancing, Logdaten und Fortschreibung des kumulierten Inflationsfaktors trotz Entnahme null.
-- `simulator-tax-recompute.js` – DOM-freie Normalisierung von Tax-Rohaggregaten und finales Settlement-Recompute nach Simulator-Zusatzverkaeufen. Skaliert die regulaere Cash-Reserve konsistent, kumuliert Forced-Sale-Reserven und liefert die genau einmal cashwirksame Differenz zur finalen Jahressteuer; Reserveunterdeckungen unter -0,01 EUR sind Contract-Fehler.
+- `simulator-tax-recompute.js` – DOM-freie Normalisierung von Tax-Rohaggregaten und finales Settlement-Recompute nach Simulator-Zusatzverkaeufen oder einer steuerrelevanten 3-Bucket-Ersetzung. Skaliert die regulaere Cash-Reserve konsistent, kumuliert Forced-Sale-Reserven und liefert die genau einmal cashwirksame Differenz zur finalen Jahressteuer; Reserveunterdeckungen unter -0,01 EUR sind Contract-Fehler. Der vor Ausfuehrung gepruefte Plan bleibt als `plannedActionFlow` erhalten. `SimulatorExecutedTaxContractV1` prueft und dokumentiert die Abweichung zwischen Quellen-Planreserve und dem kompatiblen Top-Level-Feld `action.steuer`, das nach Simulator-Zusatzeffekten die finale Jahressteuer traegt.
 - `simulator-forced-sale.js` – DOM-freie Forced-Sale-Liquiditaetsdeckung vor/nach Auszahlung inklusive Forced-Sale-Scale, skalierter Plansteuerreserve ohne erneuten SPB, Bond-Verkaufsdelta, Payout-Fallback und FIFO-Fallback.
+- `types/planned-action-contract.js` – gemeinsamer Action-Vertrag fuer Core und Direct: kanonische Typen/Keys, ausgeglichene Quellen und Verwendungen, Brutto-Steuer-Netto, Cash-Kapazitaet, eindeutige Lotzuordnung sowie aus Cost Basis/TQF/Steuerfreiheit abgeleitete signierte Rohsteuerwerte. Das V1-Modell `proportional_market_value_v1` setzt die bestehende proportionale Reduktion von Marktwert und Cost Basis innerhalb jedes Lots voraus und reconciliert die internen Rohwerte mit absolut `1e-7`; centgerundete Fremdadapter oder eine nichtproportionale kuenftige Lotauswahl gehoeren nicht zu diesem V1-Vertrag. `simulator-engine-direct.js` wendet ihn auf den rohen Engine-Plan und erneut auf die 3-Bucket-finalisierte Action an; der rohe Jahressteuerabschluss muss zusaetzlich exakt zu `settleTaxYear()` und `newState.taxState` passen.
 - `simulator-health-bucket.js` – DOM-freier Pflegebucket-Trigger, Deckungsbedarf, Verbrauch, Verzinsung, Zieldeckungsdiagnose und Warnungsweitergabe.
 - `simulator-bond-refill.js` – DOM-freie Bond-Refill-/3-Bucket-Nachsteuerung fuer gute Jahre inklusive Auto-Bond-Tranche, Equity-Verkauf und Refill-Deltas.
 - `simulator-year-result.js` – DOM-freier Builder fuer finalen Rueckgabewert, naechsten State, UI-Payload, Jahreslog, 3-Bucket-Logshape sowie flache Entnahme-/Payout-/VPW-Erklaerfelder. `jahresentnahme_real` ist die effektive Auszahlung geteilt durch den aktuellen Faktor; erst der Folgejahresstate erhält den einmal mit der Jahresinflation fortgeschriebenen Faktor. Die FlowDelta-Bilanz umfasst die nach Auszahlung gebuchte Steuer-Reconciliation.
@@ -1226,10 +1228,23 @@ Optimizer und Engine verwenden `liquidityRunwayYears`; Legacy-Daten werden in
 der Reihenfolge kanonischer Wert, `runwayTargetMonths`,
 `runwayMinMonths`, Default 5 migriert. Dabei werden ganzzahlige Altwerte
 der frueheren UI-Domains zuerst auf das naechste Sechsmonatsraster aufgerundet,
-sodass kein gespeicherter Puffer verkuerzt wird. Das Liquiditaetsziel ist exakt der
-effektive Nettojahresbedarf mal Zielmonate. Jahreslogs und Backtest-KPI messen
-den finalen Bestand nach Transaktionen und Auszahlung; null Liquiditaet ergibt
-null Runway-Monate und null Zieldeckung. Die Felder
+sodass kein gespeicherter Puffer verkuerzt wird. Der effektive Nettojahresbedarf
+ist die nach allen Spending-Policies und der Monatsquantisierung final geplante
+Portfolioauszahlung. Das
+Netto-Runway-Ziel wird daraus und `liquidityRunwayYears` berechnet. Unabhaengig
+davon bildet `minCashBufferMonths` (0 bis 12, Default 2) eine Brutto-Untergrenze
+aus Floor plus Flex vor Rentenverrechnung; das auf volle 100 EUR aufgerundete
+Liquiditaetsziel ist das Maximum beider Groessen. Der interne Pre-Policy-Runway
+wird an den SpendingPlanner uebergeben. Getrennt davon verwendet die
+Dynamic-Flex-Safety nach der Transaktion weiterhin den ungekürzten nominalen
+Nettojahresbedarf, damit eine Spending-Kuerzung nicht selbst die gemessene
+Safety-Reichweite erhoeht. `dynamicFlexSafetyRunwayBasis` nennt diesen Vertrag
+als `pre_policy_annual_net_need`; das historisch benannte Exportfeld
+`safety_runway_post_months` transportiert diesen Wert. Das Exportfeld
+`safety_runway_pre_months` bezeichnet dagegen den post-policy,
+pre-transaction Runway. Jahreslogs und Backtest-KPI messen den finalen Bestand
+nach Transaktionen und Auszahlung; null Liquiditaet ergibt null Runway-Monate
+und null Zieldeckung. Die Felder
 `runway_post_payout_end_of_year_months` und `liq_post_payout_end_of_year`
 benennen diese Phase explizit; `safety_runway_post_months` und `liqEnd`
 behalten ihre alte Bedeutung. Ueberschuesse bedienen das separate
