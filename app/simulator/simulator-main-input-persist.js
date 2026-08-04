@@ -4,6 +4,12 @@ import { SUPPORTED_PFLEGE_GRADES } from './simulator-data.js';
 import { updateStartPortfolioDisplay } from './simulator-portfolio.js';
 import { persistenceStorage } from '../shared/persistence-facade.js';
 import { MONTE_CARLO_PARAMETER_LIMITS } from './monte-carlo-parameters.js';
+import {
+    HOUSEHOLD_SIMULATOR_NEED_FIELD_IDS,
+    ensureHouseholdSimulatorNeedsMigrationPending,
+    isHouseholdSimulatorNeedField,
+    writeHouseholdSimulatorNeedOverride
+} from './simulator-household-needs-persistence.js';
 
 const CARE_GRADE_FIELD_IDS = SUPPORTED_PFLEGE_GRADES.flatMap(grade => [
     `pflegeStufe${grade}Zusatz`,
@@ -27,12 +33,24 @@ export function initInputPersistence() {
         'mcWorkerCount', 'mcWorkerBudget', 'useCapeSampling',
         'mcStartYearMode', 'mcStartYearFilter', 'mcStartYearHalfLife', 'mcExcludeEstimatedHistory'
     ];
+    const householdNeedsState = ensureHouseholdSimulatorNeedsMigrationPending();
+    const persistedHouseholdNeeds = householdNeedsState.values;
+
+    const renderHouseholdNeedWriteResult = (element, result, eventType) => {
+        const message = result.ok ? '' : result.message;
+        element.dataset.householdNeedPersistenceError = result.ok ? 'false' : 'true';
+        element.setCustomValidity?.(message);
+        if (!result.ok && eventType === 'change') element.reportValidity?.();
+    };
     allInputs.forEach(id => {
         const element = document.getElementById(id);
         if (element) {
             // Persistence Logic
             const storageKey = 'sim_' + id;
-            const storedVal = persistenceStorage.getItem(storageKey);
+            const isHouseholdNeed = isHouseholdSimulatorNeedField(id);
+            const storedVal = isHouseholdNeed
+                ? (persistedHouseholdNeeds?.[id] ?? null)
+                : persistenceStorage.getItem(storageKey);
             if (id === 'mcAnzahl' && (storedVal === null || storedVal === '')) {
                 element.value = String(MONTE_CARLO_PARAMETER_LIMITS.runs.default);
             }
@@ -44,13 +62,38 @@ export function initInputPersistence() {
                     // Radio buttons usually have same name but different IDs.
                 } else {
                     element.value = storedVal;
+                    if (isHouseholdNeed) {
+                        element.dataset.householdNeedLastValidValue = String(storedVal);
+                    }
                 }
             }
 
-            const persistAndRefresh = () => {
+            const persistAndRefresh = (event) => {
                 // Save to Storage
                 if (!element.dataset.noPersist) {
-                    if (element.type === 'checkbox') {
+                    if (isHouseholdNeed) {
+                        const currentHouseholdNeeds = {};
+                        HOUSEHOLD_SIMULATOR_NEED_FIELD_IDS.forEach(fieldId => {
+                            const field = document.getElementById(fieldId);
+                            if (field) currentHouseholdNeeds[fieldId] = field.value;
+                        });
+                        const fallbackHouseholdNeeds = {};
+                        HOUSEHOLD_SIMULATOR_NEED_FIELD_IDS.forEach(fieldId => {
+                            const field = document.getElementById(fieldId);
+                            const fallback = field?.dataset?.householdNeedLastValidValue;
+                            if (fallback !== undefined) fallbackHouseholdNeeds[fieldId] = fallback;
+                        });
+                        const result = writeHouseholdSimulatorNeedOverride(
+                            id,
+                            currentHouseholdNeeds,
+                            persistenceStorage,
+                            fallbackHouseholdNeeds
+                        );
+                        if (result.ok) {
+                            element.dataset.householdNeedLastValidValue = result.state.values[id];
+                        }
+                        renderHouseholdNeedWriteResult(element, result, event?.type);
+                    } else if (element.type === 'checkbox') {
                         persistenceStorage.setItem(storageKey, element.checked);
                     } else if (element.type !== 'radio') {
                         persistenceStorage.setItem(storageKey, element.value);

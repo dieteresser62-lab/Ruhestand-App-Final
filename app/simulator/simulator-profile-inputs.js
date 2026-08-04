@@ -64,6 +64,15 @@ function readBool(data, key, fallback = false) {
     return str === 'true' || str === '1' || str === 'yes' || str === 'on';
 }
 
+function readPositiveBalanceNeed(balanceInputs, key) {
+    if (!balanceInputs || typeof balanceInputs !== 'object'
+        || !Object.prototype.hasOwnProperty.call(balanceInputs, key)) return null;
+    const raw = balanceInputs[key];
+    if (raw === null || raw === undefined || raw === '') return null;
+    const value = Number(String(raw).replace(',', '.'));
+    return Number.isFinite(value) && value > 0 ? value : null;
+}
+
 function simKey(id) {
     return `sim_${id}`;
 }
@@ -357,16 +366,14 @@ export function buildSimulatorInputsFromProfileData(profileData) {
         baseInputs.zielLiquiditaet = (baseInputs.tagesgeld || 0) + trancheTotals.moneyMarket;
     }
 
-    // Balance-Inputs nur als Fallback verwenden, um Simulator-Felder zu füllen.
-    if ((!baseInputs.startFloorBedarf || baseInputs.startFloorBedarf <= 0) && balanceInputs) {
-        baseInputs.startFloorBedarf = Number(balanceInputs.floorBedarf) || baseInputs.startFloorBedarf;
-    }
-    if ((!baseInputs.startFlexBedarf || baseInputs.startFlexBedarf <= 0) && balanceInputs) {
-        baseInputs.startFlexBedarf = Number(balanceInputs.flexBedarf) || baseInputs.startFlexBedarf;
-    }
-    if ((!baseInputs.minimumFlexAnnual || baseInputs.minimumFlexAnnual <= 0) && balanceInputs) {
-        baseInputs.minimumFlexAnnual = Number(balanceInputs.minimumFlexAnnual) || baseInputs.minimumFlexAnnual;
-    }
+    // Floor/Flex/Mindest-Flex werden pro Profil in Balance gepflegt. Historische
+    // sim_-Werte bleiben nur fuer Profile ohne Balance-Wert als Lesefallback erhalten.
+    const balanceFloor = readPositiveBalanceNeed(balanceInputs, 'floorBedarf');
+    const balanceFlex = readPositiveBalanceNeed(balanceInputs, 'flexBedarf');
+    const balanceMinimumFlex = readPositiveBalanceNeed(balanceInputs, 'minimumFlexAnnual');
+    if (balanceFloor !== null) baseInputs.startFloorBedarf = balanceFloor;
+    if (balanceFlex !== null) baseInputs.startFlexBedarf = balanceFlex;
+    if (balanceMinimumFlex !== null) baseInputs.minimumFlexAnnual = balanceMinimumFlex;
     if ((!baseInputs.flexBudgetAnnual || baseInputs.flexBudgetAnnual <= 0) && balanceInputs) {
         baseInputs.flexBudgetAnnual = Number(balanceInputs.flexBudgetAnnual) || baseInputs.flexBudgetAnnual;
     }

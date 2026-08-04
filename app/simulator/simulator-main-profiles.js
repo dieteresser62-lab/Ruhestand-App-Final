@@ -12,6 +12,12 @@ import { buildSimulatorInputsFromProfileData, combineSimulatorProfiles } from '.
 import { updateStartPortfolioDisplay } from './simulator-portfolio.js';
 import { refreshDynamicFlexControls, syncDynamicFlexPresetSelection } from './simulator-main-dynamic-flex.js';
 import { refreshThreeBucketControls } from './simulator-main-3bucket.js';
+import {
+    HOUSEHOLD_SIMULATOR_NEED_FIELD_IDS,
+    initializeHouseholdSimulatorNeeds,
+    resolveHouseholdSimulatorNeed,
+    selectLegacyHouseholdSimulatorNeeds
+} from './simulator-household-needs-persistence.js';
 
 const PROFILE_RECOVERY_CONTROL_IDS = Object.freeze([
     'mcButton',
@@ -111,7 +117,19 @@ function installProfileRecoveryLocalActionGuards(updateStatus) {
 export function initSimulatorProfileSelection() {
     const listContainer = document.getElementById('simProfileList');
     const statusEl = document.getElementById('simProfileStatus');
-    if (!listContainer) return;
+    if (!listContainer) {
+        if (typeof window !== 'undefined') {
+            window.__profileRecoveryBlocker = {
+                message: 'Profilverbund konnte nicht initialisiert werden; die Bedarfsmigration bleibt ausstehend.'
+            };
+        }
+        setProfileRecoveryControlsBlocked(true);
+        if (statusEl) {
+            statusEl.dataset.kind = 'error';
+            statusEl.textContent = 'Profil-Recovery erforderlich: Profilverbund-Steuerelement fehlt.';
+        }
+        return;
+    }
     const MAX_HOUSEHOLD_PROFILES = 2;
 
     const renderList = (profiles) => {
@@ -207,7 +225,18 @@ export function initSimulatorProfileSelection() {
             const data = getProfileData(meta.id);
             try {
                 const inputs = buildSimulatorInputsFromProfileData(data);
-                return { profileId: meta.id, name: meta.name || meta.id, inputs };
+                const legacyHouseholdNeeds = Object.fromEntries(
+                    HOUSEHOLD_SIMULATOR_NEED_FIELD_IDS.map(fieldId => [
+                        fieldId,
+                        data?.[`sim_${fieldId}`]
+                    ])
+                );
+                return {
+                    profileId: meta.id,
+                    name: meta.name || meta.id,
+                    inputs,
+                    legacyHouseholdNeeds
+                };
             } catch (error) {
                 const profileError = new Error(
                     `Profil ${meta.name || meta.id}: ${error?.message || 'Profildaten konnten nicht sicher geladen werden.'}`
@@ -234,26 +263,45 @@ export function initSimulatorProfileSelection() {
             return false;
         }
 
+        const legacySelection = selectLegacyHouseholdSimulatorNeeds(profileInputs.map(entry => ({
+            legacyValues: entry.legacyHouseholdNeeds,
+            profileDefaults: {
+                startFloorBedarf: entry.inputs.startFloorBedarf,
+                startFlexBedarf: entry.inputs.startFlexBedarf,
+                minimumFlexAnnual: entry.inputs.minimumFlexAnnual
+            }
+        })));
+        const householdNeedsState = initializeHouseholdSimulatorNeeds(legacySelection);
+        const householdNeedOverrides = householdNeedsState.values;
+        const minimumFlexOverridden = Object.prototype.hasOwnProperty.call(
+            householdNeedOverrides || {},
+            'minimumFlexAnnual'
+        );
+
         if (typeof window !== 'undefined') {
             // Overrides allow the simulator to use aggregated tranche data.
             const override = Array.isArray(combined.detailledTranches) ? combined.detailledTranches : null;
             window.__profilverbundTranchenOverride = override;
             window.__profilverbundPreferAggregates = !override;
-            window.__profilverbundMinimumFlexProfiles = Array.isArray(combined.minimumFlexProfiles)
+            // A manual household minimum has no attributable per-profile split.
+            window.__profilverbundMinimumFlexProfiles = !minimumFlexOverridden
+                && Array.isArray(combined.minimumFlexProfiles)
                 ? combined.minimumFlexProfiles
                 : null;
         }
 
-        applyCombinedInputsToUI(combined, selected.length);
+        applyCombinedInputsToUI(combined, selected.length, householdNeedOverrides);
         syncTranchenToInputs({ silent: true });
         updateStartPortfolioDisplay();
         unblockProfileSimulation();
 
-        if (warnings && warnings.length) {
-            const combinedWarnings = selectionWarning ? warnings.concat(selectionWarning) : warnings;
-            updateStatus(combinedWarnings.join(' '), 'error');
-        } else if (selectionWarning) {
-            updateStatus(selectionWarning, 'error');
+        const statusWarnings = [
+            ...(Array.isArray(warnings) ? warnings : []),
+            selectionWarning,
+            householdNeedsState.warning
+        ].filter(Boolean);
+        if (statusWarnings.length > 0) {
+            updateStatus(statusWarnings.join(' '), 'error');
         } else {
             updateStatus(`Aktive Profile: ${selected.length}.`, 'ok');
         }
@@ -306,7 +354,7 @@ export function initSimulatorProfileSelection() {
     applySelection();
 }
 
-function applyCombinedInputsToUI(combined, selectedCount) {
+function applyCombinedInputsToUI(combined, selectedCount, householdNeedOverrides) {
     const setValue = (id, value) => {
         const el = document.getElementById(id);
         if (!el) return;
@@ -316,6 +364,11 @@ function applyCombinedInputsToUI(combined, selectedCount) {
         const el = document.getElementById(id);
         if (!el) return;
         el.checked = Boolean(value);
+    };
+    const setHouseholdNeedValue = (id, value) => {
+        setValue(id, value);
+        const el = document.getElementById(id);
+        if (el) el.dataset.householdNeedLastValidValue = String(value);
     };
     const setSelect = (id, value) => {
         const el = document.getElementById(id);
@@ -347,9 +400,15 @@ function applyCombinedInputsToUI(combined, selectedCount) {
     syncDynamicFlexPresetSelection();
     refreshDynamicFlexControls();
     refreshThreeBucketControls();
-    setValue('startFloorBedarf', combined.startFloorBedarf || 0);
-    setValue('startFlexBedarf', combined.startFlexBedarf || 0);
-    setValue('minimumFlexAnnual', combined.minimumFlexAnnual || 0);
+    setHouseholdNeedValue('startFloorBedarf', resolveHouseholdSimulatorNeed(
+        'startFloorBedarf', combined.startFloorBedarf || 0, householdNeedOverrides
+    ));
+    setHouseholdNeedValue('startFlexBedarf', resolveHouseholdSimulatorNeed(
+        'startFlexBedarf', combined.startFlexBedarf || 0, householdNeedOverrides
+    ));
+    setHouseholdNeedValue('minimumFlexAnnual', resolveHouseholdSimulatorNeed(
+        'minimumFlexAnnual', combined.minimumFlexAnnual || 0, householdNeedOverrides
+    ));
     setValue('marketCapeRatio', combined.marketCapeRatio || 0);
 
     setValue('p1StartAlter', combined.startAlter || 0);

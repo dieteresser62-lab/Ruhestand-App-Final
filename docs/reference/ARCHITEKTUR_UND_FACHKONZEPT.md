@@ -924,7 +924,7 @@ Der Simulator ist deshalb nicht nur ein UI-Wrapper um `EngineAPI.simulateSingleY
 
 | Cluster | Module | Verantwortung |
 |---------|--------|---------------|
-| **Bootstrap und UI-Fassade** | `simulator-main.js`, `simulator-main-init.js`, `simulator-main-tabs.js`, `simulator-main-input-persist.js`, `simulator-main-reset.js` | App-Start, Engine-Handshake, Tab-/Button-Bindings, Persistenz gemeinsamer Eingaben, Reset-Flow |
+| **Bootstrap und UI-Fassade** | `simulator-main.js`, `simulator-main-init.js`, `simulator-main-tabs.js`, `simulator-main-input-persist.js`, `simulator-household-needs-persistence.js`, `simulator-main-reset.js` | App-Start, Engine-Handshake, Tab-/Button-Bindings, Persistenz gemeinsamer Eingaben und feldbezogener Haushaltsbedarfs-Overrides, Reset-Flow |
 | **UI-Fachmodule** | `simulator-ui-pflege.js`, `simulator-ui-rente.js`, `simulator-main-partner.js`, `simulator-main-accumulation.js`, `simulator-main-dynamic-flex.js`, `simulator-main-3bucket.js`, `simulator-main-stress.js`, `simulator-main-sweep-ui.js` | Pflege-, Renten-, Partner-, Anspar-, Dynamic-Flex-, 3-Bucket-, Stress- und Sweep-spezifische UI-Logik |
 | **Input-Layer** | `simulator-input-dom.js`, `simulator-input-care.js`, `simulator-input-pension.js`, `simulator-input-strategy.js`, `simulator-input-tranches.js`, `simulator-profile-inputs.js` | DOM-Inputs normalisieren, Profilverbund in Simulator-Inputs mappen, Strategie-/Pflege-/Renten-/Tranchenparameter strukturieren |
 | **Portfolio und Tranchen** | `simulator-portfolio.js`, `simulator-portfolio-*.js`, `simulator-portfolio-tranches.js`, `simulator-portfolio-chart.js`, `simulator-year-portfolio.js` | Startportfolio, Detailtranchen, Renditefortschreibung, Aktien/Gold/Bonds, Anzeige und Reduktion von Portfolio-Bausteinen |
@@ -1665,7 +1665,7 @@ Eigenschaften:
 - Die Engine setzt den Mindest-Flex ratenbasiert um: `requiredRate = minimumFlexAnnual / inflatedBedarf.flex`; eine rechnerische Rate ueber 100 Prozent bleibt als nicht erreichbares Soll sichtbar und wird nicht als erfuellt ausgegeben.
 - Der Bedarf selbst bleibt unverändert; Diagnose und Logs zeigen Status, erforderliche Rate, Blockiergrund, Policy-Effekt sowie finalen wirksamen Flex und nominalen Fehlbetrag nach allen Stufen.
 - Guardrail-Resets erkennen relevante Änderungen am Mindest-Flex, erhalten aber den steuerlichen Zustand (`lastState.taxState`).
-- Profilverbund addiert profilbezogene Mindest-Flex-Werte für den Haushaltslauf und transportiert die Aufschlüsselung in `minimumFlexProfiles`. Jeder Profilwert wird gegen seinen Profil-Flexbedarf geprueft; auch die Summe darf den aggregierten Haushalts-Flexbedarf nicht ueberschreiten.
+- Profilverbund addiert die in Balance gepflegten profilbezogenen Mindest-Flex-Werte für den Haushaltslauf und transportiert die Aufschlüsselung in `minimumFlexProfiles`. Jeder Profilwert wird gegen seinen Profil-Flexbedarf geprueft; auch die Summe darf den aggregierten Haushalts-Flexbedarf nicht ueberschreiten. Nur wenn der Nutzer Mindest-Flex selbst als Haushaltswert überschreibt, entfällt die Profilaufschlüsselung, weil keine fachlich belegte Verteilung vorliegt; reine Floor- oder Flex-Overrides erhalten sie.
 
 Policy-Reihenfolge:
 

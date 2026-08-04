@@ -4,6 +4,7 @@ import {
     buildSimulatorInputsFromProfileData,
     combineSimulatorProfiles
 } from '../app/simulator/simulator-profile-inputs.js';
+import { CONFIG } from '../app/balance/balance-config.js';
 
 console.log('--- Simulator Multi-Profile Aggregation ---');
 
@@ -43,6 +44,58 @@ console.log('--- Simulator Multi-Profile Aggregation ---');
         2.5,
         'A profile created with the old 25-month UI value remains loadable without shortening its runway'
     );
+}
+
+{
+    console.log('\n📋 Test 0b: Balance needs are authoritative over read-only legacy simulator values');
+    const parsed = buildSimulatorInputsFromProfileData({
+        sim_startFloorBedarf: '12000',
+        sim_startFlexBedarf: '30000',
+        sim_minimumFlexAnnual: '15000',
+        [CONFIG.STORAGE.LS_KEY]: JSON.stringify({
+            inputs: {
+                floorBedarf: 20000,
+                flexBedarf: 40000,
+                minimumFlexAnnual: 10000
+            }
+        })
+    });
+    assertEqual(parsed.startFloorBedarf, 20000, 'Balance floor replaces stale legacy simulator floor');
+    assertEqual(parsed.startFlexBedarf, 40000, 'Balance flex replaces stale legacy simulator flex');
+    assertEqual(parsed.minimumFlexAnnual, 10000, 'Balance minimum flex replaces stale legacy simulator minimum flex');
+
+    const legacyOnly = buildSimulatorInputsFromProfileData({
+        sim_startFloorBedarf: '12000',
+        sim_startFlexBedarf: '30000',
+        sim_minimumFlexAnnual: '15000'
+    });
+    assertEqual(legacyOnly.startFloorBedarf, 12000, 'Legacy floor remains a fallback without Balance data');
+    assertEqual(legacyOnly.startFlexBedarf, 30000, 'Legacy flex remains a fallback without Balance data');
+    assertEqual(legacyOnly.minimumFlexAnnual, 15000, 'Legacy minimum flex remains a fallback without Balance data');
+
+    const emptyBalance = buildSimulatorInputsFromProfileData({
+        sim_startFloorBedarf: '12000',
+        sim_startFlexBedarf: '30000',
+        sim_minimumFlexAnnual: '15000',
+        [CONFIG.STORAGE.LS_KEY]: JSON.stringify({
+            inputs: { floorBedarf: 0, flexBedarf: 0, minimumFlexAnnual: 0 }
+        })
+    });
+    assertEqual(emptyBalance.startFloorBedarf, 12000, 'Empty Balance floor keeps the legacy fallback');
+    assertEqual(emptyBalance.startFlexBedarf, 30000, 'Empty Balance flex keeps the legacy fallback');
+    assertEqual(emptyBalance.minimumFlexAnnual, 15000, 'Optional empty Balance minimum flex keeps the legacy fallback');
+
+    const partialBalance = buildSimulatorInputsFromProfileData({
+        sim_startFloorBedarf: '12000',
+        sim_startFlexBedarf: '30000',
+        sim_minimumFlexAnnual: '15000',
+        [CONFIG.STORAGE.LS_KEY]: JSON.stringify({
+            inputs: { floorBedarf: 20000, flexBedarf: 0, minimumFlexAnnual: 0 }
+        })
+    });
+    assertEqual(partialBalance.startFloorBedarf, 20000, 'Maintained positive Balance floor is authoritative');
+    assertEqual(partialBalance.startFlexBedarf, 30000, 'Partial Balance keeps legacy flex fallback');
+    assertEqual(partialBalance.minimumFlexAnnual, 15000, 'Partial Balance keeps legacy minimum flex fallback');
 }
 
 const profileInputs = [

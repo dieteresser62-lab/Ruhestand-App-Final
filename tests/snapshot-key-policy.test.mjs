@@ -19,6 +19,8 @@ const registry = {
         default: { meta: { name: 'Default' }, data: {} }
     }
 };
+const HOUSEHOLD_NEEDS_KEY = 'household_simulator_needs_v1';
+const HOUSEHOLD_NEEDS_ACK_KEY = 'household_simulator_needs_warning_ack_v1';
 
 console.log('Test 1: capture includes fachliche Live-Daten and excludes snapshot archive data');
 {
@@ -27,6 +29,8 @@ console.log('Test 1: capture includes fachliche Live-Daten and excludes snapshot
     assert(isAllowedSnapshotCaptureKey('balance_expenses_2026'), 'Capture erlaubt Ausgaben-Rollover-Daten');
     assert(isAllowedSnapshotCaptureKey(PROFILE_STORAGE_KEYS.registry), 'Capture erlaubt Profil-Registry');
     assert(isAllowedSnapshotCaptureKey(PROFILE_STORAGE_KEYS.current), 'Capture erlaubt aktuelles Profil');
+    assert(isAllowedSnapshotCaptureKey(HOUSEHOLD_NEEDS_KEY), 'Capture erlaubt den globalen Simulator-Haushaltsbedarf');
+    assert(isAllowedSnapshotCaptureKey(HOUSEHOLD_NEEDS_ACK_KEY), 'Capture erlaubt dessen globalen Warnungsmarker');
     assert(isAllowedSnapshotCaptureKey(LEGACY_MIGRATION_MARKER_KEYS.target), 'Capture erlaubt Schema-Migrationsmarker');
     assert(!isAllowedSnapshotCaptureKey(`${CONFIG.STORAGE.SNAPSHOT_PREFIX}2026`), 'Capture schliesst Legacy-Snapshot-Keys aus');
     assert(!isAllowedSnapshotCaptureKey('featureFlags'), 'Capture schliesst technische Feature-Flags aus');
@@ -40,6 +44,8 @@ console.log('Test 2: key categories are explicit and non-overlapping for importa
     assert(isProfileScopedFixedKey('depot_tranchen'), 'Fester profilbezogener Key wird erkannt');
     assert(isSnapshotProfileScopedKey('profile_tagesgeld'), 'Profilbezogener Snapshot-Key wird erkannt');
     assert(isSnapshotGlobalDomainKey(CONFIG.STORAGE.LS_KEY), 'Globaler fachlicher Balance-Key wird erkannt');
+    assert(isSnapshotGlobalDomainKey(HOUSEHOLD_NEEDS_KEY), 'Simulator-Haushaltsbedarf wird als globaler Fach-Key erkannt');
+    assert(isSnapshotGlobalDomainKey(HOUSEHOLD_NEEDS_ACK_KEY), 'Warnungsmarker wird als globaler Fach-Key erkannt');
     assert(isSnapshotTechnicalKey('featureFlags'), 'Feature-Flags sind technisch');
     assert(isSnapshotTechnicalKey('layout_balance_sidebar'), 'Layout-Key ist technisch');
     assert(!isSnapshotGlobalDomainKey('featureFlags'), 'Technischer Key ist kein globaler Fach-Key');
@@ -70,6 +76,17 @@ console.log('Test 3: standard restore preserves profile registry and requires ex
         snapshotActiveProfileId: 'missing',
         currentRegistry: registry
     }), 'Standard-Restore erlaubt globale fachliche Keys unabhaengig vom Profil');
+
+    assert(isAllowedSnapshotRestoreLiveKey(HOUSEHOLD_NEEDS_KEY, {
+        mode: 'standard',
+        snapshotActiveProfileId: 'missing',
+        currentRegistry: registry
+    }), 'Standard-Restore erlaubt den globalen Haushaltsbedarf unabhaengig vom Profil');
+    assert(isAllowedSnapshotRestoreLiveKey(HOUSEHOLD_NEEDS_ACK_KEY, {
+        mode: 'standard',
+        snapshotActiveProfileId: 'missing',
+        currentRegistry: registry
+    }), 'Standard-Restore erlaubt den globalen Warnungsmarker unabhaengig vom Profil');
 }
 
 console.log('Test 4: restore keeps technical keys and legacy snapshot history untouched');

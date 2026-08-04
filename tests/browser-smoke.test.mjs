@@ -1170,6 +1170,143 @@ async function runSimulatorSmoke(browser, baseUrl) {
     await smoke.close();
 }
 
+async function runSimulatorHouseholdNeedsReload(browser, baseUrl) {
+    const balanceState = (floorBedarf, flexBedarf, minimumFlexAnnual) => JSON.stringify({
+        inputs: { floorBedarf, flexBedarf, minimumFlexAnnual }
+    });
+    const storage = createBrowserProfileStorage({
+        dieter: {
+            name: 'Dieter',
+            extraData: {
+                sim_startFloorBedarf: '24002',
+                sim_startFlexBedarf: '150000',
+                sim_minimumFlexAnnual: '60000'
+            },
+            balanceStateRaw: balanceState(12000, 30000, 15000)
+        },
+        karin: {
+            name: 'Karin',
+            extraData: {
+                sim_startFloorBedarf: '12000',
+                sim_startFlexBedarf: '30000',
+                sim_minimumFlexAnnual: '15000'
+            },
+            balanceStateRaw: balanceState(12000, 30000, 15000)
+        }
+    }, 'dieter');
+    const smoke = await openSmokePage(browser, baseUrl, 'Simulator.html', { storage });
+    const { page } = smoke;
+    await page.locator('#simProfileList input').first().waitFor({ state: 'visible' });
+
+    assert(await page.locator('#startFloorBedarf').inputValue() === '24000',
+        'Mehrprofil-Start behaelt die aggregierte Balance-Floor-Summe');
+    assert(await page.locator('#startFlexBedarf').inputValue() === '60000',
+        'Mehrprofil-Start behaelt die aggregierte Balance-Flex-Summe');
+    assert(await page.locator('#minimumFlexAnnual').inputValue() === '30000',
+        'Mehrprofil-Start behaelt die aggregierte Balance-Mindest-Flex-Summe');
+    assert((await page.locator('#simProfileStatus').textContent()).includes('nicht eindeutig'),
+        'Mehrdeutige Legacy-Werte werden sichtbar gemeldet statt als Haushalt uebernommen');
+
+    await page.locator('#startFloorBedarf').fill('25000');
+    await page.locator('#startFlexBedarf').fill('140000');
+    await page.locator('#minimumFlexAnnual').fill('55000');
+    await page.reload({ waitUntil: 'load' });
+    await page.locator('#simProfileList input').first().waitFor({ state: 'visible' });
+
+    assert(await page.locator('#startFloorBedarf').inputValue() === '25000',
+        'Reload behaelt den manuellen Haushalts-Floor exakt');
+    assert(await page.locator('#startFlexBedarf').inputValue() === '140000',
+        'Reload behaelt den manuellen Haushalts-Flex exakt');
+    assert(await page.locator('#minimumFlexAnnual').inputValue() === '55000',
+        'Reload behaelt den manuellen Haushalts-Mindest-Flex exakt');
+
+    const persisted = JSON.parse((await readIndexedDb(page, 'kv', 'household_simulator_needs_v1')).value);
+    assert(persisted.values.startFloorBedarf === '25000'
+        && persisted.values.startFlexBedarf === '140000'
+        && persisted.values.minimumFlexAnnual === '55000',
+    'Der Haushalts-Override wird gemeinsam und versioniert persistiert');
+    const registry = JSON.parse((await readIndexedDb(page, 'kv', 'rs_profiles_v1')).value);
+    assert(registry.profiles.dieter.data.sim_startFloorBedarf === '24002',
+        'Der manuelle Haushalts-Floor wird nicht in das aktuelle Einzelprofil zurueckgeschrieben');
+    assert(await page.evaluate(() => window.__profilverbundMinimumFlexProfiles === null),
+        'Ein manueller Haushalts-Mindest-Flex behauptet keine erfundene Profilaufteilung');
+
+    await Promise.all([
+        page.waitForNavigation({ waitUntil: 'load' }),
+        page.locator('#resetBtn').click()
+    ]);
+    await page.locator('#simProfileList input').first().waitFor({ state: 'visible' });
+    const resetFloorValue = await page.locator('#startFloorBedarf').inputValue();
+    assert(resetFloorValue === '24000',
+        `Reset stellt die aktuelle aggregierte Balance-Floor-Summe wieder her (ist: ${resetFloorValue})`);
+    assert(await page.locator('#startFlexBedarf').inputValue() === '60000',
+        'Reset stellt die aktuelle aggregierte Balance-Flex-Summe wieder her');
+    assert(await page.locator('#minimumFlexAnnual').inputValue() === '30000',
+        'Reset stellt die aktuelle aggregierte Balance-Mindest-Flex-Summe wieder her');
+
+    await page.locator('#startFloorBedarf').fill('24001');
+    await page.reload({ waitUntil: 'load' });
+    await page.locator('#simProfileList input').first().waitFor({ state: 'visible' });
+    assert(await page.locator('#startFloorBedarf').inputValue() === '24001',
+        'Ein reiner Floor-Override bleibt nach Reload erhalten');
+    assert(await page.locator('#startFlexBedarf').inputValue() === '60000'
+        && await page.locator('#minimumFlexAnnual').inputValue() === '30000',
+    'Nicht bearbeitete Bedarfsfelder bleiben bei ihren Profil-Summen');
+    assert(await page.evaluate(() => window.__profilverbundMinimumFlexProfiles?.length === 2),
+        'Ein reiner Floor-Override behaelt die Mindest-Flex-Profilaufschluesselung');
+
+    await page.locator('#minimumFlexAnnual').fill('');
+    await page.locator('#startFlexBedarf').fill('70000');
+    await page.evaluate(async () => {
+        const { PersistenceFacade } = await import('./app/shared/persistence-facade.js');
+        await PersistenceFacade.flush();
+    });
+    const editingGapRecord = JSON.parse((await readIndexedDb(page, 'kv', 'household_simulator_needs_v1')).value);
+    assert(editingGapRecord.values.startFlexBedarf === '70000',
+        'Gueltiger Flex wird waehrend eines leeren Mindest-Flex-Zwischenstands gespeichert');
+    await page.locator('#minimumFlexAnnual').fill('30000');
+    await page.reload({ waitUntil: 'load' });
+    await page.locator('#simProfileList input').first().waitFor({ state: 'visible' });
+    assert(await page.locator('#startFlexBedarf').inputValue() === '70000',
+        'Flex-Aenderung ueberlebt die Nachbarkorrektur und einen echten Reload');
+    assert(await page.locator('#minimumFlexAnnual').inputValue() === '30000',
+        'Korrigierter Mindest-Flex ueberlebt den echten Reload');
+
+    await page.evaluate(async () => {
+        const { persistenceStorage, PersistenceFacade } = await import('./app/shared/persistence-facade.js');
+        persistenceStorage.setItem('household_simulator_needs_v1', JSON.stringify({
+            schemaVersion: 2,
+            mode: 'override',
+            overriddenFields: ['startFloorBedarf'],
+            values: {
+                startFloorBedarf: '99999',
+                startFlexBedarf: '99999',
+                minimumFlexAnnual: '0'
+            }
+        }));
+        await PersistenceFacade.flush();
+    });
+    await page.reload({ waitUntil: 'load' });
+    await page.locator('#simProfileList input').first().waitFor({ state: 'visible' });
+    assert((await page.locator('#simProfileStatus').textContent()).includes('nicht unterstützte Version'),
+        'Eine unbekannte kuenftige Override-Version wird sichtbar gemeldet');
+    assert(await page.locator('#startFloorBedarf').inputValue() === '24000',
+        'Eine unbekannte Override-Version faellt auf den aktuellen Profil-Default zurueck');
+    await page.locator('#startFloorBedarf').fill('31000');
+    assert((await page.locator('#startFloorBedarf').evaluate(element => element.validationMessage))
+        .includes('neueren Version'),
+    'Ein Schreibversuch auf Zukunftsdaten wird direkt am Feld blockiert');
+    const preservedFutureRecord = JSON.parse(
+        (await readIndexedDb(page, 'kv', 'household_simulator_needs_v1')).value
+    );
+    assert(preservedFutureRecord.schemaVersion === 2
+        && preservedFutureRecord.values.startFloorBedarf === '99999',
+    'Der blockierte Schreibversuch erhaelt den Zukunftsdatensatz bytegleich fachlich');
+
+    smoke.assertNoErrors();
+    await smoke.close();
+}
+
 async function runTranchesSmoke(browser, baseUrl) {
     const profileA = 'browser-slice09-a';
     const profileB = 'browser-slice09-b';
@@ -1873,6 +2010,7 @@ async function main() {
             ['Balance five-year runway forced sale', runBalanceFiveYearRunwayForcedSale],
             ['Balance corrupt expenses', runBalanceCorruptExpenses],
             ['Simulator.html', runSimulatorSmoke],
+            ['Simulator household needs reload', runSimulatorHouseholdNeedsReload],
             ['Simulator Monte-Carlo E2E', runMonteCarloBrowserRegression],
             ['Simulator hybrid profile blocker', runSimulatorHybridProfileBlocker],
             ['Simulator Sweep integration', runSimulatorSweepIntegration],

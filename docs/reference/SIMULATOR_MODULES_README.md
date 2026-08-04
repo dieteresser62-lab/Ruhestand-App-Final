@@ -26,6 +26,7 @@ UI-Orchestrierung und Klammer um die ausgelagerten Feature-Module. Registriert E
 **Helper-Module (ausgelagert):**
 - `simulator-main-init.js` – Bootstrapping & Orchestrierung
 - `simulator-main-input-persist.js` – Persistenz + Start-Portfolio-Refresh
+- `simulator-household-needs-persistence.js` – strikter V1-Vertrag fuer manuelle Haushalts-Overrides von Floor, Flex und Mindest-Flex; einmalige `sim_`-Altwertuebernahme, feldbezogene Provenienz, Reset-Marker und kontrollierter Fallback
 - `simulator-main-rent-adjust.js` – Rentenanpassungs-UI
 - `simulator-main-accumulation.js` – Ansparphase-UI
 - `simulator-main-sweep-ui.js` – Sweep-UI + Grid-Size
@@ -36,6 +37,35 @@ UI-Orchestrierung und Klammer um die ausgelagerten Feature-Module. Registriert E
 - `simulator-main-stress.js` – Stress-Preset-Select
 - `simulator-main-partner.js` – Partner-UI Toggle
 - `simulator-main-sweep-selftest.js` – Sweep-Selbsttest (Dev)
+
+Floor, Flex und Mindest-Flex haben zwei klar getrennte Quellen: Positive, je
+Profil in Balance gepflegte Werte bilden den additiven Profilverbund-Default;
+bei leeren beziehungsweise als `0` gespeicherten Balance-Feldern bleibt ein
+historischer positiver Profilwert der Lesefallback. Manuelle
+Änderungen im Simulator werden unter `household_simulator_needs_v1` als globale,
+feldbezogene Haushalts-Overrides gespeichert. Beim ersten Start nach Einführung
+des Vertrags wird nur im Einprofil-Haushalt ein vollständiges, gültiges und von
+den aktuellen Profildefaults abweichendes historisches `sim_`-Trio einmalig
+übernommen und sichtbar gemeldet. Im
+Mehrprofil-Haushalt bleibt die aggregierte Profilbasis maßgeblich; alte
+Einzelprofilwerte werden wegen ihrer nicht beweisbaren Herkunft nicht zum
+Haushaltswert befördert. Ein `migration_pending`-Datensatz entkoppelt die
+Vertragserstellung vom späteren Profilverbund-Aufbau. Jede Eingabe wird unabhängig
+kanonisiert und gespeichert, damit ein leeres Nachbarfeld keine gültige Änderung
+verwirft. Für die Flex-/Mindest-Flex-Beziehung dient bei einem gerade leeren
+Nachbarfeld dessen letzter wirksamer Profilwert als Prüfbasis. Ungültige
+bearbeitete Felder werden über die native Feldvalidierung direkt am Eingabefeld
+gemeldet; die Browserblase erscheint erst beim abschließenden `change`, nicht bei
+jedem Tastendruck.
+Beschädigte V1-Daten heilen nach einer einmaligen Warnung zum Profil-Default;
+unbekannte Schemaversionen bleiben dagegen auch bei Eingabeversuchen unverändert
+gespeichert; ihre Warnung wird nach einmaliger Anzeige über einen separaten
+globalen Marker quittiert. Änderungen erfordern dann einen bewussten Reset.
+Der Reset wartet vor dem Reload auf den dauerhaften Flush und zeigt einen
+Flush-Fehler an.
+Fehlt das Profilverbund-Steuerelement oder scheitert der Profilaufbau, bleibt die
+Migration ausstehend und Simulatorläufe werden über den Recovery-Blocker
+fail-closed gesperrt.
 
 ---
 

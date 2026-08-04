@@ -131,12 +131,18 @@ try {
         localStorage.setItem('sim.test.key', '456');
         localStorage.setItem(CONFIG.STORAGE.LS_KEY, '{"inputs":{}}');
         localStorage.setItem('etfProxyUrl', 'global');
+        localStorage.setItem('household_simulator_needs_v1', '{"schemaVersion":1}');
+        localStorage.setItem('household_simulator_needs_warning_ack_v1', 'ack');
 
         assert(isProfileScopedKey('sim_test_key') === true, 'sim_ keys should be profile-scoped');
         assert(isProfileScopedKey('sim.test.key') === true, 'sim. keys should be profile-scoped');
         assert(isProfileScopedKey(CONFIG.STORAGE.LS_KEY) === true, 'Balance state key should be profile-scoped');
         assert(isProfileScopedKey('profile_health_bucket') === true, 'Health bucket key should be profile-scoped');
         assert(isProfileScopedKey('etfProxyUrl') === false, 'Global proxy key should not be profile-scoped');
+        assert(isProfileScopedKey('household_simulator_needs_v1') === false,
+            'Household simulator needs must not be profile-scoped');
+        assert(isProfileScopedKey('household_simulator_needs_warning_ack_v1') === false,
+            'Household simulator warning acknowledgement must not be profile-scoped');
 
         const keys = listProfileScopedKeys(localStorage);
         assert(keys.includes('sim_test_key'), 'Scoped keys should include sim_ key');
@@ -145,6 +151,9 @@ try {
         localStorage.setItem('profile_health_bucket', '{"enabled":true}');
         assert(listProfileScopedKeys(localStorage).includes('profile_health_bucket'), 'Scoped keys should include health bucket');
         assert(!keys.includes('etfProxyUrl'), 'Scoped keys should exclude global proxy key');
+        assert(!keys.includes('household_simulator_needs_v1'), 'Scoped keys should exclude household simulator needs');
+        assert(!keys.includes('household_simulator_needs_warning_ack_v1'),
+            'Scoped keys should exclude household simulator warning acknowledgement');
     }
     console.log('✓ Profile key policy OK');
 
@@ -185,17 +194,22 @@ try {
         localStorage.setItem('sim_live_key', '123');
         localStorage.setItem(CONFIG.STORAGE.LS_KEY, '{"inputs":{"x":1}}');
         localStorage.setItem('etfProxyUrl', 'global');
+        localStorage.setItem('household_simulator_needs_v1', '{"schemaVersion":1,"startFloorBedarf":"24000"}');
 
         const snapshot = captureProfileData(localStorage);
         assert(snapshot.sim_live_key === '123', 'Live storage snapshot should include sim_ keys');
         assert(snapshot[CONFIG.STORAGE.LS_KEY] === '{"inputs":{"x":1}}', 'Live storage snapshot should include balance state');
         assert(!Object.prototype.hasOwnProperty.call(snapshot, 'etfProxyUrl'), 'Live storage snapshot should exclude globals');
+        assert(!Object.prototype.hasOwnProperty.call(snapshot, 'household_simulator_needs_v1'),
+            'Live profile snapshot should exclude household simulator needs');
         assert(hasLiveProfileScopedData(localStorage) === true, 'Live storage should detect scoped data');
 
         clearProfileScopedKeys(localStorage);
         assert(localStorage.getItem('sim_live_key') === null, 'Live storage clear should remove sim_ keys');
         assert(localStorage.getItem(CONFIG.STORAGE.LS_KEY) === null, 'Live storage clear should remove balance state');
         assert(localStorage.getItem('etfProxyUrl') === 'global', 'Live storage clear should preserve globals');
+        assert(localStorage.getItem('household_simulator_needs_v1') !== null,
+            'Live profile clear should preserve household simulator needs');
         assert(hasLiveProfileScopedData(localStorage) === false, 'Live storage should be empty after clear');
 
         loadLiveProfileData({

@@ -47,6 +47,8 @@ const EXACT_KEYS = new Set([
     'etfProxyUrls',
     'enableWorkerTelemetry',
     'household_withdrawal_mode',
+    'household_simulator_needs_v1',
+    'household_simulator_needs_warning_ack_v1',
     'featureFlags',
     ...Object.values(LEGACY_MIGRATION_MARKER_KEYS),
     ...PROFILE_SCOPED_FIXED_KEYS
@@ -61,6 +63,8 @@ const SNAPSHOT_CAPTURE_EXACT_KEYS = new Set([
     'etfProxyUrl',
     'etfProxyUrls',
     'household_withdrawal_mode',
+    'household_simulator_needs_v1',
+    'household_simulator_needs_warning_ack_v1',
     ...Object.values(LEGACY_MIGRATION_MARKER_KEYS),
     ...PROFILE_SCOPED_FIXED_KEYS
 ]);

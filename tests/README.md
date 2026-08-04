@@ -1116,6 +1116,24 @@ Pflege-/Todes-/Hinterbliebenenpfade werden getrennt geprueft.
 - Detailtranchen-Merge mit profilbezogenen IDs und `sourceProfileId`
 - Pflegebucket-Definition des Primary-Profils gilt als Haushaltsdefinition; abweichende sekundäre Definitionen erzeugen Warnungen
 - Null-Marktwert-Tranchen fallen mit Warnung auf aggregierte Startwerte zurück
+- Balance-Bedarfswerte haben Vorrang vor historischen `sim_`-Werten; diese
+  bleiben nur Fallback, wenn der Balance-Wert fehlt
+
+#### `simulator-household-needs-persistence.test.mjs`
+**Zweck:** Testet den globalen Vertrag für manuelle Haushaltsbedarfs-Overrides.
+- einmalige Migration eines vollständigen gültigen `sim_`-Altwert-Trios
+- automatische Migration ausschließlich im sicher zuordenbaren
+  Einprofil-Haushalt; Mehrprofilwerte bleiben bei der aggregierten Profilbasis
+- früher `migration_pending`-Vertrag ohne Abhängigkeit vom erfolgreichen
+  Profilverbund-Aufbau; ein fehlender Profilverbund blockiert Simulatorläufe
+  sichtbar und fail-closed
+- unabhängig kanonisierte feldbezogene Overrides und Präzedenz vor Profil-Summen
+- native feldnahe Validierung ungültiger Eingaben, wirksame
+  Mindest-Flex-/Flex-Invariante mit letztem wirksamen Nachbarwert, reloadfeste
+  Eingabe-Zwischenstände und Ablehnung nicht exakt darstellbarer Großwerte
+- exakte Schemaversion mit einmaliger Warnungsquittierung, Selbstheilung
+  beschädigter V1-Daten, schreibgeschützte Zukunftsversionen und Reset ohne
+  erneute Migration
 
 ### 9. Utilities & Hilfsfunktionen
 
@@ -1383,6 +1401,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `simulator-backtest.test.mjs` | ~150 | Historischer Backtest |
 | `simulator-dynamic-flex-persistence.test.mjs` | ~110 | Persistenz von Dynamic-Flex-Inputs |
 | `simulator-headless.test.mjs` | ~125 | Headless 2000-2025 |
+| `simulator-household-needs-persistence.test.mjs` | ~180 | Migration, Schema, Validierung und Präzedenz globaler Haushaltsbedarfs-Overrides |
 | `simulator-heatmap.test.mjs` | ~60 | Heatmap-Rendering |
 | `simulator-input-readers.test.mjs` | ~160 | DOM-freie Simulator-Input-Reader |
 | `simulator-log-columns.test.mjs` | ~110 | Logspalten für Entnahme, VPW, Bonds und Steuer |

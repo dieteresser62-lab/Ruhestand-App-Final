@@ -40,6 +40,9 @@ class MockElement {
         this.children = [];
         this.parentNode = null;
         this.classList = new MockClassList();
+        this.validationMessage = '';
+        this.reportValidityCalls = 0;
+        this.attributes = new Map();
     }
 
     addEventListener(type, handler) {
@@ -66,6 +69,23 @@ class MockElement {
 
     click() {
         this.dispatchEvent({ type: 'click', target: this, preventDefault() {} });
+    }
+
+    setCustomValidity(message) {
+        this.validationMessage = String(message || '');
+    }
+
+    reportValidity() {
+        this.reportValidityCalls += 1;
+        return this.validationMessage === '';
+    }
+
+    setAttribute(name, value) {
+        this.attributes.set(String(name), String(value));
+    }
+
+    removeAttribute(name) {
+        this.attributes.delete(String(name));
     }
 
     querySelectorAll(selector) {
@@ -223,7 +243,9 @@ async function runSimulatorUiOrchestrationTests() {
         sweepUiModule,
         optimizerModule,
         monteCarloUiModule,
-        backtestUiModule
+        backtestUiModule,
+        householdNeedsModule,
+        profileSelectionModule
     ] = await Promise.all([
         import('../app/simulator/simulator-main.js'),
         import('../app/simulator/simulator-main-tabs.js'),
@@ -235,7 +257,9 @@ async function runSimulatorUiOrchestrationTests() {
         import('../app/simulator/simulator-main-sweep-ui.js'),
         import('../app/simulator/simulator-optimizer.js'),
         import('../app/simulator/monte-carlo-ui.js'),
-        import('../app/simulator/simulator-backtest.js')
+        import('../app/simulator/simulator-backtest.js'),
+        import('../app/simulator/simulator-household-needs-persistence.js'),
+        import('../app/simulator/simulator-main-profiles.js')
     ]);
 
     void mainModule;
@@ -272,17 +296,43 @@ async function runSimulatorUiOrchestrationTests() {
     console.log('Test 3: reset button removes only simulator persistence keys');
     {
         const resetBtn = registerElement(documentRef, 'resetBtn', { tagName: 'button' });
+        const profileStatus = registerElement(documentRef, 'simProfileStatus');
         let reloadCalls = 0;
         window.location.reload = () => { reloadCalls += 1; };
         persistenceStorage.setItem('sim_startFloorBedarf', '24000');
+        persistenceStorage.setItem(
+            householdNeedsModule.HOUSEHOLD_SIMULATOR_NEEDS_STORAGE_KEY,
+            JSON.stringify({ schemaVersion: 1, startFloorBedarf: '24002' })
+        );
         persistenceStorage.setItem('profile_name', 'nicht loeschen');
 
         resetModule.initResetButton();
         resetBtn.click();
+        await PersistenceFacade.flush();
 
         assertEqual(persistenceStorage.getItem('sim_startFloorBedarf'), null, 'Reset entfernt sim_-Keys');
+        const resetHouseholdNeeds = householdNeedsModule.readHouseholdSimulatorNeedsState();
+        assertEqual(resetHouseholdNeeds.status, 'profile_default', 'Reset deaktiviert den Haushaltsbedarf-Override');
+        assertEqual(resetHouseholdNeeds.values, null, 'Reset hinterlaesst keine wirksamen Haushaltswerte');
         assertEqual(persistenceStorage.getItem('profile_name'), 'nicht loeschen', 'Reset laesst fremde Keys unveraendert');
         assertEqual(reloadCalls, 1, 'Reset loest genau einen Reload aus');
+
+        const originalFlush = PersistenceFacade.flush;
+        const originalConsoleError = console.error;
+        PersistenceFacade.flush = async () => { throw new Error('synthetic flush failure'); };
+        console.error = () => {};
+        resetBtn.disabled = false;
+        reloadCalls = 0;
+        resetBtn.click();
+        await Promise.resolve();
+        await Promise.resolve();
+        assert(profileStatus.textContent.includes('nicht dauerhaft gespeichert'),
+            'Fehlgeschlagener Reset-Flush wird sichtbar gemeldet');
+        assertEqual(reloadCalls, 0, 'Fehlgeschlagener Reset-Flush laedt die Seite nicht neu');
+        assertEqual(resetBtn.disabled, false, 'Reset bleibt nach Flush-Fehler erneut ausfuehrbar');
+        PersistenceFacade.flush = originalFlush;
+        console.error = originalConsoleError;
+        await PersistenceFacade.flush();
     }
 
     console.log('Test 4: central simulator controls persist and update visible state');
@@ -302,7 +352,21 @@ async function runSimulatorUiOrchestrationTests() {
         assertEqual(persistenceStorage.getItem('sim_partnerAktiv'), '1', 'Partner-Aktiv-Flag wird persistiert');
         assertEqual(confirmCalls, 0, 'Partner-Toggle fragt nicht unnoetig nach Bestaetigung');
 
+        persistenceStorage.removeItem(householdNeedsModule.HOUSEHOLD_SIMULATOR_NEEDS_STORAGE_KEY);
+        persistenceStorage.setItem('sim_startFloorBedarf', '24002');
+        persistenceStorage.setItem('sim_startFlexBedarf', '150000');
+        persistenceStorage.setItem('sim_minimumFlexAnnual', '60000');
+        householdNeedsModule.initializeHouseholdSimulatorNeeds({
+            status: 'candidate',
+            values: {
+                startFloorBedarf: '24002',
+                startFlexBedarf: '150000',
+                minimumFlexAnnual: '60000'
+            }
+        });
         const floorInput = registerElement(documentRef, 'startFloorBedarf', { value: '24000' });
+        const flexInput = registerElement(documentRef, 'startFlexBedarf', { value: '60000' });
+        const minimumFlexInput = registerElement(documentRef, 'minimumFlexAnnual', { value: '30000' });
         const mcRunsInput = registerElement(documentRef, 'mcAnzahl', { value: '1000' });
         [
             ['displayPortfolioBreakdown', 'div'],
@@ -322,14 +386,52 @@ async function runSimulatorUiOrchestrationTests() {
             ['initialBondBucket', 'input']
         ].forEach(([id, tagName]) => registerElement(documentRef, id, { tagName }));
         persistModule.initInputPersistence();
+        assertEqual(floorInput.value, '24002', 'Persistierter Haushalts-Floor wird wiederhergestellt');
+        assertEqual(flexInput.value, '150000', 'Persistierter Haushalts-Flex wird wiederhergestellt');
+        assertEqual(minimumFlexInput.value, '60000', 'Persistierter Haushalts-Mindest-Flex wird wiederhergestellt');
         assertEqual(mcRunsInput.value, '10000', 'new/empty persistence uses the central 10,000-run default');
         persistenceStorage.setItem('sim_mcAnzahl', '7777');
         persistModule.initInputPersistence();
         assertEqual(mcRunsInput.value, '7777', 'an explicit persisted valid run count is not overwritten');
+        flexInput.value = '';
         floorInput.value = '30000';
         floorInput.dispatchEvent({ type: 'input' });
 
-        assertEqual(persistenceStorage.getItem('sim_startFloorBedarf'), '30000', 'Input-Persistenz speichert geaenderte Werte');
+        const persistedHouseholdNeeds = householdNeedsModule.readHouseholdSimulatorNeedsState().values;
+        assertEqual(persistedHouseholdNeeds.startFloorBedarf, '30000', 'Input-Persistenz speichert geaenderten Haushalts-Floor');
+        assertEqual(persistedHouseholdNeeds.startFlexBedarf, '150000', 'Input-Persistenz behaelt den Haushalts-Flex');
+        assertEqual(persistedHouseholdNeeds.minimumFlexAnnual, '60000', 'Input-Persistenz behaelt den Haushalts-Mindest-Flex');
+        assertEqual(persistenceStorage.getItem('sim_startFloorBedarf'), '24002', 'Legacy-Profilwert wird nicht mit dem Haushaltswert ueberschrieben');
+
+        flexInput.dispatchEvent({ type: 'input' });
+        assert(flexInput.validationMessage.includes('nicht gespeichert'),
+            'Ungueltige bearbeitete Bedarfseingabe wird direkt am Feld gemeldet');
+        assertEqual(flexInput.reportValidityCalls, 0,
+            'Laufende Tastatureingabe wird nicht durch reportValidity unterbrochen');
+        flexInput.dispatchEvent({ type: 'change' });
+        assert(flexInput.reportValidityCalls >= 1, 'Feldnahe Browsermeldung wird beim Abschluss ausgeloest');
+        flexInput.value = '150000';
+        flexInput.dispatchEvent({ type: 'input' });
+        assertEqual(flexInput.validationMessage, '', 'Eine gueltige Korrektur entfernt die Feldwarnung');
+
+        minimumFlexInput.value = '';
+        minimumFlexInput.dispatchEvent({ type: 'input' });
+        flexInput.value = '70000';
+        flexInput.dispatchEvent({ type: 'input' });
+        assertEqual(householdNeedsModule.readHouseholdSimulatorNeedsState().values.startFlexBedarf, '70000',
+            'Gueltiger Flex wird trotz leerem Mindest-Flex gegen dessen letzten wirksamen Wert gespeichert');
+        minimumFlexInput.value = '60000';
+        minimumFlexInput.dispatchEvent({ type: 'input' });
+        const repairedHouseholdNeeds = householdNeedsModule.readHouseholdSimulatorNeedsState().values;
+        assertEqual(repairedHouseholdNeeds.startFlexBedarf, '70000',
+            'Korrektur des Nachbarfelds behaelt die zuvor gespeicherte Flex-Aenderung');
+        assertEqual(repairedHouseholdNeeds.minimumFlexAnnual, '60000',
+            'Korrigierter Mindest-Flex wird ebenfalls gespeichert');
+
+        persistenceStorage.setItem(householdNeedsModule.HOUSEHOLD_SIMULATOR_NEEDS_STORAGE_KEY, '{kaputt');
+        const corruptHouseholdNeeds = householdNeedsModule.readHouseholdSimulatorNeedsState();
+        assertEqual(corruptHouseholdNeeds.values, null, 'Defekter Haushalts-Override faellt kontrolliert aus');
+        assert(corruptHouseholdNeeds.warning.includes('beschädigt'), 'Defekter Haushalts-Override erzeugt ein sichtbares Warnsignal');
     }
 
     console.log('Test 5: stress and sweep UI render visible state for valid and invalid combinations');
@@ -486,6 +588,20 @@ async function runSimulatorUiOrchestrationTests() {
         assertEqual(startButton.listeners.click.length, 1, 'Backtest start button has exactly one module click handler');
         assertEqual(cohortToggle.listeners.change.length, 1, 'Cohort toggle has exactly one module change handler');
         assertEqual(cohortHorizon.disabled, true, 'Cohort horizon remains disabled until explicitly selected');
+    }
+
+    console.log('Test 10: missing profile selection fails closed while migration remains pending');
+    {
+        const profileStatus = documentRef.getElementById('simProfileStatus');
+        profileSelectionModule.initSimulatorProfileSelection();
+        assert(window.__profileRecoveryBlocker?.message.includes('Bedarfsmigration bleibt ausstehend'),
+            'Fehlender Profilverbund setzt einen expliziten Recovery-Blocker');
+        assertEqual(documentRef.getElementById('mcButton').disabled, true,
+            'Fehlender Profilverbund blockiert Monte-Carlo');
+        assertEqual(documentRef.getElementById('btButton').disabled, true,
+            'Fehlender Profilverbund blockiert Backtest');
+        assert(profileStatus.textContent.includes('Profil-Recovery erforderlich'),
+            'Fehlender Profilverbund wird sichtbar gemeldet');
     }
 
     console.log('Simulator UI orchestration tests passed');
