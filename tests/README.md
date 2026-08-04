@@ -482,7 +482,10 @@ Inventar liegen bewusst in den jeweiligen Fachtests.
 - **Saettigung:** Terminalruinanzahl und -anteil sowie ein im Ruinblock
   liegendes P95 werden explizit diagnostiziert.
 - **Metadaten:** Einheit, Richtung, Rohquelle, Quantilrichtung und
-  Terminalruin-Semantik sind versioniert.
+  Terminalruin-Semantik sind versioniert. `minRunwayObserved` liest in
+  `SweepMetricsV4` ausschliesslich kanonische Vor-Auszahlungs-Monate; eine
+  Prozentdeckung, falsche Phase oder fehlendes Monatsfeld wird nicht
+  stillschweigend uebernommen.
 - **Unsicherheit:** Runzahl, CRN-Status und Wilson-95-Prozent-Intervall der
   Erfolgsquote; Quantil-Konfidenzintervall bleibt explizit `null`.
 - **Contract-Reader:** Unversionierte und nicht endliche Metrikwerte werden
@@ -929,16 +932,18 @@ zweiten Original nachgerechnet.
 Seed in jedem Lauf live. Der Test kann weiterhin einen Vergleichsstand ueber
 `DEMOGRAPHY_MEASUREMENT_RUNTIME_ROOT` laden, aktiviert Pflege, Partner und
 55-Prozent-Hinterbliebenen-Cashflow und vergleicht Monte Carlo sowie zwei
-Sweep-Kombinationen vollstaendig mit der Slice-17-Zielfixture. Die
-Slice-17-Datei bindet dabei den unveraenderten Slice-10-Eingang per SHA-256. Das
+Sweep-Kombinationen vollstaendig mit der Slice-19-Zielfixture. Die neue Datei
+bindet die unveraenderte Slice-17-Eingangsgrenze per SHA-256 und versioniert den
+Vor-Auszahlungs-Runway sowie die korrigierte Monatsmetrik des Sweeps. Die
+Slice-17-Datei bindet weiterhin den unveraenderten Slice-10-Eingang. Das
 bytegeschuetzte `post-backtest-data-07-v1` bleibt eine unabhaengige Quelle fuer
 die stabilen Slice-07-Demografieinvarianten; Runtime, Hashkette und aktive
 Pflege-/Todes-/Hinterbliebenenpfade werden getrennt geprueft.
 
 #### `historical-backtest-metrics.test.mjs`
-**Zweck:** Testet das vollstaendige `HistoricalBacktestMetricsV2`-Woerterbuch und die reine Ableitung aus kanonischen Rohzeilen.
+**Zweck:** Testet das vollstaendige `HistoricalBacktestMetricsV3`-Woerterbuch und die reine Ableitung aus kanonischen Rohzeilen.
 - **Definitionen:** Eindeutige IDs, Einheiten, nominal/real-Basis, Nenner, Rundung, Missingness, Outcome-Regel und Rohquellen fuer alle 29 Metriken.
-- **Reconciliation:** Start-/Endvermoegen, reale Werte, Entnahmen, Floor-Shortfall, Haushalts-Flexbedarf/-Erfuellung, inklusive `>= 10 %`-Haushalts-Flexgrenze, finaler Mindest-Flex-Fehlbetrag, nullable Runway, Drawdown, Steuern, Verlusttopf, Pflegebucket und Outcome-Indikatoren. Historische Rohzeilen ohne Haushaltsquote nutzen kontrolliert den Legacy-Kuerzungswert.
+- **Reconciliation:** Start-/Endvermoegen, reale Werte, Entnahmen, Floor-Shortfall, Haushalts-Flexbedarf/-Erfuellung, inklusive `>= 10 %`-Haushalts-Flexgrenze, finaler Mindest-Flex-Fehlbetrag, nullable Runway der Phase `after_transaction_before_payout`, Drawdown, Steuern, Verlusttopf, Pflegebucket und Outcome-Indikatoren. Gemischte oder fehlende Runway-Phasen invalidieren das Aggregat; terminale Ruinzeilen werden nicht als Null-Prozent-Stressjahr gezaehlt. Historische Rohzeilen ohne Haushaltsquote nutzen kontrolliert den Legacy-Kuerzungswert.
 - **Fehlerpfade:** `incomplete`/`technical_error` erhalten keine erfundenen Finanzmetriken; Ruin behaelt additive Floor-Deckungsdiagnostik.
 
 #### `historical-backtest-cohorts.test.mjs`

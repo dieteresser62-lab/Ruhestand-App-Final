@@ -1412,7 +1412,7 @@ Die technische Modulzuordnung steht in Teil B. Zur schnellen Orientierung:
 | **Effektiver Flex** | Flex-Basis multipliziert mit der nach allen Spending-Policies wirksamen Flex-Rate; die final quantisierte Portfolioauszahlung bestimmt den tatsächlich geplanten Eurobetrag. | Mindest-Flex, Budgets, Glättung und Monatsquantisierung können den Policy-Wert anheben, begrenzen oder runden. |
 | **Nominal** | Geldbetrag in Preisen des betrachteten Modelljahres. | Die Engine erwartet den aktuellen Jahreswert; sie inflationsindexiert den Bedarf nicht nochmals intern. |
 | **Real** | Auf ein Basisjahr deflationierter Betrag. | Im Simulator ist das erste Simulatorjahr das Basisjahr; der aktuelle kumulierte Inflationsfaktor wird auch während einer Ansparphase fortgeschrieben. |
-| **Operativer Runway** | Frei verfügbare Liquidität geteilt durch die nach allen Spending-Policies final quantisierte jährliche Netto-Portfolioentnahme, ausgedrückt in Monaten. | Bestimmt Ziel, Transaktions-Guardrail und Jahresend-KPI; keine Überlebenswahrscheinlichkeit und keine garantierte Mindestreichweite des Gesamtvermögens. |
+| **Operativer Runway** | Frei verfügbare Liquidität geteilt durch die nach allen Spending-Policies final quantisierte jährliche Netto-Portfolioentnahme, ausgedrückt in Monaten. | Bestimmt Ziel und Transaktions-Guardrail; der kanonische Ergebnis-KPI misst nach Transaktion und vor Jahresauszahlung. Der Post-Payout-Jahresendwert ist nur eine separat benannte Diagnose. Keine Überlebenswahrscheinlichkeit und keine garantierte Mindestreichweite des Gesamtvermögens. |
 | **Dynamic-Flex-Safety-Runway** | Liquidität nach der Transaktion geteilt durch den ungekürzten nominalen Nettojahresbedarf vor den Spending-Policies. | Bleibt wegen der bestehenden Schwellenkalibrierung getrennt; eine Policy-Kürzung darf nicht ihr eigenes Entspannungssignal erzeugen. |
 | **Reserve** | Sammelbegriff, der nur zusammen mit seinem Typ verwendet werden soll: freie Liquidität, Runway-Ziel, Gold-Floor oder Pflegebucket. | Die vier Größen haben unterschiedliche Verfügbarkeit und Rechenwirkung. |
 | **Aktives Gesamtvermögen** | Aktien-, Gold- und freie Liquiditätsbestände, die der Entnahmeplanung zur Verfügung stehen; ein aktivierter Pflegebucket ist herausgerechnet. | Kein vollständiger Haushalts-Net-Worth und kein frei erweiterbares Multi-Asset-Portfolio. |
@@ -2236,7 +2236,7 @@ dynamicFlexSafetyRunwayMonths = cashAfterTransaction / (rawAnnualNetNeed / 12);
 `minCashBufferMonths` ist von 0 bis 12 konfigurierbar und hat Default 2. Diese
 Brutto-Untergrenze ist weder ein zweiter Runway noch ein separater
 Vermoegenstopf. Die harte Mindestgrenze ist abgeleitete Engine-Policy auf der
-Netto-Basis und keine zweite Nutzereingabe. Ziel und Jahresend-KPI werden nicht
+Netto-Basis und keine zweite Nutzereingabe. Ziel und kanonische Zielerfuellung werden nicht
 regimeabhaengig geglaettet. Vor dem SpendingPlanner berechnet der Core einen
 Runway aus dem ungekürzten Bedarf als Policy-Eingang. Nach der Transaktion wird
 derselbe Rohbedarfsnenner fuer die separat kalibrierte Dynamic-Flex-Safety
@@ -2249,8 +2249,12 @@ Legacy-Daten migrieren in der Prioritaet kanonischer Wert,
 den alten UI-Domains werden auf das naechste Sechsmonatsraster aufgerundet und
 danach in Jahre umgerechnet; die Migration verkuerzt den Puffer nie. Diagnose und Logs
 weisen Ziel, harte Mindestgrenze sowie Vor-, Zwischen- und finalen
-Post-Payout-Bestand getrennt aus. `runway_post_payout_end_of_year_months` und
-`liq_post_payout_end_of_year` sind die expliziten neuen Jahresendfelder;
+Post-Payout-Bestand getrennt aus. Der kanonische KPI misst den Zwischenbestand
+nach Transaktion und vor Auszahlung; `RunwayMeasurementPhase =
+after_transaction_before_payout` kennzeichnet diesen Vertrag.
+`RunwayCoveragePostPayoutEndOfYearPct`,
+`runway_post_payout_end_of_year_months` und `liq_post_payout_end_of_year` sind
+die expliziten Jahresend-Diagnosefelder;
 `liq_post_accumulation_end_of_year` ist das entsprechende Ansparfeld. Die
 Bestandsfelder `safety_runway_post_months` und `liqEnd` behalten aus
 Kompatibilitaetsgruenden ihre bisherige Bedeutung.
@@ -2729,7 +2733,7 @@ export function renderSweepHeatmapSVG(sweepResults, metricKey, xParam, yParam, x
 | `medianEndWealth` | Median Endvermögen | Maximieren |
 | `p10EndWealth` | 10%-Perzentil Endvermögen | Maximieren |
 | `worst5Drawdown` | Schlimmste 5% Drawdowns | Minimieren |
-| `minRunwayObserved` | Minimale beobachtete Runway | Maximieren |
+| `minRunwayObserved` | Minimale beobachtete Runway nach Transaktion/vor Auszahlung (Monate) | Maximieren |
 
 ---
 

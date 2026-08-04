@@ -3,7 +3,8 @@ import {
     FLEX_REDUCTION_OPERATOR,
     FLEX_REDUCTION_THRESHOLD_PCT,
     HISTORICAL_BACKTEST_METRIC_DESCRIPTORS,
-    HISTORICAL_BACKTEST_METRICS_SCHEMA_VERSION
+    HISTORICAL_BACKTEST_METRICS_SCHEMA_VERSION,
+    RUNWAY_MEASUREMENT_PHASE
 } from '../app/simulator/historical-backtest-metrics.js';
 
 console.log('--- Historical Backtest Metrics Tests ---');
@@ -48,6 +49,7 @@ function row({
             minimumFlexShortfallAnnual: year === 2001 ? 25 : (year === 2002 ? 75 : 0),
             ...(explicitShortfall === undefined ? {} : { floor_shortfall_nominal: explicitShortfall }),
             RunwayCoveragePct: runwayPct,
+            RunwayMeasurementPhase: RUNWAY_MEASUREMENT_PHASE,
             steuern_gesamt: taxes,
             taxSavedByLossCarry: taxSaved,
             lossCarryEnd: lossCarry
@@ -120,6 +122,8 @@ assertEqual(metrics.reductionContract.includesExactThreshold, true, 'exactly ten
 assertEqual(metrics.reductionContract.metricId, 'flex_reduction_years_gte_10_pct', 'metric id encodes the inclusive threshold');
 assertEqual(metrics.flexBasisContract.effective, 'static_input', 'one consistent household-flex basis is explicit');
 assertEqual(metrics.flexBasisContract.consistent, true, 'uniform household-flex bases are aggregatable');
+assertEqual(metrics.runwayMeasurementContract.phase, RUNWAY_MEASUREMENT_PHASE, 'runway aggregation declares the pre-payout phase');
+assertEqual(metrics.runwayMeasurementContract.phaseComplete, true, 'all decumulation rows use the canonical runway phase');
 assertEqual(values.wealth_start_nominal_eur, 1000, 'start wealth reconciles to the canonical start snapshot');
 assertEqual(values.wealth_end_nominal_eur, 700, 'end wealth reconciles to the canonical end snapshot');
 assertClose(values.wealth_end_real_eur, 700 / 1.1, 1e-12, 'real end wealth uses the complete inflation path without display rounding');
@@ -211,6 +215,23 @@ assertEqual(positiveNeedWithoutCoverage.values.runway_min_coverage_pct, 0,
     'A real zero-coverage year with positive need remains a finite crisis value');
 assertEqual(positiveNeedWithoutCoverage.values.runway_stress_years_below_100_pct, 1,
     'A real zero-coverage year remains counted as runway stress');
+
+const wrongRunwayPhase = deriveHistoricalBacktestMetrics({
+    ...goldenResult,
+    rows: goldenResult.rows.map((entry, index) => ({
+        ...entry,
+        row: {
+            ...entry.row,
+            ...(index === 1 ? { RunwayMeasurementPhase: 'post_payout_end_of_year' } : {})
+        }
+    }))
+});
+assertEqual(wrongRunwayPhase.runwayMeasurementContract.phaseComplete, false,
+    'A decumulation row from the wrong phase invalidates the runway phase contract');
+assertEqual(wrongRunwayPhase.values.runway_min_coverage_pct, null,
+    'A mixed-phase run must not silently aggregate incomparable runway coverage');
+assertEqual(wrongRunwayPhase.values.runway_stress_years_below_100_pct, null,
+    'A mixed-phase run must not invent a runway-stress denominator');
 
 const mixedFlexBasis = deriveHistoricalBacktestMetrics({
     ...goldenResult,

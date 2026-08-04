@@ -523,13 +523,23 @@ export function buildSweepInputs(baseInputs, params) {
     return inputs;
 }
 
-export function mergeApplicableRunwayMinimum(currentMinimum, coveragePct) {
-    if (typeof coveragePct !== 'number' || !Number.isFinite(coveragePct)) {
+export function mergeApplicableRunwayMinimum(currentMinimum, runwayMonths) {
+    if (typeof runwayMonths !== 'number' || !Number.isFinite(runwayMonths)) {
         return currentMinimum;
     }
-    return currentMinimum === null || coveragePct < currentMinimum
-        ? coveragePct
+    return currentMinimum === null || runwayMonths < currentMinimum
+        ? runwayMonths
         : currentMinimum;
+}
+
+export function readApplicableRunwayMonths(logData) {
+    if (logData?.RunwayMeasurementPhase !== 'after_transaction_before_payout') {
+        return null;
+    }
+    const runwayMonths = logData?.runway_after_transaction_before_payout_months;
+    return typeof runwayMonths === 'number' && Number.isFinite(runwayMonths)
+        ? runwayMonths
+        : null;
 }
 
 export function runSweepChunk({
@@ -870,10 +880,10 @@ export function runSweepChunk({
                     totalTaxSavedByLossCarryThisRun += Number(result.logData?.taxSavedByLossCarry) || 0;
                     depotWertHistorie.push(portfolioTotal(simState.portfolio));
 
-                    // Track the worst runway coverage within a run.
+                    // Track canonical after-transaction/before-payout runway months.
                     minRunway = mergeApplicableRunwayMinimum(
                         minRunway,
-                        result.logData.RunwayCoveragePct
+                        readApplicableRunwayMonths(result.logData)
                     );
                 }
             }

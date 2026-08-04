@@ -328,7 +328,7 @@ initiale Vierjahres-Markthistorie aus dem Contract und gibt bei einer Luecke
 `incomplete` zurueck, bevor die Jahresschleife beginnt. Request und Ergebnis
 tragen Dataset-, Manifest-, Temporal-, Engine-Build- und Config-Provenienz.
 
-`BacktestRunResultV1` ist tief eingefroren und enthaelt `BacktestRequestV1`, diskriminiertes Outcome, Warnungen/sichere Fehlerdaten, unverkuerzte `rows`, `requestedYears`, wirtschaftlich erfolgreiche `completedYears`, erste/letzte Laufjahre, kanonische Start-/Endportfolio-Snapshots, Historical-Year-Records, `HistoricalBacktestMetricsV2`, Summary sowie die Legacy-Aliase. Caller-Inputs, Partner-/Tranchenobjekte und historische Records werden vor dem Lauf in eigene Kopien ueberfuehrt; `undefined`, `Date`, `RegExp`, Prototypen und zyklische Referenzen bleiben dabei runnerintern erhalten.
+`BacktestRunResultV1` ist tief eingefroren und enthaelt `BacktestRequestV1`, diskriminiertes Outcome, Warnungen/sichere Fehlerdaten, unverkuerzte `rows`, `requestedYears`, wirtschaftlich erfolgreiche `completedYears`, erste/letzte Laufjahre, kanonische Start-/Endportfolio-Snapshots, Historical-Year-Records, `HistoricalBacktestMetricsV3`, Summary sowie die Legacy-Aliase. Caller-Inputs, Partner-/Tranchenobjekte und historische Records werden vor dem Lauf in eigene Kopien ueberfuehrt; `undefined`, `Date`, `RegExp`, Prototypen und zyklische Referenzen bleiben dabei runnerintern erhalten.
 
 ### `historical-backtest-metrics.js`
 
@@ -336,8 +336,8 @@ DOM-freies Metrikwoerterbuch und reine Ableitung fuer das kanonische
 `BacktestRunResultV1`.
 
 **Hauptfunktionen / Exporte:**
-- `HISTORICAL_BACKTEST_METRIC_DESCRIPTORS` – versionierte Definitionen fuer 29 Metriken mit Einheit, nominal/real-Basis, Aggregation, Nenner, Rundung, Missingness, Outcome-Regel und Rohquelle. V2 trennt Haushalts-Flexbedarf, Rentenueberschuss, Depot-Flex und erfuellten Haushalts-Flex und zaehlt finale Mindest-Flex-Fehlbetraege.
-- `deriveHistoricalBacktestMetrics()` – leitet das unverkuerzte `HistoricalBacktestMetricsV2` aus Jahreszeilen und Outcome ab; Summary und Export konsumieren dieselben Werte ohne zweite Berechnung. Fuer historische Rohzeilen bleibt `entscheidung.kuerzungProzent` ein expliziter Fallback, falls die neue Haushalts-Kuerzungsquote fehlt.
+- `HISTORICAL_BACKTEST_METRIC_DESCRIPTORS` – versionierte Definitionen fuer 29 Metriken mit Einheit, nominal/real-Basis, Aggregation, Nenner, Rundung, Missingness, Outcome-Regel und Rohquelle. V3 behaelt die V2-Trennung von Haushalts-Flexbedarf, Rentenueberschuss, Depot-Flex und erfuelltem Haushalts-Flex bei und bindet Runway-Minimum/-Stress an `after_transaction_before_payout`.
+- `deriveHistoricalBacktestMetrics()` – leitet das unverkuerzte `HistoricalBacktestMetricsV3` aus Jahreszeilen und Outcome ab; Summary und Export konsumieren dieselben Werte ohne zweite Berechnung. Alle Entnahmezeilen muessen denselben Vor-Auszahlungs-Phasenvertrag tragen; `null` bei nicht anwendbarer Zieldeckung wird aus dem endlichen Nenner ausgeschlossen, eine fehlende oder falsche Phase invalidiert dagegen beide Runway-Aggregate. Terminale Ruinzeilen und Ansparzeilen gehoeren nicht zu diesem Nenner. Fuer historische Rohzeilen bleibt `entscheidung.kuerzungProzent` ein expliziter Fallback, falls die neue Haushalts-Kuerzungsquote fehlt.
 - `FLEX_REDUCTION_THRESHOLD_PCT` / `FLEX_REDUCTION_OPERATOR` – gemeinsamer inklusiver `>= 10 %`-Vertrag fuer ID, Label, UI und Export.
 
 ### `historical-backtest-cohorts.js`
@@ -1228,7 +1228,10 @@ app/simulator/simulator-main.js
    `goGoMultiplier`.
    Dieser Datenpfadnachweis ist kein eigenstaendiger KPI-Wirkungsnachweis.
    Der Browser-Smoke prueft `SweepRequestV1`, `SweepExecutionV2`,
-   `SweepMetricsV3` und die Parameterprovenienz eines echten Ein-Zellen-Laufs.
+   `SweepMetricsV4` und die Parameterprovenienz eines echten Ein-Zellen-Laufs.
+   `minRunwayObserved` ist in V4 das Minimum der kanonischen
+   `runway_after_transaction_before_payout_months`; V3 hatte hier trotz der
+   Einheit „Monate“ versehentlich `RunwayCoveragePct` in Prozent aggregiert.
 
 ### Auto-Optimize
 
@@ -1272,12 +1275,17 @@ Safety-Reichweite erhoeht. `dynamicFlexSafetyRunwayBasis` nennt diesen Vertrag
 als `pre_policy_annual_net_need`; das historisch benannte Exportfeld
 `safety_runway_post_months` transportiert diesen Wert. Das Exportfeld
 `safety_runway_pre_months` bezeichnet dagegen den post-policy,
-pre-transaction Runway. Jahreslogs und Backtest-KPI messen den finalen Bestand
-nach Transaktionen und Auszahlung; null Liquiditaet ergibt null Runway-Monate
-und null Zieldeckung. Die Felder
+pre-transaction Runway. Jahreslogs, Backtest-KPI und Monte-Carlo-Jahreszeilen
+messen den Bestand nach Transaktionen und vor Jahresauszahlung.
+`RunwayMeasurementPhase = after_transaction_before_payout`,
+`runway_after_transaction_before_payout_months` und `RunwayCoveragePct`
+benennen diesen kanonischen Messpunkt. Nicht anwendbare Zieldeckung bleibt
+`null`; terminale Ruin-/Todeszeilen erfinden keine Null-Prozent-Beobachtung.
+`RunwayCoveragePostPayoutEndOfYearPct`,
 `runway_post_payout_end_of_year_months` und `liq_post_payout_end_of_year`
-benennen diese Phase explizit; `safety_runway_post_months` und `liqEnd`
-behalten ihre alte Bedeutung. Ueberschuesse bedienen das separate
+bewahren die Phase nach Auszahlung explizit als Diagnose;
+`safety_runway_post_months` und `liqEnd` behalten ihre alte Bedeutung.
+Ueberschuesse bedienen das separate
 Goldziel und danach Aktien nur bis zum expliziten Skim-Budget, ohne eine feste
 Aktienquote wiederherzustellen. VPW gewichtet die tatsaechliche Aktien-, Gold-
 und Liquiditaetszusammensetzung.

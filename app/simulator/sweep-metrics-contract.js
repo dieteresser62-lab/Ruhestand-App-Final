@@ -1,7 +1,7 @@
 "use strict";
 
-export const SWEEP_METRICS_VERSION = 'SweepMetricsV3';
-export const SWEEP_METRIC_METADATA_VERSION = 'SweepMetricMetadataV2';
+export const SWEEP_METRICS_VERSION = 'SweepMetricsV4';
+export const SWEEP_METRIC_METADATA_VERSION = 'SweepMetricMetadataV3';
 export const SWEEP_DRAWDOWN_DEFINITION_VERSION = 'SweepDrawdownLossP95V1';
 export const SWEEP_COMPARISON_DIAGNOSTICS_VERSION = 'SweepComparisonDiagnosticsV2';
 
@@ -92,8 +92,11 @@ export const SWEEP_METRIC_METADATA = Object.freeze({
             label: 'Minimale beobachtete Runway',
             unit: 'months',
             direction: 'higher_is_better',
-            source: 'runOutcomes.minRunway',
-            statistic: 'minimum'
+            source: 'runOutcomes.minRunway from logData.runway_after_transaction_before_payout_months',
+            measurementPhase: 'after_transaction_before_payout',
+            annualNeedBasis: 'reconciled_final_planned_net_withdrawal',
+            statistic: 'minimum',
+            missingnessRule: 'null_if_no_run_contains_an_applicable_finite_runway_month_value'
         })
     })
 });

@@ -136,7 +136,7 @@ Funktion runBacktest() in simulator-backtest.js:
   4. Kanonisches Resultat ableiten
      - Erzeuge tief eingefrorenes BacktestRunResultV1
      - Reconciliiere Start-/Endportfolio, requested/completedYears,
-       Outcome, Jahreszeilen, Summary und HistoricalBacktestMetricsV2
+       Outcome, Jahreszeilen, Summary und HistoricalBacktestMetricsV3
      - UI, Tabelle und Export teilen dieselbe Result-/Row-Instanz
 
   5. Optional Rolling Cohorts

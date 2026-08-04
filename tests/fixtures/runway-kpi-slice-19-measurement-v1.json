@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "RunwayKpiSlice19MeasurementV1",
+  "snapshotId": "post-backtest-data-19-v1",
+  "sourceCommit": "32dbef844ffef878995cb0f8446407a4feb14e7f",
+  "sourceReference": "post-backtest-data-17-v1",
+  "sourceFixtureSha256": "9a733a9cf5454d038e178250e0904d564244657c35173d0a5b899ec54312f241",
+  "targetResultDocument": "docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_19_RUNWAY_KPI_VOR_AUSZAHLUNG.md",
+  "reviewStatus": "pending_external_review",
+  "personalReplayDataIncluded": false,
+  "contract": {
+    "runwayMeasurementPhase": "after_transaction_before_payout",
+    "postPayoutRole": "explicit_diagnostic_only",
+    "historicalMetrics": "HistoricalBacktestMetricsV3",
+    "sweepMetrics": "SweepMetricsV4"
+  },
+  "backtest": {
+    "contracts": {
+      "historicalMetrics": "HistoricalBacktestMetricsV3",
+      "postPayoutRole": "explicit_diagnostic_only",
+      "runwayMeasurementPhase": "after_transaction_before_payout",
+      "sweepMetrics": "SweepMetricsV4"
+    },
+    "crossSliceRuntimeBinding": {
+      "sourceCrossSliceOracleProjectionSha256": "efff8eb80137348c4566ed870acbfb67a9781f2894cadd82f886ae283c810142",
+      "sourceSlice09To10DeltaLedgerSha256": "30a2c212ae75c72e974132b16f617f7fd6e03c1b1fd040f87918bbb3bba4b621",
+      "targetCrossSliceOracleProjectionSha256": "15813110bf8964fd7004eb80e1cba1d5d54b676a3edb7ea9ec0cbcee4f80675c",
+      "targetSlice09To10DeltaLedgerSha256": "30a2c212ae75c72e974132b16f617f7fd6e03c1b1fd040f87918bbb3bba4b621"
+    },
+    "integratedReference": {
+      "maxAbsolutePortfolioFlowDelta": 0,
+      "observedRowCountDelta": 0,
+      "outcomeChanged": false,
+      "sourceCanonicalRowsHash": "49aada4625b1992db0e45a29d8e16b03934fe32fe5c9a36cd0e573df0f52b0c3",
+      "summaryEndWealthDelta": 0,
+      "targetCanonicalRowsHash": "1121fa8bea4c08234a46786677da0a55e07893d27e01273c5223c40d4541b4a0",
+      "totalTaxDelta": 0,
+      "totalWithdrawalDelta": 0
+    },
+    "resultProjection": {
+      "caseCount": 12,
+      "negativeCaseCount": 5,
+      "ruinCaseCount": 1,
+      "sourceActualSha256": "47b325c50727cd8ab5efe75b5980385a1b2a7647dd3863c1e369066dc02085f8",
+      "targetActualSha256": "80f5942c906f20d593172628b51b62656ca2189be47923d0325bcbeb397577b3"
+    },
+    "reviewStatus": "pending_external_review",
+    "schemaVersion": "RunwayKpiSlice19BacktestMeasurementV1",
+    "sourceFixtureSha256": "9a733a9cf5454d038e178250e0904d564244657c35173d0a5b899ec54312f241",
+    "sourceReference": "post-backtest-data-17-v1",
+    "targetResultDocument": "docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_19_RUNWAY_KPI_VOR_AUSZAHLUNG.md"
+  },
+  "demography": {
+    "schemaVersion": "RunwayKpiSlice19DemographyMeasurementV1",
+    "sourceMeasurementSha256": "53f0378427ef955d3b3bfdf49ea59773765c2573bb1a2509d7e34d1fb04fd60c",
+    "targetMeasurementSha256": "e24a5ce7bec03fce129c77f14aa247d6c8ed14872ac63e40791e63cb4d7b3856",
+    "cause": "pre_payout_runway_kpi_and_month_based_sweep_contract"
+  }
+}

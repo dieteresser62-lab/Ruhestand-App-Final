@@ -142,14 +142,8 @@ export function buildSimulatorYearResult({
     const vpw = fullResult.ui.vpw || null;
     const safetyDiagnosis = fullResult.diagnosis?.general || {};
     const keyParams = fullResult.diagnosis?.keyParams || {};
-    const runwayAfterTransactionBeforePayout = Number.isFinite(fullResult.ui.runway?.months)
-        ? fullResult.ui.runway.months
-        : null;
     const flexRate = Number.isFinite(spendingResult.details?.flexRate)
         ? spendingResult.details.flexRate
-        : null;
-    const runwayCoveragePct = zielLiquiditaet > 0
-        ? (liquiditaet / zielLiquiditaet) * 100
         : null;
     const plannedWithdrawalResolution = resolvePlannedAnnualWithdrawal({
         spendingResult,
@@ -168,8 +162,19 @@ export function buildSimulatorYearResult({
     const annualRunwayNeed = plannedWithdrawalResolution.status === 'resolved'
         ? plannedWithdrawalResolution.annualWithdrawal
         : null;
-    const runwayMonths = Number.isFinite(annualRunwayNeed)
+    const runwayAfterTransactionBeforePayoutMonths = Number.isFinite(annualRunwayNeed)
+        && Number.isFinite(liqBeforePayout)
+        ? (annualRunwayNeed > 0 ? liqBeforePayout / (annualRunwayNeed / 12) : null)
+        : null;
+    const runwayPostPayoutEndOfYearMonths = Number.isFinite(annualRunwayNeed)
+        && Number.isFinite(liquiditaet)
         ? (annualRunwayNeed > 0 ? liquiditaet / (annualRunwayNeed / 12) : null)
+        : null;
+    const runwayCoveragePct = zielLiquiditaet > 0 && Number.isFinite(liqBeforePayout)
+        ? (liqBeforePayout / zielLiquiditaet) * 100
+        : null;
+    const runwayPostPayoutEndOfYearCoveragePct = zielLiquiditaet > 0 && Number.isFinite(liquiditaet)
+        ? (liquiditaet / zielLiquiditaet) * 100
         : null;
     const pensionFlexCapacity = Math.max(0, pensionAnnual - effectiveBaseFloor);
     const dynamicPortfolioFlex = vpw?.enabled === true && Number.isFinite(vpw?.dynamicFlex)
@@ -231,10 +236,17 @@ export function buildSimulatorYearResult({
             zielLiquiditaet,
             liquiditaet: {
                 vorher: initialLiqStart,
-                nachher: liquiditaet,
-                deckungNachher: runwayCoveragePct
+                nachher: liqBeforePayout,
+                deckungNachher: runwayCoveragePct,
+                vorAuszahlung: liqBeforePayout,
+                nachAuszahlung: liqAfterPayout,
+                jahresende: liquiditaet,
+                deckungJahresende: runwayPostPayoutEndOfYearCoveragePct
             },
-            runway: { months: runwayMonths }
+            runway: {
+                months: runwayAfterTransactionBeforePayoutMonths,
+                postPayoutEndOfYearMonths: runwayPostPayoutEndOfYearMonths
+            }
         },
         newState: {
             portfolio: nextPortfolio,
@@ -257,7 +269,7 @@ export function buildSimulatorYearResult({
                 ...spendingResult,
                 jahresEntnahme: jahresEntnahmeEffektiv,
                 jahresEntnahme_plan: jahresEntnahmePlan,
-                runwayMonths,
+                runwayMonths: runwayAfterTransactionBeforePayoutMonths,
                 kuerzungProzent: spendingResult.kuerzungProzent
             },
             FlexRatePct: flexRate,
@@ -283,7 +295,8 @@ export function buildSimulatorYearResult({
             Regime: spendingNewState.lastMarketSKey || 'unknown',
             QuoteEndPct: withdrawalRateEndPct,
             RunwayCoveragePct: runwayCoveragePct,
-            RunwayMeasurementPhase: 'post_payout_end_of_year',
+            RunwayMeasurementPhase: 'after_transaction_before_payout',
+            RunwayCoveragePostPayoutEndOfYearPct: runwayPostPayoutEndOfYearCoveragePct,
             RunwayTargetRawMonths: Number.isFinite(safetyDiagnosis.runwayTargetSmoothing?.rawTargetMonths) ? safetyDiagnosis.runwayTargetSmoothing.rawTargetMonths : null,
             RunwayTargetSmoothedMonths: Number.isFinite(safetyDiagnosis.runwayTargetSmoothing?.targetMonths) ? safetyDiagnosis.runwayTargetSmoothing.targetMonths : null,
             RunwayTargetSmoothingApplied: safetyDiagnosis.runwayTargetSmoothing?.smoothingApplied === true,
@@ -306,11 +319,12 @@ export function buildSimulatorYearResult({
             safety_stable_streak: Number.isFinite(safetyDiagnosis.dynamicFlexSafetyStableStreak) ? safetyDiagnosis.dynamicFlexSafetyStableStreak : null,
             safety_transition: safetyDiagnosis.dynamicFlexSafetyTransition || '',
             safety_runway_pre_months: Number.isFinite(safetyDiagnosis.runwayMonateVorTransaktion) ? safetyDiagnosis.runwayMonateVorTransaktion : null,
-            safety_runway_after_transaction_before_payout_months: runwayAfterTransactionBeforePayout,
+            runway_after_transaction_before_payout_months: runwayAfterTransactionBeforePayoutMonths,
+            safety_runway_after_transaction_before_payout_months: runwayAfterTransactionBeforePayoutMonths,
             safety_runway_post_months: Number.isFinite(safetyDiagnosis.dynamicFlexSafetyRunwayMonate)
                 ? safetyDiagnosis.dynamicFlexSafetyRunwayMonate
                 : null,
-            runway_post_payout_end_of_year_months: runwayMonths,
+            runway_post_payout_end_of_year_months: runwayPostPayoutEndOfYearMonths,
             safety_real_drawdown_pct: Number.isFinite(keyParams.realerDepotDrawdown) ? keyParams.realerDepotDrawdown * 100 : null,
             liq_before_payout: liqBeforePayout,
             liq_after_payout: liqAfterPayout,

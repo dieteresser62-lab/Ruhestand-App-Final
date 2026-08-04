@@ -18,6 +18,8 @@ import { CONFIG } from '../engine/config.mjs';
 import { formatPercentValue } from '../app/simulator/simulator-formatting.js';
 import { formatCurrency } from '../app/simulator/simulator-utils.js';
 import { buildHistoricalBacktestRawExport } from '../app/simulator/historical-backtest-export.js';
+import { HISTORICAL_BACKTEST_METRICS_SCHEMA_VERSION } from '../app/simulator/historical-backtest-metrics.js';
+import { SWEEP_METRICS_VERSION } from '../app/simulator/sweep-metrics-contract.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,6 +33,7 @@ const slice09AddedCaseFinancialFixturePath = path.join(__dirname, 'fixtures', 'm
 const slice10MeasurementFixturePath = path.join(__dirname, 'fixtures', 'tax-logic-slice-10-backtest-measurement-v1.json');
 const slice13IntegrationFixturePath = path.join(__dirname, 'fixtures', 'backtest-data-integration-slice-13-v1.json');
 const slice17MeasurementFixturePath = path.join(__dirname, 'fixtures', 'liquidity-runway-basis-slice-17-measurement-v1.json');
+const slice19MeasurementFixturePath = path.join(__dirname, 'fixtures', 'runway-kpi-slice-19-measurement-v1.json');
 const backtestSourcePath = path.join(__dirname, '..', 'app', 'simulator', 'simulator-backtest.js');
 const backtestRunnerSourcePath = path.join(__dirname, '..', 'app', 'simulator', 'historical-backtest-runner.js');
 const UPDATE_TARGET = process.env.UPDATE_BACKTEST_TARGET === '1';
@@ -550,6 +553,7 @@ function projectScenario({ id, oracleClass = 'target_expected', inputs, data, al
         .map(entry => (Number(entry?.wertAktien) || 0) + (Number(entry?.wertGold) || 0) + (Number(entry?.liquiditaet) || 0))
         .filter(Number.isFinite);
     const finiteRunwayCoverage = rows
+        .filter(entry => entry?.row?.RunwayMeasurementPhase === 'after_transaction_before_payout')
         .map(entry => entry?.row?.RunwayCoveragePct)
         .filter(value => typeof value === 'number' && Number.isFinite(value));
     let runningPeak = Number(normalizedInputs.startVermoegen) || 0;
@@ -2162,16 +2166,77 @@ try {
         crossSliceOracleProjectionSha256: stableHash(crossSliceOracleProjection),
         slice09To10DeltaLedgerSha256: stableHash(slice09To10CompleteLedger)
     };
-    if (process.env.PRINT_BACKTEST_DATA_17 === '1') {
-        console.log('__BACKTEST_DATA_17_MEASUREMENT_START__');
-        console.log(stableStringify(slice17BacktestMeasurement, 2));
-        console.log('__BACKTEST_DATA_17_MEASUREMENT_END__');
+    const slice17FixtureBytes = fs.readFileSync(slice17MeasurementFixturePath);
+    const expectedSlice17Root = JSON.parse(slice17FixtureBytes.toString('utf8'));
+    assertEqual(
+        createHash('sha256').update(slice17FixtureBytes).digest('hex'),
+        '9a733a9cf5454d038e178250e0904d564244657c35173d0a5b899ec54312f241',
+        'Immutable Slice-17 combined measurement must remain byte-identical'
+    );
+    const expectedSlice17 = expectedSlice17Root.backtest;
+    const slice19BacktestMeasurement = {
+        schemaVersion: 'RunwayKpiSlice19BacktestMeasurementV1',
+        sourceReference: expectedSlice17Root.snapshotId,
+        sourceFixtureSha256: createHash('sha256').update(slice17FixtureBytes).digest('hex'),
+        targetResultDocument: 'docs/internal/SLICE_BACKTEST_DATENPRUEFUNG_19_RUNWAY_KPI_VOR_AUSZAHLUNG.md',
+        reviewStatus: 'pending_external_review',
+        contracts: {
+            historicalMetrics: HISTORICAL_BACKTEST_METRICS_SCHEMA_VERSION,
+            sweepMetrics: SWEEP_METRICS_VERSION,
+            runwayMeasurementPhase: 'after_transaction_before_payout',
+            postPayoutRole: 'explicit_diagnostic_only'
+        },
+        resultProjection: {
+            sourceActualSha256: expectedSlice17.targetActualSha256,
+            targetActualSha256: slice17BacktestMeasurement.targetActualSha256,
+            caseCount: slice17BacktestMeasurement.caseCount,
+            negativeCaseCount: slice17BacktestMeasurement.negativeCaseCount,
+            ruinCaseCount: slice17BacktestMeasurement.ruinCaseCount
+        },
+        integratedReference: {
+            sourceCanonicalRowsHash: expectedSlice17.integratedReferenceDelta.target.canonicalRowsHash,
+            targetCanonicalRowsHash: slice17BacktestMeasurement.integratedReferenceDelta.target.canonicalRowsHash,
+            outcomeChanged: expectedSlice17.integratedReferenceDelta.target.outcome
+                !== slice17BacktestMeasurement.integratedReferenceDelta.target.outcome,
+            observedRowCountDelta: slice17BacktestMeasurement.integratedReferenceDelta.target.observedRowCount
+                - expectedSlice17.integratedReferenceDelta.target.observedRowCount,
+            summaryEndWealthDelta: round(
+                slice17BacktestMeasurement.integratedReferenceDelta.target.summaryEndWealth
+                - expectedSlice17.integratedReferenceDelta.target.summaryEndWealth
+            ),
+            totalWithdrawalDelta: round(
+                slice17BacktestMeasurement.integratedReferenceDelta.target.totalWithdrawal
+                - expectedSlice17.integratedReferenceDelta.target.totalWithdrawal
+            ),
+            totalTaxDelta: round(
+                slice17BacktestMeasurement.integratedReferenceDelta.target.totalTax
+                - expectedSlice17.integratedReferenceDelta.target.totalTax
+            ),
+            maxAbsolutePortfolioFlowDelta: slice17BacktestMeasurement.integratedReferenceDelta.target.maxAbsolutePortfolioFlowDelta
+        },
+        crossSliceRuntimeBinding: {
+            sourceCrossSliceOracleProjectionSha256: expectedSlice17.preservedCrossSliceRuntimeBinding.crossSliceOracleProjectionSha256,
+            targetCrossSliceOracleProjectionSha256: slice17BacktestMeasurement.preservedCrossSliceRuntimeBinding.crossSliceOracleProjectionSha256,
+            sourceSlice09To10DeltaLedgerSha256: expectedSlice17.preservedCrossSliceRuntimeBinding.slice09To10DeltaLedgerSha256,
+            targetSlice09To10DeltaLedgerSha256: slice17BacktestMeasurement.preservedCrossSliceRuntimeBinding.slice09To10DeltaLedgerSha256
+        }
+    };
+    if (process.env.PRINT_BACKTEST_DATA_19 === '1') {
+        console.log('__BACKTEST_DATA_19_MEASUREMENT_START__');
+        console.log(stableStringify(slice19BacktestMeasurement, 2));
+        console.log('__BACKTEST_DATA_19_MEASUREMENT_END__');
     } else {
-        const expectedSlice17 = JSON.parse(fs.readFileSync(slice17MeasurementFixturePath, 'utf8')).backtest;
-        const slice17Diffs = collectDiffs(expectedSlice17, slice17BacktestMeasurement);
-        if (slice17Diffs.length > 0) console.error(stableStringify(slice17Diffs.slice(0, 20), 2));
-        assertEqual(slice17Diffs.length, 0,
-            'Slice-17 backtest measurement and preserved cross-slice oracles must reproduce exactly');
+        const slice19FixtureBytes = fs.readFileSync(slice19MeasurementFixturePath);
+        assertEqual(
+            createHash('sha256').update(slice19FixtureBytes).digest('hex'),
+            'f4e5ec836831319eb889396d2535e55400ab35e7f8e492d11091bf786900cc9e',
+            'Slice-19 runway KPI fixture must remain byte-identical'
+        );
+        const expectedSlice19 = JSON.parse(slice19FixtureBytes.toString('utf8')).backtest;
+        const slice19Diffs = collectDiffs(expectedSlice19, slice19BacktestMeasurement);
+        if (slice19Diffs.length > 0) console.error(stableStringify(slice19Diffs.slice(0, 20), 2));
+        assertEqual(slice19Diffs.length, 0,
+            'Slice-19 runway KPI measurement and preserved financial invariants must reproduce exactly');
     }
     if (process.env.PRINT_BACKTEST_DATA_10 === '1') {
         console.log('__BACKTEST_DATA_10_MEASUREMENT_START__');

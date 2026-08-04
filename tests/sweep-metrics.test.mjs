@@ -6,7 +6,10 @@ import {
     SWEEP_METRICS_VERSION
 } from '../app/simulator/simulator-results.js';
 import { readSweepMetricValue } from '../app/simulator/sweep-metrics-contract.js';
-import { mergeApplicableRunwayMinimum } from '../app/simulator/sweep-runner.js';
+import {
+    mergeApplicableRunwayMinimum,
+    readApplicableRunwayMonths
+} from '../app/simulator/sweep-runner.js';
 
 console.log('--- Sweep Metrics Contract Tests ---');
 
@@ -23,6 +26,9 @@ console.log('--- Sweep Metrics Contract Tests ---');
     });
 
     assertEqual(metrics.schemaVersion, SWEEP_METRICS_VERSION, 'Sweep metric result shape is versioned');
+    assertEqual(metrics.metricMetadata.definitions.minRunwayObserved.unit, 'months', 'Runway metadata declares months');
+    assertEqual(metrics.metricMetadata.definitions.minRunwayObserved.measurementPhase, 'after_transaction_before_payout', 'Runway metadata declares the pre-payout phase');
+    assert(metrics.metricMetadata.definitions.minRunwayObserved.source.includes('runway_after_transaction_before_payout_months'), 'Runway metadata names the canonical monthly source');
     assertClose(metrics.worst5Drawdown, 95.05, 1e-12, 'D-06 uses P95 of the ascending non-negative loss distribution');
     assertClose(metrics.p10EndWealth, 100009.9, 1e-12, 'P10 end wealth uses the canonical interpolated quantile');
     assertClose(metrics.p25EndWealth, 100024.75, 1e-12, 'P25 end wealth uses the canonical interpolated quantile');
@@ -125,6 +131,11 @@ console.log('--- Sweep Metrics Contract Tests ---');
         'Canonical metric reader rejects an unversioned shape'
     );
     assertEqual(
+        readSweepMetricValue({ metrics: { ...canonical.metrics, schemaVersion: 'SweepMetricsV3' } }, 'worst5Drawdown'),
+        null,
+        'Canonical metric reader rejects the former percent-as-months contract version'
+    );
+    assertEqual(
         readSweepMetricValue({
             metrics: {
                 ...canonical.metrics,
@@ -137,7 +148,20 @@ console.log('--- Sweep Metrics Contract Tests ---');
 }
 
 {
-    assertEqual(mergeApplicableRunwayMinimum(null, null), null, 'Sweep runner preserves missing runway coverage');
+    assertEqual(readApplicableRunwayMonths({
+        RunwayMeasurementPhase: 'after_transaction_before_payout',
+        runway_after_transaction_before_payout_months: 60,
+        RunwayCoveragePct: 100
+    }), 60, 'Sweep runner reads canonical pre-payout months instead of the coverage percentage');
+    assertEqual(readApplicableRunwayMonths({
+        RunwayMeasurementPhase: 'post_payout_end_of_year',
+        runway_after_transaction_before_payout_months: 48
+    }), null, 'Sweep runner rejects a runway value from the wrong measurement phase');
+    assertEqual(readApplicableRunwayMonths({
+        RunwayMeasurementPhase: 'after_transaction_before_payout',
+        RunwayCoveragePct: 100
+    }), null, 'Sweep runner does not treat a coverage percentage as months when the monthly field is absent');
+    assertEqual(mergeApplicableRunwayMinimum(null, null), null, 'Sweep runner preserves missing runway months');
     assertEqual(mergeApplicableRunwayMinimum(null, 24), 24, 'Sweep runner initializes the first applicable runway');
     assertEqual(mergeApplicableRunwayMinimum(24, 0), 0, 'Sweep runner preserves an applicable zero runway');
     assertEqual(mergeApplicableRunwayMinimum(12, 24), 12, 'Sweep runner retains the lower applicable runway');

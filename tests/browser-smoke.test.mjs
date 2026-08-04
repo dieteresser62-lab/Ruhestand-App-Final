@@ -1880,7 +1880,7 @@ async function runSimulatorSweepIntegration(browser, baseUrl) {
     assert(
         execution.schemaVersion === 'SweepExecutionV2'
         && execution.requestVersion === 'SweepRequestV1'
-        && execution.metricVersion === 'SweepMetricsV3',
+        && execution.metricVersion === 'SweepMetricsV4',
         'Browser sweep must expose versioned execution provenance'
     );
     assert(execution.resultCount === 1,

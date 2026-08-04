@@ -414,6 +414,9 @@ function buildBasicInputs() {
                 taxSavedByLossCarry: 12,
                 entnahme_plan: 100,
                 entnahme_effektiv: 90,
+                RunwayCoveragePct: 100,
+                RunwayMeasurementPhase: 'after_transaction_before_payout',
+                runway_after_transaction_before_payout_months: 60,
                 liq_before_payout: 500,
                 liq_after_payout: 410
             },
@@ -430,10 +433,13 @@ function buildBasicInputs() {
     });
 
     assert(ruinRow.aktionUndGrund === '>>> RUIN <<<', 'Ruin log builder should set ruin marker');
+    assert(ruinRow.RunwayCoveragePct === null && ruinRow.RunwayMeasurementPhase === 'not_applicable_terminal_ruin', 'Ruin log builder should not invent runway stress');
     assert(normalRow.taxSavedByLossCarry === 12, 'Year log builder should preserve result log fields');
+    assert(normalRow.RunwayCoveragePct === 100 && normalRow.runway_after_transaction_before_payout_months === 60, 'Year log builder should preserve canonical pre-payout runway fields');
     assert(normalRow.entnahme_plan === 100 && normalRow.liq_after_payout === 410, 'Year log builder should preserve payout transparency fields');
     assert(normalRow.CareP1_Active === 1 && normalRow.CareP2_Active === 0, 'Year log builder should write care activity fields');
     assert(deathRow.aktionUndGrund.includes('Alle Personen verstorben'), 'Death log builder should set death marker');
+    assert(deathRow.RunwayCoveragePct === null && deathRow.RunwayMeasurementPhase === 'not_applicable_all_persons_deceased', 'Death log builder should not invent runway stress');
     assert(deathRow.Person2Alive === 0, 'Death log builder should preserve partner alive flag');
 }
 

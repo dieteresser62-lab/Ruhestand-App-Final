@@ -5,6 +5,7 @@ import {
     runHistoricalBacktest
 } from '../app/simulator/historical-backtest-runner.js';
 import { HISTORICAL_TEMPORAL_CONVENTION_ID } from '../app/simulator/historical-backtest-contract.js';
+import { HISTORICAL_BACKTEST_METRICS_SCHEMA_VERSION } from '../app/simulator/historical-backtest-metrics.js';
 
 console.log('--- Historical Backtest Runner Tests ---');
 
@@ -233,6 +234,8 @@ const dependencies = {
             floor_brutto: 12,
             renteSum: 0,
             aktionUndGrund: 'TEST',
+            RunwayCoveragePct: 100,
+            RunwayMeasurementPhase: 'after_transaction_before_payout',
             steuern_gesamt: 1 + yearIndex,
             health_bucket_enabled: yearIndex === 1,
             health_bucket_end: yearIndex === 1 ? 4321.09 : 0,
@@ -396,7 +399,8 @@ assertEqual(completed.legacyMetrics.totalTaxes, 3, 'runner retains total taxes')
 assertEqual(completed.legacyMetrics.reductionYears, 1, 'exactly ten percent retains the legacy reduction counter');
 assertEqual(completed.legacyMetrics.maxReductionStreak, 1, 'runner retains the legacy reduction streak');
 assertEqual(completed.summary.reductionDenominator, 2, 'summary denominator uses completed years');
-assertEqual(completed.metrics.schemaVersion, 'HistoricalBacktestMetricsV2', 'runner exposes the canonical metric bundle');
+assertEqual(completed.metrics.schemaVersion, HISTORICAL_BACKTEST_METRICS_SCHEMA_VERSION, 'runner exposes the canonical metric bundle');
+assertEqual(completed.metrics.values.runway_stress_years_below_100_pct, 0, 'runner aggregates canonical pre-payout coverage without false stress years');
 assertEqual(completed.metrics.reductionContract.metricId, 'flex_reduction_years_gte_10_pct', 'runner exposes the inclusive ten-percent metric contract');
 assertEqual(completed.metrics.values.flex_reduction_years_gte_10_pct, 1, 'canonical reduction metric includes exactly ten percent');
 assertEqual(completed.summary.metrics.flex_reduction_years_gte_10_pct, completed.metrics.values.flex_reduction_years_gte_10_pct, 'summary projects the same canonical metric id and raw value');
@@ -489,6 +493,10 @@ assertEqual(ruin.portfolioEnd, 7, 'ruin end wealth uses the terminal ruin-year p
 assertEqual(ruin.rows[0].wertAktien + ruin.rows[0].wertGold + ruin.rows[0].liquiditaet, 7, 'ruin row reconciles to terminal end wealth');
 assertEqual(ruin.summary.endWealth, ruin.portfolioEnd, 'ruin summary reconciles to canonical terminal end wealth');
 assertEqual(ruin.rows[0].row.floor_shortfall_nominal, 5, 'ruin row retains the explicit floor shortfall raw value');
+assertEqual(ruin.rows[0].row.RunwayCoveragePct, null, 'terminal ruin row does not invent zero-percent runway coverage');
+assertEqual(ruin.rows[0].row.RunwayMeasurementPhase, 'not_applicable_terminal_ruin', 'terminal ruin row exposes a non-applicable runway phase');
+assertEqual(ruin.metrics.values.runway_min_coverage_pct, null, 'terminal ruin row does not create an artificial runway minimum');
+assertEqual(ruin.metrics.values.runway_stress_years_below_100_pct, null, 'terminal ruin row does not create an artificial stress year');
 assertEqual(ruin.metrics.values.floor_shortfall_total_nominal_eur, 5, 'ruin metric reconciles to the raw floor shortfall');
 assertEqual(ruin.metrics.values.floor_shortfall_total_real_eur, 5, 'first-year ruin shortfall is real at the start-year price basis');
 

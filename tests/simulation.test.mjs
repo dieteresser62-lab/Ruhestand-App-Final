@@ -625,7 +625,12 @@ try {
     assert(result.logData.RunwayTargetSmoothingApplied === true, 'Year result should expose runway smoothing applied flag');
     assert(result.logData.RunwayTargetSeverityPct === 50, 'Year result should expose runway smoothing severity');
     assert(result.logData.RunwayTargetHardMinMonths === 24, 'Year result should expose hard minimum runway');
-    assertEqual(result.logData.entscheidung.runwayMonths, 20, 'Post-payout runway should use the final planned annual withdrawal');
+    assertEqual(result.logData.entscheidung.runwayMonths, 32, 'Canonical runway should use pre-payout liquidity and the final planned annual withdrawal');
+    assertEqual(result.logData.runway_after_transaction_before_payout_months, 32, 'Explicit pre-payout runway should match the canonical runway');
+    assertEqual(result.logData.runway_post_payout_end_of_year_months, 20, 'Post-payout runway should remain available under an explicit diagnostic name');
+    assertEqual(result.logData.RunwayMeasurementPhase, 'after_transaction_before_payout', 'Canonical runway should expose its measurement phase');
+    assertEqual(result.ui.liquiditaet.nachher, 32000, 'Simulator UI liquidity-after-action should stop before the annual payout');
+    assertEqual(result.ui.liquiditaet.jahresende, 20000, 'Simulator UI should retain year-end liquidity under an explicit field');
     assert(result.logData.balance_trace[0].phase === 'after_payout', 'Year result should expose raw balance trace phases');
     assert(result.logData.health_bucket_end === 30000, 'Year result should expose locked health bucket at year end');
     assert(result.logData.health_bucket_warning.includes('gekappt'), 'Year result should expose health bucket warnings');
@@ -635,6 +640,9 @@ try {
     const zeroMetricResult = buildSimulatorYearResult({
         ...yearResultArgs,
         liquiditaet: 0,
+        liqBeforePayout: 0,
+        liqAfterPayout: 0,
+        liqNachZins: 0,
         zielLiquiditaet: 1000,
         spendingResult: {
             ...yearResultArgs.spendingResult,
@@ -668,7 +676,24 @@ try {
             }
         }
     });
-    assertEqual(postPolicyRunwayResult.logData.entscheidung.runwayMonths, 20, 'Post-payout runway must ignore the raw pre-policy need when the final plan is lower');
+    assertEqual(postPolicyRunwayResult.logData.entscheidung.runwayMonths, 32, 'Pre-payout runway must ignore the raw pre-policy need when the final plan is lower');
+
+    const fiveYearTargetResult = buildSimulatorYearResult({
+        ...yearResultArgs,
+        liquiditaet: 48000,
+        liqBeforePayout: 60000,
+        liqAfterPayout: 48000,
+        liqNachZins: 48000,
+        zielLiquiditaet: 60000
+    });
+    assertEqual(fiveYearTargetResult.logData.RunwayCoveragePct, 100,
+        'Five planned withdrawals before payout should report exactly 100 percent target coverage');
+    assertEqual(fiveYearTargetResult.logData.entscheidung.runwayMonths, 60,
+        'Five planned withdrawals before payout should report exactly 60 canonical runway months');
+    assertEqual(fiveYearTargetResult.logData.RunwayCoveragePostPayoutEndOfYearPct, 80,
+        'Post-payout target coverage should remain an explicitly named 80 percent diagnostic');
+    assertEqual(fiveYearTargetResult.logData.runway_post_payout_end_of_year_months, 48,
+        'Post-payout runway should remain an explicitly named 48-month diagnostic');
 
     let conflictingWithdrawalSourcesError = null;
     try {

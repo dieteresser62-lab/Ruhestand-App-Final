@@ -1,8 +1,9 @@
 "use strict";
 
-export const HISTORICAL_BACKTEST_METRICS_SCHEMA_VERSION = 'HistoricalBacktestMetricsV2';
+export const HISTORICAL_BACKTEST_METRICS_SCHEMA_VERSION = 'HistoricalBacktestMetricsV3';
 export const FLEX_REDUCTION_THRESHOLD_PCT = 10;
 export const FLEX_REDUCTION_OPERATOR = 'gte';
+export const RUNWAY_MEASUREMENT_PHASE = 'after_transaction_before_payout';
 
 const FINANCIAL_OUTCOMES = new Set(['completed', 'ruin']);
 const FLEX_HOUSEHOLD_BASES = new Set(['static_input', 'effective_vpw_plus_pension_surplus']);
@@ -282,11 +283,11 @@ export const HISTORICAL_BACKTEST_METRIC_DESCRIPTORS = freezeDeep([
         unit: 'percent',
         sign: 'higher_is_better',
         aggregationRule: 'minimum',
-        denominator: 'rows_with_finite_runway_coverage',
+        denominator: 'finite_coverage_rows_within_complete_after_transaction_before_payout_decumulation_phase',
         fractionDigits: 2,
-        missingnessRule: 'null_if_no_finite_RunwayCoveragePct',
+        missingnessRule: 'null_if_no_decumulation_row_or_phase_contract_incomplete_or_no_finite_RunwayCoveragePct',
         outcomeRule: 'available_for_completed_or_ruin',
-        source: 'rows[*].row.RunwayCoveragePct (post_payout_end_of_year)'
+        source: 'decumulation_rows[*].row.RunwayCoveragePct (after_transaction_before_payout)'
     }),
     descriptor({
         id: 'runway_stress_years_below_100_pct',
@@ -294,11 +295,11 @@ export const HISTORICAL_BACKTEST_METRIC_DESCRIPTORS = freezeDeep([
         unit: 'years',
         sign: 'lower_is_better',
         aggregationRule: 'count_value_below_100_pct',
-        denominator: 'rows_with_finite_runway_coverage',
+        denominator: 'finite_coverage_rows_within_complete_after_transaction_before_payout_decumulation_phase',
         fractionDigits: 0,
-        missingnessRule: 'null_if_no_finite_RunwayCoveragePct',
+        missingnessRule: 'null_if_no_decumulation_row_or_phase_contract_incomplete_or_no_finite_RunwayCoveragePct',
         outcomeRule: 'available_for_completed_or_ruin',
-        source: 'rows[*].row.RunwayCoveragePct (post_payout_end_of_year)'
+        source: 'decumulation_rows[*].row.RunwayCoveragePct (after_transaction_before_payout)'
     }),
     descriptor({
         id: 'wealth_max_drawdown_nominal_end_series_pct',
@@ -503,9 +504,13 @@ export function deriveHistoricalBacktestMetrics(result) {
     const minimumFlexShortfallSeries = isFinancialOutcome
         ? completeFiniteSeries(minimumFlexApplicableRows, entry => finiteOrNull(entry?.row?.minimumFlexShortfallAnnual))
         : null;
-    const runwaySeries = isFinancialOutcome
-        ? rows.map(entry => finiteOrNull(entry?.row?.RunwayCoveragePct)).filter(value => value !== null)
-        : [];
+    const runwayPhaseComplete = decumulationRows.length > 0
+        && decumulationRows.every(entry => entry?.row?.RunwayMeasurementPhase === RUNWAY_MEASUREMENT_PHASE);
+    const runwaySeries = isFinancialOutcome && runwayPhaseComplete
+        ? decumulationRows
+            .map(entry => finiteOrNull(entry?.row?.RunwayCoveragePct))
+            .filter(value => value !== null)
+        : null;
     const taxSeries = isFinancialOutcome
         ? completeFiniteSeries(rows, entry => finiteOrNull(entry?.row?.steuern_gesamt))
         : null;
@@ -552,8 +557,8 @@ export function deriveHistoricalBacktestMetrics(result) {
         minimum_flex_shortfall_total_nominal_eur: minimumFlexShortfallSeries
             ? minimumFlexShortfallSeries.reduce((sum, value) => sum + value, 0)
             : null,
-        runway_min_coverage_pct: runwaySeries.length > 0 ? Math.min(...runwaySeries) : null,
-        runway_stress_years_below_100_pct: runwaySeries.length > 0
+        runway_min_coverage_pct: runwaySeries && runwaySeries.length > 0 ? Math.min(...runwaySeries) : null,
+        runway_stress_years_below_100_pct: runwaySeries && runwaySeries.length > 0
             ? runwaySeries.filter(value => value < 100).length
             : null,
         wealth_max_drawdown_nominal_end_series_pct: startWealth !== null && rowEndSeries
@@ -589,6 +594,14 @@ export function deriveHistoricalBacktestMetrics(result) {
             effective: flexHouseholdBasis,
             consistent: flexBasisConsistent,
             decumulationRowCount: decumulationRows.length
+        },
+        runwayMeasurementContract: {
+            phase: RUNWAY_MEASUREMENT_PHASE,
+            population: 'all_non_accumulation_non_terminal_ruin_rows',
+            phaseComplete: runwayPhaseComplete,
+            finiteObservationCount: runwaySeries?.length ?? 0,
+            nullCoverageRowsExcludedAsNotApplicable: true,
+            postPayoutEndOfYearExcluded: true
         },
         drawdownReferenceSeries: 'portfolioStart followed by each rows[*].row.portfolio_total_end, nominal, including health bucket',
         descriptors: HISTORICAL_BACKTEST_METRIC_DESCRIPTORS,

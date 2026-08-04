@@ -66,6 +66,11 @@ const slice17FixturePath = path.join(
     'fixtures',
     'liquidity-runway-basis-slice-17-measurement-v1.json'
 );
+const slice19FixturePath = path.join(
+    testDir,
+    'fixtures',
+    'runway-kpi-slice-19-measurement-v1.json'
+);
 
 function runtimeModule(relativePath) {
     return import(pathToFileURL(path.join(runtimeRoot, relativePath)).href);
@@ -399,7 +404,15 @@ if (captureMode) {
     const slice08Fixture = JSON.parse(fs.readFileSync(slice08FixturePath, 'utf8'));
     const slice10FixtureBytes = fs.readFileSync(slice10FixturePath);
     const slice10Fixture = JSON.parse(slice10FixtureBytes.toString('utf8'));
-    const slice17Fixture = JSON.parse(fs.readFileSync(slice17FixturePath, 'utf8')).demography;
+    const slice17FixtureBytes = fs.readFileSync(slice17FixturePath);
+    const slice17Fixture = JSON.parse(slice17FixtureBytes.toString('utf8')).demography;
+    const slice19FixtureBytes = fs.readFileSync(slice19FixturePath);
+    assert.equal(
+        crypto.createHash('sha256').update(slice19FixtureBytes).digest('hex'),
+        'f4e5ec836831319eb889396d2535e55400ab35e7f8e492d11091bf786900cc9e',
+        'Slice-19 runway KPI fixture must remain byte-identical'
+    );
+    const slice19Fixture = JSON.parse(slice19FixtureBytes.toString('utf8'));
     assert.equal(fixture.schemaVersion, 'DemographyCareSurvivorRuntimeMeasurementV1');
     assert.equal(fixture.snapshotId, 'post-backtest-data-07-v1');
     assert.equal(fixture.sourceReference, 'post-backtest-data-06-v2');
@@ -428,9 +441,19 @@ if (captureMode) {
         'Slice-17 evidence must bind the byte-identical Slice-10 demography fixture'
     );
     assert.equal(
-        sha256(actualMeasurement),
+        crypto.createHash('sha256').update(slice17FixtureBytes).digest('hex'),
+        slice19Fixture.sourceFixtureSha256,
+        'Slice-19 evidence must bind the byte-identical Slice-17 combined fixture'
+    );
+    assert.equal(
+        slice19Fixture.demography.sourceMeasurementSha256,
         slice17Fixture.targetMeasurementSha256,
-        'Current runtime must reproduce the pending Slice-17 runway-basis projection'
+        'Slice-19 demography evidence must name the Slice-17 runtime projection'
+    );
+    assert.equal(
+        sha256(actualMeasurement),
+        slice19Fixture.demography.targetMeasurementSha256,
+        'Current runtime must reproduce the pending Slice-19 pre-payout runway projection'
     );
     assert.deepEqual(
         {

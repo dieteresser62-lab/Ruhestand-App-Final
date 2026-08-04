@@ -1959,6 +1959,49 @@ Branchentscheidung zu dokumentieren.
 Bis zu einer gesonderten Entscheidung darf eine nichtproportionale Lotauswahl
 nicht still unter `proportional_market_value_v1` eingefuehrt werden.
 
+### Slice 19 - Runway-KPI vor Jahresauszahlung
+
+**Slice-Dokument:**
+[`SLICE_BACKTEST_DATENPRUEFUNG_19_RUNWAY_KPI_VOR_AUSZAHLUNG.md`](SLICE_BACKTEST_DATENPRUEFUNG_19_RUNWAY_KPI_VOR_AUSZAHLUNG.md)
+
+**Umsetzungsstatus:** am 2026-08-04 durch den Nutzer auf dem aktuellen Branch
+beauftragt, technisch umgesetzt und validiert; externe Freigabe offen. Die
+neue Slice-19-Messgrenze belegt unveraenderte Finanzfluesse und versioniert
+`HistoricalBacktestMetricsV3` sowie `SweepMetricsV4`.
+
+**Ziel**
+
+Die generische Zieldeckung und Runway-Stresskennzahlen messen die freie
+Liquiditaet nach Transaktion und vor Jahresauszahlung. Die Jahresend-Reichweite
+nach Auszahlung bleibt als eigene Diagnose erhalten. Monte-Carlo-Jahreslogs
+uebernehmen denselben Phasenvertrag; terminale Zeilen erfinden keine
+Null-Prozent-Beobachtung. Der Sweep korrigiert zugleich den offengelegten
+Einheitenfehler, bei dem eine als Monate deklarierte Kennzahl bisher
+Prozentwerte aggregiert.
+
+**Abnahmekriterien**
+
+- Vor-Auszahlungs-Zieldeckung und -Monate sind in Backtest und Monte Carlo
+  phasengleich und nachrechenbar.
+- Historische Stresskennzahlen konsumieren ausschliesslich anwendbare
+  Vor-Auszahlungs-Zeilen.
+- Sweep-/Auto-Optimize-Runway ist tatsaechlich in Monaten und der geaenderte
+  Vertrag ist versioniert.
+- Finanzfluesse und Engine-Policies bleiben unveraendert; Pflichtgates
+  bestehen und Codex erteilt keine eigene Freigabe.
+
+**Technischer Nachweis**
+
+- Fuenfjahreszeuge: 100 Prozent/60 Monate vor und 80 Prozent/48 Monate nach
+  einer Jahresauszahlung;
+- historischer Referenzlauf: kein Delta bei Endvermoegen, Entnahme, Steuer,
+  Outcome, Jahreszahl oder FlowDelta;
+- vertraulicher Nutzerlauf rein lesend nachgerechnet: Mindestdeckung
+  80,1547 auf 100,4302 Prozent und Stressjahre 23 auf 0; keine absoluten
+  Nutzerwerte in Repository-Artefakten;
+- `npm test`: 18.977/18.977; Browser: 29/29; Dokumentations- und Diff-Gates
+  bestanden.
+
 ## Priorisierung und Startreihenfolge
 
 Die technische Reihenfolge ist:
@@ -1977,6 +2020,8 @@ Die technische Reihenfolge ist:
     offengelegten effektiven Runway-Bedarfsbasis.
 11. Slice 18 als noch nicht begonnener Folgeslice fuer Robustheit und
     Versionierung des Lot-Steuervertrags nach CR17-13.
+12. Slice 19 als Ergebnisvertrags-Bugfix fuer die vom Nutzer festgelegte
+    Vor-Auszahlungs-Runway und die damit verbundene Sweep-Einheit.
 
 Innerhalb der Datenersetzung besitzt Slice 2 wegen des bereits quantifizierten
 2024-Aktienfehlers die hoechste Ergebnisprioritaet. Ein Quellen- oder
