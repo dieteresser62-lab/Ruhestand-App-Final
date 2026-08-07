@@ -59,7 +59,7 @@ engine/
 | `planners/minimum-flex-policy.mjs` | `{ applyMinimumFlexFloor }` | Bedingte Mindest-Flex-Untergrenze als Rate nach Guardrails und vor Flex-Budget |
 | `planners/spending-diagnosis.mjs` | `{ buildSpendingDiagnosis, resolveRunwayTarget }` | Finale Spending-Diagnose, Guardrail-Uebersicht, Key-Parameter-Kopie und Runway-Ziel |
 | `planners/spending-guardrails.mjs` | `{ applyGuardrails }` | Recovery-Cap, Caution-Inflationscap, Budget-Floor und Guardrail-Diagnosen |
-| `planners/spending-policy-pipeline.mjs` | `{ applySpendingPolicyPipeline, SPENDING_POLICY_ORDER_CONTRACT }` | Laufzeitgepruefter `SpendingPolicyOrderV1`: Alarm, Guardrails, Mindest-Flex, Flex-Budget und finale Glaettung |
+| `planners/spending-policy-pipeline.mjs` | `{ applySpendingPolicyPipeline, SPENDING_POLICY_ORDER_CONTRACT }` | Laufzeitgepruefter `SpendingPolicyOrderV2`: Alarm, Guardrails, Mindest-Flex, Flex-Budget, finale Glaettung und abschliessender Safety-Cap |
 | `planners/spending-policy-helpers.mjs` | `{ quantizeMonthly, smoothstep, calcFlexShare, calculateFinalWithdrawal }` | Reine Helper fuer Spending-Policies |
 | `planners/wealth-reduction.mjs` | `{ calculateWealthAdjustedReductionFactor }` | Vermoegensbasierte Daempfung der Flex-Reduktion |
 | `transactions/TransactionEngine.mjs` | `TransactionEngine` | Liquiditätsziele, Rebalancing |
@@ -122,6 +122,31 @@ Bei `dynamicFlex=false` bleibt das bisherige Flex-Verhalten unverändert.
 `minimumFlexAnnual` ist ein optionaler nicht-negativer Jahresbetrag. Ein fehlender oder leerer Wert bedeutet `0`; nicht-finite oder negative Engine-Werte werden abgelehnt. Werte über `flexBedarf` werden bereits an den Simulator-/Profilgrenzen fail-closed abgelehnt, damit der Flex-Bedarf die fachliche Obergrenze bleibt. Im Profilverbund werden die profilbezogenen Werte addiert; ihre Summe darf den aggregierten Haushalts-Flexbedarf nicht uebersteigen.
 
 Die Spending-Wirkung erfolgt in `applyMinimumFlexFloor()` als Rate nach Guardrails und vor Flex-Budget sowie finaler Glaettung; `0` verändert bestehende Simulationen nicht. Das Ziel ist haushaltsweit: Ein nach Floor-Deckung verbleibender Rentenueberschuss deckt zuerst Mindest-Flex, nur der Rest ist ein Depotziel. Alarm oder unzureichende Gesamtvermoegens-/Runway-Deckung blockieren die Anhebung. Die finale Monatsquantisierung schreibt Rentenueberschuss plus tatsaechlich wirksamen Depotflex und einen moeglichen Fehlbetrag in `minimumFlexEffectiveFinal`, `minimumFlexShortfallAnnual` und `minimumFlexFulfilled`; `minimumFlexStatus` unterscheidet Policy-Blockaden, nachgelagerte Limits, unzureichenden Gesamt-Flex und Quantisierung.
+
+### Safety-Cap und schwere Flex-Notlage
+
+`SpendingPolicyOrderV2` fuehrt nach Alarm, Guardrails, Mindest-Flex,
+Flex-Budget und finaler Glaettung einen abschliessenden `safety_cap` aus.
+Strukturierte Kandidaten entstehen durch aktiven Alarm, einen positiven
+`bear_deep`-Rohcut oder einen tatsaechlich bindenden Flexraten-/Spending-
+Guardrail. Die niedrigste Kandidatenrate ist das normale Policy-Ziel gegen
+spaetere Komfortanhebungen. Seine im aktuellen Jahr wirksame Obergrenze
+respektiert weiterhin die konfigurierten jaehrlichen Flex-Aenderungsgrenzen;
+ein noch nicht erreichbares Ziel wird als aufgeschoben diagnostiziert. Bei rein
+marktbedingten Safety-Caps bleibt
+Mindest-Flex ausserhalb der schweren Notlage die Untergrenze, sofern kein
+bestehender Alarm-, Solvenz- oder Runway-Blocker greift.
+
+Die schwere Flex-Notlage verlangt gleichzeitig `bear_deep` und mehr als 25
+Prozent realen Drawdown des aktiven Gesamtvermoegens. Exakt 25 Prozent, ein
+lokaler Extrembaer allein, Alarm oder ein Entnahmebelastungsfaktor reichen
+nicht. Bei aktivem Gate wird der Flex einschliesslich Mindest-Flex auf 0
+gesetzt und mit `overridden_by_severe_flex_emergency` diagnostiziert. Die
+Nullrate wird als Istwert gespeichert, waehrend ein getrennter Vor-Gate-Wert
+als Glaettungsanker fuer das erste Erholungsjahr erhalten bleibt. Der
+separate Floor bleibt unveraendert. Fehlende oder nicht-endliche Gatewerte
+scheitern fail-closed; ein endlicher negativer Vor-Peak-Drawdown wird als neues
+reales Hoch auf 0 normalisiert.
 
 ---
 

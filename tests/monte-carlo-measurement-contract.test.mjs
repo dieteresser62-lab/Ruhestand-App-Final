@@ -89,6 +89,7 @@ const slice08MeasurementPath = path.join(fixtureDir, 'liquidity-runway-slice-08-
 const slice09MeasurementPath = path.join(fixtureDir, 'minimum-flex-slice-09-v1.json');
 const slice10MeasurementPath = path.join(fixtureDir, 'tax-logic-slice-10-v1.json');
 const slice17MeasurementPath = path.join(fixtureDir, '..', 'liquidity-runway-basis-slice-17-measurement-v1.json');
+const safetyPolicySlice03MeasurementPath = path.join(fixtureDir, '..', 'safety-policy-slice-03-measurement-v1.json');
 
 function getGolden(id) {
     return goldenFixture.cases.find(entry => entry.id === id);
@@ -1698,16 +1699,49 @@ const currentSlice17Measurement = {
     measuredProjectionCount: Object.keys(slice17TargetProjectionHashes).length,
     cause: 'planned_withdrawal_controls_liquidity_while_safety_retains_pre_policy_need'
 };
-if (process.env.MC_PRINT_SLICE_17 === '1') {
-    console.log('__POST_BACKTEST_DATA_17_CAPTURE_START__');
-    console.log(JSON.stringify(currentSlice17Measurement, null, 2));
-    console.log('__POST_BACKTEST_DATA_17_CAPTURE_END__');
+const slice17FixtureBytes = fs.readFileSync(slice17MeasurementPath);
+assertEqual(
+    createHash('sha256').update(slice17FixtureBytes).digest('hex'),
+    '9a733a9cf5454d038e178250e0904d564244657c35173d0a5b899ec54312f241',
+    'Immutable Slice-17 combined measurement must remain byte-identical for Slice-03'
+);
+const expectedSlice17 = JSON.parse(slice17FixtureBytes.toString('utf8')).monteCarlo;
+const safetyPolicySlice03MonteCarloMeasurement = {
+    schemaVersion: 'SafetyPolicySlice03MonteCarloMeasurementV1',
+    sourceReference: 'post-backtest-data-17-v1',
+    sourceFixtureSha256: createHash('sha256').update(slice17FixtureBytes).digest('hex'),
+    targetResultDocument: 'docs/internal/SLICE_ABSCHLUSSHAERTUNG_03_SAFETY_POLICY_PRIORITAET.md',
+    reviewStatus: 'pending_external_review',
+    sourceProjectionHashes: expectedSlice17.targetProjectionHashes,
+    targetProjectionHashes: slice17TargetProjectionHashes,
+    changedProjectionCount: Object.entries(slice17TargetProjectionHashes)
+        .filter(([key, value]) => expectedSlice17.targetProjectionHashes[key] !== value)
+        .length,
+    measuredProjectionCount: Object.keys(slice17TargetProjectionHashes).length,
+    technicalErrorCount: actualFinalProjection?.result?.technicalInventory?.technicalError ?? null,
+    requestedRuns: actualFinalProjection?.result?.technicalInventory?.requested ?? null,
+    financiallyEvaluableRuns: actualFinalProjection?.result?.technicalInventory?.financiallyEvaluable ?? null,
+    cause: 'structural_safety_cap_changes_withdrawals_without_changing_sampling_or_worker_contracts'
+};
+assertEqual(safetyPolicySlice03MonteCarloMeasurement.technicalErrorCount, 0,
+    'Slice-03 fixed Monte Carlo evidence must contain no technical path errors');
+assertEqual(
+    safetyPolicySlice03MonteCarloMeasurement.financiallyEvaluableRuns,
+    safetyPolicySlice03MonteCarloMeasurement.requestedRuns,
+    'Slice-03 fixed Monte Carlo evidence must retain every requested run as financially evaluable'
+);
+if (process.env.MC_PRINT_SAFETY_POLICY_SLICE_03 === '1') {
+    console.log('__SAFETY_POLICY_SLICE_03_MONTE_CARLO_START__');
+    console.log(JSON.stringify(safetyPolicySlice03MonteCarloMeasurement, null, 2));
+    console.log('__SAFETY_POLICY_SLICE_03_MONTE_CARLO_END__');
 } else {
-    const expectedSlice17 = JSON.parse(fs.readFileSync(slice17MeasurementPath, 'utf8')).monteCarlo;
+    const expectedSafetyPolicySlice03 = JSON.parse(
+        fs.readFileSync(safetyPolicySlice03MeasurementPath, 'utf8')
+    ).monteCarlo;
     compareSnapshotNode(
-        currentSlice17Measurement,
-        expectedSlice17,
-        'postBacktestData17.measurement',
+        safetyPolicySlice03MonteCarloMeasurement,
+        expectedSafetyPolicySlice03,
+        'safetyPolicySlice03.monteCarlo',
         sameRuntime,
         activeSnapshot.metadata.numericTolerance
     );

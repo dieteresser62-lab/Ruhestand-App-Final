@@ -15,6 +15,7 @@ import {
 } from '../app/simulator/historical-backtest-contract.js';
 import { EngineAPI } from '../engine/index.mjs';
 import { CONFIG } from '../engine/config.mjs';
+import { SpendingPlanner } from '../engine/planners/SpendingPlanner.mjs';
 import { formatPercentValue } from '../app/simulator/simulator-formatting.js';
 import { formatCurrency } from '../app/simulator/simulator-utils.js';
 import { buildHistoricalBacktestRawExport } from '../app/simulator/historical-backtest-export.js';
@@ -34,6 +35,7 @@ const slice10MeasurementFixturePath = path.join(__dirname, 'fixtures', 'tax-logi
 const slice13IntegrationFixturePath = path.join(__dirname, 'fixtures', 'backtest-data-integration-slice-13-v1.json');
 const slice17MeasurementFixturePath = path.join(__dirname, 'fixtures', 'liquidity-runway-basis-slice-17-measurement-v1.json');
 const slice19MeasurementFixturePath = path.join(__dirname, 'fixtures', 'runway-kpi-slice-19-measurement-v1.json');
+const safetyPolicySlice03MeasurementFixturePath = path.join(__dirname, 'fixtures', 'safety-policy-slice-03-measurement-v1.json');
 const backtestSourcePath = path.join(__dirname, '..', 'app', 'simulator', 'simulator-backtest.js');
 const backtestRunnerSourcePath = path.join(__dirname, '..', 'app', 'simulator', 'historical-backtest-runner.js');
 const UPDATE_TARGET = process.env.UPDATE_BACKTEST_TARGET === '1';
@@ -1585,6 +1587,157 @@ try {
         'Reference result source commit is measured from git rev-parse HEAD');
     assertEqual(integrated2000To2025Result?.request?.engine?.sourceTreeStatus, measuredSourceTreeStatus,
         'Reference result source-tree status is measured from git status');
+    const integratedSafetyRows = (integrated2000To2025Result?.rows || [])
+        .filter(entry => entry?.row?.Regime !== 'BANKRUPT');
+    const safetyCapBindingYears = integratedSafetyRows
+        .filter(entry => entry?.row?.SafetyCapApplied === true)
+        .map(entry => ({
+            year: entry.jahr,
+            source: entry.row.SafetyCapSource || null,
+            policyTargetRatePct: round(entry.row.SafetyCapFlexRatePct, 9),
+            effectiveCapRatePct: round(entry.row.SafetyCapEffectiveFlexRatePct, 9),
+            finalFlexRatePct: round(entry.row.FlexRatePct, 9),
+            deferredByRateLimit: entry.row.SafetyCapDeferredByRateLimit === true,
+            withdrawalNominalEur: round(entry.row.entscheidung?.jahresEntnahme),
+            floorNominalEur: round(entry.row.floor_brutto),
+            minimumFlexAnnualNominalEur: round(entry.row.minimumFlexAnnual),
+            minimumFlexStatus: entry.row.minimumFlexStatus || null,
+            severeFlexEmergencyActive: entry.row.SevereFlexEmergencyActive === true,
+            realTotalWealthDrawdownPct: round(entry.row.RealTotalWealthDrawdownPct, 9)
+        }));
+    const syntheticInput = {
+        inflation: 0,
+        liquidityRunwayYears: 5,
+        floorBedarf: 24_000,
+        flexBedarf: 60_000,
+        minimumFlexAnnual: 30_000,
+        flexBudgetAnnual: 0,
+        flexBudgetYears: 0,
+        flexBudgetRecharge: 0,
+        budgetInflationBoost: 0,
+        endeVJ: 100,
+        endeVJ_1: 100,
+        endeVJ_2: 100
+    };
+    const syntheticBaseState = {
+        initialized: true,
+        flexRate: 100,
+        alarmActive: false,
+        peakRealVermoegen: 1_000_000,
+        cumulativeInflationFactor: 1,
+        lastEntnahmeReal: 84_000,
+        lastMarketSKey: 'bear_deep',
+        lastTotalBudget: 84_000
+    };
+    const runSyntheticSafetyYear = ({ lastState, sKey, totalWealth, athGapPct }) => SpendingPlanner.determineSpending({
+        lastState,
+        market: { sKey, szenarioText: sKey, abstandVomAthProzent: athGapPct },
+        inflatedBedarf: { floor: 24_000, flex: 60_000 },
+        runwayMonate: 60,
+        profil: {},
+        depotwertGesamt: totalWealth,
+        gesamtwert: totalWealth,
+        renteJahr: 0,
+        input: syntheticInput
+    });
+    const syntheticNormal = runSyntheticSafetyYear({
+        lastState: syntheticBaseState,
+        sKey: 'bear_deep',
+        totalWealth: 800_000,
+        athGapPct: 35
+    });
+    const syntheticSevere = runSyntheticSafetyYear({
+        lastState: syntheticBaseState,
+        sKey: 'bear_deep',
+        totalWealth: 700_000,
+        athGapPct: 35
+    });
+    const syntheticRecovery = runSyntheticSafetyYear({
+        lastState: syntheticSevere.newState,
+        sKey: 'side_long',
+        totalWealth: 900_000,
+        athGapPct: 10
+    });
+    const projectSyntheticSafetyWitness = result => ({
+        finalFlexRatePct: round(result.spendingResult.details.flexRate, 9),
+        withdrawalNominalEur: round(result.spendingResult.details.endgueltigeEntnahme),
+        floorNominalEur: 24_000,
+        minimumFlexAnnualNominalEur: round(result.spendingResult.details.minimumFlexAnnual),
+        minimumFlexStatus: result.spendingResult.details.minimumFlexStatus || null,
+        minimumFlexFulfilled: result.spendingResult.details.minimumFlexFulfilled === true,
+        policyTargetRatePct: round(result.spendingResult.details.safetyCapFlexRatePct, 9),
+        effectiveCapRatePct: round(result.spendingResult.details.safetyCapEffectiveFlexRatePct, 9),
+        safetyCapApplied: result.spendingResult.details.safetyCapApplied === true,
+        deferredByRateLimit: result.spendingResult.details.safetyCapDeferredByRateLimit === true,
+        severeFlexEmergencyActive: result.spendingResult.details.severeFlexEmergencyActive === true,
+        smoothingReferencePct: round(result.newState.flexRateSmoothingReference, 9)
+    });
+    const safetyPolicyEvidence = {
+        completedYearCount: integratedSafetyRows.length,
+        safetyCapActiveYearCount: integratedSafetyRows.filter(entry => entry?.row?.SafetyCapActive === true).length,
+        safetyCapAppliedYearCount: safetyCapBindingYears.length,
+        normalSafetyCapAppliedYearCount: integratedSafetyRows.filter(entry => (
+            entry?.row?.SafetyCapApplied === true
+            && entry?.row?.SevereFlexEmergencyActive !== true
+        )).length,
+        normalSafetyCapDeferredYearCount: integratedSafetyRows.filter(entry => (
+            entry?.row?.SafetyCapDeferredByRateLimit === true
+            && entry?.row?.SevereFlexEmergencyActive !== true
+        )).length,
+        severeFlexEmergencyYearCount: integratedSafetyRows.filter(entry => entry?.row?.SevereFlexEmergencyActive === true).length,
+        floorViolationCount: integratedSafetyRows.filter(entry => (
+            Number(entry?.row?.entscheidung?.jahresEntnahme) + 0.01 < Number(entry?.row?.floor_brutto)
+        )).length,
+        normalSafetyCapMinimumFlexViolationCount: integratedSafetyRows.filter(entry => (
+            entry?.row?.SafetyCapApplied === true
+            && entry?.row?.SevereFlexEmergencyActive !== true
+            && entry?.row?.minimumFlexApplicable === true
+            && entry?.row?.minimumFlexFulfilled !== true
+        )).length,
+        severeEmergencyFloorMismatchCount: integratedSafetyRows.filter(entry => (
+            entry?.row?.SevereFlexEmergencyActive === true
+            && Math.abs(
+                Number(entry?.row?.entscheidung?.jahresEntnahme)
+                - Number(entry?.row?.floor_brutto)
+            ) > 0.01
+        )).length,
+        bindingYears: safetyCapBindingYears,
+        syntheticWitnesses: {
+            normalRateLimitedCapWithPositiveMinimumFlex: projectSyntheticSafetyWitness(syntheticNormal),
+            severeOverrideWithPositiveMinimumFlex: projectSyntheticSafetyWitness(syntheticSevere),
+            firstRecoveredYearWithPositiveMinimumFlex: projectSyntheticSafetyWitness(syntheticRecovery)
+        }
+    };
+    assertEqual(safetyPolicyEvidence.floorViolationCount, 0,
+        'Slice-03 integrated reference must never reduce the planned Floor');
+    assertEqual(safetyPolicyEvidence.normalSafetyCapMinimumFlexViolationCount, 0,
+        'Normal Slice-03 Safety-Caps must preserve applicable minimum flex');
+    assertEqual(safetyPolicyEvidence.severeEmergencyFloorMismatchCount, 0,
+        'Every integrated severe emergency year must retain exactly the planned Floor');
+    assertEqual(
+        safetyPolicyEvidence.syntheticWitnesses.normalRateLimitedCapWithPositiveMinimumFlex.deferredByRateLimit,
+        true,
+        'Synthetic normal witness must prove the rate-limited Safety target with positive minimum flex'
+    );
+    assertEqual(
+        safetyPolicyEvidence.syntheticWitnesses.severeOverrideWithPositiveMinimumFlex.finalFlexRatePct,
+        0,
+        'Synthetic severe witness must prove that positive minimum flex can be overridden'
+    );
+    assertEqual(
+        safetyPolicyEvidence.syntheticWitnesses.severeOverrideWithPositiveMinimumFlex.withdrawalNominalEur,
+        safetyPolicyEvidence.syntheticWitnesses.severeOverrideWithPositiveMinimumFlex.floorNominalEur,
+        'Synthetic severe witness must retain exactly the Floor'
+    );
+    assert(
+        safetyPolicyEvidence.syntheticWitnesses.firstRecoveredYearWithPositiveMinimumFlex.finalFlexRatePct >= 50,
+        'First recovered synthetic year must immediately restore the positive minimum flex'
+    );
+    assertEqual(
+        safetyPolicyEvidence.syntheticWitnesses.firstRecoveredYearWithPositiveMinimumFlex.minimumFlexFulfilled,
+        true,
+        'First recovered synthetic year must fulfil positive minimum flex'
+    );
 
     const backtestSource = [backtestSourcePath, backtestRunnerSourcePath]
         .map(sourcePath => fs.readFileSync(sourcePath, 'utf8'))
@@ -2221,22 +2374,84 @@ try {
             targetSlice09To10DeltaLedgerSha256: slice17BacktestMeasurement.preservedCrossSliceRuntimeBinding.slice09To10DeltaLedgerSha256
         }
     };
-    if (process.env.PRINT_BACKTEST_DATA_19 === '1') {
-        console.log('__BACKTEST_DATA_19_MEASUREMENT_START__');
-        console.log(stableStringify(slice19BacktestMeasurement, 2));
-        console.log('__BACKTEST_DATA_19_MEASUREMENT_END__');
+    const slice19FixtureBytes = fs.readFileSync(slice19MeasurementFixturePath);
+    assertEqual(
+        createHash('sha256').update(slice19FixtureBytes).digest('hex'),
+        'f4e5ec836831319eb889396d2535e55400ab35e7f8e492d11091bf786900cc9e',
+        'Slice-19 runway KPI fixture must remain byte-identical'
+    );
+    const expectedSlice19 = JSON.parse(slice19FixtureBytes.toString('utf8')).backtest;
+    const safetyPolicySlice03BacktestMeasurement = {
+        schemaVersion: 'SafetyPolicySlice03BacktestMeasurementV1',
+        sourceReference: 'post-backtest-data-19-v1',
+        sourceFixtureSha256: createHash('sha256').update(slice19FixtureBytes).digest('hex'),
+        targetResultDocument: 'docs/internal/SLICE_ABSCHLUSSHAERTUNG_03_SAFETY_POLICY_PRIORITAET.md',
+        reviewStatus: 'pending_external_review',
+        cause: 'rate_limited_structural_safety_targets_and_severe_gate_protects_floor_without_poisoning_recovery_anchor',
+        resultProjection: {
+            sourceActualSha256: expectedSlice19.resultProjection.targetActualSha256,
+            targetActualSha256: slice17BacktestMeasurement.targetActualSha256,
+            caseCount: slice17BacktestMeasurement.caseCount,
+            negativeCaseCount: slice17BacktestMeasurement.negativeCaseCount,
+            ruinCaseCount: slice17BacktestMeasurement.ruinCaseCount
+        },
+        integratedReference: {
+            source: {
+                outcome: expectedSlice17.integratedReferenceDelta.target.outcome,
+                observedRowCount: expectedSlice17.integratedReferenceDelta.target.observedRowCount,
+                summaryEndWealth: expectedSlice17.integratedReferenceDelta.target.summaryEndWealth,
+                totalWithdrawal: expectedSlice17.integratedReferenceDelta.target.totalWithdrawal,
+                totalTax: expectedSlice17.integratedReferenceDelta.target.totalTax,
+                canonicalRowsHash: expectedSlice19.integratedReference.targetCanonicalRowsHash
+            },
+            target: {
+                outcome: slice17BacktestMeasurement.integratedReferenceDelta.target.outcome,
+                observedRowCount: slice17BacktestMeasurement.integratedReferenceDelta.target.observedRowCount,
+                summaryEndWealth: slice17BacktestMeasurement.integratedReferenceDelta.target.summaryEndWealth,
+                totalWithdrawal: slice17BacktestMeasurement.integratedReferenceDelta.target.totalWithdrawal,
+                totalTax: slice17BacktestMeasurement.integratedReferenceDelta.target.totalTax,
+                canonicalRowsHash: slice17BacktestMeasurement.integratedReferenceDelta.target.canonicalRowsHash,
+                maxAbsolutePortfolioFlowDelta: slice17BacktestMeasurement.integratedReferenceDelta.target.maxAbsolutePortfolioFlowDelta
+            },
+            delta: {
+                outcomeChanged: expectedSlice17.integratedReferenceDelta.target.outcome
+                    !== slice17BacktestMeasurement.integratedReferenceDelta.target.outcome,
+                observedRowCount: slice17BacktestMeasurement.integratedReferenceDelta.target.observedRowCount
+                    - expectedSlice17.integratedReferenceDelta.target.observedRowCount,
+                summaryEndWealth: round(
+                    slice17BacktestMeasurement.integratedReferenceDelta.target.summaryEndWealth
+                    - expectedSlice17.integratedReferenceDelta.target.summaryEndWealth
+                ),
+                totalWithdrawal: round(
+                    slice17BacktestMeasurement.integratedReferenceDelta.target.totalWithdrawal
+                    - expectedSlice17.integratedReferenceDelta.target.totalWithdrawal
+                ),
+                totalTax: round(
+                    slice17BacktestMeasurement.integratedReferenceDelta.target.totalTax
+                    - expectedSlice17.integratedReferenceDelta.target.totalTax
+                )
+            }
+        },
+        policyEvidence: safetyPolicyEvidence,
+        crossSliceRuntimeBinding: {
+            sourceCrossSliceOracleProjectionSha256: expectedSlice19.crossSliceRuntimeBinding.targetCrossSliceOracleProjectionSha256,
+            targetCrossSliceOracleProjectionSha256: slice17BacktestMeasurement.preservedCrossSliceRuntimeBinding.crossSliceOracleProjectionSha256,
+            sourceSlice09To10DeltaLedgerSha256: expectedSlice19.crossSliceRuntimeBinding.targetSlice09To10DeltaLedgerSha256,
+            targetSlice09To10DeltaLedgerSha256: slice17BacktestMeasurement.preservedCrossSliceRuntimeBinding.slice09To10DeltaLedgerSha256
+        }
+    };
+    if (process.env.PRINT_SAFETY_POLICY_SLICE_03 === '1') {
+        console.log('__SAFETY_POLICY_SLICE_03_BACKTEST_START__');
+        console.log(stableStringify(safetyPolicySlice03BacktestMeasurement, 2));
+        console.log('__SAFETY_POLICY_SLICE_03_BACKTEST_END__');
     } else {
-        const slice19FixtureBytes = fs.readFileSync(slice19MeasurementFixturePath);
-        assertEqual(
-            createHash('sha256').update(slice19FixtureBytes).digest('hex'),
-            'f4e5ec836831319eb889396d2535e55400ab35e7f8e492d11091bf786900cc9e',
-            'Slice-19 runway KPI fixture must remain byte-identical'
-        );
-        const expectedSlice19 = JSON.parse(slice19FixtureBytes.toString('utf8')).backtest;
-        const slice19Diffs = collectDiffs(expectedSlice19, slice19BacktestMeasurement);
-        if (slice19Diffs.length > 0) console.error(stableStringify(slice19Diffs.slice(0, 20), 2));
-        assertEqual(slice19Diffs.length, 0,
-            'Slice-19 runway KPI measurement and preserved financial invariants must reproduce exactly');
+        const expectedSafetyPolicySlice03 = JSON.parse(
+            fs.readFileSync(safetyPolicySlice03MeasurementFixturePath, 'utf8')
+        ).backtest;
+        const safetyPolicyDiffs = collectDiffs(expectedSafetyPolicySlice03, safetyPolicySlice03BacktestMeasurement);
+        if (safetyPolicyDiffs.length > 0) console.error(stableStringify(safetyPolicyDiffs.slice(0, 20), 2));
+        assertEqual(safetyPolicyDiffs.length, 0,
+            'Slice-03 Safety-Policy backtest delta and Floor invariants must reproduce exactly');
     }
     if (process.env.PRINT_BACKTEST_DATA_10 === '1') {
         console.log('__BACKTEST_DATA_10_MEASUREMENT_START__');

@@ -116,6 +116,60 @@ export function buildKeyParams(params = {}) {
             meta: 'Geplante Entnahmedynamik'
         });
     }
+    if (params.safetyCapActive === true && Number.isFinite(params.safetyCapFlexRatePct)) {
+        const sourceLabels = {
+            severe_bear_wealth_emergency: 'Schwere Flex-Notlage',
+            spending_guardrail: 'bindender Spending-Guardrail',
+            flex_rate_hard_cap: 'bindender Flexraten-Hard-Cap',
+            alarm: 'aktiver Alarm',
+            bear_deep: 'positiver Bear-Deep-Rohcut'
+        };
+        const source = sourceLabels[params.safetyCapSource] || params.safetyCapSource || 'unbekannte Quelle';
+        const rawCandidate = Number.isFinite(params.safetyCapRawCandidateFlexRatePct)
+            ? `; Rohkandidat ${UIUtils.formatPercentValue(params.safetyCapRawCandidateFlexRatePct, { fractionDigits: 1, invalid: 'n/a' })}`
+            : '';
+        const effectiveCap = Number.isFinite(params.safetyCapEffectiveFlexRatePct)
+            ? params.safetyCapEffectiveFlexRatePct
+            : params.safetyCapFlexRatePct;
+        const rateLimit = params.safetyCapDeferredByRateLimit === true
+            ? `; Policy-Ziel ${UIUtils.formatPercentValue(params.safetyCapFlexRatePct, { fractionDigits: 1, invalid: 'n/a' })} wird wegen der bestehenden Änderungsgrenze schrittweise erreicht`
+            : '';
+        pushMetric({
+            label: 'Safety-Flex-Obergrenze',
+            value: UIUtils.formatPercentValue(effectiveCap, { fractionDigits: 1, invalid: null }),
+            meta: `${source}${rawCandidate}${rateLimit}; final begrenzende Policy: ${params.finalLimitingPolicy || 'n/a'}`,
+            trend: params.safetyCapApplied === true ? 'down' : 'neutral'
+        });
+    }
+    if (params.severeFlexEmergencyActive === true) {
+        const threshold = Number.isFinite(params.realTotalWealthDrawdownThresholdRatio)
+            ? UIUtils.formatPercentRatio(params.realTotalWealthDrawdownThresholdRatio, { fractionDigits: 1, invalid: 'n/a' })
+            : 'n/a';
+        const drawdown = Number.isFinite(params.realTotalWealthDrawdownRatio)
+            ? UIUtils.formatPercentRatio(params.realTotalWealthDrawdownRatio, { fractionDigits: 1, invalid: 'n/a' })
+            : 'n/a';
+        pushMetric({
+            label: 'Schwere Flex-Notlage',
+            value: 'AKTIV · Flex 0%',
+            meta: `Tiefer Bärenmarkt UND realer Drawdown des aktiven Gesamtvermögens ${drawdown} > ${threshold}. Mindest-Flex bewusst überstimmt; Floor bleibt geschützt.`,
+            trend: 'down'
+        });
+        if (params.alarmActiveDiagnostic === false) {
+            pushMetric({
+                label: 'Alarm-Diagnose',
+                value: 'Inaktiv (separat)',
+                meta: 'Die Entnahmebelastung ist nur Diagnose und steuert das zweigliedrige Notfallgate nicht.',
+                trend: 'neutral'
+            });
+        }
+    } else if (params.safetyCapSource === 'alarm' && Number.isFinite(params.baseAlarmCutPct)) {
+        pushMetric({
+            label: 'Alarm-Cut',
+            value: UIUtils.formatPercentValue(params.effectiveAlarmCutPct, { fractionDigits: 1, invalid: null }),
+            meta: `Basis ${UIUtils.formatPercentValue(params.baseAlarmCutPct, { fractionDigits: 1, invalid: 'n/a' })} × Entnahmebelastungsfaktor ${Number.isFinite(params.withdrawalBurdenFactor) ? params.withdrawalBurdenFactor.toFixed(2) : 'n/a'}`,
+            trend: 'down'
+        });
+    }
     if (typeof params.minFlexRatePct === 'number' && isFinite(params.minFlexRatePct)) {
         pushMetric({
             label: 'Flex-Min-Rate',
@@ -145,7 +199,8 @@ export function buildKeyParams(params = {}) {
             limited_by_final_quantization: 'Durch Endrundung begrenzt',
             limited_by_available_flex: 'Durch verfügbaren Flex begrenzt',
             blocked_emergency: 'Blockiert',
-            limited_by_flex_budget: 'Durch Flex-Budget begrenzt'
+            limited_by_flex_budget: 'Durch Flex-Budget begrenzt',
+            overridden_by_severe_flex_emergency: 'In schwerer Flex-Notlage bewusst überstimmt'
         };
         const blockReasonLabels = {
             alarm_active: 'Alarmmodus aktiv',
@@ -157,7 +212,9 @@ export function buildKeyParams(params = {}) {
         const blockReason = params.minimumFlexBlockReason || null;
         const hasShortfall = Number.isFinite(params.minimumFlexShortfallAnnual)
             && params.minimumFlexShortfallAnnual > 0.01;
-        const trend = status === 'blocked_emergency' || hasShortfall ? 'down'
+        const trend = status === 'blocked_emergency'
+            || status === 'overridden_by_severe_flex_emergency'
+            || hasShortfall ? 'down'
             : (status === 'applied' ? 'up' : 'neutral');
         pushMetric({
             label: 'Mindest-Flex p.a.',

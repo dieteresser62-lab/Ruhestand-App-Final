@@ -20,7 +20,23 @@ export function createDiagnosisHandlers({ dom, appState }) {
         text += `Marktregime: ${diagnosis.general.marketSzenario}\n`;
         text += `Alarm-Modus: ${diagnosis.general.alarmActive ? 'AKTIV' : 'Inaktiv'}\n`;
         text += `Entnahmequote: ${UIUtils.formatPercentRatio(diagnosis.keyParams.entnahmequoteDepot, { fractionDigits: 2, invalid: 'n/a' })}\n`;
-        text += `Realer Drawdown: ${UIUtils.formatPercentRatio(-diagnosis.keyParams.realerDepotDrawdown, { fractionDigits: 1, invalid: 'n/a' })}\n`;
+        text += `Realer Drawdown aktives Gesamtvermögen: ${UIUtils.formatPercentRatio(diagnosis.keyParams.realerDepotDrawdown, { fractionDigits: 1, invalid: 'n/a' })}\n`;
+        if (diagnosis.general.safetyCapActive === true) {
+            const effectiveSafetyCap = Number.isFinite(diagnosis.general.safetyCapEffectiveFlexRatePct)
+                ? diagnosis.general.safetyCapEffectiveFlexRatePct
+                : diagnosis.general.safetyCapFlexRatePct;
+            text += `Safety-Flex-Obergrenze: ${UIUtils.formatPercentValue(effectiveSafetyCap, { fractionDigits: 1, invalid: 'n/a' })}\n`;
+            if (diagnosis.general.safetyCapDeferredByRateLimit === true) {
+                text += `Safety-Policy-Ziel: ${UIUtils.formatPercentValue(diagnosis.general.safetyCapFlexRatePct, { fractionDigits: 1, invalid: 'n/a' })} (wird wegen der bestehenden Änderungsgrenze schrittweise erreicht)\n`;
+            }
+            text += `Safety-Quelle: ${diagnosis.general.safetyCapSource || 'n/a'} (${diagnosis.general.safetyCapAnchorStage || 'n/a'})\n`;
+            text += `Final begrenzende Policy: ${diagnosis.general.finalLimitingPolicy || 'n/a'}\n`;
+        }
+        if (diagnosis.general.severeFlexEmergencyActive === true) {
+            text += `Schwere Flex-Notlage: AKTIV – aktueller tiefer Bärenmarkt UND realer Drawdown des aktiven Gesamtvermögens ${UIUtils.formatPercentRatio(diagnosis.general.realTotalWealthDrawdownRatio, { fractionDigits: 1, invalid: 'n/a' })} > ${UIUtils.formatPercentRatio(diagnosis.general.realTotalWealthDrawdownThresholdRatio, { fractionDigits: 1, invalid: 'n/a' })}\n`;
+            text += `Folge: Flex einschließlich Mindest-Flex 0%; geplanter Floor bleibt geschützt.\n`;
+            text += `Alarm-Diagnose separat: ${diagnosis.general.alarmActiveDiagnostic ? 'aktiv' : 'inaktiv/unterdrückt'}; Entnahmebelastung steuert das Notfallgate nicht.\n`;
+        }
         const formatCoverage = (value) => UIUtils.formatPercentValue(value, { fractionDigits: 0, invalid: 'n/a' });
         const coverageLine = `Liquiditätsdeckung: ${formatCoverage(diagnosis.general.deckungVorher)} → ${formatCoverage(diagnosis.general.deckungNachher)} (Ziel: 100%)`;
         text += `${coverageLine}\n`;
@@ -138,8 +154,11 @@ export function createDiagnosisHandlers({ dom, appState }) {
                 not_needed: 'Nicht benötigt',
                 applied: 'Angewandt',
                 applied_limited_by_final_smoothing: 'Geglättet angewandt',
+                limited_by_final_quantization: 'Durch Endrundung begrenzt',
+                limited_by_available_flex: 'Durch verfügbaren Flex begrenzt',
                 blocked_emergency: 'Blockiert',
-                limited_by_flex_budget: 'Durch Flex-Budget begrenzt'
+                limited_by_flex_budget: 'Durch Flex-Budget begrenzt',
+                overridden_by_severe_flex_emergency: 'In schwerer Flex-Notlage bewusst überstimmt'
             };
             const blockReasonLabels = {
                 alarm_active: 'Alarmmodus aktiv',

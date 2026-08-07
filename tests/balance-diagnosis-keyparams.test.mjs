@@ -171,4 +171,37 @@ setupDom();
     assert(txt.includes('Mindest-Runway nicht wiederherstellbar'), 'Minimum flex block reason should be visible');
 }
 
+{
+    const grid = buildKeyParams({
+        aktuelleFlexRate: 0,
+        safetyCapActive: true,
+        safetyCapFlexRatePct: 0,
+        safetyCapRawCandidateFlexRatePct: 0,
+        safetyCapSource: 'severe_bear_wealth_emergency',
+        safetyCapAnchorStage: 'post_total_wealth_drawdown_gate',
+        safetyCapApplied: true,
+        finalLimitingPolicy: 'safety_cap',
+        severeFlexEmergencyActive: true,
+        realTotalWealthDrawdownRatio: 0.2501,
+        realTotalWealthDrawdownThresholdRatio: 0.25,
+        alarmActiveDiagnostic: false,
+        minimumFlexAnnual: 30000,
+        minimumFlexStatus: 'overridden_by_severe_flex_emergency',
+        minimumFlexEffectiveBefore: 12000,
+        minimumFlexEffectiveAfter: 30000,
+        minimumFlexApplicable: true,
+        minimumFlexEffectiveFinal: 0,
+        minimumFlexShortfallAnnual: 30000
+    });
+    const txt = flattenText(grid);
+    const minimumCard = findCardByLabel(grid, 'Mindest-Flex p.a.');
+    assert(txt.includes('Safety-Flex-Obergrenze'), 'Safety cap should be visible as its own metric');
+    assert(txt.includes('Schwere Flex-Notlage'), 'Severe flex emergency should be visible');
+    assert(txt.includes('aktiven Gesamtvermögens'), 'Emergency copy should name the total-wealth basis');
+    assert(txt.includes('Mindest-Flex bewusst überstimmt; Floor bleibt geschützt'), 'Emergency copy should separate flex from floor');
+    assert(txt.includes('Alarm-Diagnose'), 'Suppressed alarm should remain a separate diagnostic');
+    assert(minimumCard?.dataset?.trend === 'down', 'Overridden minimum flex should be marked as warning trend');
+    assert(txt.includes('In schwerer Flex-Notlage bewusst überstimmt'), 'Minimum-flex override status should be human-readable');
+}
+
 console.log('✅ Balance diagnosis keyparams tests passed');

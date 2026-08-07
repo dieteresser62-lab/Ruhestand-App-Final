@@ -1,7 +1,7 @@
 # Fokussierte Abschlusshaertung der Ruhestand-Suite: Arbeitsplan
 
 **Stand:** 2026-08-07<br>
-**Status:** Slice 1 mit Commit `55bdd84` abgeschlossen; Slice 2 implementiert, die Claude-Code-Review-Findings CR2-01 bis CR2-06 nachgebessert und intern validiert; externe Re-Review von Slice 2 ausstehend<br>
+**Status:** Slice 1 mit Commit `55bdd84` und Slice 2 mit Commit `c322bbe` abgeschlossen; Slice 3 nach dem Opus-Code-Review am 2026-08-07 korrigiert und intern vollstaendig validiert; externe Re-Review/Freigabe ausstehend<br>
 **Autor:** Codex<br>
 **Entscheider und einziger Produktnutzer:** Nutzer<br>
 **Vorgesehener Feature-Branch:** `codex/fokussierte-abschlusshaertung`<br>
@@ -149,7 +149,9 @@ folgen diese verbindlichen Korrekturen:
    `eventType` behandelt.
 8. Das Jahr-2-Beispiel in Slice 3 ist nur ein isoliertes
    Ein-Jahres-Kontrafaktum. Fuer einen vollstaendigen Neulauf gilt ausschliesslich
-   die jahresweise Invariante `finaler Flex <= aktiver Safety-Cap`.
+   die jahresweise Invariante `finaler Flex <= aktuell wirksamer Safety-Cap`;
+   ein niedrigeres Policy-Ziel darf die bestehende Jahres-Abwaertsgrenze nicht
+   umgehen.
 
 Claudes dritte Reviewrunde hat fuenf Detailauflagen ergaenzt:
 
@@ -394,8 +396,8 @@ Nach Abschluss der vier Slices gilt:
 | Slice | Datei | Ziel | Abhaengigkeit | Status |
 | ---: | --- | --- | --- | --- |
 | 1 | [SLICE_ABSCHLUSSHAERTUNG_01_MC_EXPORTVERTRAG_V2.md](SLICE_ABSCHLUSSHAERTUNG_01_MC_EXPORTVERTRAG_V2.md) | einmaliger MC- und Szenario-V2-Schnitt inklusive realem Drawdown, Mindest-Flex- und 4,5-Prozent-Messcontract | keine | mit Commit `55bdd84` abgeschlossen und Baseline fuer Slice 2 |
-| 2 | [SLICE_ABSCHLUSSHAERTUNG_02_RISIKOANZEIGEN.md](SLICE_ABSCHLUSSHAERTUNG_02_RISIKOANZEIGEN.md) | exakte KPI-Anzeige mit Nutzen-/Kostenorakel und eindeutiger 4,5-Prozent-Beschriftung | Slice 1 | implementiert; CR2-01 bis CR2-06 nachgebessert; 168 Testdateien/19.222 Assertions und 29 Browserworkflows gruen; externe Re-Review ausstehend |
-| 3 | [SLICE_ABSCHLUSSHAERTUNG_03_SAFETY_POLICY_PRIORITAET.md](SLICE_ABSCHLUSSHAERTUNG_03_SAFETY_POLICY_PRIORITAET.md) | struktureller Safety-Cap mit konjunktivem Null-Flex-Notfallgate und absolutem Floor-Schutz | Slice 2 abgeschlossen; fachlich unabhaengig | Nutzerentscheidung NE-03 eingearbeitet; Jahr-1-Evidenzlauf und Gemini-Re-Review ausstehend |
+| 2 | [SLICE_ABSCHLUSSHAERTUNG_02_RISIKOANZEIGEN.md](SLICE_ABSCHLUSSHAERTUNG_02_RISIKOANZEIGEN.md) | exakte KPI-Anzeige mit Nutzen-/Kostenorakel und eindeutiger 4,5-Prozent-Beschriftung | Slice 1 | mit Commit `c322bbe` abgeschlossen; 168 Testdateien/19.222 Assertions und 29 Browserworkflows gruen |
+| 3 | [SLICE_ABSCHLUSSHAERTUNG_03_SAFETY_POLICY_PRIORITAET.md](SLICE_ABSCHLUSSHAERTUNG_03_SAFETY_POLICY_PRIORITAET.md) | struktureller Safety-Cap mit konjunktivem Null-Flex-Notfallgate und absolutem Floor-Schutz | Slice 2 abgeschlossen; fachlich unabhaengig | nach Opus-Findings korrigiert; 169 Testdateien/19.382 Assertions, 29 Browserworkflows und Delta gruen; externe Re-Review/Freigabe ausstehend |
 | 4 | [SLICE_ABSCHLUSSHAERTUNG_04_RECONCILE_CASHSTATUS.md](SLICE_ABSCHLUSSHAERTUNG_04_RECONCILE_CASHSTATUS.md) | append-only Cashstatus nach Realverkauf | Slice 3 abgeschlossen; fachlich unabhaengig | append-only Korrekturkette fuer Cashnachweise ergaenzt; Gemini-Re-Review ausstehend |
 
 Die Slices werden seriell umgesetzt. Dadurch besitzt jeder Slice einen eigenen
@@ -621,8 +623,10 @@ verbindliche Entscheidung:
   nicht ein lokal extremer Aktienmarkt allein ausreichend.
 - Ausserhalb dieser Konjunktion bleibt Mindest-Flex die Untergrenze fuer
   marktbedingte Safety-Caps. Guardrail und finale Glättung duerfen den Wert nicht
-  oberhalb der wirksamen Obergrenze anheben, der Safety-Cap darf Mindest-Flex
-  aber auch nicht allein wegen eines lokalen `bear_deep` unterschreiten.
+  oberhalb der fuer dieses Jahr unter den bestehenden Aenderungsgrenzen
+  wirksamen Obergrenze anheben. Ein niedrigeres Policy-Ziel wird schrittweise
+  erreicht; der Safety-Cap darf Mindest-Flex nicht allein wegen eines lokalen
+  `bear_deep` unterschreiten.
 - Unabhaengig vom Markt gilt die bestehende Floor-Prioritaet: Keine Flex-Policy
   reduziert den geplanten Floor. `calculateFinalWithdrawal` begrenzt die
   geplante Entnahme mindestens auf den Netto-Floor. Kann der Simulator diesen
@@ -659,9 +663,11 @@ verbindliche Entscheidung:
   festgelegte numerische Toleranz reduziert hat. Nur ein wirklich bindender
   Guardrail erzeugt einen Kandidaten; `spending-guardrails.mjs` muss dafuer
   nicht veraendert werden.
-- Die Pipeline exponiert `safetyCapFlexRatePct`, `safetyCapSource`,
-  `safetyCapBinding`, einen **quellenspezifischen** `safetyCapAnchorStage` und
-  die final begrenzende Policy.
+- Die Pipeline exponiert das Policy-Ziel `safetyCapFlexRatePct`, die fuer das
+  aktuelle Jahr rate-limitierte Obergrenze `safetyCapEffectiveFlexRatePct`,
+  `safetyCapDeferredByRateLimit`, `safetyCapSource`, `safetyCapBinding`, einen
+  **quellenspezifischen** `safetyCapAnchorStage` und die final begrenzende
+  Policy.
   `safetyCapSource` ist `alarm`, `bear_deep`, `flex_rate_hard_cap`,
   `spending_guardrail`, `severe_bear_wealth_emergency` oder `null`.
 - Das konjunktive Notfallgate exponiert
@@ -681,6 +687,12 @@ verbindliche Entscheidung:
   `safetyCapSource: severe_bear_wealth_emergency` und
   `safetyCapAnchorStage: post_total_wealth_drawdown_gate`. Er gewinnt als
   Minimum gegen alle anderen Kandidaten.
+- Der tatsaechlich ausgezahlte Null-Flex-Satz bleibt als Jahres-Istwert
+  erhalten, wird aber nicht zum Aufwaertsglaettungsanker der Folgejahre. Ein
+  getrennt persistierter Vor-Gate-Anker verhindert nach Ende der schweren
+  Notlage eine rein technisch verursachte, mehrjaehrige Mindest-Flex-
+  Unterdeckung. In normalen Jahren bleibt dagegen weiterhin die tatsaechlich
+  quantisierte Flexrate der Glaettungsanker.
 - Fuer `alarm`, `bear_deep` und `flex_rate_hard_cap` lautet der Anker
   `post_internal_smoothing_and_flex_rate_hard_caps`: bewusst **nach** EMA,
   `MAX_DOWN`, S-Kurve sowie Bären-/Runway-Hard-Cap innerhalb von
@@ -689,7 +701,10 @@ verbindliche Entscheidung:
   `applyGuardrails` entsteht. Beide liegen vor Mindest-Flex, Flex-Budget und
   finaler Pipeline-Glättung. Der rohe `basisKuerzung`-Wert ist kein Cap-Anker;
   es findet keine Neukalibrierung der internen Flexratenlogik statt.
-- Spaetere Policies respektieren einen aktiven Cap fail-closed; bei mehreren
+- Spaetere Policies respektieren einen aktiven Cap fail-closed. Im normalen
+  Pfad wird das Policy-Ziel zusaetzlich durch die bestehenden jaehrlichen
+  Auf-/Abwaertsgrenzen in eine aktuell wirksame Obergrenze ueberfuehrt; nur das
+  schwere Null-Flex-Gate darf diese Glaettung bewusst umgehen. Bei mehreren
   Safety-Signalen gilt das Minimum der Kandidaten. Bei exakt gleichem Minimum
   ist die Diagnosequelle deterministisch priorisiert:
   `severe_bear_wealth_emergency` vor `spending_guardrail` vor
@@ -729,8 +744,10 @@ verbindliche Entscheidung:
 ### Abnahme
 
 - Ein Alarm- oder Nicht-Alarm-Guardrailfall kann nachgelagert nicht mehr
-  oberhalb seiner wirksamen Obergrenze enden; ausserhalb der schweren Notlage
-  bleibt Mindest-Flex dennoch die Untergrenze.
+  oberhalb seiner fuer das Jahr wirksamen, rate-limitierten Obergrenze enden;
+  das tiefere Policy-Ziel darf die konfigurierte Jahres-Abwaertsgrenze nicht
+  umgehen. Ausserhalb der schweren Notlage bleibt Mindest-Flex dennoch die
+  Untergrenze.
 - `bear_deep` plus 25,01 Prozent realer Gesamtvermoegensdrawdown ergibt
   `severeFlexEmergencyActive: true`, finalen Flex `0` und unveraenderten Floor.
   `bear_deep` allein, exakt 25 Prozent oder ein gleich hoher Drawdown ausserhalb
@@ -2174,7 +2191,7 @@ angenommen. Die Dokumente bleiben bis zum erneuten externen Review gesperrt.
   ist bewusst kein Cap-Wert dieses Slices.
 - C-P-19: Jahr 2 ist nur noch als isoliertes Ein-Jahres-Kontrafaktum
   dokumentiert. Fuer einen Neulauf gilt pro aktivem Jahr allein
-  `finaler Flex <= Cap`.
+  `finaler Flex <= aktuell wirksamer rate-limitierter Cap`.
 - C-P-20: Jeder Abschlussrecord besitzt
   `actionId === confirmationActionId`; reservierter Namespace,
   Kollisionspruefung, Mixed-Event-Read und Preview-Filter sind verbindlich.

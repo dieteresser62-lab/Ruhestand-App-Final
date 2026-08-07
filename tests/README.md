@@ -4,7 +4,7 @@
 
 This directory contains the comprehensive testing infrastructure for the Ruhestand-App-Final project. The tests are designed to be zero-dependency, using native Node.js ESM and a custom test runner, avoiding the need for heavy frameworks like Jest or Mocha.
 
-**Test-Statistik:** 168 entdeckte Testdateien mit 19.222 von 19.222 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien, einem bestandenen separaten Gate und 0 offenen Handles (Nachbesserung der Slice-02-Code-Review-Findings mit `npm test` am 2026-08-07 verifiziert). Das separate Browser-Pflichtgate bestand mit 29/29 Workflows einschliesslich der responsiven Exaktwert-Fixture, sichtbarer langer Kartentitel und der vollstaendigen realen Simulatorseite nach einem Lauf bei 320 Pixel. Der letzte gesonderte Coverage-Lauf stammt aus der Slice-13-Nachbesserung und erreichte 78,97 Prozent Zeilenabdeckung (40.302/51.035); Coverage wurde fuer Slice 02 nicht erneut gemessen.
+**Test-Statistik:** 169 entdeckte Testdateien mit 19.382 von 19.382 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien, einem bestandenen separaten Gate und 0 offenen Handles (Slice-03-Reviewkorrektur mit `npm test` am 2026-08-07 verifiziert). Das separate Browser-Pflichtgate bestand im Wiederholungslauf nach einem transienten lokalen Windows-Socketfehler mit 29/29 Workflows einschliesslich der responsiven Exaktwert-Fixture, sichtbarer langer Kartentitel und der vollstaendigen realen Simulatorseite nach einem Lauf bei 320 Pixel. Der letzte gesonderte Coverage-Lauf stammt aus der Slice-13-Nachbesserung und erreichte 78,97 Prozent Zeilenabdeckung (40.302/51.035); Coverage wurde fuer Slice 03 nicht erneut gemessen.
 
 Die Zahl beschreibt nur die Node-Standardsuite. `npm run test:browser`, `npm run test:coverage` und ein echter Tauri-Build sind getrennte Gates und in den Assertions nicht enthalten.
 
@@ -201,6 +201,19 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 - **Guardrail-Integration:** Tests für Ceiling/Floor-Mechanismen
 - **Mindest-Flex:** Prüft Contract, haushaltsweite Anrechnung des Rentenueberschusses, Notfall-/Runway-Blockaden, Pipeline-Ordering vor Flex-Budget/Final-Limits, finale Quantisierung und die Interaktion mit niedrigem Dynamic-Flex-Stage-2-Safety-Flex. Nicht-finite vorhandene Eingaben werden an Engine- und Simulatorgrenze abgelehnt statt auf null ersetzt.
 
+#### `spending-safety-cap.test.mjs`
+**Zweck:** Validiert `SpendingPolicyOrderV2`, normale Safety-Obergrenze und das
+konjunktive Null-Flex-Gate.
+- Prüft strukturelle Quellen/Anchor, Minimum- und Gleichstandsregeln sowie die
+  Trennung von Textlabels und tatsaechlicher Ratenwirkung.
+- Deckt die Schwellen 24,99/25,00/25,01 Prozent, Alarm an/aus,
+  Entnahmebelastungsfaktor 0/1 und den C-16-Wechsel 0 -> normal -> 0 ab.
+- Belegt, dass normaler Safety-Cap Mindest-Flex respektiert, die schwere
+  Notlage alle Flex-Floors ueberstimmt und der Floor centgenau geschuetzt
+  bleibt.
+- Fehlende oder nicht-endliche Drawdowns scheitern fail-closed; ein endlicher
+  negativer Vor-Peak-Wert wird als neues reales Hoch auf 0 normalisiert.
+
 #### `spending-quantization.test.mjs`
 **Zweck:** Testet die Anti-Pseudo-Accuracy-Rundungslogik für Entnahmen.
 - **Tier-basierte Rundung:**
@@ -393,6 +406,15 @@ Inventar liegen bewusst in den jeweiligen Fachtests.
   Dynamic-Flex-Safety-Runway. Persoenliche Daten des Nutzer-Replays sind nicht
   enthalten. Die historischen Fixtures werden nicht ueberschrieben; der alte
   Slice-10-Updatepfad ist absichtlich blockiert.
+- **Abschlusshaertung Slice-03-Messung:**
+  `fixtures/safety-policy-slice-03-measurement-v1.json` bindet die
+  bytegeschuetzten Backtest-/Demografie- und Monte-Carlo-Eingangsgrenzen als
+  neuen Pending-Kandidaten. Die 2000-2025-Messung weist vier schwere
+  Null-Flex-Jahre (2002-2004 und 2008), 0 Floorverletzungen, FlowDelta 0 sowie
+  Entnahme-, Steuer- und Endvermoegensdelta aus. Monte Carlo und
+  Demografie/Pflege besitzen getrennte Zielhashes; persoenliche Replaydaten
+  sind nicht enthalten. `reviewStatus` bleibt bis zur externen Codepruefung
+  `pending_external_review`.
 - **Historische Fixture-Kompatibilitaet:** Vergleichsausnahmen fuer
   unveraenderliche Pending-Fixtures stehen ausschliesslich in
   `snapshot-policy-v1.json`. Der produktive Runtime-Vertrag enthaelt weder

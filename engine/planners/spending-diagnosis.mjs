@@ -19,6 +19,7 @@ export function buildSpendingDiagnosis({
     alarmStatus,
     params,
     guardrailDiagnostics = {},
+    policyDiagnostics = {},
     diagnosisMetrics
 }) {
     const { market, runwayMonate, profil, input } = params;
@@ -85,6 +86,42 @@ export function buildSpendingDiagnosis({
             marketSKey: market.sKey,
             marketSzenario: market.szenarioText,
             alarmActive: alarmStatus.active,
+            safetyCapActive: policyDiagnostics.safetyCapActive === true,
+            safetyCapFlexRatePct: Number.isFinite(policyDiagnostics.safetyCapFlexRatePct)
+                ? policyDiagnostics.safetyCapFlexRatePct
+                : null,
+            safetyCapEffectiveFlexRatePct: Number.isFinite(policyDiagnostics.safetyCapEffectiveFlexRatePct)
+                ? policyDiagnostics.safetyCapEffectiveFlexRatePct
+                : null,
+            safetyCapRawCandidateFlexRatePct: Number.isFinite(policyDiagnostics.safetyCapRawCandidateFlexRatePct)
+                ? policyDiagnostics.safetyCapRawCandidateFlexRatePct
+                : null,
+            safetyCapSource: policyDiagnostics.safetyCapSource || null,
+            safetyCapAnchorStage: policyDiagnostics.safetyCapAnchorStage || null,
+            safetyCapBinding: policyDiagnostics.safetyCapBinding || null,
+            safetyCapDeferredByRateLimit: policyDiagnostics.safetyCapDeferredByRateLimit === true,
+            severeFlexEmergencyActive: policyDiagnostics.severeFlexEmergencyActive === true,
+            marketExtremeBear: policyDiagnostics.marketExtremeBear === true,
+            realTotalWealthDrawdownRatio: Number.isFinite(policyDiagnostics.realTotalWealthDrawdownRatio)
+                ? policyDiagnostics.realTotalWealthDrawdownRatio
+                : null,
+            realTotalWealthDrawdownThresholdRatio: Number.isFinite(policyDiagnostics.realTotalWealthDrawdownThresholdRatio)
+                ? policyDiagnostics.realTotalWealthDrawdownThresholdRatio
+                : null,
+            minimumFlexOverrideAllowed: policyDiagnostics.minimumFlexOverrideAllowed === true,
+            alarmActiveDiagnostic: policyDiagnostics.alarmActive === true,
+            withdrawalBurdenFactor: Number.isFinite(policyDiagnostics.withdrawalBurdenFactor)
+                ? policyDiagnostics.withdrawalBurdenFactor
+                : null,
+            alarmWealthSufficient: typeof policyDiagnostics.alarmWealthSufficient === 'boolean'
+                ? policyDiagnostics.alarmWealthSufficient
+                : null,
+            alarmWealthSufficientThreshold: Number.isFinite(policyDiagnostics.alarmWealthSufficientThreshold)
+                ? policyDiagnostics.alarmWealthSufficientThreshold
+                : null,
+            withdrawalBurdenGateRole: policyDiagnostics.withdrawalBurdenGateRole || null,
+            finalLimitingPolicy: policyDiagnostics.finalLimitingPolicy || null,
+            floorProtectionPolicy: policyDiagnostics.floorProtectionPolicy || null,
             runwayMonate,
             runwayTargetMonate: runwayTargetInfo.targetMonths,
             runwayTargetQuelle: runwayTargetInfo.source

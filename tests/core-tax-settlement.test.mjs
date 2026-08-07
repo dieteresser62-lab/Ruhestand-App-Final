@@ -106,7 +106,15 @@ function assertSaleContract(action, messagePrefix) {
     assertClose(result.ui.action.verwendungen.liquiditaet, 27626.25, 0.001,
         'Core should add the tax saving only to liquidity use');
     assertClose(result.ui.spending.details.endgueltigeEntnahme, 45600, 0.001,
-        'Core witness should retain the final post-policy annual withdrawal');
+        'Core witness should retain the rate-limited and quantized final annual withdrawal');
+    assertEqual(result.ui.spending.details.safetyCapSource, 'flex_rate_hard_cap',
+        'Core witness should retain the structural flex-rate policy target as diagnostic evidence');
+    assertEqual(result.ui.spending.details.safetyCapApplied, false,
+        'Core witness should not claim that a deferred Safety target already bound this year');
+    assertEqual(result.ui.spending.details.safetyCapDeferredByRateLimit, true,
+        'Core witness should expose that the structural target is approached gradually');
+    assertEqual(result.ui.spending.details.finalLimitingPolicy, 'final_smoothing',
+        'Core witness should expose final smoothing as the actual limiting policy');
     assertClose(result.ui.runway.months, 27626.25 / (45600 / 12), 0.000001,
         'Core runway should use reconciled liquidity over the final post-policy withdrawal');
     assertSaleContract(result.ui.action, 'Partial loss carry');

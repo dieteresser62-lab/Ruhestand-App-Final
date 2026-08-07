@@ -637,6 +637,46 @@ try {
     assert(result.logData.portfolio_total_end === 150000, 'Year result should expose portfolio total including health bucket at year end');
     assert(result.logData.threeBucket.bondBucketAfter === 0, 'Year result should expose three-bucket log shape');
 
+    const safetyLogResult = buildSimulatorYearResult({
+        ...yearResultArgs,
+        fullResult: {
+            ...yearResultArgs.fullResult,
+            diagnosis: {
+                ...yearResultArgs.fullResult.diagnosis,
+                keyParams: {
+                    ...yearResultArgs.fullResult.diagnosis.keyParams,
+                    safetyCapActive: true,
+                    safetyCapFlexRatePct: 0,
+                    safetyCapRawCandidateFlexRatePct: 0,
+                    safetyCapSource: 'severe_bear_wealth_emergency',
+                    safetyCapAnchorStage: 'post_total_wealth_drawdown_gate',
+                    safetyCapApplied: true,
+                    finalLimitingPolicy: 'safety_cap',
+                    severeFlexEmergencyActive: true,
+                    marketExtremeBear: true,
+                    realTotalWealthDrawdownRatio: 0.2501,
+                    realTotalWealthDrawdownThresholdRatio: 0.25,
+                    minimumFlexOverrideAllowed: true,
+                    alarmActiveDiagnostic: false,
+                    withdrawalBurdenFactor: 0,
+                    alarmWealthSufficient: true,
+                    withdrawalBurdenGateRole: 'diagnostic_only',
+                    baseAlarmCutPct: 10,
+                    effectiveAlarmCutPct: 0,
+                    floorProtectionPolicy: 'planned_floor_unchanged'
+                }
+            }
+        }
+    });
+    assertEqual(safetyLogResult.logData.SafetyCapSource, 'severe_bear_wealth_emergency', 'Year result should project the structural safety source');
+    assertEqual(safetyLogResult.logData.SafetyCapAnchorStage, 'post_total_wealth_drawdown_gate', 'Year result should project the source-specific anchor');
+    assertEqual(safetyLogResult.logData.SafetyCapFlexRatePct, 0, 'Year result should preserve an observed zero safety cap');
+    assertEqual(safetyLogResult.logData.SevereFlexEmergencyActive, true, 'Year result should expose the severe-flex gate');
+    assertClose(safetyLogResult.logData.RealTotalWealthDrawdownPct, 25.01, 1e-12, 'Year result should expose total-wealth drawdown in percentage points');
+    assertEqual(safetyLogResult.logData.WithdrawalBurdenGateRole, 'diagnostic_only', 'Year result should keep withdrawal burden diagnostic only');
+    assertEqual(safetyLogResult.logData.AlarmActiveDiagnostic, false, 'Year result should preserve the separate suppressed-alarm diagnostic');
+    assertEqual(safetyLogResult.logData.FloorProtectionPolicy, 'planned_floor_unchanged', 'Year result should expose floor protection');
+
     const zeroMetricResult = buildSimulatorYearResult({
         ...yearResultArgs,
         liquiditaet: 0,

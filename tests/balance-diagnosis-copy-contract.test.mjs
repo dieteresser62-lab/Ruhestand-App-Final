@@ -17,7 +17,16 @@ const appState = {
     diagnosisData: {
         general: {
             marketSzenario: 'bear_deep',
-            alarmActive: true,
+            alarmActive: false,
+            safetyCapActive: true,
+            safetyCapFlexRatePct: 0,
+            safetyCapSource: 'severe_bear_wealth_emergency',
+            safetyCapAnchorStage: 'post_total_wealth_drawdown_gate',
+            finalLimitingPolicy: 'safety_cap',
+            severeFlexEmergencyActive: true,
+            realTotalWealthDrawdownRatio: 0.2501,
+            realTotalWealthDrawdownThresholdRatio: 0.25,
+            alarmActiveDiagnostic: false,
             deckungVorher: 72,
             deckungNachher: 105,
             runwayMonate: 18,
@@ -38,14 +47,14 @@ const appState = {
         },
         keyParams: {
             entnahmequoteDepot: 0.041,
-            realerDepotDrawdown: -0.18,
+            realerDepotDrawdown: 0.2501,
             peakRealVermoegen: 1000000,
             currentRealVermoegen: 820000,
             cumulativeInflationFactor: 1.18,
             aktuelleFlexRate: 78,
             minFlexRatePct: 65,
             minimumFlexAnnual: 10000,
-            minimumFlexStatus: 'blocked_emergency',
+            minimumFlexStatus: 'overridden_by_severe_flex_emergency',
             minimumFlexBlockReason: 'minimum_runway_not_restorable',
             kuerzungProzent: 22,
             jahresentnahme: 42000,
@@ -138,6 +147,12 @@ assert(text.includes('VPW-Sicherheitsmodus: Stufe 2'), 'Copytext sollte VPW-Sich
 assert(text.includes('Warnsignale:'), 'Copytext sollte VPW-Warnsignale ausgeben');
 assert(text.includes('Mindest-Flex p.a.:'), 'Copytext sollte Mindest-Flex ausgeben');
 assert(text.includes('Mindest-Runway nicht wiederherstellbar'), 'Copytext sollte Mindest-Flex-Blockgrund ausgeben');
+assert(text.includes('Realer Drawdown aktives Gesamtvermögen'), 'Copytext sollte die tatsaechliche Drawdown-Basis benennen');
+assert(text.includes('Safety-Flex-Obergrenze: 0.0%'), 'Copytext sollte den exakten Null-Flex-Cap ausgeben');
+assert(text.includes('Schwere Flex-Notlage: AKTIV'), 'Copytext sollte die schwere Flex-Notlage sichtbar benennen');
+assert(text.includes('Flex einschließlich Mindest-Flex 0%; geplanter Floor bleibt geschützt'), 'Copytext sollte Mindest-Flex und Floor trennen');
+assert(text.includes('Alarm-Diagnose separat: inaktiv/unterdrückt'), 'Copytext sollte den unterdrueckten Alarm getrennt ausweisen');
+assert(text.includes('In schwerer Flex-Notlage bewusst überstimmt'), 'Copytext sollte den neuen Mindest-Flex-Status uebersetzen');
 assert(text.includes('automatische Freigabe: Nein'), 'Copytext sollte die Balance-Freigabepolicy ausgeben');
 assert(text.includes('Pflegebucket-Policy:'), 'Copytext sollte die Pflegebucket-Policy begruenden');
 

@@ -116,7 +116,8 @@ export const SpendingPlanner = {
             alarmStatus,
             flexRate,
             policyResult.kuerzungQuelle,
-            params
+            params,
+            policyResult
         );
 
         // 7. Diagnose vervollständigen.
@@ -126,6 +127,7 @@ export const SpendingPlanner = {
             alarmStatus,
             params,
             guardrailDiagnostics: policyResult.guardrailDiagnostics,
+            policyDiagnostics: policyResult,
             diagnosisMetrics
         });
 
@@ -152,9 +154,12 @@ export const SpendingPlanner = {
             const realerDepotDrawdown = (peakRealVermoegen > 0)
                 ? (peakRealVermoegen - realVermögen) / peakRealVermoegen
                 : 0;
-            const previousFlexRate = Number.isFinite(lastState.flexRate)
+            const previousActualFlexRate = Number.isFinite(lastState.flexRate)
                 ? Math.max(0, Math.min(100, lastState.flexRate))
                 : 100;
+            const previousFlexRate = Number.isFinite(lastState.flexRateSmoothingReference)
+                ? Math.max(0, Math.min(100, lastState.flexRateSmoothingReference))
+                : previousActualFlexRate;
             const vorlaeufigeEntnahme = p.inflatedBedarf.floor +
                 (p.inflatedBedarf.flex * (previousFlexRate / 100));
             const entnahmequoteDepot = p.depotwertGesamt > 0
@@ -163,12 +168,15 @@ export const SpendingPlanner = {
 
             return {
                 ...lastState,
+                flexRate: previousFlexRate,
                 keyParams: {
                     peakRealVermoegen,
                     currentRealVermoegen: realVermögen,
                     cumulativeInflationFactor,
                     entnahmequoteDepot,
-                    realerDepotDrawdown
+                    realerDepotDrawdown,
+                    previousActualFlexRate,
+                    previousFlexRateSmoothingReference: previousFlexRate
                 }
             };
         }
@@ -305,7 +313,7 @@ export const SpendingPlanner = {
      * @param {Object} params - Laufzeitdaten.
      * @returns {{ newState: Object, spendingResult: Object, diagnosisMetrics: Object }}
      */
-    _buildResults(state, endgueltigeEntnahme, alarmStatus, flexRate, kuerzungQuelle, params) {
+    _buildResults(state, endgueltigeEntnahme, alarmStatus, flexRate, kuerzungQuelle, params, policyResult = {}) {
         const { market, renteJahr } = params;
         const { peakRealVermoegen, currentRealVermoegen, cumulativeInflationFactor } = state.keyParams;
 
@@ -319,9 +327,19 @@ export const SpendingPlanner = {
         };
 
         const entnahmeReal = endgueltigeEntnahme / cumulativeInflationFactor;
+        // Only the exceptional severe-emergency override may decouple the
+        // persisted actual rate (0%) from the next year's smoothing anchor.
+        // In every normal year the quantized, actually paid flex rate remains
+        // the anchor, preserving the established anti-pseudo-accuracy contract.
+        const flexRateSmoothingReference = policyResult.severeFlexEmergencyActive === true
+            && Number.isFinite(policyResult.nextFlexRateSmoothingReferencePct)
+            ? Math.max(0, Math.min(100, policyResult.nextFlexRateSmoothingReferencePct))
+            : flexRate;
+        state.keyParams.nextFlexRateSmoothingReferencePct = flexRateSmoothingReference;
         const newState = {
             ...state,
             flexRate,
+            flexRateSmoothingReference,
             lastMarketSKey: market.sKey,
             lastTotalBudget: aktuellesGesamtbudgetFinal,
             peakRealVermoegen: Math.max(peakRealVermoegen, currentRealVermoegen),

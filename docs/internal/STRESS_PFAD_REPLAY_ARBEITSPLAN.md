@@ -1659,7 +1659,359 @@ Eine Gegenfaktual-Variante ohne Aktienfonds wird vom Nutzer als „überlegene S
 
 ## 23. Review-Feedback von Claude
 
-Noch nicht durchgefuehrt.
+**Reviewstand:** 2026-08-07, Branch `codex/fokussierte-abschlusshaertung`,
+HEAD `c322bbe` (Planungs-HEAD im Kopf des Dokuments nennt `55bdd84`; siehe
+C-P-16). Adversariale Planprüfung gegen den tatsächlichen Codestand, nicht
+gegen die Planbeschreibung.
+
+### 23.1 Geprüfte Dimensionen und Quellen
+
+Geprüft wurden Korrektheit gegen die Akzeptanzkriterien, Vertragstreue gegen
+bestehende Contracts, Fehlerbehandlung, Seiteneffekte außerhalb des
+Slice-Scopes und Bruchszenarien. Belegquellen:
+
+- `app/simulator/monte-carlo-runner.js` (Runschleife, Post-Ruin-Loop,
+  Terminalauflösung)
+- `app/simulator/mc-run-context.js` (RNG-Modus, Chunking, Stresskontext)
+- `app/simulator/simulator-utils.js` (`rng`, `fork`, `makeRunSeed`)
+- `app/simulator/simulator-engine-helpers.js` (`initMcRunState`)
+- `app/simulator/simulator-portfolio-init.js` (Startallokation, Health-Bucket)
+- `app/simulator/simulator-year-portfolio.js` (Renditeanwendung,
+  `marketDataHist`)
+- `app/simulator/simulator-engine-direct.js` (Balance-Trace-Phasen, Käufe)
+- `app/simulator/simulator-forced-sale.js` (Notverkauf, Payout-Fallback)
+- `app/simulator/scenario-analyzer.js` (Auswahl und Tie-Break)
+- `app/simulator/simulator-monte-carlo.js` (serieller Nachlauf, Worker-Merge)
+- `app/simulator/monte-carlo-export.js` (`ScenarioLogExportV2`)
+- `app/simulator/simulator-input-strategy.js` (reale Feldnamen)
+- `app/shared/persistence-key-policy.js` (`sim.`-Präfix, Snapshotpolicy)
+
+### 23.2 Lifecycle der Vorbefunde von Gemini
+
+| ID | Status | Begründung |
+| --- | --- | --- |
+| G-P-01 | bestätigt | Der Arbeitsbaum in Abschnitt 3 ist inzwischen committed (`c322bbe`); der Befund bleibt als Prozessauflage gültig, ist aber am aktuellen HEAD faktisch erledigt. Der Plan muss die Baseline nachziehen (C-P-16). |
+| G-P-02 | bestätigt | NE-01 bis NE-06 sind unverändert offen. NE-01 ist nach C-P-01 sogar unvollständig gestellt. |
+| G-P-03 | bestätigt, aber unterschätzt | Die Verzerrung ist real, jedoch nicht das Hauptproblem: der Geldmarktbestand bleibt gar nicht im Geldmarkt (C-P-01). Zusätzlich verzinsen 3-Bucket-Bonds bereits heute mit `rC` (`simulator-year-portfolio.js:33`), sodass „Geldmarkt" keine neue risikolose Quelle einführt, sondern eine bestehende dupliziert. |
+| G-P-04 | widerlegt in der genannten Form | Im einzig unterstützten Modus `per-run-seed` besitzt jeder Lauf einen eigenen Stream (`mc-run-context.js:30-35`, `monte-carlo-runner.js:451-452`). Ein serieller Nachlauf eines einzelnen Index kann fremde Läufe technisch nicht kontaminieren. Das tatsächliche Determinismusproblem liegt woanders (C-P-08). |
+| G-P-05 | bestätigt und verschärft | Für `payout_floor_fallback_sale` existiert nicht nur kein Orakel, sondern überhaupt keine Steuer- und Bruttoinformation (C-P-06). |
+| G-P-06 | bestätigt | Slice 07 ist zu groß; Slice 05 ebenfalls grenzwertig (C-P-14). |
+
+### 23.3 Neue Findings
+
+#### C-P-01 (Blocker) – „Aktienfonds aus" ist kein stabiles Gegenfaktum
+
+Abschnitt 7.2 beschreibt ausschließlich eine **Startallokation**. Es gibt
+keinen fortlaufenden Policy-Zwang. Der Rechenpfad kauft freie Liquidität
+oberhalb des Runway-Ziels planmäßig wieder in Aktien:
+`simulator-engine-direct.js:789` und `:807` übernehmen
+`actionResult.verwendungen.aktien` in `buyEqAmount`, `:884-887` führen den Kauf
+aus. Das Liquiditätsziel stammt dabei nicht aus den Eingaben, sondern wird von
+der Engine berechnet (`simulator-engine-direct.js:637`), sodass der in den
+Geldmarkt umgeschichtete Betrag ab Jahr 1 als Überschuss gilt.
+
+Folge: Die Variante „Aktienfonds aus" entfernt Aktien für genau ein Jahr und
+baut sie danach wieder auf. Die Leitfrage aus Abschnitt 1 („Was ändert sich,
+wenn Aktienfonds im Gegenfaktum fehlen?") wird vom vorgeschlagenen Vertrag
+nicht beantwortet, sondern falsch beantwortet. Für Gold gilt dasselbe in
+umgekehrter Richtung: `goldAktiv` steuert die laufende Zielquote, eine reine
+Startallokationsänderung ohne Policyänderung ist bei Gold gar nicht
+darstellbar.
+
+Erforderlich vor Slice 01: Entweder ein laufender Policy-Constraint – der die
+Engine berührt und damit die Stop-Regel aus Abschnitt 16.3 auslöst – oder eine
+ehrliche Umbenennung des Faktors in „andere Startaufteilung bei unveränderter
+Zielpolicy" samt Streichung der irreführenden Leitfrage. Die Entscheidung
+gehört in NE-01, das derzeit nur die Steuerfrage stellt.
+
+#### C-P-02 (Blocker) – Der Pfadvertrag enthält den Startzustand nicht
+
+`initMcRunState(inputs, startYearIndex)` leitet `endeVJ`, `endeVJ_1..3`, `ath`,
+`jahreSeitAth` und `inflation` aus `HISTORICAL_DATA` für die Jahre **vor** dem
+Startjahr ab (`simulator-engine-helpers.js:167-195`). Diese Größen treiben über
+`buildNextMarketDataHist` und den `MarketAnalyzer` die Regimeerkennung, den
+Bärenmarktstatus und damit den 3-Bucket-Pfad.
+
+`StressReplayPathV1` in Abschnitt 8.1 führt weder `startYearIndex` noch einen
+initialen `marketDataHist`-Snapshot. `historicalYearSequence` ist kein Ersatz:
+Bei Fixed-Block und Stationary Bootstrap muss das erste gezogene Jahr nicht dem
+Startjahrindex entsprechen, und die Rückabbildung Jahr → Index ist von der
+Datenversion abhängig.
+
+Ohne dieses Feld kann der Runner die Baseline nicht reproduzieren; die harte
+Abnahmebedingung aus Abschnitt 10.3 ist unerfüllbar oder wird zufällig grün.
+Der Pfad muss den Startzustand entweder als `startYearIndex` **und**
+materialisierten `initialMarketDataHist` tragen; letzteres ist vorzuziehen,
+weil es unabhängig von der Indexierung der Datenbasis ist.
+
+#### C-P-03 (Blocker) – Die Whitelist benennt Felder, die es nicht gibt
+
+Abschnitt 6 definiert `assetAllocation.goldEnabled` und
+`assetAllocation.equityFundEnabled`. Beide existieren im Repository nicht. Die
+realen Eingaben heißen `inputs.goldAktiv` und `inputs.goldZielProzent`
+(`simulator-input-strategy.js:63-64`). `goldTargetPct` ist kein
+Simulatoreingabefeld, sondern ein Sweep-/Auto-Optimize-Parametername
+(`auto-optimize-param-meta.js`, `simulator-sweep.js`). `maxSkimPctOfEq`,
+`liquidityRunwayYears`, `rebalancingBand`, `decumulation.mode`,
+`bondTargetFactor`, `drawdownTrigger`, `bondRefillThreshold`,
+`survivalQuantile`, `goGoActive`, `goGoMultiplier`, `longevityMode` und die
+Flex-Felder existieren dagegen als `getCommonInputs()`-Pfade.
+
+Der Plan vermischt damit drei Namensräume und verletzt seine eigene
+Regressionsinvariante „UI- und Runnerparameter verwenden dieselben Namen"
+(Abschnitt 16.2). Slice 01 darf nicht mit einer erfundenen Pfadliste starten:
+Die Whitelist ist vollständig in `getCommonInputs()`-Pfaden auszudrücken, mit
+einer Mappingtabelle DOM-Feld-ID → Inputpfad → Contractpfad.
+
+#### C-P-04 (Blocker) – Gold-Patch über Inputs kehrt Abschnitt 7.2 um
+
+Im Legacy-Aggregatpfad reduziert der Goldzielwert direkt das Neuaktienkapital:
+`depotwertNeu = max(0, investitionsKapitalNeu - zielwertGold)`
+(`simulator-portfolio-init.js:317-331`). `goldAktiv = false` verschiebt Gold
+daher in **Aktien**, nicht in den Geldmarkt – das exakte Gegenteil des in
+Abschnitt 7.2 zugesagten Reallokationsziels.
+
+Zusätzlich ist der Vertrag in sich asymmetrisch: 7.2 schiebt deaktiviertes Gold
+in den Geldmarkt, 7.3 finanziert aktiviertes Gold zuerst aus Aktien. Ein
+Roundtrip „Gold aus, dann Gold an mit gleicher Zielquote" landet nicht wieder
+bei der Baseline-Aufteilung.
+
+Der Plan muss (a) explizit verbieten, die Assetfaktoren durch Patchen von
+`goldAktiv`/`goldZielProzent` mit anschließendem erneuten
+`initializePortfolio()` umzusetzen, und (b) Quelle und Ziel der Reallokation in
+einer einzigen, richtungssymmetrischen Regel festlegen.
+
+#### C-P-05 (Blocker) – Synthetische Tranchen brechen die Doppelbuchführung
+
+Im Detailtranchenpfad gilt `geldmarktEtf === Summe(depotTranchesGeldmarkt)` und
+`liquiditaet = tagesgeld + geldmarktEtf`
+(`simulator-portfolio-init.js:279-299`). Abschnitt 7.2 spricht nur von einem
+„synthetischen Geldmarktbestand" und lässt offen, dass alle drei Größen
+konsistent fortgeschrieben werden müssen. Andernfalls driften
+`portfolioTotal()`, die Runway-Deckungsquote und die Health-Bucket-Rechnung
+auseinander, ohne dass die Cent-Reconciliation aus 7.4 das bemerkt – sie prüft
+nur Marktwertsummen.
+
+Ebenfalls unspezifiziert und ergebniswirksam:
+
+- `purchaseDate` der `simreplay:`-Tranche. Der FIFO-Fallback ist `1900-01-01`
+  (`simulator-forced-sale.js:11`, `simulator-portfolio-init.js:13`), eine
+  Tranche ohne Datum wird also **zuerst** verkauft.
+- `tqf` und `taxExempt`. Wird steuerfreies Gold (`goldSteuerfrei`) durch
+  steuerpflichtigen Geldmarkt ersetzt, ändert sich der Steuerpfad dauerhaft.
+  Abschnitt 7.2 sichert nur „keine Jahr-0-Verkaufsteuer" zu und deckt diesen
+  Folgeeffekt nicht ab.
+
+#### C-P-06 (hoch) – Payout-Floor-Fallback liefert weder Brutto noch Steuer
+
+`applyPayoutFallbackSale` verkauft über `reduceAcrossTranches` direkt am
+Bestand, ruft `calculateSaleAndTax` nicht auf und gibt weder Bruttobetrag noch
+Steuer zurück (`simulator-forced-sale.js:190-249`). Zusätzlich existiert nach
+diesem Schritt keine `snapshotBalance`-Phase: Der Trace springt von
+`after_payout` (`simulator-engine-direct.js:926`) direkt zu
+`after_bond_refill` (`:979`).
+
+Damit ist das Akzeptanzkriterium „Brutto-/Netto-/Steuer-Reconciliation" aus
+Abschnitt 15.6 für die Ereignisklasse `payout_floor_fallback_sale` nicht
+erfüllbar, und die Klasse ist aus `balance_trace` nicht einmal isolierbar. Der
+Plan muss vor Slice 05 entscheiden: Ereignisklasse mit ausgewiesener
+Missingness führen, oder eine zusätzliche Trace-Phase akzeptieren und damit
+eine Änderung an `simulator-engine-direct.js` außerhalb der reinen
+Diagnostikzusage aus Abschnitt 15.6 einplanen.
+
+#### C-P-07 (hoch) – Die Quellidentität ist heute nicht nur unqualifiziert, sondern nicht vorhanden
+
+`buildScenarioLogs()` projiziert für charakteristische Szenarien ausschließlich
+`key`, `label`, `endVermoegen`, `failed`, `lebensdauer`, Pflegefelder und
+`logDataRows` (`scenario-analyzer.js:211-223`). Ein Run-Index ist dort
+überhaupt nicht enthalten; nur Zufallsproben tragen ihn implizit im Schlüssel
+`random_${index}`. Abschnitt 9.1 fordert ihn zu Recht, unterschätzt aber, dass
+dies eine Änderung an einer bereits von `simulator-results.js` und dem Export
+konsumierten Struktur ist – additiv, aber vertragsrelevant und in Slice 02 als
+solche zu deklarieren.
+
+Zum Tie-Break: Sortiert wird über `a.endVermoegen - b.endVermoegen`, und für
+jeden ruinierten Lauf ist `endVermoegen` exakt 0 (`monte-carlo-runner.js:1000`,
+`finalValueNominalEur = failed ? 0 : ...`). Bei vielen Ruinen entscheidet
+ausschließlich die Einfügereihenfolge des stabilen Sorts. Der Worker-Pfad stellt
+die Indexreihenfolge heute wieder her (`monte-carlo-chunk-result.js:1002-1003`
+und `:1101-1102`), sodass direkt und Worker aktuell übereinstimmen. Das ist
+jedoch ein unversicherter Zufall: Die Tie-Break-Regel muss als Contract fixiert
+und mit einem Paritätstest abgesichert werden, sonst zeigt jeder gespeicherte
+Pfad nach einer Merge-Änderung auf einen anderen Lauf.
+
+#### C-P-08 (hoch) – Der Shadow-Pfad ist so nicht reproduzierbar
+
+Der bestehende Post-Ruin-Loop (`monte-carlo-runner.js:192-253`) zieht
+Mortalität aus dem Haupt-`rand`, ruft aber **kein** Marktsampling auf und
+aktualisiert die Pflegemetadaten mit `neutralYearData = { inflation: 0 }`
+(`:212`). Ein Shadow-Loop nach Abschnitt 9.4, der zusätzlich Marktjahre zieht,
+verbraucht den Stream in anderer Reihenfolge. Da `generator.fork(label)` aus
+dem **aktuellen** Zustand ableitet (`simulator-utils.js:77-83`), ist jede
+positionsabhängige Ableitung fragil.
+
+Zwei Konsequenzen, die der Plan nicht nennt:
+
+1. Die materialisierten Post-Ruin-Life-Events weichen zwangsläufig von den
+   Life-Events ab, die der Ursprungslauf selbst für `stress_CaR_P10_Real` und
+   die Nullentnahme-Auffüllung verwendet hat. Der Pfad darf gegen diese
+   Kennzahlen nicht reconciliiert werden.
+2. Die Pflegeprogression unterscheidet sich systematisch, weil der
+   Ursprungslauf nach Ruin inflationsfrei fortschreibt, ein realistischer
+   Shadow-Pfad aber nicht.
+
+Empfehlung statt „Samplingstate weiterverwenden": ein eigener,
+positionsunabhängig abgeleiteter Stream, etwa
+`rng(makeRunSeed(seed, SHADOW_COMBO, runIdx))`, der als benannter Bestandteil in
+den `pathFingerprint` eingeht. Ergänzend ist zu prüfen, ob `BREAK_ON_RUIN`
+(`simulator-data.js:681`, aktuell `true`) im Vertrag festgeschrieben wird; eine
+spätere Umstellung würde die gesamte Fortsetzungslogik gegenstandslos machen.
+
+#### C-P-09 (hoch) – `sim.stressReplay.active.v1` landet automatisch in Snapshots
+
+`SNAPSHOT_DOMAIN_PREFIXES` enthält `'sim.'`
+(`app/shared/persistence-key-policy.js:89-93`). Damit liefert
+`isAllowedSnapshotCaptureKey` für den geplanten Schlüssel `true`, und
+`isAllowedSnapshotRestoreLiveKey` stellt ihn im Standardmodus über
+`isSnapshotGlobalDomainKey` wieder her (`:192`).
+
+Abschnitt 12.1 stellt das als reine Testaufgabe für Slice 06 dar. Es ist aber
+eine Produktentscheidung mit zwei konkreten Nebenwirkungen: Ein Envelope von bis
+zu 2 MiB (Abschnitt 12.2) wird in jeden Snapshot kopiert und belastet das
+localStorage-Kontingent mehrfach; und ein Restore reaktiviert einen
+Replay-Arbeitsstand, dessen Daten- und Enginefingerprint zum
+Wiederherstellungszeitpunkt nicht mehr passen muss. Entweder wird der Schlüssel
+von der Snapshot-Erfassung ausgenommen, oder ein wiederhergestellter Eintrag
+gilt regelbasiert als Nur-Lesen. Das gehört als NE-07 in Abschnitt 17.
+
+#### C-P-10 (mittel) – Ein Gold-Toggle erzeugt vier Patcheinträge
+
+`goldZielProzent`, `goldFloorProzent`, `rebalancingBand` und `goldSteuerfrei`
+sind sämtlich an `goldAktiv` gekoppelt; `rebalancingBand` fällt bei
+deaktiviertem Gold auf den fest verdrahteten Wert 25 zurück
+(`simulator-input-strategy.js:63-67`). Ein aus dem aktuellen UI gebildeter Patch
+(Abschnitt 15.5) enthält damit vier Änderungen für eine Nutzerentscheidung, von
+denen mindestens eine keine Nutzerentscheidung ist. Das verfälscht die
+Patchvorschau aus 13.3 und löst die Mehr-Faktor-Warnung aus 11.4 fälschlich
+aus. Der Patchbildner muss diese Kopplungen normalisieren.
+
+#### C-P-11 (mittel) – Der vorhandene serielle Nachlauf wird ignoriert
+
+`runMonteCarloLogsForIndices` führt bereits genau das aus, was Abschnitt 9.3
+und Slice 02 neu beschreiben: einen einzelnen absoluten Index mit
+`runRange: { start: runIdx, count: 1 }` und aktiviertem Logging
+(`simulator-monte-carlo.js:56-84`). Der Plan erwähnt diese Funktion nicht.
+Slice 02 sollte sie erweitern statt einen zweiten Pfad zu bauen, sonst
+existieren zwei divergierende Vorstellungen davon, was „der ausgewählte Lauf"
+ist. Zu beachten: Der bestehende Aufruf reicht weder `engine` noch ein
+Abbruchsignal an `runMonteCarloChunk` weiter – eine Capture-Variante darf das
+nicht stillschweigend erben.
+
+#### C-P-12 (mittel) – Das Ruinjahr trägt im Exportvertrag keine Marktdaten
+
+`buildMonteCarloRuinLogRow` setzt `RealReturnEquityPct: 0`
+(`mc-log-builder.js:97-98`), und `projectScenarioRecordV2` erzwingt für
+nicht-finanzielle Datensätze `null` in allen Renditefeldern
+(`monte-carlo-export.js:531-534`, Validierung `:657-659`). Abschnitt 9.3
+verlangt eine Reconciliation der „effektiven Renditen" gegen
+`ScenarioLogExportV2`; für das Terminaljahr ist das unmöglich, dort überleben
+nur `histJahr` und `inflation`.
+
+Der Reconciliationsvertrag muss je `recordType` festlegen, welche Felder
+vergleichbar sind. Sonst schlägt Slice 02 entweder unbegründet fehl oder
+überspringt stillschweigend genau das Jahr, das den Stresspfad interessant
+macht.
+
+#### C-P-13 (mittel) – Das 50-ms-Ziel ist unbelegt
+
+Abschnitt 15.9 fordert p95 unter 50 ms für vier Varianten à 60 Pfadjahre, also
+240 `simulateOneYear()`-Durchläufe inklusive `calculateSaleAndTax`,
+Steuernachrechnung, acht `snapshotBalance`-Aufrufen pro Jahr
+(`simulator-engine-direct.js:455-1050`) und tiefem Klonen des Portfolios je
+Variante. Das entspricht unter 0,2 ms pro Simulationsjahr. Der Plan nennt keine
+Messung am Bestand, aus der dieses Ziel abgeleitet wäre. Ein unbelegtes Ziel in
+den Akzeptanzkriterien erzeugt exakt den Druck, den R-13 abwehren soll. Vor
+Slice 01 ist eine Referenzmessung eines vorhandenen 60-Jahres-Laufs nachzutragen
+und das Ziel daran zu kalibrieren.
+
+#### C-P-14 (mittel) – Slice 05 und 07 sprengen absehbar die Zehn-Dateien-Regel
+
+Slice 05 führt bereits sieben produktive Dateien; kommt die für C-P-06 nötige
+Trace-Phase hinzu, ist die Grenze erreicht, bevor Integrationskorrekturen
+eingerechnet sind. Slice 07 listet sieben bis acht Dateien und greift zugleich
+in `Simulator.html`, `simulator-results.js`, `simulator-main.js` und
+`simulator-main-init.js` ein. Empfehlung: Slice 07 vor Beginn teilen in 07a
+(Fixieren, Banner, Persistenzanbindung) und 07b (Varianten, Vergleichsansicht).
+
+#### C-P-15 (mittel) – Health-Bucket-Kappung ist in der Cent-Invariante nicht abgedeckt
+
+`carveOutHealthBucketFromPortfolio` kappt den Pflegebucket, wenn die
+Liquidität nicht ausreicht (`simulator-portfolio-init.js:178-182`). Wird eine
+Gegenfaktualvariante entgegen C-P-04 vor `initializePortfolio()` gebildet, kann
+ein zuvor gekappter Bucket plötzlich voll bedient werden: Das Gesamtvermögen
+bleibt centgleich, die Aufteilung ändert sich aber zusätzlich zum gewollten
+Faktor. Abschnitt 7.2 sichert nur zu, dass der Health-Bucket nicht *reduziert*
+wird. Der Transformationsvertrag muss festschreiben, dass er strikt nach
+`initializePortfolio()` arbeitet und `healthBucketMeta` unverändert
+reassertiert.
+
+#### C-P-16 (niedrig) – Planungsbaseline ist veraltet
+
+Kopf und Abschnitt 3 nennen HEAD `55bdd84` und einen unreinen Arbeitsbaum mit
+21 Dateien. Der aktuelle Stand ist `c322bbe`, der Arbeitsbaum ist sauber, und
+die dort gelisteten Änderungen sind in `55bdd84` und `c322bbe` committed.
+Abschnitt 3 ist vor Slice 01 zu aktualisieren, sonst verlangt er einen Nachweis
+für einen Zustand, den es nicht mehr gibt.
+
+### 23.4 Prüfdimensionen ohne Blocker
+
+- **Per-Run-Seed-Voraussetzung (NE-04):** technisch korrekt begründet.
+  `legacy-stream` verbietet Chunking bereits fail-closed
+  (`mc-run-context.js:31-33`); ein isolierter Nachlauf ist dort tatsächlich
+  unmöglich. Der Vorschlag ist tragfähig.
+- **Trennung `extractMonteCarloReplayArgsV1` versus Stresspfad-Replay:** sauber
+  begründet, keine Contractkollision erkennbar.
+- **Verbergen der Gold-Felder in `Simulator.html`:** die Beschreibung in 4.2
+  stimmt; `goldAllokationAktiv` und `goldAllokationProzent` sind versteckte
+  `data-no-persist`-Felder (`Simulator.html:576-577`).
+- **Kategoriebasierte statt namensbasierte Fondserkennung (R-06):** korrekt und
+  umsetzbar, `classifyTranche` liefert `equity`/`bonds`/`gold`/`money_market`.
+  Einschränkung: Bonds liegen physisch **in** `depotTranchesAktien`
+  (`simulator-portfolio-init.js:269-270`); die Formulierung „bleiben separat"
+  in 7.4 ist strukturell falsch und muss als Kategoriefilter innerhalb desselben
+  Arrays präzisiert werden.
+
+### 23.5 Pre-Mortem
+
+**Angenommen, dieses Feature verursacht in drei Monaten einen Fehler im
+Produktivbetrieb – was ist die wahrscheinlichste Ursache?**
+
+Die wahrscheinlichste Ursache ist C-P-01: Ein Nutzer vergleicht „mit Gold" gegen
+„ohne Aktienfonds", sieht ein plausibles Ergebnis und trifft daraus eine
+Allokationsentscheidung – während die Variante „ohne Aktienfonds" die Aktien
+tatsächlich nur im Startjahr entfernt und die Policy sie über die Folgejahre
+wieder aufgebaut hat. Der Fehler ist besonders gefährlich, weil er keine
+Fehlermeldung erzeugt, jede Cent-Reconciliation besteht und die Baseline
+korrekt reproduziert. Alle in Abschnitt 19 aufgeführten Schutzmechanismen
+greifen nicht: Der exogene Pfad ist identisch, die Fingerprints stimmen, das
+Transformationsledger ist ausgeglichen.
+
+Die zweitwahrscheinlichste Ursache ist C-P-02: Ein importierter oder nach einem
+Datenupdate erneut ausgeführter Pfad rekonstruiert einen abweichenden
+`marketDataHist`-Startzustand, wodurch Regimeerkennung und Bärenmarktlogik in
+einzelnen Jahren kippen. Das erzeugt kleine, nicht offensichtlich falsche
+Abweichungen in den Delta-Markern statt eines sichtbaren Fehlers.
+
+### 23.6 Review-Ergebnis
+
+- **Status:** blockiert – nicht implementierungsreif
+- **Blocker:** C-P-01, C-P-02, C-P-03, C-P-04, C-P-05 sowie unverändert G-P-02
+  (offene Nutzerentscheidungen)
+- **Restrisiken:** C-P-06 bis C-P-09 (hoch), C-P-10 bis C-P-15 (mittel),
+  C-P-16 (niedrig). Zusätzlich unverändert: die Zehn-Dateien-Grenze je Slice und
+  das strikte Verbot von Mutationen an Profil- und Tranchenpersistenz.
+- **Pre-Mortem:** stille Rückreallokation im Assetgegenfaktum (C-P-01); an
+  zweiter Stelle ein abweichender Marktstartzustand (C-P-02).
 
 ## 24. Review-Antworten von Codex
 
@@ -1669,4 +2021,25 @@ Noch keine Review-Findings vorhanden.
 
 | ID | Quelle | Finding | Entscheidung | Umsetzung |
 | --- | --- | --- | --- | --- |
-| - | - | Noch kein Review | ausstehend | ausstehend |
+| G-P-01 | Gemini | Unreine Baseline / Branch-Konflikt | ausstehend | ausstehend |
+| G-P-02 | Gemini | Offene Nutzerentscheidungen NE-01 bis NE-06 | ausstehend | ausstehend |
+| G-P-03 | Gemini | Renditeverzerrung durch Geldmarkt-Reallokation | ausstehend | ausstehend |
+| G-P-04 | Gemini | RNG-Entkopplung Post-Ruin-Shadow | ausstehend | ausstehend |
+| G-P-05 | Gemini | Transaktionsdiagnostik ohne Engine-Mutation | ausstehend | ausstehend |
+| G-P-06 | Gemini | Blast-Radius Slice 07 | ausstehend | ausstehend |
+| C-P-01 | Claude | „Aktienfonds aus" ist kein stabiles Gegenfaktum | ausstehend | ausstehend |
+| C-P-02 | Claude | Pfadvertrag ohne Marktstartzustand | ausstehend | ausstehend |
+| C-P-03 | Claude | Whitelist benennt nicht existierende Felder | ausstehend | ausstehend |
+| C-P-04 | Claude | Gold-Patch über Inputs kehrt Reallokationsziel um | ausstehend | ausstehend |
+| C-P-05 | Claude | Synthetische Tranchen brechen Doppelbuchführung | ausstehend | ausstehend |
+| C-P-06 | Claude | Payout-Fallback ohne Brutto/Steuer und ohne Trace-Phase | ausstehend | ausstehend |
+| C-P-07 | Claude | Quellidentität fehlt, Tie-Break unversichert | ausstehend | ausstehend |
+| C-P-08 | Claude | Shadow-Pfad nicht reproduzierbar abgeleitet | ausstehend | ausstehend |
+| C-P-09 | Claude | Replay-Key landet automatisch in Snapshots | ausstehend | ausstehend |
+| C-P-10 | Claude | Gold-Toggle erzeugt gekoppelte Patcheinträge | ausstehend | ausstehend |
+| C-P-11 | Claude | Vorhandener serieller Nachlauf ignoriert | ausstehend | ausstehend |
+| C-P-12 | Claude | Ruinjahr ohne Marktdaten im Exportvertrag | ausstehend | ausstehend |
+| C-P-13 | Claude | 50-ms-Performanceziel unbelegt | ausstehend | ausstehend |
+| C-P-14 | Claude | Slice 05/07 sprengen Zehn-Dateien-Regel | ausstehend | ausstehend |
+| C-P-15 | Claude | Health-Bucket-Kappung nicht in Cent-Invariante | ausstehend | ausstehend |
+| C-P-16 | Claude | Planungsbaseline veraltet | ausstehend | ausstehend |

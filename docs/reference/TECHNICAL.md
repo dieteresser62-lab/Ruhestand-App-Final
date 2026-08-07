@@ -108,13 +108,48 @@ endif
 :Mindest-Flex anwenden\n- nur als Rate\n- keine Bedarfs-Mutation;
 :Flex-Budget Cap\n- Euro-Topf (Cap)\n- Min-Rate;
 :Finale Rate-Limits\n(Delta Caps + Final-Guardrail);
+:Safety-Cap anwenden\n- normal: Mindest-Flex respektieren\n- schwer: gesamter Flex 0\n- Floor unveraendert;
 :Entnahme berechnen\n+ Quantisierung;
 :Finale Flex-Rate ableiten\n& Ergebnisse bauen;
 stop
 @enduml
 ```
 
-`applyMinimumFlexFloor()` nutzt nur Spending-Layer-Daten. Der haushaltsweite Mindest-Flex wird zuerst mit dem nach Floor-Deckung verbleibenden Rentenueberschuss reconciliert; nur der offene Rest bestimmt die erforderliche Depot-Flex-Rate. Der Schritt blockiert eine Anhebung bei aktivem Alarm, bei unzureichendem Gesamtvermoegen fuer Netto-Floor plus offenen Depotanteil oder wenn der Mindest-Runway nach dieser Zahlung nicht mehr aus dem Gesamtvermoegen wiederherstellbar waere. Niedrige aktuelle Liquiditaet allein ist kein Blocker, solange der Gesamtvermoegens-Proxy ausreichend ist. `SpendingPolicyOrderV1` bindet Alarm, Guardrails, Mindest-Flex, Flex-Budget und finale Glaettung durch einen Laufzeittrace. Die Jahreszeile reconciliert danach den finalen Mindest-Flex gegen die tatsaechliche Auszahlung und weist eine zusaetzliche Luecke als `limited_by_actual_payout` aus.
+`applyMinimumFlexFloor()` nutzt nur Spending-Layer-Daten. Der haushaltsweite Mindest-Flex wird zuerst mit dem nach Floor-Deckung verbleibenden Rentenueberschuss reconciliert; nur der offene Rest bestimmt die erforderliche Depot-Flex-Rate. Der Schritt blockiert eine Anhebung bei aktivem Alarm, bei unzureichendem Gesamtvermoegen fuer Netto-Floor plus offenen Depotanteil oder wenn der Mindest-Runway nach dieser Zahlung nicht mehr aus dem Gesamtvermoegen wiederherstellbar waere. Niedrige aktuelle Liquiditaet allein ist kein Blocker, solange der Gesamtvermoegens-Proxy ausreichend ist. Die Jahreszeile reconciliert danach den finalen Mindest-Flex gegen die tatsaechliche Auszahlung und weist eine zusaetzliche Luecke als `limited_by_actual_payout` aus.
+
+`SpendingPolicyOrderV2` bindet Alarm, Guardrails, Mindest-Flex, Flex-Budget,
+finale Glaettung und den abschliessenden `safety_cap` durch einen
+Laufzeittrace. Die Flexraten-Policy liefert strukturierte Safety-Evidenz fuer
+aktiven Alarm, positiven `bear_deep`-Rohcut und bindende Flexraten-Hard-Caps;
+die Pipeline ergaenzt einen nur bei echter Ratenreduktion bindenden
+ Spending-Guardrail. Das Minimum der endlichen Kandidaten ist das normale
+ Policy-Ziel gegen spaetere Aufwaertsglaettung. Die aktuell wirksame Obergrenze
+ wird mit denselben jaehrlichen Auf-/Abwaertsgrenzen wie die finale Flexrate
+ bestimmt; ein weiter entferntes Ziel wird sichtbar auf Folgejahre verschoben.
+ Bei Gleichstand gilt die dokumentierte Quellenprioritaet. Bei rein
+ marktbedingten Safety-Caps wird das Policy-Ziel ausserhalb der schweren Notlage
+ bis zur erforderlichen
+Mindest-Flex-Rate angehoben, sofern kein bestehender Alarm-, Solvenz- oder
+Runway-Blocker greift. Der Alarmcut ist eine Basis von 10
+Prozentpunkten multipliziert mit dem vorhandenen Entnahmebelastungsfaktor.
+
+Das separate Null-Flex-Gate verlangt exakt `market.sKey === 'bear_deep'` und
+einen realen Drawdown des aktiven Gesamtvermoegens von mehr als der
+konfigurierten 25-Prozent-Alarmgrenze. Exakt 25 Prozent reicht nicht;
+`alarmStatus`, Entnahmebelastungsfaktor und Vermoegenssuffizienz sind nur
+Diagnose. Ein endlicher negativer Vor-Peak-Wert bedeutet ein neues reales Hoch
+und wird auf 0 normalisiert, fehlende oder nicht-endliche Gatewerte scheitern
+ fail-closed. Im aktiven Gate ueberstimmt die Rate 0 alle Flex-Aufwaertsfloors
+ einschliesslich Mindest-Flex und traegt
+ `overridden_by_severe_flex_emergency`. Der Floor liegt ausserhalb dieses
+ Flexvertrags und bleibt unveraendert. Persistiert werden die tatsaechliche
+ Nullrate und getrennt der normale Vor-Gate-Glaettungsanker; dadurch erzwingt
+ das Ausnahmejahr in einer anschliessenden Erholung keine mehrjaehrige
+ Mindest-Flex-Unterdeckung. `spending-diagnosis.mjs`, Balance-
+ Keyparams und Simulator-Jahresrecords projizieren Quelle, Roh-/Effektiv-Cap,
+ Anchor, Bindung beziehungsweise Aufschub, Gatewerte, final begrenzende Policy
+ und Floor-Schutz getrennt. Die Schwelle fuer die diagnostische
+ Alarmunterdrueckung stammt gemeinsam aus `alarm-policy.mjs`.
 
 `engine/core.mjs` haelt zwei Runway-Vertraege auseinander. Vor `determineSpending()` berechnet es `prePolicyRunwayMonths` aus dem noch ungekürzten nominalen Bedarf als Eingang der Spending-Policies. Nach Rueckgabe des Planners ist dessen nach allen Policies und der Monatsquantisierung final geplante Netto-Portfoliojahresentnahme die kanonische Basis fuer Ziel-Liquiditaet, Transaktion und operative Runway-KPIs. Die Dynamic-Flex-Safety bleibt dagegen auf dem vor Slice 17 kalibrierten Rohbedarf und verwendet den Bestand nach der Transaktion; so kann eine Policy-Kuerzung nicht allein durch einen kleineren Nenner eine Deeskalation ausloesen. `types/planned-withdrawal-contract.js` reconciliert `details.endgueltigeEntnahme`, `monatlicheEntnahme * 12` und einen gegebenen Jahresplan innerhalb 0,01 EUR. Fehlende, negative, nicht endliche oder widerspruechliche Werte scheitern an Produktivgrenzen fail-closed; nur ein direkter Legacy-Transaktionsaufruf ohne jedes Spending-Ergebnis verwendet einen explizit diagnostizierten Rohbedarfsfallback.
 

@@ -277,6 +277,7 @@ export function buildSimulatorYearResult({
             minimumFlexAnnual,
             minimumFlexStatus,
             minimumFlexBlockReason: keyParams.minimumFlexBlockReason || '',
+            minimumFlexStatusBeforeSafetyOverride: keyParams.minimumFlexStatusBeforeSafetyOverride || '',
             minimumFlexRequiredRate: Number.isFinite(keyParams.minimumFlexRequiredRate) ? keyParams.minimumFlexRequiredRate : null,
             minimumFlexEffectiveBefore: Number.isFinite(keyParams.minimumFlexEffectiveBefore) ? keyParams.minimumFlexEffectiveBefore : null,
             minimumFlexEffectiveAfter: Number.isFinite(keyParams.minimumFlexEffectiveAfter) ? keyParams.minimumFlexEffectiveAfter : null,
@@ -284,6 +285,42 @@ export function buildSimulatorYearResult({
             minimumFlexEffectiveFinal,
             minimumFlexShortfallAnnual,
             minimumFlexFulfilled,
+            SafetyCapActive: keyParams.safetyCapActive === true,
+            SafetyCapFlexRatePct: Number.isFinite(keyParams.safetyCapFlexRatePct) ? keyParams.safetyCapFlexRatePct : null,
+            SafetyCapEffectiveFlexRatePct: Number.isFinite(keyParams.safetyCapEffectiveFlexRatePct)
+                ? keyParams.safetyCapEffectiveFlexRatePct
+                : null,
+            SafetyCapRawCandidateFlexRatePct: Number.isFinite(keyParams.safetyCapRawCandidateFlexRatePct)
+                ? keyParams.safetyCapRawCandidateFlexRatePct
+                : null,
+            SafetyCapSource: keyParams.safetyCapSource || '',
+            SafetyCapAnchorStage: keyParams.safetyCapAnchorStage || '',
+            SafetyCapApplied: keyParams.safetyCapApplied === true,
+            SafetyCapDeferredByRateLimit: keyParams.safetyCapDeferredByRateLimit === true,
+            FinalLimitingPolicy: keyParams.finalLimitingPolicy || '',
+            SevereFlexEmergencyActive: keyParams.severeFlexEmergencyActive === true,
+            MarketExtremeBear: keyParams.marketExtremeBear === true,
+            RealTotalWealthDrawdownPct: Number.isFinite(keyParams.realTotalWealthDrawdownRatio)
+                ? keyParams.realTotalWealthDrawdownRatio * 100
+                : null,
+            RealTotalWealthDrawdownThresholdPct: Number.isFinite(keyParams.realTotalWealthDrawdownThresholdRatio)
+                ? keyParams.realTotalWealthDrawdownThresholdRatio * 100
+                : null,
+            MinimumFlexOverrideAllowed: keyParams.minimumFlexOverrideAllowed === true,
+            AlarmActiveDiagnostic: keyParams.alarmActiveDiagnostic === true,
+            WithdrawalBurdenFactor: Number.isFinite(keyParams.withdrawalBurdenFactor)
+                ? keyParams.withdrawalBurdenFactor
+                : null,
+            AlarmWealthSufficient: typeof keyParams.alarmWealthSufficient === 'boolean'
+                ? keyParams.alarmWealthSufficient
+                : null,
+            AlarmWealthSufficientThreshold: Number.isFinite(keyParams.alarmWealthSufficientThreshold)
+                ? keyParams.alarmWealthSufficientThreshold
+                : null,
+            WithdrawalBurdenGateRole: keyParams.withdrawalBurdenGateRole || '',
+            BaseAlarmCutPct: Number.isFinite(keyParams.baseAlarmCutPct) ? keyParams.baseAlarmCutPct : null,
+            EffectiveAlarmCutPct: Number.isFinite(keyParams.effectiveAlarmCutPct) ? keyParams.effectiveAlarmCutPct : null,
+            FloorProtectionPolicy: keyParams.floorProtectionPolicy || '',
             WealthRedF: Number.isFinite(spendingResult.details?.wealthReductionFactor)
                 ? spendingResult.details.wealthReductionFactor * 100
                 : null,

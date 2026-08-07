@@ -5,6 +5,8 @@ import {
     resolveLiquidityRunwayYears
 } from '../../types/liquidity-runway-contract.js';
 
+export const ALARM_WEALTH_SUFFICIENT_FACTOR_THRESHOLD = 0.5;
+
 export function shouldDeescalateInPeak(alarmWarAktiv, state, params) {
     const { market } = params;
     if (!alarmWarAktiv || !['peak_hot', 'peak_stable', 'side_long'].includes(market.sKey)) {
@@ -37,7 +39,7 @@ export function evaluateAlarmConditions(state, params, addDecision) {
     const wealthFactor = Number.isFinite(wealthReduction.factor)
         ? Math.min(1, Math.max(0, wealthReduction.factor))
         : 1;
-    const wealthSufficient = wealthFactor < 0.5;
+    const wealthSufficient = wealthFactor < ALARM_WEALTH_SUFFICIENT_FACTOR_THRESHOLD;
 
     let alarmWarAktiv = state.alarmActive;
 

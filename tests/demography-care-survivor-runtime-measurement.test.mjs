@@ -71,6 +71,11 @@ const slice19FixturePath = path.join(
     'fixtures',
     'runway-kpi-slice-19-measurement-v1.json'
 );
+const safetyPolicySlice03FixturePath = path.join(
+    testDir,
+    'fixtures',
+    'safety-policy-slice-03-measurement-v1.json'
+);
 
 function runtimeModule(relativePath) {
     return import(pathToFileURL(path.join(runtimeRoot, relativePath)).href);
@@ -450,11 +455,50 @@ if (captureMode) {
         slice17Fixture.targetMeasurementSha256,
         'Slice-19 demography evidence must name the Slice-17 runtime projection'
     );
-    assert.equal(
-        sha256(actualMeasurement),
-        slice19Fixture.demography.targetMeasurementSha256,
-        'Current runtime must reproduce the pending Slice-19 pre-payout runway projection'
-    );
+    const safetyPolicySlice03DemographyMeasurement = {
+        schemaVersion: 'SafetyPolicySlice03DemographyMeasurementV1',
+        sourceReference: 'post-backtest-data-19-v1',
+        sourceFixtureSha256: crypto.createHash('sha256').update(slice19FixtureBytes).digest('hex'),
+        targetResultDocument: 'docs/internal/SLICE_ABSCHLUSSHAERTUNG_03_SAFETY_POLICY_PRIORITAET.md',
+        reviewStatus: 'pending_external_review',
+        sourceMeasurementSha256: slice19Fixture.demography.targetMeasurementSha256,
+        targetMeasurementSha256: sha256(actualMeasurement),
+        targetSummary: {
+            outcomeCounts: actualMeasurement.monteCarlo.outcomeCounts,
+            lifespanYears: actualMeasurement.monteCarlo.lifespanYears,
+            finalWealthNominalEur: actualMeasurement.monteCarlo.finalWealthNominalEur,
+            care: {
+                anyCareRunCount: actualMeasurement.monteCarlo.care.anyCareRunCount,
+                p1EntryRunCount: actualMeasurement.monteCarlo.care.p1EntryRunCount,
+                p2EntryRunCount: actualMeasurement.monteCarlo.care.p2EntryRunCount,
+                additionalNeedNominalEur: actualMeasurement.monteCarlo.care.additionalNeedNominalEur
+            },
+            pathEvidenceHash: actualMeasurement.monteCarlo.pathEvidenceHash,
+            sweep: actualMeasurement.sweep.map(entry => ({
+                comboIdx: entry.comboIdx,
+                successProbFloor: entry.metrics.successProbFloor,
+                p10EndWealth: entry.metrics.p10EndWealth,
+                medianEndWealth: entry.metrics.medianEndWealth,
+                worst5Drawdown: entry.metrics.worst5Drawdown,
+                evidenceHash: entry.evidenceHash
+            }))
+        },
+        cause: 'safety_policy_changes_financial_paths_while_demography_care_and_survivor_models_remain_unchanged'
+    };
+    if (process.env.DEMOGRAPHY_PRINT_SAFETY_POLICY_SLICE_03 === '1') {
+        console.log('__SAFETY_POLICY_SLICE_03_DEMOGRAPHY_START__');
+        console.log(JSON.stringify(safetyPolicySlice03DemographyMeasurement, null, 2));
+        console.log('__SAFETY_POLICY_SLICE_03_DEMOGRAPHY_END__');
+    } else {
+        const expectedSafetyPolicySlice03 = JSON.parse(
+            fs.readFileSync(safetyPolicySlice03FixturePath, 'utf8')
+        ).demography;
+        assert.deepEqual(
+            safetyPolicySlice03DemographyMeasurement,
+            expectedSafetyPolicySlice03,
+            'Slice-03 Safety-Policy demography projection must reproduce exactly'
+        );
+    }
     assert.deepEqual(
         {
             outcomeCounts: actualMeasurement.monteCarlo.outcomeCounts,

@@ -339,8 +339,9 @@ function clone(value) {
         result.spendingResult.kuerzungQuelle.includes('Glättung') ||
         result.spendingResult.kuerzungQuelle.includes('Flex-Anteil') ||
         result.spendingResult.kuerzungQuelle.includes('Guardrail') ||
-        result.spendingResult.kuerzungQuelle.includes('Vermögen'),
-        `Source should be Smoothing/Flex-Anteil/Guardrail, but was: ${result.spendingResult.kuerzungQuelle}`
+        result.spendingResult.kuerzungQuelle.includes('Vermögen') ||
+        result.spendingResult.kuerzungQuelle.includes('Safety-Cap'),
+        `Source should be Smoothing/Flex-Anteil/Guardrail/Safety-Cap, but was: ${result.spendingResult.kuerzungQuelle}`
     );
 
     console.log('✅ Flex Rate Smoothing/Caps work');
@@ -991,7 +992,7 @@ function clone(value) {
     };
     const state = clone(params.lastState);
     state.keyParams.entnahmequoteDepot = 0.08;
-    state.keyParams.realerDepotDrawdown = 0.30;
+    state.keyParams.realerDepotDrawdown = 0.24;
     const delegateState = clone(state);
     const decisions = [];
     const initialPolicyResult = { geglätteteFlexRate: 40, kuerzungQuelle: 'Tiefer Bär' };
@@ -1014,10 +1015,10 @@ function clone(value) {
     assert(Number.isFinite(state.flexBudgetBalanceYears), 'Policy pipeline should update flex-budget state');
     assert(decisions.some(d => String(d.step).includes('Flex-Budget')), 'Policy pipeline should log flex-budget decision');
     assertClose(delegated.flexRate, result.flexRate, 0.0001, 'Planner policy-pipeline delegate should match module');
-    assertEqual(SPENDING_POLICY_ORDER_CONTRACT.schemaVersion, 'SpendingPolicyOrderV1', 'Policy order contract is versioned');
+    assertEqual(SPENDING_POLICY_ORDER_CONTRACT.schemaVersion, 'SpendingPolicyOrderV2', 'Policy order contract is versioned');
     assertEqual(
         JSON.stringify(SPENDING_POLICY_ORDER_CONTRACT.steps),
-        JSON.stringify(['alarm', 'guardrails', 'minimum_flex', 'flex_budget', 'final_smoothing']),
+        JSON.stringify(['alarm', 'guardrails', 'minimum_flex', 'flex_budget', 'final_smoothing', 'safety_cap']),
         'Policy order contract fixes the complete stage sequence'
     );
     assertEqual(
@@ -1087,7 +1088,7 @@ function clone(value) {
     budgetState.flexRate = 20;
     budgetState.flexBudgetBalanceYears = 2;
     budgetState.keyParams.entnahmequoteDepot = CONFIG.THRESHOLDS.CAUTION.withdrawalRate;
-    budgetState.keyParams.realerDepotDrawdown = 0.30;
+    budgetState.keyParams.realerDepotDrawdown = 0.24;
     const budgetResult = applySpendingPolicyPipeline(
         budgetState,
         { active: false, newlyTriggered: false },
@@ -1198,6 +1199,8 @@ function clone(value) {
     params.renteJahr = 0;
     params.depotwertGesamt = 300000;
     params.gesamtwert = 310000;
+    params.lastState.peakRealVermoegen = params.gesamtwert / 0.60;
+    params.lastState.cumulativeInflationFactor = 1;
     params.input = {
         ...params.input,
         floorBedarf: 24000,
@@ -1213,12 +1216,13 @@ function clone(value) {
 
     assert(result.diagnosis.general.alarmActive === true, 'Alarm should be active in this scenario');
     assert(decisionSteps.includes('Flex-Budget (Cap)'), 'Flex-Budget cap should be applied in decision tree');
-    assert(
-        result.spendingResult.kuerzungQuelle.includes('Final-Guardrail') ||
-        result.spendingResult.kuerzungQuelle.includes('Glättung'),
-        'Final limits should cap the extreme cut'
-    );
-    assert(flexRate >= 85 && flexRate <= 100, `Final flex rate should be limited by final caps (got ${flexRate})`);
+    assertEqual(result.spendingResult.kuerzungQuelle, 'Safety-Cap (schwere Flex-Notlage)',
+        'Severe bear plus real total-wealth drawdown should name the dedicated safety source');
+    assertClose(flexRate, 0, 0.0001, 'Severe flex emergency should override every upward flex floor');
+    assertEqual(result.spendingResult.details.minimumFlexStatus, 'overridden_by_severe_flex_emergency',
+        'Severe flex emergency should expose the explicit minimum-flex override status');
+    assertClose(result.spendingResult.details.endgueltigeEntnahme, params.inflatedBedarf.floor, 0.0001,
+        'Severe flex emergency must preserve the full planned floor');
 
     console.log('✅ Alarm + Flex-Budget + Final-Limits interaction works');
 }

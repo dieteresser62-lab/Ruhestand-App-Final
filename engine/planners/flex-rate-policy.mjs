@@ -6,6 +6,36 @@ import {
     resolveLiquidityRunwayYears
 } from '../../types/liquidity-runway-contract.js';
 
+export const SAFETY_RATE_TOLERANCE_PCT = 1e-9;
+export const SAFETY_CAP_INTERNAL_ANCHOR = 'post_internal_smoothing_and_flex_rate_hard_caps';
+export const BASE_ALARM_CUT_PCT = 10;
+
+function createSafetyEvidence({
+    source = null,
+    candidateFlexRatePct = null,
+    positiveBearDeepRawCut = false,
+    flexRateHardCapApplied = false,
+    flexRateHardCapSource = null,
+    alarmActive = false,
+    baseAlarmCutPct,
+    effectiveAlarmCutPct
+}) {
+    return {
+        active: source !== null,
+        source,
+        candidateFlexRatePct: Number.isFinite(candidateFlexRatePct)
+            ? Math.max(0, Math.min(100, candidateFlexRatePct))
+            : null,
+        anchorStage: source === null ? null : SAFETY_CAP_INTERNAL_ANCHOR,
+        positiveBearDeepRawCut,
+        flexRateHardCapApplied,
+        flexRateHardCapSource,
+        alarmActive,
+        baseAlarmCutPct,
+        effectiveAlarmCutPct
+    };
+}
+
 export function applyFlexShareCurve(flexRate, inflatedBedarf, addDecision, wealthFactor = 1) {
     const curve = CONFIG.SPENDING_MODEL?.FLEX_SHARE_S_CURVE;
     if (!curve?.ENABLED) {
@@ -49,6 +79,9 @@ export function calculateFlexRate(state, alarmStatus, params, addDecision) {
         : 1;
     if (state.keyParams) {
         state.keyParams.wealthReductionFactor = wealthFactor;
+        state.keyParams.withdrawalBurdenFactor = wealthFactor;
+        state.keyParams.baseAlarmCutPct = BASE_ALARM_CUT_PCT;
+        state.keyParams.effectiveAlarmCutPct = BASE_ALARM_CUT_PCT * wealthFactor;
         if (Number.isFinite(wealthReduction.entnahmequoteUsed)) {
             state.keyParams.entnahmequoteUsed = wealthReduction.entnahmequoteUsed;
         }
@@ -59,13 +92,7 @@ export function calculateFlexRate(state, alarmStatus, params, addDecision) {
         let geglätteteFlexRate = state.flexRate;
 
         if (alarmStatus.newlyTriggered) {
-            const hardMinimumMonths = deriveLiquidityRunwayPolicy(resolveLiquidityRunwayYears(p.input || {}).years).hardMinimumMonths;
-            const shortfallRatio = Math.max(
-                0,
-                (hardMinimumMonths - p.runwayMonate) / hardMinimumMonths
-            );
-            const zielCut = Math.min(10, Math.round(10 + 20 * shortfallRatio));
-            const zielCutScaled = zielCut * wealthFactor;
+            const zielCutScaled = BASE_ALARM_CUT_PCT * wealthFactor;
             geglätteteFlexRate = Math.max(35, state.flexRate - zielCutScaled);
             addDecision(
                 'Anpassung im Alarm-Modus',
@@ -90,7 +117,17 @@ export function calculateFlexRate(state, alarmStatus, params, addDecision) {
                 'alarm'
             );
         }
-        return { geglätteteFlexRate, kuerzungQuelle };
+        return {
+            geglätteteFlexRate,
+            kuerzungQuelle,
+            safetyEvidence: createSafetyEvidence({
+                source: 'alarm',
+                candidateFlexRatePct: geglätteteFlexRate,
+                alarmActive: true,
+                baseAlarmCutPct: BASE_ALARM_CUT_PCT,
+                effectiveAlarmCutPct: BASE_ALARM_CUT_PCT * wealthFactor
+            })
+        };
     }
 
     const { market } = p;
@@ -131,6 +168,9 @@ export function calculateFlexRate(state, alarmStatus, params, addDecision) {
             kuerzungQuelle = 'Tiefer Bär';
         }
     }
+
+    const positiveBearDeepRawCut = market.sKey === 'bear_deep'
+        && roheKuerzungProzent > SAFETY_RATE_TOLERANCE_PCT;
 
     const roheFlexRate = 100 - roheKuerzungProzent;
     const prevFlexRate = state.flexRate ?? 100;
@@ -182,11 +222,15 @@ export function calculateFlexRate(state, alarmStatus, params, addDecision) {
     const hardCaps = CONFIG.SPENDING_MODEL?.FLEX_RATE_HARD_CAPS;
     const shareRelief = Math.max(0, hardCaps?.FLEX_SHARE_RELIEF_MAX_PP ?? 0);
     const relief = shareRelief * (1 - flexShare);
+    let flexRateHardCapApplied = false;
+    let flexRateHardCapSource = null;
     if (hardCaps?.BEAR_DEEP_MAX_RATE && market.sKey === 'bear_deep') {
         const baseCap = Math.min(100, hardCaps.BEAR_DEEP_MAX_RATE + relief);
         const cap = Math.min(100, 100 - (wealthFactor * (100 - baseCap)));
         if (geglätteteFlexRate > cap) {
             geglätteteFlexRate = cap;
+            flexRateHardCapApplied = true;
+            flexRateHardCapSource = 'bear_deep_max_rate';
             kuerzungQuelle = 'Guardrail (Bären-Cap)';
             addDecision(
                 'Guardrail (Bären-Cap)',
@@ -209,6 +253,8 @@ export function calculateFlexRate(state, alarmStatus, params, addDecision) {
             const cap = baseCap === null ? null : Math.min(100, 100 - (wealthFactor * (100 - baseCap)));
             if (cap !== null && geglätteteFlexRate > cap) {
                 geglätteteFlexRate = cap;
+                flexRateHardCapApplied = true;
+                flexRateHardCapSource = 'runway_coverage_cap';
                 kuerzungQuelle = 'Guardrail (Runway-Cap)';
                 addDecision(
                     'Guardrail (Runway-Cap)',
@@ -220,5 +266,22 @@ export function calculateFlexRate(state, alarmStatus, params, addDecision) {
         }
     }
 
-    return { geglätteteFlexRate, kuerzungQuelle };
+    const safetySource = flexRateHardCapApplied
+        ? 'flex_rate_hard_cap'
+        : (positiveBearDeepRawCut ? 'bear_deep' : null);
+
+    return {
+        geglätteteFlexRate,
+        kuerzungQuelle,
+        safetyEvidence: createSafetyEvidence({
+            source: safetySource,
+            candidateFlexRatePct: safetySource === null ? null : geglätteteFlexRate,
+            positiveBearDeepRawCut,
+            flexRateHardCapApplied,
+            flexRateHardCapSource,
+            alarmActive: false,
+            baseAlarmCutPct: BASE_ALARM_CUT_PCT,
+            effectiveAlarmCutPct: BASE_ALARM_CUT_PCT * wealthFactor
+        })
+    };
 }

@@ -1,0 +1,252 @@
+{
+  "schemaVersion": "SafetyPolicySlice03MeasurementV1",
+  "snapshotId": "post-abschlusshaertung-03-v1",
+  "sourceCommit": "c322bbe9ed049c4700de25d0dc33585e5e6598c7",
+  "sourceReferences": {
+    "backtestAndDemography": "post-backtest-data-19-v1",
+    "monteCarlo": "post-backtest-data-17-v1"
+  },
+  "targetResultDocument": "docs/internal/SLICE_ABSCHLUSSHAERTUNG_03_SAFETY_POLICY_PRIORITAET.md",
+  "reviewStatus": "pending_external_review",
+  "personalReplayDataIncluded": false,
+  "backtest": {
+    "cause": "rate_limited_structural_safety_targets_and_severe_gate_protects_floor_without_poisoning_recovery_anchor",
+    "crossSliceRuntimeBinding": {
+      "sourceCrossSliceOracleProjectionSha256": "15813110bf8964fd7004eb80e1cba1d5d54b676a3edb7ea9ec0cbcee4f80675c",
+      "sourceSlice09To10DeltaLedgerSha256": "30a2c212ae75c72e974132b16f617f7fd6e03c1b1fd040f87918bbb3bba4b621",
+      "targetCrossSliceOracleProjectionSha256": "069c2bb52c1f67b75dd3734ae8b94390547d5b8ebf823b91479a8f5a1f91db69",
+      "targetSlice09To10DeltaLedgerSha256": "6888e2bee8ebe3393315926e8b6cb9a24a3cc468a881f23413012b94a576f208"
+    },
+    "integratedReference": {
+      "delta": {
+        "observedRowCount": 0,
+        "outcomeChanged": false,
+        "summaryEndWealth": -111704.33,
+        "totalTax": 6248.9,
+        "totalWithdrawal": 38238.36
+      },
+      "source": {
+        "canonicalRowsHash": "1121fa8bea4c08234a46786677da0a55e07893d27e01273c5223c40d4541b4a0",
+        "observedRowCount": 26,
+        "outcome": "completed",
+        "summaryEndWealth": 5890797,
+        "totalTax": 109577.83,
+        "totalWithdrawal": 803550.31
+      },
+      "target": {
+        "canonicalRowsHash": "ba523fc94bea9f1d0dbe7db4fb96d783a9c76bde0c6f7857d0f1001b754a626c",
+        "maxAbsolutePortfolioFlowDelta": 0,
+        "observedRowCount": 26,
+        "outcome": "completed",
+        "summaryEndWealth": 5779092.67,
+        "totalTax": 115826.73,
+        "totalWithdrawal": 841788.67
+      }
+    },
+    "policyEvidence": {
+      "bindingYears": [
+        {
+          "deferredByRateLimit": false,
+          "effectiveCapRatePct": 0,
+          "finalFlexRatePct": 0,
+          "floorNominalEur": 24798.24,
+          "minimumFlexAnnualNominalEur": 0,
+          "minimumFlexStatus": "overridden_by_severe_flex_emergency",
+          "policyTargetRatePct": 0,
+          "realTotalWealthDrawdownPct": 41.547319513,
+          "severeFlexEmergencyActive": true,
+          "source": "severe_bear_wealth_emergency",
+          "withdrawalNominalEur": 24798.24,
+          "year": 2002
+        },
+        {
+          "deferredByRateLimit": false,
+          "effectiveCapRatePct": 0,
+          "finalFlexRatePct": 0,
+          "floorNominalEur": 25145.42,
+          "minimumFlexAnnualNominalEur": 0,
+          "minimumFlexStatus": "overridden_by_severe_flex_emergency",
+          "policyTargetRatePct": 0,
+          "realTotalWealthDrawdownPct": 38.748576143,
+          "severeFlexEmergencyActive": true,
+          "source": "severe_bear_wealth_emergency",
+          "withdrawalNominalEur": 25145.42,
+          "year": 2003
+        },
+        {
+          "deferredByRateLimit": false,
+          "effectiveCapRatePct": 0,
+          "finalFlexRatePct": 0,
+          "floorNominalEur": 25396.87,
+          "minimumFlexAnnualNominalEur": 0,
+          "minimumFlexStatus": "overridden_by_severe_flex_emergency",
+          "policyTargetRatePct": 0,
+          "realTotalWealthDrawdownPct": 33.704841265,
+          "severeFlexEmergencyActive": true,
+          "source": "severe_bear_wealth_emergency",
+          "withdrawalNominalEur": 25396.87,
+          "year": 2004
+        },
+        {
+          "deferredByRateLimit": false,
+          "effectiveCapRatePct": 0,
+          "finalFlexRatePct": 0,
+          "floorNominalEur": 27248.15,
+          "minimumFlexAnnualNominalEur": 0,
+          "minimumFlexStatus": "overridden_by_severe_flex_emergency",
+          "policyTargetRatePct": 0,
+          "realTotalWealthDrawdownPct": 46.819509653,
+          "severeFlexEmergencyActive": true,
+          "source": "severe_bear_wealth_emergency",
+          "withdrawalNominalEur": 27248.15,
+          "year": 2008
+        }
+      ],
+      "completedYearCount": 26,
+      "floorViolationCount": 0,
+      "normalSafetyCapAppliedYearCount": 0,
+      "normalSafetyCapDeferredYearCount": 0,
+      "normalSafetyCapMinimumFlexViolationCount": 0,
+      "safetyCapActiveYearCount": 5,
+      "safetyCapAppliedYearCount": 4,
+      "severeEmergencyFloorMismatchCount": 0,
+      "severeFlexEmergencyYearCount": 4,
+      "syntheticWitnesses": {
+        "firstRecoveredYearWithPositiveMinimumFlex": {
+          "deferredByRateLimit": false,
+          "effectiveCapRatePct": 0,
+          "finalFlexRatePct": 75,
+          "floorNominalEur": 24000,
+          "minimumFlexAnnualNominalEur": 30000,
+          "minimumFlexFulfilled": true,
+          "minimumFlexStatus": "not_needed",
+          "policyTargetRatePct": 0,
+          "safetyCapApplied": false,
+          "severeFlexEmergencyActive": false,
+          "smoothingReferencePct": 75,
+          "withdrawalNominalEur": 69000
+        },
+        "normalRateLimitedCapWithPositiveMinimumFlex": {
+          "deferredByRateLimit": true,
+          "effectiveCapRatePct": 90,
+          "finalFlexRatePct": 90,
+          "floorNominalEur": 24000,
+          "minimumFlexAnnualNominalEur": 30000,
+          "minimumFlexFulfilled": true,
+          "minimumFlexStatus": "applied",
+          "policyTargetRatePct": 50,
+          "safetyCapApplied": false,
+          "severeFlexEmergencyActive": false,
+          "smoothingReferencePct": 90,
+          "withdrawalNominalEur": 78000
+        },
+        "severeOverrideWithPositiveMinimumFlex": {
+          "deferredByRateLimit": false,
+          "effectiveCapRatePct": 0,
+          "finalFlexRatePct": 0,
+          "floorNominalEur": 24000,
+          "minimumFlexAnnualNominalEur": 30000,
+          "minimumFlexFulfilled": false,
+          "minimumFlexStatus": "overridden_by_severe_flex_emergency",
+          "policyTargetRatePct": 0,
+          "safetyCapApplied": true,
+          "severeFlexEmergencyActive": true,
+          "smoothingReferencePct": 90,
+          "withdrawalNominalEur": 24000
+        }
+      }
+    },
+    "resultProjection": {
+      "caseCount": 12,
+      "negativeCaseCount": 5,
+      "ruinCaseCount": 1,
+      "sourceActualSha256": "80f5942c906f20d593172628b51b62656ca2189be47923d0325bcbeb397577b3",
+      "targetActualSha256": "5de98e83c26923967246056221977c89894ec32ca78e07fcf75309814f404f48"
+    },
+    "reviewStatus": "pending_external_review",
+    "schemaVersion": "SafetyPolicySlice03BacktestMeasurementV1",
+    "sourceFixtureSha256": "f4e5ec836831319eb889396d2535e55400ab35e7f8e492d11091bf786900cc9e",
+    "sourceReference": "post-backtest-data-19-v1",
+    "targetResultDocument": "docs/internal/SLICE_ABSCHLUSSHAERTUNG_03_SAFETY_POLICY_PRIORITAET.md"
+  },
+  "monteCarlo": {
+    "schemaVersion": "SafetyPolicySlice03MonteCarloMeasurementV1",
+    "sourceReference": "post-backtest-data-17-v1",
+    "sourceFixtureSha256": "9a733a9cf5454d038e178250e0904d564244657c35173d0a5b899ec54312f241",
+    "targetResultDocument": "docs/internal/SLICE_ABSCHLUSSHAERTUNG_03_SAFETY_POLICY_PRIORITAET.md",
+    "reviewStatus": "pending_external_review",
+    "sourceProjectionHashes": {
+      "carResultSha256": "ff9233e3142eb78e9e8eefb3c426778c8a8b8899106c09a60cfd719b120085fc",
+      "autoOptimizeResultSha256": "18fc45b4466d3b0027600ab43b2795143bc287b98e99581fd970cb043b207da3",
+      "finalResultSha256": "3184117cc52b6e1a50c0752fb166ecfbc75070b1684cc8454ec60b6a327f8b1a"
+    },
+    "targetProjectionHashes": {
+      "carResultSha256": "9021e165213f1f2bd08442708ae77fee356428715f5305d4f13ca3d676feee40",
+      "autoOptimizeResultSha256": "3db5ace7731b003911ba533875ea8594d170f8ba7de21fe032c7f3edce308955",
+      "finalResultSha256": "6ecf663ab4551b399ea9823652250dbae6f52cfc956c380d286091567e317707"
+    },
+    "changedProjectionCount": 3,
+    "measuredProjectionCount": 3,
+    "technicalErrorCount": 0,
+    "requestedRuns": 8,
+    "financiallyEvaluableRuns": 8,
+    "cause": "structural_safety_cap_changes_withdrawals_without_changing_sampling_or_worker_contracts"
+  },
+  "demography": {
+    "schemaVersion": "SafetyPolicySlice03DemographyMeasurementV1",
+    "sourceReference": "post-backtest-data-19-v1",
+    "sourceFixtureSha256": "f4e5ec836831319eb889396d2535e55400ab35e7f8e492d11091bf786900cc9e",
+    "targetResultDocument": "docs/internal/SLICE_ABSCHLUSSHAERTUNG_03_SAFETY_POLICY_PRIORITAET.md",
+    "reviewStatus": "pending_external_review",
+    "sourceMeasurementSha256": "e24a5ce7bec03fce129c77f14aa247d6c8ed14872ac63e40791e63cb4d7b3856",
+    "targetMeasurementSha256": "80eba72b118cd4dd8c41adcd360479e1b2c49be3af3222a749ae73fd9f19d42f",
+    "targetSummary": {
+      "outcomeCounts": {
+        "ruin": 2,
+        "allDead": 2045,
+        "horizonExhausted": 1,
+        "technicalError": 0
+      },
+      "lifespanYears": {
+        "p10": 16,
+        "p50": 26,
+        "p90": 32
+      },
+      "finalWealthNominalEur": {
+        "p10": 1468681.22736,
+        "p50": 3934508.947123,
+        "p90": 11417762.023677
+      },
+      "care": {
+        "anyCareRunCount": 1725,
+        "p1EntryRunCount": 1159,
+        "p2EntryRunCount": 1315,
+        "additionalNeedNominalEur": {
+          "p10": 0,
+          "p50": 84193.536697,
+          "p90": 306424.653501
+        }
+      },
+      "pathEvidenceHash": "e69eb2438871b588e8cc359a9b576f4aba2a839cd8159d34f6d4adc6c6ce7556",
+      "sweep": [
+        {
+          "comboIdx": 0,
+          "successProbFloor": 99.902344,
+          "p10EndWealth": 1468681.22736,
+          "medianEndWealth": 3934508.947123,
+          "worst5Drawdown": 55.682115,
+          "evidenceHash": "33097174f41ff3e6c429bfb48035167b47cfd405767b1ee865eebf37b503594c"
+        },
+        {
+          "comboIdx": 1,
+          "successProbFloor": 99.902344,
+          "p10EndWealth": 1387967.794176,
+          "medianEndWealth": 3308077.297146,
+          "worst5Drawdown": 51.539107,
+          "evidenceHash": "63b25f5ab75f8c554503d17e29d1d8ae48f422132de7840f6955709106a7bf60"
+        }
+      ]
+    },
+    "cause": "safety_policy_changes_financial_paths_while_demography_care_and_survivor_models_remain_unchanged"
+  }
+}
