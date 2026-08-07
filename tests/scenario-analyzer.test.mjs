@@ -101,6 +101,7 @@ import { ScenarioAnalyzer, analyzeScenario, compareScenarios, extractKeyMetrics 
         logDataRows: []
     });
     const scenarios = analyzer.buildScenarioLogs().characteristic;
+    assertEqual(scenarios.find(entry => entry.key === 'p10')?.label, 'P10 des nominalen Endvermögens', 'P10 example path should name its actual nominal-final-wealth selection criterion');
     assertEqual(scenarios.find(entry => entry.key === 'earliestCareP1')?.p1CareEntryAge, 74, 'Scenario analysis should select earliest P1 care independently');
     assertEqual(scenarios.find(entry => entry.key === 'earliestCareP2')?.p2CareEntryAge, 68, 'Scenario analysis should select earliest P2 care independently');
 }

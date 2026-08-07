@@ -172,7 +172,7 @@ export function computeHeatmapStats(heatInput, bins, totalRuns) {
 
     const allSharesFlat = shares.flat().filter(s => s > 1e-6);
 
-    // Fix-Bins für KPI-Highlights (z.B. Quote >4.5%).
+    // Fix-Bins fuer die bin-basierte Berichtsreferenz ab 4,5 Prozent.
     const binIdx30 = bins.findIndex(b => b === 3.0);
     const binIdx55 = bins.findIndex(b => b === 5.5);
     const binIdx45 = bins.findIndex(b => b === 4.5);
@@ -279,7 +279,7 @@ export function renderHeatmapSVG(heatInput, bins, totalRuns, extraKPI = {}, opti
             const color = paletteFn(t);
             const { textFill, bgFill, dotFill } = computeLabelStyles(color);
 
-            const tooltip = `Jahr ${yIdx + 1} | Entnahme: ${formatFixed(bins[bIdx], 1)}%-` +
+            const tooltip = `Jahr ${yIdx + 1} | Realisierte Entnahmequote: ${formatFixed(bins[bIdx], 1)}%-` +
                 `${bins[bIdx + 1] < 100 ? formatFixed(bins[bIdx + 1], 1) : '∞'}% | ` +
                 `Anteil: ${formatFixed(pct, 2)}% (${heat[yIdx][bIdx]} Läufe)`;
 
@@ -333,22 +333,23 @@ export function renderHeatmapSVG(heatInput, bins, totalRuns, extraKPI = {}, opti
         footer = `
             <g class="footer" transform="translate(0, ${opts.height - 25})">
                 <text x="0" y="0" class="footer-text">
-                    <tspan>Zeitanteil Quote > 4.5%:</tspan><tspan x="140" font-weight="600">${kpi1}</tspan>
-                    <tspan x="280">Anteil Jahr-1 in 3.0-3.5%:</tspan><tspan x="440" font-weight="600">${kpi2}</tspan>
-                    <tspan x="580">Anteil Jahr-1 > 5.5%:</tspan><tspan x="710" font-weight="600">${kpi3}</tspan>
+                    <tspan>Gesamt: realisierte Quote &gt; 4,5 %:</tspan><tspan x="205" font-weight="600">${kpi1}</tspan>
+                    <tspan x="310">Jahr 1 in 3,0–3,5 %:</tspan><tspan x="445" font-weight="600">${kpi2}</tspan>
+                    <tspan x="570">Jahr 1 &gt; 5,5 %:</tspan><tspan x="680" font-weight="600">${kpi3}</tspan>
                 </text>
             </g>`;
     }
 
     return `
     <div id="heatmap-container" style="text-align:center;">
-        <h4 style="text-align:center;">Verteilung der Entnahmeraten in den ersten 10 Jahren</h4>
+        <h4 style="text-align:center;">Verteilung der realisierten Entnahmequote in den ersten 10 Jahren</h4>
+        <p class="reporting-reference-note">Die Überlagerung zeigt den bin-basierten Anteil mit realisierter Entnahmequote ≥ 4,5 %. Die 4,5 % sind nur eine Berichtsreferenz und keine Alarm- oder Guardrail-Schwelle.</p>
         <svg class="heatmap-v4-svg" viewBox="0 0 ${opts.width} ${opts.height}">
             <defs>${HEATMAP_V4_STYLE}</defs>
             <g transform="translate(${margin.left}, ${margin.top})">
                 <text x="${chartWidth / 2}" y="-35" text-anchor="middle" class="axis-label">Simulationsjahr</text>
-                <text x="${chartWidth / 2}" y="-5" text-anchor="middle" class="axis-label" font-size="9" fill="var(--danger-color, #c0392b)">Anteil Läufe >4.5% Quote</text>
-                <text transform="translate(-50, ${chartHeight / 2}) rotate(-90)" text-anchor="middle" class="axis-label">Entnahmerate</text>
+                <text x="${chartWidth / 2}" y="-5" text-anchor="middle" class="axis-label" font-size="9" fill="var(--danger-color, #c0392b)">Anteil Läufe: realisierte Entnahmequote ≥ 4,5 % (bin-basiert)</text>
+                <text transform="translate(-50, ${chartHeight / 2}) rotate(-90)" text-anchor="middle" class="axis-label">Realisierte Entnahmequote</text>
 
                 ${cellBackgrounds}
                 ${cellOverlays}

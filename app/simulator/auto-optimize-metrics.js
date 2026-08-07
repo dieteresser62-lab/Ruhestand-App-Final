@@ -78,7 +78,7 @@ export function getObjectiveValue(results, objective) {
             value = requireAutoOptimizeMetricValue(results, 'worst5Drawdown', 'Drawdown P90');
             break;
         case 'TimeShare_WR_gt_4_5':
-            value = requireAutoOptimizeMetricValue(results, 'timeShareWRgt45', 'Time Share WR > 4,5 %');
+            value = requireAutoOptimizeMetricValue(results, 'timeShareWRgt45', 'Zeitanteil realisierte Entnahmequote strikt > 4,5 % (Berichtsreferenz)');
             break;
         case 'Median_WR':
             value = requireAutoOptimizeMetricValue(results, 'medianWithdrawalRate', 'Median Withdrawal Rate');

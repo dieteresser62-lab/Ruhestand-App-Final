@@ -83,6 +83,18 @@ try {
     assert(cardHtml.includes('kpi-card ') && cardHtml.includes('Default-tooltip'), 'KPI card should render its default tone and tooltip');
     assert(cardHtml.includes('is-green') && cardHtml.includes('is-amber') && cardHtml.includes('is-red'), 'KPI card should map all semantic tones');
     assert(renderKpiCard({ title: 'Fallback', value: '1', tone: 'unknown' }).includes('title="Fallback"'), 'KPI card should fall back from missing tooltip and description to its title');
+    const exactCardHtml = renderKpiCard({
+        title: 'Exaktwert',
+        value: '12.345.678,90 €',
+        secondaryLabel: 'Zweiter Exaktwert',
+        secondaryValue: '34,25 %',
+        statusLine: 'Grund: missing_inflation · Beobachtungen: 0 Läufe',
+        layout: 'exact-risk',
+        tone: 'danger'
+    });
+    assert(exactCardHtml.includes('kpi-exact-value'), 'Exact-value cards should receive the non-clipping layout class');
+    assert(exactCardHtml.includes('Zweiter Exaktwert') && exactCardHtml.includes('34,25 %'), 'Second exact values should be visible in the card body');
+    assert(exactCardHtml.includes('missing_inflation') && exactCardHtml.includes('Beobachtungen: 0'), 'Missing metrics should render stable reason and count visibly');
 
     const summary = new MockElement('div', documentRef);
     renderSummary(summary, toneCards);
@@ -92,6 +104,12 @@ try {
     simpleMode.enabled = true;
     renderSummary(summary, toneCards);
     assert(summary.innerHTML.includes('Warning') && !summary.innerHTML.includes('Danger'), 'Simple summary should render only the first three cards');
+    const criticalSummaryCards = [...toneCards, { ...card('Tax exact'), decisionCritical: true, layout: 'exact-risk' }];
+    renderSummary(summary, criticalSummaryCards);
+    assert(summary.innerHTML.includes('Tax exact') && summary.innerHTML.includes('summary-exact-value'), 'Decision-critical exact summary cards should remain visible in simple mode');
+    const unavailableSummaryCards = [...toneCards, { ...card('Tax unavailable'), value: '—', statusLine: 'Grund: no_observations · Beobachtungen: 0 Läufe', decisionCritical: true, layout: 'exact-risk' }];
+    renderSummary(summary, unavailableSummaryCards);
+    assert(summary.innerHTML.includes('summary-status-line') && summary.innerHTML.includes('Beobachtungen: 0'), 'Summary should render missing reason and observation count visibly');
     const unchangedSummary = summary.innerHTML;
     renderSummary(null, toneCards);
     renderSummary(summary, null);
@@ -101,12 +119,16 @@ try {
     const dashboard = new MockElement('div', documentRef);
     renderKpiDashboard(dashboard, {
         primary: [card('Primary', 'success')],
+        drawdownKpis: [card('Nominal drawdown', 'warning'), card('Real drawdown', 'danger')],
+        reportingReferenceNotice: 'Nur Berichtsreferenz; keine Alarm- oder Guardrail-Schwelle.',
         detailSections: [
             { title: 'Risk details', kpis: [card('Risk', 'warning')] },
             { title: 'Care details', kpis: [card('Care', 'danger')] }
         ]
     });
     assert(dashboard.innerHTML.includes('Wichtigste Kennzahlen') && dashboard.innerHTML.includes('Risk details') && dashboard.innerHTML.includes('Care details'), 'Dashboard should render primary and detail sections');
+    assert(dashboard.innerHTML.includes('kpi-grid-pair') && dashboard.innerHTML.includes('Nominal drawdown') && dashboard.innerHTML.includes('Real drawdown'), 'Dashboard should render nominal and real drawdowns in a dedicated pair grid');
+    assert(dashboard.innerHTML.includes('reporting-reference-note') && dashboard.innerHTML.includes('keine Alarm- oder Guardrail-Schwelle'), 'Dashboard should render the reporting-role notice outside collapsed details');
     assertEqual(dashboard.style.display, 'block', 'Dashboard should become visible after rendering');
     const unchangedDashboard = dashboard.innerHTML;
     renderKpiDashboard(null, { primary: [], detailSections: [] });

@@ -157,7 +157,7 @@ export class ScenarioAnalyzer {
         const wealthPercentiles = [
             { key: 'worst', label: 'Worst Case', scenario: sortedByWealth[0] },
             { key: 'p5', label: 'P5', scenario: sortedByWealth[percentileIndex(sortedByWealth, 0.05)] },
-            { key: 'p10', label: 'P10', scenario: sortedByWealth[percentileIndex(sortedByWealth, 0.10)] },
+            { key: 'p10', label: 'P10 des nominalen Endvermögens', scenario: sortedByWealth[percentileIndex(sortedByWealth, 0.10)] },
             { key: 'p25', label: 'P25', scenario: sortedByWealth[percentileIndex(sortedByWealth, 0.25)] },
             { key: 'p50', label: 'Median', scenario: sortedByWealth[percentileIndex(sortedByWealth, 0.50)] },
             { key: 'p75', label: 'P75', scenario: sortedByWealth[percentileIndex(sortedByWealth, 0.75)] },

@@ -254,6 +254,205 @@ async function downloadSelectedScenarioJson(page) {
     return document;
 }
 
+async function renderSyntheticRiskDisplayFixture(page) {
+    return page.evaluate(async () => {
+        const { prepareMonteCarloViewModel } = await import('/app/simulator/results-metrics.js');
+        const { renderCareSection, renderKpiDashboard, renderSummary } = await import('/app/simulator/results-renderers.js');
+        const results = {
+            finalOutcomes: {
+                p10: 100000.009,
+                p50: 500000.009,
+                p50_successful: 600000.009,
+                p90: 900000.009,
+                distribution: { sampleSize: 12 },
+                successfulCount: 10,
+                successfulMissingness: null
+            },
+            taxOutcomes: { p50: 12345678.9 },
+            depotErschoepfungsQuote: 0,
+            cutYearSharePct: { p50: 0, sampleSize: 12, excludedRuns: 0 },
+            maxDrawdowns: {
+                p50: 34.25,
+                p90: 48.125,
+                distribution: { sampleSize: 12, missingness: { technical_error: 0 } }
+            },
+            realMaxDrawdowns: {
+                p50: 35.5,
+                p90: 51.75,
+                distribution: { sampleSize: 12, missingness: { technical_error: 0 } },
+                missingness: { missing_inflation: 0, no_observations: 0, technical_error: 0 },
+                observationCount: { observedPaths: 12, pathPointsAvailable: 240 }
+            },
+            realWithdrawalP10: {
+                realEur: 12345678.9,
+                p50RealEur: 9876543.21,
+                sampleSize: 12,
+                excludedRuns: 0,
+                missingness: { no_observations: 0, technical_error: 0 }
+            },
+            extraKPI: {
+                timeShareQuoteAbove45: 0.0125,
+                lossCarryTaxSavings: { perRunMean: 331.01 },
+                pflege: {
+                    p1: {
+                        entryRatePct: 25,
+                        entryRateNumerator: 3,
+                        entryRateDenominator: 12,
+                        entryAgeP50: 82,
+                        careYearsP50: 4,
+                        realCostEurP50: 25000,
+                        sampleSize: 3
+                    },
+                    household: {
+                        sampleSize: 3,
+                        noCareSampleSize: 9,
+                        maxAnnualAdditionalNeedRealEurP50: 20000,
+                        totalAdditionalNeedRealEurP50: 80000,
+                        shortfallRateWithCarePct: 10,
+                        shortfallRateWithoutCarePct: 2,
+                        endWealthWithCareRealEurP50: 400000,
+                        endWealthNoCareRealEurP50: 550000
+                    },
+                    comparison: { endWealthNoCareMinusCareRealEur: 150000 }
+                }
+            }
+        };
+        const viewModel = prepareMonteCarloViewModel({
+            results,
+            totalRuns: 12,
+            failCount: 0,
+            inputs: { pflegefallLogikAktivieren: true, partner: { aktiv: false } }
+        });
+        const resultRegion = document.getElementById('monteCarloResults');
+        const summary = document.getElementById('monteCarloSummary');
+        const dashboard = document.getElementById('unifiedKpiDashboard');
+        const careContainer = document.createElement('section');
+        const careSummary = document.createElement('div');
+        careContainer.append(careSummary);
+        renderSummary(summary, viewModel.summaryCards);
+        renderKpiDashboard(dashboard, viewModel.kpiDashboard);
+        renderCareSection(careSummary, careContainer, viewModel.careMetrics);
+        dashboard.querySelector('details')?.setAttribute('open', '');
+        resultRegion.replaceChildren(summary, dashboard, careContainer);
+        resultRegion.style.display = 'block';
+        document.body.replaceChildren(resultRegion);
+        return resultRegion.innerText;
+    });
+}
+
+async function inspectSyntheticRiskLayout(page, width) {
+    await page.setViewportSize({ width, height: 900 });
+    return page.evaluate(() => {
+        const exactCards = Array.from(document.querySelectorAll('.kpi-exact-value, .summary-exact-value'));
+        const clippedNodes = exactCards.flatMap(card => [
+            card,
+            ...card.querySelectorAll('strong, .value-line, .kpi-secondary-value, .kpi-status-line, .kpi-description')
+        ]).filter(node => node.scrollWidth > node.clientWidth + 1);
+        const outsideViewport = exactCards.filter(card => {
+            const rect = card.getBoundingClientRect();
+            return rect.left < -0.5 || rect.right > document.documentElement.clientWidth + 0.5;
+        });
+        const copyTitles = Array.from(document.querySelectorAll('.kpi-card > strong'))
+            .filter(title => title.getBoundingClientRect().width > 0);
+        const clippedCopyTitles = copyTitles.filter(title => title.scrollWidth > title.clientWidth + 1);
+        const pairGrid = document.querySelector('.kpi-grid-pair');
+        const pairColumns = pairGrid
+            ? getComputedStyle(pairGrid).gridTemplateColumns.split(' ').filter(Boolean).length
+            : 0;
+        return {
+            text: document.getElementById('monteCarloResults')?.innerText || '',
+            exactCardCount: exactCards.length,
+            clippedCount: clippedNodes.length,
+            outsideViewportCount: outsideViewport.length,
+            copyTitleCount: copyTitles.length,
+            clippedCopyTitleCount: clippedCopyTitles.length,
+            hasVisibleCareNonCausalTitle: copyTitles.some(title => title.textContent.trim() === 'Gruppenmedian-Differenz (nicht kausal)'),
+            hasVisibleWithdrawalRateTitle: copyTitles.some(title => title.textContent.trim() === 'Zeitanteil realisierte Entnahmequote > 4,5 %'),
+            documentWidth: document.documentElement.scrollWidth,
+            viewportWidth: document.documentElement.clientWidth,
+            pairColumns
+        };
+    });
+}
+
+async function inspectFullSimulatorLayout(page, width) {
+    await page.setViewportSize({ width, height: 900 });
+    return page.evaluate(() => {
+        const viewportWidth = document.documentElement.clientWidth;
+        const overflowingElements = Array.from(document.querySelectorAll('body *')).map(element => {
+            const rect = element.getBoundingClientRect();
+            const style = getComputedStyle(element);
+            return {
+                tag: element.tagName,
+                id: element.id || '',
+                className: typeof element.className === 'string' ? element.className.slice(0, 100) : '',
+                text: (element.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 100),
+                left: Math.round(rect.left),
+                right: Math.round(rect.right),
+                width: Math.round(rect.width),
+                scrollWidth: element.scrollWidth,
+                overflowX: style.overflowX,
+                display: style.display
+            };
+        }).filter(item => item.display !== 'none' && item.right > viewportWidth + 1 && item.overflowX === 'visible')
+            .sort((left, right) => right.right - left.right)
+            .slice(0, 12);
+        const nonLogOverflowingElements = Array.from(document.querySelectorAll('body *'))
+            .filter(element => !element.closest('#scenarioLogOutput'))
+            .map(element => {
+                const rect = element.getBoundingClientRect();
+                const style = getComputedStyle(element);
+                return {
+                    tag: element.tagName,
+                    id: element.id || '',
+                    className: typeof element.className === 'string' ? element.className.slice(0, 100) : '',
+                    text: (element.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 100),
+                    left: Math.round(rect.left),
+                    right: Math.round(rect.right),
+                    width: Math.round(rect.width),
+                    scrollWidth: element.scrollWidth,
+                    overflowX: style.overflowX,
+                    display: style.display
+                };
+            }).filter(item => item.display !== 'none' && (item.right > viewportWidth + 1 || item.scrollWidth > item.width + 1))
+            .sort((left, right) => Math.max(right.right - viewportWidth, right.scrollWidth - right.width) - Math.max(left.right - viewportWidth, left.scrollWidth - left.width))
+            .slice(0, 12);
+        const logAncestors = [];
+        let logNode = document.querySelector('#scenarioLogOutput table');
+        while (logNode && logNode !== document.body && logAncestors.length < 10) {
+            const rect = logNode.getBoundingClientRect();
+            const style = getComputedStyle(logNode);
+            logAncestors.push({
+                tag: logNode.tagName,
+                id: logNode.id || '',
+                className: typeof logNode.className === 'string' ? logNode.className.slice(0, 100) : '',
+                left: Math.round(rect.left),
+                right: Math.round(rect.right),
+                width: Math.round(rect.width),
+                scrollWidth: logNode.scrollWidth,
+                minWidth: style.minWidth,
+                maxWidth: style.maxWidth,
+                overflowX: style.overflowX,
+                boxSizing: style.boxSizing
+            });
+            logNode = logNode.parentElement;
+        }
+        return {
+            documentWidth: document.documentElement.scrollWidth,
+            viewportWidth,
+            bodyWidth: document.body.scrollWidth,
+            mainWidth: Math.ceil(document.querySelector('.main-layout')?.getBoundingClientRect().width || 0),
+            overflowingElements,
+            nonLogOverflowingElements,
+            logAncestors,
+            visibleFieldsetOverflowCount: Array.from(document.querySelectorAll('fieldset')).filter(fieldset => {
+            const rect = fieldset.getBoundingClientRect();
+            return rect.width > 0 && rect.right > document.documentElement.clientWidth + 1;
+            }).length
+        };
+    });
+}
+
 async function runWorkerSuccessCase(browser, baseUrl) {
     const test = await createMonteCarloPage(browser, baseUrl);
     try {
@@ -280,6 +479,11 @@ async function runWorkerSuccessCase(browser, baseUrl) {
         }
         assert(visibleResult.includes('95%-KI'), 'completed browser result shows estimator uncertainty');
         assert(await page.evaluate(() => document.activeElement?.id) === 'monteCarloResults', 'completed run focuses the result region');
+
+        const actualMobileLayout = await inspectFullSimulatorLayout(page, 320);
+        assert(actualMobileLayout.documentWidth <= actualMobileLayout.viewportWidth && actualMobileLayout.bodyWidth <= actualMobileLayout.viewportWidth, `real 320px Simulator page should not overflow horizontally: ${JSON.stringify(actualMobileLayout)}`);
+        assert(actualMobileLayout.visibleFieldsetOverflowCount === 0, `real 320px Simulator fieldsets should remain inside the viewport: ${JSON.stringify(actualMobileLayout)}`);
+        await page.setViewportSize({ width: 1366, height: 900 });
 
         const exported = await downloadRunExport(page);
         assert(exported.request.execution.mode === 'worker', 'successful browser run records worker execution');
@@ -333,6 +537,24 @@ async function runWorkerSuccessCase(browser, baseUrl) {
         await page.locator('#toastContainer').filter({ hasText: 'Szenario-Export nicht möglich' }).waitFor({ state: 'visible' });
         assert(await page.evaluate(() => Number.isNaN(window.globalCurrentScenarioData?.rows?.[0]?.invalidExportProbe)),
             'failed export keeps scenario B selected instead of restoring scenario A');
+
+        const fixtureText = await renderSyntheticRiskDisplayFixture(page);
+        assert(fixtureText.includes('12.345.678,90') && fixtureText.includes('9.876.543,21'), 'synthetic browser fixture renders both large cent-exact benefit/cost values as DOM text');
+        assert(fixtureText.includes('Max. Drawdown nominal (Median)') && fixtureText.includes('Max. Drawdown real (Median)'), 'synthetic browser fixture renders both price bases');
+        assert(fixtureText.includes('34,25 %') && fixtureText.includes('35,50 %'), 'synthetic browser fixture renders both drawdowns exactly');
+        assert(fixtureText.includes('Gruppenmedian-Differenz (nicht kausal)'), 'synthetic browser fixture renders the care non-causality marker in the DOM');
+
+        const desktopLayout = await inspectSyntheticRiskLayout(page, 1366);
+        assert(desktopLayout.pairColumns === 2, `desktop drawdowns should be paired in two columns: ${JSON.stringify(desktopLayout)}`);
+        assert(desktopLayout.clippedCount === 0 && desktopLayout.outsideViewportCount === 0, `desktop exact cards should not clip or overlap the viewport: ${JSON.stringify(desktopLayout)}`);
+        assert(desktopLayout.clippedCopyTitleCount === 0 && desktopLayout.hasVisibleCareNonCausalTitle && desktopLayout.hasVisibleWithdrawalRateTitle, `desktop copy-critical titles should remain fully visible: ${JSON.stringify(desktopLayout)}`);
+        assert(desktopLayout.documentWidth <= desktopLayout.viewportWidth, `desktop result should not overflow horizontally: ${JSON.stringify(desktopLayout)}`);
+
+        const mobileLayout = await inspectSyntheticRiskLayout(page, 320);
+        assert(mobileLayout.pairColumns === 1, `320px drawdowns should wrap to one column: ${JSON.stringify(mobileLayout)}`);
+        assert(mobileLayout.clippedCount === 0 && mobileLayout.outsideViewportCount === 0, `320px exact cards should remain fully readable: ${JSON.stringify(mobileLayout)}`);
+        assert(mobileLayout.clippedCopyTitleCount === 0 && mobileLayout.hasVisibleCareNonCausalTitle && mobileLayout.hasVisibleWithdrawalRateTitle, `320px copy-critical titles should remain fully visible: ${JSON.stringify(mobileLayout)}`);
+        assert(mobileLayout.documentWidth <= mobileLayout.viewportWidth, `320px result should not overflow horizontally: ${JSON.stringify(mobileLayout)}`);
         test.assertNoUnexpectedErrors(['Szenario-Export fehlgeschlagen']);
     } finally {
         await test.context.close();

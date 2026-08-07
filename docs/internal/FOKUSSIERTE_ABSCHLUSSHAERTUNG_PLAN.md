@@ -1,7 +1,7 @@
 # Fokussierte Abschlusshaertung der Ruhestand-Suite: Arbeitsplan
 
 **Stand:** 2026-08-07<br>
-**Status:** Slice 1 implementiert; Claudes Implementierungsfindings C-01 bis C-04 korrigiert und intern validiert; externes Re-Review und Freigabe vor Commit ausstehend<br>
+**Status:** Slice 1 mit Commit `55bdd84` abgeschlossen; Slice 2 implementiert, die Claude-Code-Review-Findings CR2-01 bis CR2-06 nachgebessert und intern validiert; externe Re-Review von Slice 2 ausstehend<br>
 **Autor:** Codex<br>
 **Entscheider und einziger Produktnutzer:** Nutzer<br>
 **Vorgesehener Feature-Branch:** `codex/fokussierte-abschlusshaertung`<br>
@@ -393,8 +393,8 @@ Nach Abschluss der vier Slices gilt:
 
 | Slice | Datei | Ziel | Abhaengigkeit | Status |
 | ---: | --- | --- | --- | --- |
-| 1 | [SLICE_ABSCHLUSSHAERTUNG_01_MC_EXPORTVERTRAG_V2.md](SLICE_ABSCHLUSSHAERTUNG_01_MC_EXPORTVERTRAG_V2.md) | einmaliger MC- und Szenario-V2-Schnitt inklusive realem Drawdown, Mindest-Flex- und 4,5-Prozent-Messcontract | keine | implementiert; CR-01 bis CR-04 korrigiert; 167 Testdateien und adversarialer Browser-Smoke gruen; externes Re-Review vor Commit ausstehend |
-| 2 | [SLICE_ABSCHLUSSHAERTUNG_02_RISIKOANZEIGEN.md](SLICE_ABSCHLUSSHAERTUNG_02_RISIKOANZEIGEN.md) | exakte KPI-Anzeige mit Nutzen-/Kostenorakel und eindeutiger 4,5-Prozent-Beschriftung | Slice 1 | Drawdown-Domaene und responsive Layouttests ergaenzt; durch Slice 1 gesperrt |
+| 1 | [SLICE_ABSCHLUSSHAERTUNG_01_MC_EXPORTVERTRAG_V2.md](SLICE_ABSCHLUSSHAERTUNG_01_MC_EXPORTVERTRAG_V2.md) | einmaliger MC- und Szenario-V2-Schnitt inklusive realem Drawdown, Mindest-Flex- und 4,5-Prozent-Messcontract | keine | mit Commit `55bdd84` abgeschlossen und Baseline fuer Slice 2 |
+| 2 | [SLICE_ABSCHLUSSHAERTUNG_02_RISIKOANZEIGEN.md](SLICE_ABSCHLUSSHAERTUNG_02_RISIKOANZEIGEN.md) | exakte KPI-Anzeige mit Nutzen-/Kostenorakel und eindeutiger 4,5-Prozent-Beschriftung | Slice 1 | implementiert; CR2-01 bis CR2-06 nachgebessert; 168 Testdateien/19.222 Assertions und 29 Browserworkflows gruen; externe Re-Review ausstehend |
 | 3 | [SLICE_ABSCHLUSSHAERTUNG_03_SAFETY_POLICY_PRIORITAET.md](SLICE_ABSCHLUSSHAERTUNG_03_SAFETY_POLICY_PRIORITAET.md) | struktureller Safety-Cap mit konjunktivem Null-Flex-Notfallgate und absolutem Floor-Schutz | Slice 2 abgeschlossen; fachlich unabhaengig | Nutzerentscheidung NE-03 eingearbeitet; Jahr-1-Evidenzlauf und Gemini-Re-Review ausstehend |
 | 4 | [SLICE_ABSCHLUSSHAERTUNG_04_RECONCILE_CASHSTATUS.md](SLICE_ABSCHLUSSHAERTUNG_04_RECONCILE_CASHSTATUS.md) | append-only Cashstatus nach Realverkauf | Slice 3 abgeschlossen; fachlich unabhaengig | append-only Korrekturkette fuer Cashnachweise ergaenzt; Gemini-Re-Review ausstehend |
 

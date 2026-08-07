@@ -4,7 +4,7 @@
 
 This directory contains the comprehensive testing infrastructure for the Ruhestand-App-Final project. The tests are designed to be zero-dependency, using native Node.js ESM and a custom test runner, avoiding the need for heavy frameworks like Jest or Mocha.
 
-**Test-Statistik:** 166 entdeckte Testdateien mit 18.822 von 18.822 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien, einem bestandenen separaten Gate und 0 offenen Handles (Slice-17-Nachbearbeitung nach Claude-Runde 2 mit `npm test` am 2026-08-04 verifiziert). Das separate Browser-Pflichtgate bestand mit 28/28 Workflows. Der letzte gesonderte Coverage-Lauf stammt aus der Slice-13-Nachbesserung und erreichte 78,97 Prozent Zeilenabdeckung (40.302/51.035); Coverage wurde fuer Slice 17 nicht erneut gemessen.
+**Test-Statistik:** 168 entdeckte Testdateien mit 19.222 von 19.222 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien, einem bestandenen separaten Gate und 0 offenen Handles (Nachbesserung der Slice-02-Code-Review-Findings mit `npm test` am 2026-08-07 verifiziert). Das separate Browser-Pflichtgate bestand mit 29/29 Workflows einschliesslich der responsiven Exaktwert-Fixture, sichtbarer langer Kartentitel und der vollstaendigen realen Simulatorseite nach einem Lauf bei 320 Pixel. Der letzte gesonderte Coverage-Lauf stammt aus der Slice-13-Nachbesserung und erreichte 78,97 Prozent Zeilenabdeckung (40.302/51.035); Coverage wurde fuer Slice 02 nicht erneut gemessen.
 
 Die Zahl beschreibt nur die Node-Standardsuite. `npm run test:browser`, `npm run test:coverage` und ein echter Tauri-Build sind getrennte Gates und in den Assertions nicht enthalten.
 
@@ -427,13 +427,26 @@ Inventar liegen bewusst in den jeweiligen Fachtests.
 - **Mindest-Flex:** Serial-MC-Lauf mit `minimumFlexAnnual > 0` inklusive Withdrawal-Effekt und Logstatus.
 
 #### `results-metrics.test.mjs`
-**Zweck:** Sichert den sichtbaren Vertrag der Depotrest-/Ruin-KPI ohne DOM.
+**Zweck:** Sichert den sichtbaren Ergebnisvertrag ohne DOM.
 - **Präzises Label:** Ruin oder Aktien/Gold-Endbestand ≤ 100 Euro statt
   vollständiger Vermögensaufzehrung
 - **Aussagegrenze:** `isRuin`, freie Liquidität und Pflegebucket werden im
   Beschreibungstext ausdrücklich eingeordnet
 - **Kompatibilität:** Prozentformatierung, Altersanzeige und bestehende
   Success-/Warning-/Danger-Schwellen bleiben unverändert
+- **Exaktwerte:** P10/P50/P90-Endvermoegen ohne Grobstufen, reale
+  Depotentnahme P10, Median der Run-P10, Steuermedian und
+  Verlustvortragsersparnis bleiben centgenau und primaer sichtbar
+- **Rundungsrichtung:** Zusatzdezimal-Fixtures sichern Nutzen abwaerts, Kosten
+  aufwaerts und positive Drawdown-Verlustbetraege aufwaerts; Gleitkommawerte
+  nahe einer exakten Centgrenze bleiben stabil
+- **Drawdown:** nominale/reale Preisbasis, Paarreihenfolge, gueltige
+  Grenzwerte 0/34,25/100 sowie fail-closed Verhalten fuer negative,
+  groesser-100-, nicht endliche, fehlende und nicht anwendbare Werte
+- **Missingness:** fehlende Beobachtungszahlen erscheinen als `unbekannt`;
+  bei mehreren Gruenden gewinnt der hoechste aggregierte Zaehler
+- **Copy:** strikt-`>`-Berichtsreferenz und sichtbar nicht kausaler
+  Pflege-Gruppenmedianvergleich
 
 #### `care-meta.test.mjs`
 **Zweck:** Validiert die Pflegefall-Logik.
@@ -1064,6 +1077,9 @@ Pflege-/Todes-/Hinterbliebenenpfade werden getrennt geprueft.
 - **viridis:** Farbskala-Endpunkte (0 → dunkelviolett, 1 → gelb)
 - **computeHeatmapStats:** Leere/einzelne Werte
 - **renderHeatmapSVG:** Cell-Mapping, Legende
+- **4,5-Prozent-Grenze:** Das exakt bei 4,5 Prozent beginnende Bin gehoert zur
+  bin-basierten `>=`-Ueberlagerung; Basis, Operator und Berichtsrolle sind
+  sichtbar und vom strikt-`>`-Gesamt-KPI getrennt
 - **renderSweepHeatmapSVG:** Placeholder bei leeren Ergebnissen
 
 #### `scenario-analyzer.test.mjs`
@@ -1345,7 +1361,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `balance-ui-orchestration.test.mjs` | ~225 | Balance-UI-Bindings, Import-/Export-Control-Pfade, Schema-V1/V2-Migration, CSV-Provenienz und Profilverbund-Hooks |
 | `browser-smoke.test.mjs` | ~1070 | Playwright-Gate fuer HTML-Einstiege, MC-/Backtest-UI, A11y/Negativpfade sowie zentrale Balance-/Tranchenflows |
 | `suite-data-integration-contract.test.mjs` | ~330 | 65 Findings, I-01 bis I-08, O-01 bis O-22, Browser-/Paritaetsinventar, fail-closed Parameterpfade, Gate-Zuordnung und unveraenderte Delta-Baselines |
-| `simulator-monte-carlo-browser.mjs` | ~430 | Vier isolierte MC-Browserfaelle fuer Worker, Fallback, Technikfehler, Cancel/Restart, V2-Download, adversarialen Szenariowechsel und A11y |
+| `simulator-monte-carlo-browser.mjs` | ~520 | Vier isolierte MC-Browserfaelle fuer Worker, Fallback, Technikfehler, Cancel/Restart, V2-Download, adversarialen Szenariowechsel, A11y, sichtbare Pflege-/4,5-Prozent-Titel sowie centgenaue Exaktwert-/Drawdown-Layouts und die vollstaendige reale Simulatorseite nach einem Lauf bei 320 px |
 | `care-meta.test.mjs` | ~200 | Pflegefall-Logik |
 | `health-bucket.test.mjs` | ~160 | Pflegebucket-Trigger, Deckung, Verzinsung und Diagnose |
 | `core-engine.test.mjs` | ~150 | EngineAPI-Basisvalidierung |
@@ -1400,6 +1416,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `profilverbund-profile-gold-overrides.test.mjs` | ~160 | Gold-Parameter-Overrides |
 | `runner-contract.test.mjs` | ~260 | Test-Runner-Sortierung, Null-Assertion-Gate, Isolation, separate Gates, Legacy-Zaehler und QUICK_TESTS-Deprecation |
 | `scenario-analyzer.test.mjs` | ~95 | Szenario-Tags, Vergleich |
+| `slice-02-risk-display-copy-contract.test.mjs` | ~75 | Sichtbarer Copy-Contract fuer P10-Auswahlkriterium, Pflege-Nichtkausalitaet sowie Basis, Operator und Berichtsrolle der 4,5-Prozent-Anzeige in Ergebnissen, Heatmap und Auto-Optimize |
 | `scenarios.test.mjs` | ~150 | Komplexe Lebenspfade |
 | `simulation.test.mjs` | ~200 | Simulations-Integration |
 | `simulator-3bucket-ui-e2e.test.mjs` | ~130 | 3-Bucket-UI-Integration im Simulator |

@@ -339,6 +339,16 @@ try {
                 && resultEl.innerHTML.includes('geschaetzte Historie ausgeschlossen'),
             'Ergebnisansicht sollte die effektive Datenauswahl zusammen mit den Datenhashes rendern'
         );
+        assert(
+            resultEl.innerHTML.includes('Zeitanteil realisierte Entnahmequote &gt; 4,5 %')
+                && resultEl.innerHTML.includes('nur eine Berichtsreferenz')
+                && resultEl.innerHTML.includes('keine Alarm- oder Guardrail-Schwelle'),
+            'Auto-Optimize-Ergebnis sollte Basis, strikten Operator und reine Berichtsrolle der 4,5-Prozent-Metrik nennen'
+        );
+        assert(
+            resultEl.innerHTML.includes('Δ Zeitanteil realisierte Entnahmequote &gt; 4,5 %'),
+            'Auto-Optimize-Delta sollte denselben fachlichen Metriknamen verwenden'
+        );
 
         const previousSetTimeout = global.setTimeout;
         global.setTimeout = () => 0;

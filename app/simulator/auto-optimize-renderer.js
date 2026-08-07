@@ -248,11 +248,12 @@ export function renderAutoOptimizeResult({ resultEl, result, objective }) {
 
             <div style="background: white; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
                 <h4 style="margin-top: 0;">Key Metrics (Test Seeds)</h4>
+                <p class="reporting-reference-note">Die 4,5-%-Kennzahl misst die realisierte Entnahmequote strikt größer 4,5 %. Sie ist nur eine Berichtsreferenz und keine Alarm- oder Guardrail-Schwelle.</p>
                 <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
                     <div><strong>Success Rate:</strong><span style="margin-left: 10px;">${formatPercentFromRatio(metricsTest.successProbFloor, 1)}</span></div>
                     <div><strong>P90 Drawdown:</strong><span style="margin-left: 10px;">${formatPercentFromRatio(metricsTest.worst5Drawdown, 1)}</span></div>
                     <div><strong>End Wealth P50:</strong><span style="margin-left: 10px;">${formatCurrency(metricsTest.medianEndWealth ?? 0)}</span></div>
-                    <div><strong>Time Share WR > 4.5%:</strong><span style="margin-left: 10px;">${formatPercentFromRatio(metricsTest.timeShareWRgt45, 2)}</span></div>
+                    <div><strong>Zeitanteil realisierte Entnahmequote &gt; 4,5 %:</strong><span style="margin-left: 10px;">${formatPercentFromRatio(metricsTest.timeShareWRgt45, 2)}</span></div>
                 </div>
             </div>
 
@@ -278,7 +279,7 @@ export function renderAutoOptimizeResult({ resultEl, result, objective }) {
                         </span>
                     </div>
                     <div>
-                        <strong>Time Share WR > 4.5%:</strong>
+                        <strong>Δ Zeitanteil realisierte Entnahmequote &gt; 4,5 %:</strong>
                         <span style="margin-left: 10px; color: ${deltaVsCurrent.timeShareWRgt45 <= 0 ? '#4caf50' : '#f44336'};">
                             ${formatSignedPercentFromRatio(deltaVsCurrent.timeShareWRgt45, 2)}
                         </span>

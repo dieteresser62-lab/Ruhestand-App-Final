@@ -24,6 +24,9 @@ console.log('--- Simulator Heatmap Tests ---');
     const stats = computeHeatmapStats(heat, [0, 4.5, 10], 2);
     assertClose(stats.globalP90, 1, 0.0001, 'Single-value heatmap should have globalP90=1');
     assertClose(stats.shares[0][0], 1, 0.0001, 'Share should be 1 for full bin');
+
+    const exactBoundaryBin = computeHeatmapStats([new Uint32Array([0, 1])], [0, 4.5, 10], 1);
+    assertClose(exactBoundaryBin.colSharesAbove45[0], 1, 0.0001, 'The bin starting at exactly 4.5 percent belongs to the bin-based >= overlay');
 }
 
 // --- TEST 4: renderHeatmapSVG cell mapping ---
@@ -34,6 +37,12 @@ console.log('--- Simulator Heatmap Tests ---');
     const svg = renderHeatmapSVG(heat, bins, 2, { timeShareQuoteAbove45: 0.1 }, { showLegend: false, showFooterStats: false });
     const cellCount = (svg.match(/class="heatmap-cell"/g) || []).length;
     assertEqual(cellCount, 4, 'Heatmap should render one cell per year/bin');
+    assert(svg.includes('realisierte Entnahmequote ≥ 4,5 % (bin-basiert)'), 'Heatmap header should name realized-rate basis and bin-based >= operator');
+    assert(svg.includes('nur eine Berichtsreferenz') && svg.includes('keine Alarm- oder Guardrail-Schwelle'), 'Heatmap should state the reporting-only role visibly');
+    assert(svg.includes('Realisierte Entnahmequote:'), 'Heatmap cell tooltip should name the realized withdrawal-rate basis');
+
+    const svgWithFooter = renderHeatmapSVG(heat, bins, 2, { timeShareQuoteAbove45: 0.1 }, { showLegend: false, showFooterStats: true });
+    assert(svgWithFooter.includes('realisierte Quote &gt; 4,5 %'), 'Heatmap footer should distinguish the strict overall KPI from the >= bin overlay');
 }
 
 // --- TEST 5: count/share input contract ---

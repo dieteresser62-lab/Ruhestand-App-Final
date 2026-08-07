@@ -11,12 +11,21 @@ import { renderHeatmapSVG } from './simulator-heatmap.js';
  */
 export function renderKpiCard(kpi) {
     const toneClass = mapToneToClass(kpi.tone);
+    const layoutClass = kpi.layout === 'exact-risk' ? ' kpi-exact-value' : '';
     const description = kpi.description || '';
     const tooltip = kpi.tooltip || description || kpi.title;
+    const statusLine = kpi.statusLine
+        ? `<div class="kpi-status-line">${kpi.statusLine}</div>`
+        : '';
+    const secondaryLine = kpi.secondaryLabel
+        ? `<div class="kpi-secondary-value"><span>${kpi.secondaryLabel}</span><strong>${kpi.secondaryValue || '—'}</strong>${kpi.secondaryStatusLine ? `<small>${kpi.secondaryStatusLine}</small>` : ''}</div>`
+        : '';
     return `
-    <div class="kpi-card ${toneClass}" title="${tooltip}">
+    <div class="kpi-card ${toneClass}${layoutClass}" title="${tooltip}">
       <strong>${kpi.title}</strong>
       <div class="value-line">${kpi.value}</div>
+      ${statusLine}
+      ${secondaryLine}
       <div class="kpi-description">${description}</div>
     </div>`;
 }
@@ -32,13 +41,19 @@ export function renderSummary(container, summaryCards) {
 
     // In simple mode, show only the 3 most important cards.
     const isSimpleMode = document.body.classList.contains('mode-simple');
-    const cardsToShow = isSimpleMode ? summaryCards.slice(0, 3) : summaryCards;
+    const cardsToShow = isSimpleMode
+        ? summaryCards.filter((card, index) => index < 3 || card.decisionCritical === true)
+        : summaryCards;
 
     const summaryHtml = `
         <div class="summary-grid">
           ${cardsToShow.map(card => {
               const tooltip = card.tooltip || card.description || card.title;
-              return `<div class="summary-item${mapToneToSummaryClass(card.tone)}" title="${tooltip}"><strong>${card.title}</strong><span>${card.value}</span></div>`;
+              const layoutClass = card.layout === 'exact-risk' ? ' summary-exact-value' : '';
+              const statusLine = card.statusLine
+                  ? `<small class="summary-status-line">${card.statusLine}</small>`
+                  : '';
+              return `<div class="summary-item${mapToneToSummaryClass(card.tone)}${layoutClass}" title="${tooltip}"><strong>${card.title}</strong><span>${card.value}</span>${statusLine}</div>`;
           }).join('')}
         </div>`;
     container.innerHTML = summaryHtml;
@@ -56,6 +71,17 @@ export function renderKpiDashboard(container, dashboard) {
     let html = '<h3 class="unified-kpi-header">Wichtigste Kennzahlen</h3><div class="kpi-grid">';
     html += dashboard.primary.map(renderKpiCard).join('');
     html += '</div>';
+
+    if (Array.isArray(dashboard.drawdownKpis) && dashboard.drawdownKpis.length > 0) {
+        html += '<h4 class="drawdown-pair-heading">Maximum-Drawdown: nominal und real</h4>';
+        html += '<div class="kpi-grid kpi-grid-pair">';
+        html += dashboard.drawdownKpis.map(renderKpiCard).join('');
+        html += '</div>';
+    }
+
+    if (dashboard.reportingReferenceNotice) {
+        html += `<p class="reporting-reference-note">${dashboard.reportingReferenceNotice}</p>`;
+    }
 
     html += '<details class="details-card" style="margin-top: 15px; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px;"><summary style="cursor: pointer; font-weight: 600; color: var(--primary-color); font-size: 0.95rem;">📊 Weitere Detail-KPIs anzeigen</summary>';
     html += '<div style="margin-top: 15px;">';

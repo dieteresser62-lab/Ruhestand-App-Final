@@ -591,7 +591,24 @@ Die Worker-Pools bieten ein opt-in Telemetrie-System für lokale Performance-Ana
 ### Ergebnisdarstellung
 
 * KPIs (P10/P50/P90) und Worst-Run-Logs.
+* Entscheidungskritische Monte-Carlo-EUR-KPIs einschliesslich der
+  P10/P50/P90-Endvermoegens-Summary werden aus den validierten
+  `aggregatedResults` ohne Grobstufenrundung centgenau projiziert. Untercent-
+  Nutzenwerte werden abwaerts, Kostenwerte aufwaerts quantisiert. Nominaler
+  und realer Maximum-Drawdown werden nicht in der UI neu berechnet, sondern als
+  getrennte positive Verlustbetraege mit Preisbasis und Domaene 0 bis 100
+  Prozent angezeigt; weitere Dezimalstellen werden zur sichtbaren
+  Hundertstel-Prozentpunktgrenze aufwaerts quantisiert. Ungueltige, fehlende
+  oder nicht anwendbare Werte scheitern fail-closed mit Grund statt als
+  numerische 0. Eine Beobachtungszahl wird nur angezeigt, wenn sie im Aggregat
+  vorhanden ist, andernfalls als `unbekannt`; bei mehreren Missingness-
+  Ursachen entscheidet der groesste aggregierte Zaehler.
 * **Heatmap (Renten-Fokus):** Die Heatmap visualisiert die Verteilung der Entnahmeraten. Um bei aktivierter Ansparphase (0% Entnahme) keine leeren Spalten zu zeigen, beginnt die Aufzeichnung der Heatmap erst mit dem ersten Jahr der Rentenphase.
+* Die bestehende 4,5-Prozent-Auswertung misst die realisierte Entnahmequote und
+  ist eine Berichtsreferenz, keine Alarm- oder Guardrail-Schwelle. Ergebnis-
+  und Auto-Optimize-KPI verwenden strikt `> 4,5 %`; die Heatmap umfasst wegen
+  ihrer Klassenbildung das bei 4,5 Prozent beginnende Bin und bezeichnet es
+  deshalb als `>= 4,5 %`.
 * Pflegefall-Szenarien mit zusätzlichen Kostenverläufen.
 
 ### Suite-Datenintegritaet: Abschlussvertrag

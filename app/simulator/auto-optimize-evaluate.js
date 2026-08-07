@@ -220,7 +220,7 @@ export async function evaluateCandidate(
                     requireFiniteMetric(r.aggregatedResults.depotErschoepfungsQuote, 'Depot-Erschoepfungsquote') / 100
                 ))),
                 timeShareWRgt45: mean(allResults.map(r => (
-                    requireFiniteMetric(r.aggregatedResults.extraKPI?.timeShareQuoteAbove45, 'TimeShare WR > 4,5 %')
+                    requireFiniteMetric(r.aggregatedResults.extraKPI?.timeShareQuoteAbove45, 'Zeitanteil realisierte Entnahmequote strikt > 4,5 % (Berichtsreferenz)')
                 ))),
                 worst5Drawdown: mean(allResults.map(r => (
                     requireFiniteMetric(r.aggregatedResults.maxDrawdowns?.p90, 'Drawdown P90') / 100
@@ -301,7 +301,7 @@ export async function evaluateCandidate(
             requireFiniteMetric(r.aggregatedResults.depotErschoepfungsQuote, 'Depot-Erschoepfungsquote') / 100
         ))),
         timeShareWRgt45: mean(allResults.map(r => (
-            requireFiniteMetric(r.aggregatedResults.extraKPI?.timeShareQuoteAbove45, 'TimeShare WR > 4,5 %')
+            requireFiniteMetric(r.aggregatedResults.extraKPI?.timeShareQuoteAbove45, 'Zeitanteil realisierte Entnahmequote strikt > 4,5 % (Berichtsreferenz)')
         ))),
         endWealthQuantilesPct,
         p10EndWealth: endWealthQuantilesPct[10],

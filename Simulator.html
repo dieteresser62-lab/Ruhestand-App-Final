@@ -64,6 +64,9 @@
             gap: 6px;
             justify-content: center;
             margin-top: 10px;
+            min-width: 0;
+            max-width: 100%;
+            flex-wrap: wrap;
         }
 
         .log-export-buttons button {
@@ -78,6 +81,9 @@
             width: auto !important;
             min-width: 0 !important;
             flex: 0 0 auto !important;
+            max-width: 100%;
+            white-space: normal;
+            overflow-wrap: anywhere;
         }
 
         .log-export-buttons button:hover {
@@ -149,6 +155,222 @@
         .toast-show {
             opacity: 1;
             transform: translateY(0);
+        }
+
+        /* Slice 02: Exaktwerte und Messhinweise duerfen auch mobil nicht
+           abgeschnitten oder als technische Kurzlabels missverstanden werden. */
+        .main-layout,
+        .panel,
+        .tab-content,
+        .tab-panel,
+        fieldset,
+        fieldset.collapsible .fieldset-content {
+            min-width: 0;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+
+        fieldset {
+            min-inline-size: 0;
+        }
+
+        fieldset.collapsible legend {
+            width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
+        }
+
+        fieldset.collapsible legend .legend-text {
+            min-width: 0;
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
+
+        .care-panel,
+        .care-sections,
+        .care-section,
+        .care-section-grid,
+        .care-duration-group,
+        .care-grade-matrix,
+        .care-grade-row {
+            min-width: 0;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+
+        .tab-buttons {
+            max-width: 100%;
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+
+        .tab-btn {
+            flex: 0 0 auto;
+        }
+
+        #monteCarloResults,
+        #scenarioLogContainer,
+        #scenarioSelector,
+        #scenarioLogOutput,
+        .scenario-selector {
+            min-width: 0;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+
+        #scenarioLogOutput {
+            width: 100%;
+        }
+
+        #scenarioSelect {
+            min-width: 0 !important;
+            max-width: 100%;
+        }
+
+        #withdrawalRateChartContainer,
+        #heatmap-container {
+            min-width: 0;
+            max-width: 100%;
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+
+        .kpi-card>strong,
+        .summary-item>strong {
+            white-space: normal;
+            overflow: visible;
+            text-overflow: clip;
+            overflow-wrap: anywhere;
+        }
+
+        .summary-item>span,
+        .kpi-card .value-line {
+            min-width: 0;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+
+        .kpi-card.kpi-exact-value,
+        .summary-item.summary-exact-value {
+            min-width: 0;
+        }
+
+        .kpi-card.kpi-exact-value>strong,
+        .summary-item.summary-exact-value>strong {
+            white-space: normal;
+            overflow: visible;
+            text-overflow: clip;
+            overflow-wrap: anywhere;
+        }
+
+        .kpi-card.kpi-exact-value .value-line,
+        .kpi-card.kpi-exact-value .kpi-secondary-value,
+        .kpi-card.kpi-exact-value .kpi-status-line,
+        .summary-item.summary-exact-value>span,
+        .summary-item.summary-exact-value .summary-status-line {
+            min-width: 0;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+
+        .kpi-secondary-value {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            margin: 2px 0 8px;
+            font-size: 0.76rem;
+            color: var(--text-muted, #64748b);
+        }
+
+        .kpi-secondary-value>strong {
+            color: var(--secondary-color);
+            font-size: 1rem;
+        }
+
+        .kpi-secondary-value>small,
+        .kpi-status-line,
+        .summary-status-line {
+            color: var(--danger-color, #b91c1c);
+            font-size: 0.72rem;
+            line-height: 1.3;
+        }
+
+        .summary-status-line {
+            display: block;
+            margin-top: 4px;
+        }
+
+        .reporting-reference-note {
+            max-width: 78ch;
+            margin: 10px auto 14px;
+            padding: 8px 10px;
+            border: 1px solid var(--border-color, #d1d5db);
+            border-radius: 6px;
+            color: var(--text-muted, #475569);
+            font-size: 0.82rem;
+            line-height: 1.4;
+            text-align: left;
+            overflow-wrap: anywhere;
+        }
+
+        .heatmap-v4-svg {
+            display: block;
+            width: 100%;
+            max-width: 100%;
+            height: auto;
+            overflow: hidden;
+        }
+
+        .kpi-grid.kpi-grid-pair {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .drawdown-pair-heading {
+            margin: 18px 0 0;
+            color: var(--primary-color);
+            text-align: center;
+        }
+
+        @media (max-width: 360px) {
+            body {
+                padding: 8px;
+            }
+
+            .panel {
+                padding: 14px;
+            }
+
+            .section-title {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .section-title>div {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+
+            .summary-grid,
+            .kpi-grid,
+            .kpi-grid.kpi-grid-pair {
+                grid-template-columns: minmax(0, 1fr);
+            }
+
+            .form-grid,
+            .form-grid-three-col,
+            .form-grid-four-col,
+            .form-grid-compact {
+                grid-template-columns: minmax(0, 1fr) !important;
+            }
+
+            .care-sections,
+            .care-section-grid,
+            .care-duration-group,
+            .care-grade-row {
+                grid-template-columns: minmax(0, 1fr) !important;
+            }
         }
 
     </style>
@@ -1162,8 +1384,8 @@
                                         <option value="SuccessRate" selected>Success Rate
                                         </option>
                                         <option value="Drawdown_P90">Drawdown P90</option>
-                                        <option value="TimeShare_WR_gt_4_5">Time Share WR >
-                                            4.5%</option>
+                                        <option value="TimeShare_WR_gt_4_5">Zeitanteil realisierte Entnahmequote &gt;
+                                            4,5 % (Berichtsreferenz)</option>
                                         <option value="Median_WR">Median Withdrawal Rate
                                         </option>
                                     </select> </div>
@@ -1172,7 +1394,8 @@
                                         <option value="max" selected>Maximize</option>
                                         <option value="min">Minimize</option>
                                     </select> </div>
-                            </div>
+                             </div>
+                            <p class="reporting-reference-note">Die 4,5-%-Metrik misst die realisierte Entnahmequote strikt größer 4,5 %. Sie ist nur eine Berichtsreferenz und keine Alarm- oder Guardrail-Schwelle.</p>
                             <div id="ao_quantile_container" class="form-group" style="display: none;"> <label
                                     for="ao_quantile">Quantile
                                     (%)</label> <input type="number" id="ao_quantile" value="50" min="1" max="99"
@@ -1301,7 +1524,7 @@
                                 <div class="form-group" style="justify-content: center;"> <label
                                         style="flex-direction: row; align-items: center;">
                                         <input type="checkbox" id="ao_c_ts45" style="width: auto; margin-right: 8px;">
-                                        Zeitanteil Quote > 4.5% ≤ 1%
+                                        Zeitanteil realisierte Entnahmequote &gt; 4,5 % ≤ 1 % (Berichtsreferenz)
                                     </label> </div>
                                 <div class="form-group" style="justify-content: center;"> <label
                                         style="flex-direction: row; align-items: center;">

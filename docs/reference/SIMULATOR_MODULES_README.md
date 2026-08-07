@@ -2,12 +2,14 @@
 
 Die Simulator-App ist inzwischen in mehrere spezialisierte ES6-Module zerlegt. Die zentralen Abläufe (Monte-Carlo, Sweep, Backtests, Pflege-UI) leben nicht mehr als Monolith in `simulator-main.js`, sondern wurden in klar abgegrenzte Dateien ausgelagert. Dieses Dokument beschreibt Zweck, Haupt-Exports, Einbindungspunkte und die gewünschte Aufteilung neuer Features.
 
-**Stand:** 2026-08-04 (einschliesslich offener globaler
+**Stand:** 2026-08-07 (einschliesslich offener globaler
 Aktien-Forschungsproxykette, Langlebigkeit, Stationary Bootstrap,
 Tail-Risk-Overlay, Realentnahmevertrag, getrennter Pflege-KPI-Semantik,
 vollstaendigem historischen Backtest-Contract, SimulationDataInventoryV1
 sowie verlustfreier Profilasset-/Goldzielaggregation und technisch
-nachgebesserter, extern noch nicht freigegebener Slice-17-Runway-Semantik)
+nachgebesserter, extern noch nicht freigegebener Slice-17-Runway-Semantik
+sowie intern validierter, extern noch nicht freigegebener wahrheitsgetreuer
+Risikoanzeigen)
 
 **Pfadkonvention:** Simulator-Module liegen unter `app/simulator/`, Profilmodule unter `app/profile/`, Shared-Utilities unter `app/shared/`, Tranchen-Status unter `app/tranches/`. Im Dokument werden Dateinamen aus Lesbarkeit meist ohne Präfix genannt.
 
@@ -499,6 +501,21 @@ Berechnet alle KPIs (Perzentile, Quoten, Pflege-Kosten/Overlap, Shortfall-Deltas
   „Ruin oder Aktien/Gold ≤ 100 €“ und stellt klar, dass freie Liquidität und
   Pflegebucket nicht zur 100-Euro-Schwelle gehören; technischer Key und
   Aggregation bleiben unverändert.
+- Entscheidungskritische EUR-Werte einschliesslich der P10/P50/P90-
+  Endvermoegens-Summary werden ohne Grobstufenrundung centgenau aus
+  `aggregatedResults` projiziert. Zusaetzliche Dezimalstellen werden fuer
+  Nutzen abwaerts und fuer Kosten aufwaerts quantisiert. Nominaler und realer
+  Maximum-Drawdown werden ohne UI-Neuberechnung als positive Verlustbetraege
+  in der Domaene 0 bis 100 Prozent validiert und zur sichtbaren
+  Hundertstel-Prozentpunktgrenze aufwaerts quantisiert. Ungueltige, fehlende
+  oder nicht anwendbare Werte liefern Gedankenstrich, stabilen Grund und eine
+  tatsaechlich vorhandene Beobachtungszahl; andernfalls steht `unbekannt`.
+  Bei mehreren Missingness-Ursachen wird der Grund mit dem groessten
+  aggregierten Zaehler deterministisch ausgewaehlt.
+- Die sichtbare 4,5-Prozent-KPI benennt die realisierte Entnahmequote mit dem
+  strikten `>`-Operator und ordnet sie als Berichtsreferenz statt als Alarm-
+  oder Guardrail-Schwelle ein. Pflege-Gruppenmediane bleiben sichtbar als
+  ungepaarter, nicht kausaler Vergleich gekennzeichnet.
 
 **Dependencies:** `results-formatting.js`, `simulator-utils.js`.
 
@@ -510,6 +527,13 @@ Rendering-Layer für KPI-Karten, Tabellen und Badges.
 **Hauptfunktionen:**
 - `renderKpiCards()` – erzeugt HTML für KPI-Dashboard.
 - `renderScenarioSelector()` – baut die Szenario-Dropdowns auf.
+- Exaktwertkarten unterstuetzen sichtbare Zweitwerte und Statuszeilen. Alle
+  KPI-/Summary-Titel und Werte duerfen umbrechen, sodass auch Pflege-
+  Nichtkausalitaet und lange 4,5-Prozent-Titel sichtbar bleiben. Nominale und
+  reale Drawdowns erscheinen in einer eigenen Paarmatrix; der
+  Berichtsrollenhinweis bleibt auch ausserhalb eingeklappter Detailbereiche
+  sichtbar. Bei 320 Pixel bleibt die vollstaendige Simulatorseite ohne
+  horizontalen Seitenoverflow; breite Logtabellen scrollen lokal.
 
 **Dependencies:** `results-formatting.js`, `simulator-utils.js`.
 
@@ -535,6 +559,10 @@ Die Logik wurde in spezialisierte Module zerlegt, um Wartbarkeit und Testbarkeit
 - `auto-optimize-param-meta.js` – Parameter-Optionen, Labels, Units, Dynamic-Flex-Keys und Apply-Mapping.
 - `auto-optimize-config-ui.js` – Liest und validiert die UI-Konfiguration fuer `runAutoOptimize()`.
 - `auto-optimize-renderer.js` – Rendert Parameterbloecke, Progress-Texte, Ergebnis-HTML und Apply-Erfolgsmeldung.
+- Objective-, Constraint- und Ergebnis-Copy bezeichnet die bestehende
+  4,5-Prozent-Metrik als Zeitanteil der realisierten Entnahmequote strikt
+  groesser 4,5 Prozent und als reine Berichtsreferenz; die stabilen technischen
+  Metric-Keys und ihre Berechnung bleiben unveraendert.
 - `auto-optimize-apply.js` – Uebernimmt Champion-Parameter in die Simulator-Formularfelder.
 
 **Dependencies:** `simulator-portfolio.js`, `monte-carlo-runner.js`, `simulator-engine-helpers.js`, `workers/worker-pool.js`.
@@ -615,6 +643,8 @@ SVG-Rendering für Parameter-Sweeps und Heatmaps.
 - `renderHeatmapSVG()` – erzeugt SVG-Heatmap mit Farbskala
 - `getColorForValue()` – Farbzuordnung nach Metrik
 - `renderParameterSweepResults()` – vollständige Sweep-Ergebnisdarstellung
+- Die 4,5-Prozent-Ueberlagerung benennt ihre klassenbedingte `>=`-Semantik
+  ausdruecklich und bleibt damit vom strikt-`>`-Gesamt-KPI unterscheidbar.
 
 **Dependencies:** `simulator-utils.js`
 
