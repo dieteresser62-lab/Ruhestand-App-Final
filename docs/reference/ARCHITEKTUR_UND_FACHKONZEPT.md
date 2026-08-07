@@ -2,11 +2,12 @@
 
 **Technische Dokumentation der DIY-Software für Ruhestandsplanung**
 
-**Dokumentstand:** 2026-07-22 (integrierter Abschlusskandidat nach Simulator-Monte-Carlo-Hardening Slice 12; Runway-Vertragsabschnitte am 2026-08-04 fuer den extern noch nicht freigegebenen Slice 17 nachgezogen)
-**Inhaltlicher Codeabgleich:** Architekturabschnitt B, Monte-Carlo-Fachkonzept C.3, Backtest-Fachkonzept C.8 sowie Rechenkonventions- und Modellgrenzen gegen Commit `4cd9eeb` und die lokale Slice-12-Arbeitskopie vom 2026-07-22
+**Dokumentstand:** 2026-08-07 (Exportvertraege V2 aus Abschlusshaertung Slice 01 lokal umgesetzt; externes Codereview ausstehend)
+**Inhaltlicher Codeabgleich:** Architekturabschnitt B, Monte-Carlo-Fachkonzept C.3, Backtest-Fachkonzept C.8 sowie Rechenkonventions- und Modellgrenzen gegen Commit `4cd9eeb`, die lokale Slice-12-Arbeitskopie vom 2026-07-22 und den lokalen Implementierungsstand von Abschlusshaertung Slice 01
 **Reproduzierbarer Inventarstand:** Commit `4cd9eeb` plus getrenntem, extern noch nicht freigegebenem Kandidaten `monte-carlo-v1-final`; Ermittlungsweg siehe Release-Checkliste
 **Engine API:** v31.0, Build-ID `2025-12-22_16-35`; acht exponierte Methoden, davon fünf unterstützte operative Methoden und drei deprecated No-op-Kompatibilitäts-Stubs
 **Externer Quellenstand:** Marktvergleich mit Stichtag 2026-07-15; wissenschaftliches Korpus mit 55 Records, Abrufstand 2026-07-15 und abgeschlossenem Mechanismusabgleich MAP-01 bis MAP-17
+**Ausgegliederte Bereiche:** Marktvergleich (D) und wissenschaftlicher Rahmen (E) stehen seit 2026-08-05 in [`MARKTVERGLEICH.md`](MARKTVERGLEICH.md) und [`WISSENSCHAFTLICHER_RAHMEN.md`](WISSENSCHAFTLICHER_RAHMEN.md); dieses Dokument verweist nur noch darauf
 **Lizenz:** MIT
 
 ---
@@ -26,9 +27,18 @@
 - [Technische Architektur](#technische-architektur)
 - [Fachkonzept und Rechenkonventionen](#fachkonzept-und-rechenkonventionen)
 - [Annahmen, Modellgrenzen und Validierung](#annahmen-modellgrenzen-und-validierung)
-- [Marktvergleich](#marktvergleich)
-- [Wissenschaftlicher Rahmen, Quellenkorpus und Tiefeneinordnung](#wissenschaftlicher-rahmen-quellenkorpus-und-tiefeneinordnung)
+- [Marktvergleich](#marktvergleich) — ausgegliedert nach [`MARKTVERGLEICH.md`](MARKTVERGLEICH.md)
+- [Wissenschaftlicher Rahmen und Quellenkorpus](#wissenschaftlicher-rahmen-und-quellenkorpus) — ausgegliedert nach [`WISSENSCHAFTLICHER_RAHMEN.md`](WISSENSCHAFTLICHER_RAHMEN.md)
 - [Appendix: Modul-Inventar](#appendix-modul-inventar)
+
+Ausgelagerte Referenzdokumente in diesem Ordner:
+
+| Dokument | Inhalt |
+| --- | --- |
+| [`MARKTVERGLEICH.md`](MARKTVERGLEICH.md) | Marktvergleich D.1 bis D.18 (Methodik, Ergebnisse, Positionierung) |
+| [`MARKTVERGLEICH_EVIDENZREGISTER.md`](MARKTVERGLEICH_EVIDENZREGISTER.md) | 69 Quellenrecords und Kriterienmatrix des Marktvergleichs |
+| [`WISSENSCHAFTLICHER_RAHMEN.md`](WISSENSCHAFTLICHER_RAHMEN.md) | Forschungsrahmen E.1 bis E.8 (Evidenzvertrag, Mechanismusabgleich, Risiken) |
+| [`FORSCHUNGSABGLEICH_EVIDENZREGISTER.md`](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md) | 55 Quellenrecords und die vollständigen MAP-Dossiers |
 
 ## Software-Profil
 
@@ -221,12 +231,15 @@ Vor jedem Release oder größeren Merge diese Punkte aktualisieren:
 5. **Feature-Delta nachziehen:** Neue Funktionen in `Hauptfunktionen`, den
    Architektur-/Fachabschnitten, Annahmen-/Risikoregistern und der Modulkarte
    ergänzen.
-6. **Marktvergleich aktualisieren:** Produktidentität, untersuchte Stufe,
-   Preis/Lizenz, offizielle Quellen und Evidenzlücken für einen neuen
-   Vergleichsstichtag prüfen; alte Befunde nicht still überschreiben.
-7. **Forschungsabgleich aktualisieren:** neue Literatur- oder amtliche
-   Datenstände versionieren, FOR-Records nachziehen und betroffene MAP-, FR-
-   und FQ-Einträge neu bewerten; Literaturbefunde nicht als Suite-Ergebnisse
+6. **Marktvergleich aktualisieren:** in [`MARKTVERGLEICH.md`](MARKTVERGLEICH.md)
+   Produktidentität, untersuchte Stufe, Preis/Lizenz, offizielle Quellen und
+   Evidenzlücken für einen neuen Vergleichsstichtag prüfen; alte Befunde nicht
+   still überschreiben.
+7. **Forschungsabgleich aktualisieren:** in
+   [`WISSENSCHAFTLICHER_RAHMEN.md`](WISSENSCHAFTLICHER_RAHMEN.md) und im
+   zugehörigen Evidenzregister neue Literatur- oder amtliche Datenstände
+   versionieren, FOR-Records nachziehen und betroffene MAP-, FR- und
+   FQ-Einträge neu bewerten; Literaturbefunde nicht als Suite-Ergebnisse
    ausgeben.
 8. **Quellenintegrität prüfen:** zentrale Aussagen quellennahe belegen,
    MKT-/FOR-IDs eindeutig halten und Abruf-, Publikations- und Datenstand nicht
@@ -2001,6 +2014,60 @@ Floor-Deckung, Outcome-Inventar, Depoterschöpfung, Endvermögen, Kürzungsjahre
 Drawdown müssen daher gemeinsam gelesen werden. Keine einzelne Kennzahl ist
 ein vollständiges Qualitätsurteil über einen Ruhestandsplan.
 
+### C.3.6 Exportvertraege V2
+
+Der aktuelle Monte-Carlo-Download schreibt `MonteCarloExportV2`. Der
+Versionsdispatcher liest V2 direkt und historische `MonteCarloExportV1` nur
+mit einer maschinenlesbaren Kompatibilitaetswarnung zur alten Bin- und
+Einheitensemantik. Unbekannte Objektversionen werden fail-closed abgewiesen.
+Die interne Laufrechnung darf weiterhin V1-Feldnamen tragen; allein die
+validierte V2-Projektion in `monte-carlo-contracts.js` und
+`monte-carlo-export.js` ist Source of Truth fuer den neuen Export.
+
+Die V2-Heatmap beschreibt elf Intervalle aus zwoelf Grenzen. Jede Grenze nennt
+Untergrenze, inklusive/exklusive Kanten und Count; Bin- und Count-Listen sind
+gleich lang. Die zugrunde liegende Messung ist
+`realizedWithdrawalRatePct`. Der vorhandene KPI zaehlt nur Werte strikt
+groesser als 4,5 Prozent, waehrend die Heatmap bei ihrer Binaufloesung den bei
+4,5 Prozent beginnenden Bin einschliesst. Diese Schwelle ist eine
+Berichtsreferenz und kein Guardrail- oder Alarmausloeser.
+
+Nominaler und realer Maximum-Drawdown werden als positive Verlustbetraege in
+Prozentpunkten ueber dieselben Portfoliopunkte und Zeitgrenzen berechnet. Beide
+liegen in `[0, 100]`. Fehlt fuer einen benoetigten Punkt die Inflation, bleibt
+der nominale Wert auswertbar, der reale Wert ist jedoch `null` mit Grund und
+Beobachtungszahl; er wird nicht als beobachtete Null ausgegeben.
+
+Der getrennte Szenarioexport schreibt `ScenarioLogExportV2` mit
+`ScenarioLogUnitContractV2`. JSON und CSV entstehen aus derselben validierten
+Projektion. Der CSV-Header ist die sortierte Vereinigungsmenge aller
+Recordschluessel. Jahresrecords sind als `financial_year` finanziell
+auswertbar; `terminal_ruin` und `terminal_death` sind explizit typisiert und
+nicht auswertbar. Renditequotienten, Entnahmequoten und die zwei
+Mindest-Flex-Messungen besitzen eindeutige Namen sowie dokumentierte Einheit,
+Nenner und Messphase. Nicht anwendbare Messungen sind `null` mit stabilem Grund
+und Count.
+
+Akkumulationsjahre bleiben `financial_year`, weil ihre Marktreturns echte
+Finanzbeobachtungen sind. Entnahmequoten und Mindest-Flex sind in dieser Phase
+jedoch nicht anwendbar und werden als `null` mit
+`not_applicable_accumulation_year` und Count 0 exportiert. Der geplante
+Policy-Mindest-Flex stammt aus dem Post-Policy-Wert in den
+Entscheidungsdetails, die tatsaechliche Erfuellung aus der separaten
+Ausfuehrungsmessung. Der kollidierende verschachtelte Legacy-Name ist in V2
+nicht mehr enthalten.
+
+Die V2-Projektion wird erst durch den JSON- oder CSV-Exportklick ausgefuehrt.
+Vor jedem Szenariowechsel wird der vorherige Exportzustand invalidiert. Scheitert
+die fail-closed Projektion, erscheint ein sichtbarer Fehler und es wird keine
+Datei erzeugt; insbesondere kann nie versehentlich der zuvor angezeigte Pfad
+exportiert werden.
+
+Der Szenarioexport verarbeitet bewusst nur den bereits materialisierten,
+ausgewaehlten Einzelpfad. Dessen Laenge ist durch die validierte Laufdauer
+begrenzt. Der Vertrag verspricht deshalb weder Streaming noch konstante
+Speichernutzung fuer einen hypothetischen Export aller Monte-Carlo-Runs.
+
 ---
 
 ## C.4 Pflegefall-Modellierung
@@ -3407,763 +3474,71 @@ Prognosefähigkeit oder die Eignung einer konkreten finanziellen Entscheidung.
 
 # Marktvergleich
 
-**Methodikstand und Vergleichsstichtag:** 2026-07-15. Die Erhebung verwendet
-öffentlich zugängliche offizielle Quellen und die lokale Source of Truth der
-Ruhestand-Suite. Produktstufen, Preise, Funktionsbefunde und Evidenzlücken sind
-auf diesen Stichtag eingefroren.
-Symbolwertungen, Reviewer-Zitate, Gesamtscores und unbeschränkte
-Exklusivitätsaussagen werden nicht verwendet.
+> **Ausgegliedert.** Der vollständige Marktvergleich steht seit 2026-08-05 im
+> eigenständigen Dokument
+> **[`MARKTVERGLEICH.md`](MARKTVERGLEICH.md)**.
+> Die Abschnittsnummern D.1 bis D.18 sind dort unverändert erhalten.
 
-## D.1 Erkenntnisziel und Vergleichsgrenze
+**Vergleichsstichtag:** 2026-07-15 · **Status:** eingefrorener Stichtagsbefund
 
-Der Vergleich fragt, wie die festgelegte Stufe den synthetischen deutschen
-Referenzhaushalt modelliert und wie transparent, reproduzierbar und operativ
-nutzbar ihre Annahmen, Rechenwege und Ergebnisse sind. Er bestimmt kein
-allgemein „bestes“ Produkt.
+Der Marktvergleich prüft, wie die Ruhestand-Suite und zehn weitere
+Planungswerkzeuge einen synthetischen deutschen Referenzhaushalt abbilden und
+wie transparent, reproduzierbar und operativ nutzbar ihre Annahmen, Rechenwege
+und Ergebnisse sind. Er bestimmt kein allgemein „bestes" Produkt und verwendet
+weder Symbolwertungen noch Gesamtscores oder Ranglisten.
 
-Vergleichseinheit ist **Produkt, Stufe, Region/Sprache und Erhebungsdatum**.
-Segmente werden in ihrem eigenen Zweck interpretiert; es gibt weder Scores
-noch Rangliste. Eine Funktion anderer Stufen wird nicht übertragen. Auch
-lokaler Suite-Code belegt keine externe Wirksamkeit.
-
-## D.2 Recherchefenster und reproduzierbarer Stichtag
-
-Die Erhebung endete am 2026-07-15. Eine Vollerhebung dauert höchstens 14 Tage;
-am letzten Tag werden Stufe, Verfügbarkeit und Preis erneut geprüft. Records
-führen Abruf- sowie erkennbaren Veröffentlichungs-/Änderungsstand. Längere
-Erhebungen erfordern eine Neuprüfung; verlorene Quellen werden historisch oder
-nicht erneut verifiziert. Kauf, Registrierung, Anbieteranfrage oder reale
-Finanzdaten benötigen gesonderte Freigabe.
-
-## D.3 Produktsegmente
-
-Die fünf Segmente sind Consumer Planner, deutsche Vorsorge-/Entnahmewerkzeuge,
-Beratersoftware, FIRE-Werkzeuge und Offline-/Tabellenlösungen. Vollplaner
-werden nach Szenarien und Haushaltsbreite, schmale Werkzeuge nach ihrem
-Rechen-/Informationszweck, Beraterprodukte nach Kollaboration und Auditierbarkeit
-und lokale Werkzeuge auch nach Kontrolle und Laufzeitabhängigkeiten gelesen.
-`Nicht anwendbar` schützt sachfremde Zwecke; Abdeckung ist nicht
-Zweckerfüllung.
-
-## D.4 Auswahlregeln und Stichprobe
-
-### D.4.1 Auswahlverfahren
-
-Die bewusste Maximum-Variation-Stichprobe ist nicht statistisch
-repräsentativ. Sie kontrastiert Zielgruppen, Rechtsräume, Rechenansätze und
-Betriebsmodelle; Marktanteils-, Häufigkeits- und universelle
-Exklusivitätsaussagen sind unzulässig.
-
-Aufgenommen werden erreichbare, stufenscharf benennbare Werkzeuge mit
-Ruhestands-, Vorsorge- oder Entnahmezweck, eigenständigem Segmentnutzen und
-prüfbaren offiziellen Quellen. Reine Portfolioanalyse, doppelte Stufen,
-nicht erreichbare Produkte und nur sekundär belegte Werkzeuge bleiben
-Kontext, nicht Kernstichprobe.
-
-### D.4.2 Untersuchte Stichprobe
-
-Die Tabelle fixiert Segment und untersuchte Stufe; Aufnahme allein belegt
-keine Funktion.
-
-| ID | Segment | Produkt und untersuchte Stufe | Auswahlgrund | Offizieller Einstieg, geprüft am 2026-07-15 |
-| --- | --- | --- | --- | --- |
-| RS-01 | Referenzprodukt | Ruhestand-Suite, lokale Arbeitskopie | Gegenstand des Vergleichs; deutschsprachiger DIY- und Jahresworkflow | lokale Source of Truth dieses Repositorys |
-| CP-01 | Consumer Planner | ProjectionLab Premium | international ausgerichteter DIY-Planer; eine bezahlte Endkundenstufe verhindert den Vergleich einer Vollsuite mit einem absichtlich reduzierten Gratiszugang | [Pricing & Subscriptions](https://projectionlab.com/pricing) |
-| CP-02 | Consumer Planner | Boldin PlannerPlus | ruhestandsspezifischer US-Endkundenplaner mit klar benannter bezahlter Stufe | [Boldin Pricing](https://www.boldin.com/retirement/pricing/) |
-| DE-01 | Deutsches Werkzeug | BVI Entnahme-Rechner, öffentlicher Webzugang | institutioneller deutscher Basisfall für einen Fonds-Auszahlplan | [BVI-Rechner](https://www.bvi.de/service/rechner/) |
-| DE-02 | Deutsches Werkzeug | Finanzfluss Entnahmeplan, öffentlicher Webzugang | verbreiteter deutschsprachiger Endkundenrechner als niedrige Komplexitätsstufe | [Entnahmeplan-Rechner](https://www.finanzfluss.de/rechner/entnahmeplan/) |
-| DE-03 | Deutsches Werkzeug | Digitale Rentenübersicht, öffentlicher Portalzweck | Referenz für deutsche Vorsorgeanspruchs-Aggregation; ausdrücklich kein Vollplaner | [Digitale Rentenübersicht](https://www.rentenuebersicht.de/DE/01_startseite/home_node.html) |
-| AD-01 | Beratersoftware | MoneyGuide, Produktstufe „MoneyGuide“ | zielbasierte Beraterplanung und Berater-Kunden-Workflow als eigener Markt | [MoneyGuide](https://www.moneyguidepro.com/) |
-| AD-02 | Beratersoftware | eMoney Pro | cashflow-orientierte Beraterplanung als methodischer Gegenpol zur zielbasierten Plattform | [eMoney Pro](https://emoneyadvisor.com/products/emoney-pro/) |
-| FIRE-01 | FIRE-Werkzeug | FI Calc, öffentlicher Webzugang | fokussiertes Entnahmewerkzeug mit öffentlich strukturierter Methodikdokumentation | [FI Calc Guide](https://guide.ficalc.app/) |
-| FIRE-02 | FIRE-Werkzeug | FIRECalc 3.0, öffentlicher Webzugang | etablierter historischer Sequenzrechner als zweite FIRE-Methodik | [FIRECalc](https://firecalc.com/) |
-| OT-01 | Offline-/Tabellenlösung | Pralana Gold | explizit herunterladbare Excel-Produktstufe und damit eigenständiger Offline-/Tabellenfall | [Pralana](https://pralanaretirementcalculator.com/) |
-
-Die zehn externen Werkzeuge decken zwei Consumer Planner, drei deutsche
-Werkzeuge, zwei Beraterprodukte, zwei FIRE-Werkzeuge und eine
-Offline-/Tabellenlösung ab.
-
-### D.4.3 Austausch- und Abbruchregeln
-
-Ersatz erfolgt nur im selben Segment mit dokumentiertem Grund. Produkt- und
-Stufenwechsel werden nicht vermischt; geschlossene Zugänge erzeugen neutrale
-Dokumentationsbefunde. Mehr als zwei Ersetzungen oder der Wegfall eines
-Segments erfordern eine neue Stichprobenentscheidung.
-
-## D.5 Statuslexikon und Evidenzregeln
-
-### D.5.1 Zellstatus
-
-| Status | Verbindliche Bedeutung |
+| Was Sie suchen | Wo es steht |
 | --- | --- |
-| **vorhanden** | offizielle Quelle oder Direktbefund bestätigt den gesamten Kriterienkern nativ |
-| **teilweise** | Kernanteil vorhanden, aber Umfang, Region, Person, Zeit, Export oder Referenzfall ist eingeschränkt; beide Seiten werden benannt |
-| **nicht öffentlich dokumentiert** | offizieller Suchpfad ohne belastbare Aussage; niemals Abwesenheitsbeleg |
-| **nicht vorhanden** | ausdrückliche Negativaussage oder reproduzierter Direktbefund; nie aus Schweigen |
-| **nicht anwendbar** | außerhalb von Produktzweck oder Zugriffsebene; keine negative Wertung |
-| **nicht geprüft** | offen, blockiert oder nur über nicht freigegebenen Zugang prüfbar; Grund ist Pflicht |
-
-Auf Kriterienebene gilt die konservativste verpflichtende Teilfrage:
-`vorhanden` verlangt vollständige Kernabdeckung, gemischte Abdeckung ist
-`teilweise`. Die Evidenzklassen P1 bis P4, S1 und I1 sowie ihre Grenzen sind
-im [Evidenzregister](MARKTVERGLEICH_EVIDENZREGISTER.md#evidenzklassen-und-pflichtfelder)
-definiert. Werbeaussagen bleiben Anbieteraussagen; Widersprüche werden über
-Stufe, Datum und Kontext geklärt oder bleiben offen.
-
-## D.6 Einheitlicher Kriterienkatalog
-
-Alle Produktstufen werden mit denselben 18 Kriterien geprüft. Schmalere
-Werkzeuge erhalten bei sachfremden Fragen `nicht anwendbar`, nicht automatisch
-einen negativen Befund.
-
-| ID | Prüffeld | ID | Prüffeld |
-| --- | --- | --- | --- |
-| K-01 | Fachmodell und Zeitlogik | K-10 | Optimierung und Suchgrenzen |
-| K-02 | Steuerregion und -tiefe | K-11 | Datenschutz und Speicherung |
-| K-03 | Renten je Person | K-12 | Offline-Fähigkeit und Netzreste |
-| K-04 | Pflege, Eintritt und Reserve | K-13 | Export, Backup und Reimport |
-| K-05 | Haushalt, Eigentum, Tod | K-14 | Auditierbarkeit und Reproduktion |
-| K-06 | Datenbasis, Zeitraum, Quelle | K-15 | UX und Fehlerbehandlung |
-| K-07 | Stochastik, Seed, Stress | K-16 | Barrierefreiheit und WCAG-Nachweis |
-| K-08 | Formeln, Defaults, Grenzen | K-17 | Stufe, Währung und Preisperiode |
-| K-09 | Szenarien und Vergleich | K-18 | Lizenz- und Weitergaberechte |
-
-Preise bleiben in Originalwährung und -periode; UX und Barrierefreiheit
-werden nur in zugänglichen Oberflächen bewertet. Marketing-Screenshots
-ersetzen keinen Bedienbefund.
-
-## D.7 Synthetischer Referenzhaushalt
-
-### D.7.1 Zweck und Einheiten
-
-Der vollständig synthetische Fall prüft Modellierbarkeit, nicht gleiche
-Ergebniszahlen. Stichtag und Kaufkraftbasis sind 2027-01-01, der Horizont
-reicht bis 2066-12-31. Ohne harmonisierte Daten, Ereignisreihenfolge,
-Inflation, Steuer und Erfolgsdefinition werden keine Erfolgsquoten verglichen.
-Die Steuersätze sind feste Testparameter, keine Rechts- oder Steuerberatung.
-
-### D.7.2 Basisfall RH-01
-
-| Gruppe | Festgelegter synthetischer Input |
-| --- | --- |
-| Personen | A: 63, Ruhestand 2027; B: 61, Ruhestand 2029; deutscher Paarhaushalt, 40 Jahre, im Basisfall kein vorgegebener Tod |
-| Netto-Cashflows | B: 30.000 EUR Erwerbseinkommen 2027/2028; gesetzliche Rente A 22.800 EUR ab 2029 und B 17.400 EUR ab 2033, je 2 % indexiert; private Rente A 4.800 EUR ab 2032 nominal konstant |
-| Bedarf | Floor 42.000 EUR real und Flex 12.000 EUR real, je 2 % Inflation; Gebäudemaßnahme 35.000 EUR real im Jahr 2035 |
-| Vermögen | Aktien-ETF 550.000/350.000 EUR Marktwert/Kostenbasis; Anleihen 120.000 EUR; Liquidität 60.000 EUR; Gold 40.000/30.000 EUR; gesperrte Pflegevorsorge 80.000 EUR; nicht entnahmefreigegebene Immobilie 450.000 EUR |
-| Rendite/Kosten | nominal Aktien 5,0 %, Anleihen 2,5 %, Liquidität/Pflegevorsorge 1,5 %, Gold 2,0 %; Kosten 0,25 % p.a. auf investiertes Finanzvermögen |
-| Steuer/Priorität | 25 % Kapitalertragsteuer, 5,5 % Zuschlag darauf, keine Kirchensteuer, 30 % ETF-Teilfreistellung, 2.000 EUR gemeinsamer Freibetrag; Einkommen deckt Floor und Flex, Portfolio die Lücke, Pflegevorsorge bleibt bis RH-03 gesperrt |
-
-Nicht sauber trennbare Brutto-/Nettoflüsse und fehlende Assetklassen werden
-als Vereinfachung dokumentiert, nicht durch passend erscheinende Werte oder
-stille Umschichtung ersetzt.
-
-### D.7.3 Feste Modellierbarkeitsproben
-
-| ID | Änderung gegenüber RH-01 | Prüffrage |
-| --- | --- | --- |
-| RH-02 Sequenzstress | Aktienrendite 2027: -25 %, 2028: -10 %; Inflation 2027: 6 %, 2028: 4 %; danach Rückkehr zu den Kontrollannahmen | Lassen sich zeitlich bestimmte Markt-/Inflationsschocks und die Entnahmewirkung transparent abbilden? |
-| RH-03 Pflege | Person B erhält ab 2044-01-01 Pflegegrad 3; zusätzlicher Bedarf 24.000 EUR real p.a., 2 % indexiert; zweckgebundene Reserve wird zuerst genutzt | Sind Personenbezug, Pflegeereignis, Kostendynamik und Reservefreigabe nativ oder nur als allgemeine Ausgabe modellierbar? |
-| RH-04 Hinterbliebene | Person A stirbt am 2048-12-31; eigene Renten A enden; ab 2049 erhält B 55 % der gesetzlichen Rente A; gemeinsamer Floor sinkt um 20 %, Flex um 30 % | Werden Tod, verzögerter Hinterbliebenenzufluss und veränderte Haushaltsausgaben konsistent verarbeitet? |
-
-Für jedes Produkt wird je Input und Probe einer von vier
-Modellierbarkeitsbefunden notiert: **nativ**, **mit dokumentiertem Workaround**,
-**nur als grobe Näherung** oder **nicht modellierbar/nicht prüfbar**. Ein
-Workaround darf die fachliche Bedeutung nicht verdecken. Ergebnisse werden
-nur dann numerisch nebeneinandergestellt, wenn Einheit, Zeitpunkt,
-Rendite-/Inflationspfad, Steuerbehandlung, Kosten und Erfolgsdefinition
-tatsächlich harmonisiert sind.
-
-## D.8 Quellen- und Erhebungsprotokoll
-
-Der Suchpfad läuft von Produkt-/Stufen- und Preisseite über Handbuch und
-Methodik zu Datenschutz, Export, Offline, Lizenz, Barrierefreiheit und
-zugänglicher Oberfläche; Sekundärquellen dienen erst danach subjektiven
-UX-Fragen. Suchmaschinen-Snippets sind nur Wegweiser. Ein erfolgloser
-offizieller Suchweg wird als neutraler `99`-Record protokolliert.
-
-Jeder Beleg hat die stabile Form `MKT-<PRODUKT>-<NN>` und führt Stufe,
-Betreiber, Ziel, Klasse, Veröffentlichungs-/Abrufstand, Region, Kriterium,
-Paraphrase, Fundstelle und Grenze. Der vollständige Feldvertrag und alle
-Records stehen im [Evidenzregister](MARKTVERGLEICH_EVIDENZREGISTER.md#evidenzklassen-und-pflichtfelder).
-Lange Kopien geschützter Quellentexte bleiben ausgeschlossen.
-
-## D.9 Auswertung und zulässige Aussagen
-
-Der Ergebnisblock folgt einer festen Reihenfolge:
-
-1. Methoden- und Quellenstand;
-2. Ergebnisse je Segment;
-3. Modellierbarkeit RH-01 bis RH-04;
-4. segmentübergreifende Stärken und Grenzen;
-5. Positionierung und Nicht-Zielsegmente der Ruhestand-Suite;
-6. Evidenzlücken und Aktualisierungsbedarf.
-
-Konkurrenzstärken sind ebenso verpflichtend wie eigene Stärken. Ein
-Differenzierungsmerkmal darf höchstens lauten, dass es **in der untersuchten
-Stichprobe, Produktstufe und öffentlichen Dokumentation am Stichtag** nicht
-gleichartig belegt wurde. `Nicht öffentlich dokumentiert` darf nie zu „kein
-anderes Tool kann das“ verkürzt werden. Implementierungsdetails der
-Ruhestand-Suite belegen außerdem keine bessere Prognosegüte oder bessere reale
-Ruhestandsentscheidungen.
-
-## D.10 Festgelegte Methodenbasis
-
-Die abgeschlossene Methodenbasis umfasst:
-
-- die zehn externen Produkte und jeweils festgelegten Stufen;
-- die fünf Segmentgrenzen;
-- den Kriterienkatalog K-01 bis K-18 samt Statuslexikon;
-- Referenzhaushalt RH-01 und die drei festen Proben RH-02 bis RH-04;
-- Recherchefenster, Quellenrecord und Verzicht auf Gesamtscore/Rangliste.
-
-Erhebung und Auswertung in D.11 bis D.18 verwenden diese Basis unverändert.
-
-## D.11 Erhebungsstand, Zugang, Preis und Lizenz
-
-Die Vollerhebung und die abschließende Volatilitätsprüfung erfolgten am
-2026-07-15. Es wurden weder Konten angelegt noch Testphasen, Käufe,
-Demoanforderungen oder nicht öffentliche Beraterzugänge genutzt. Preise
-stehen in Originalwährung und -periode; Steuern, Wechselkurse und nicht
-ausgewiesene Gesamtkosten wurden nicht ergänzt.
-
-| Untersuchte Stufe | Region/Zugang | Preisstand 2026-07-15 | Tragender Record |
-| --- | --- | --- | --- |
-| Ruhestand-Suite, lokale Arbeitskopie | DE/lokal | kein kommerzieller Tarif untersucht | [MKT-RS-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-01) |
-| ProjectionLab Premium | international/Web | 129 USD pro Jahr | [MKT-PL-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-pl-01) |
-| Boldin PlannerPlus | USA/Web | 12 USD monatlich, 144 USD jährlich abgerechnet | [MKT-BD-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-bd-01) |
-| BVI Entnahme-Rechner | DE/öffentlich | kein gesonderter Tarif dokumentiert | [MKT-BVI-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-bvi-01) |
-| Finanzfluss Entnahmeplan | DE/öffentlich | kein gesonderter Tarif dokumentiert | [MKT-FF-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-ff-01) |
-| Digitale Rentenübersicht | DE/eID-Portal | freiwillig und kostenfrei | [MKT-DR-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-dr-01) |
-| MoneyGuide | USA/Berater | 2.000 USD pro Berater und Jahr | [MKT-MG-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-mg-01) |
-| eMoney Pro | USA/Berater | nicht öffentlich dokumentiert | [MKT-EM-99](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-em-99) |
-| FI Calc | USA/öffentlich | kostenlos, freiwillige Unterstützung | [MKT-FI-05](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-fi-05) |
-| FIRECalc 3.0 | USA/öffentlich | Unterstützerfunktionen; Betrag offen | [MKT-FC-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-fc-01) |
-| Pralana Gold 2026 | USA/Excel-Download | 99 USD einmalig für Version 2026 | [MKT-PR-02](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-pr-02) |
-
-Lizenz- und Nutzungsgrenzen stehen stufenscharf bei den Records. Für die Suite
-nennen `LICENSE.md`, npm-Manifest, Root-Lockfile-Eintrag und Cargo-Manifest
-seit Slice 5 einheitlich MIT. GAP-MKT-06 ist mit automatisiertem
-Metadaten-Contract geschlossen; Abhängigkeiten behalten ihre eigenen
-Lizenzangaben.
-
-## D.12 Quellenrecords der Erhebung
-
-Die vollständigen 69 MKT-Records mit Produktstufe, Region, Evidenzklasse,
-Veröffentlichungs- beziehungsweise Änderungsstand, Quellenziel,
-Belegparaphrase und Grenze stehen im normativen
-[Marktvergleich-Evidenzregister](MARKTVERGLEICH_EVIDENZREGISTER.md). Jeder
-Record besitzt dort einen stabilen Anker. Für externe Records gilt das
-Abrufdatum 2026-07-15 in Europe/Berlin. Records mit der Endung `99` sind
-neutrale Suchprotokolle und niemals Abwesenheitsbelege.
-
-## D.13 Kriterienprofil K-01 bis K-18
-
-Die [vollständige Kriterienmatrix](MARKTVERGLEICH_EVIDENZREGISTER.md#kriterienmatrix-k-01-bis-k-18)
-steht beim Quellenregister. Sie verwendet ausschließlich das Statuslexikon
-aus D.5; `teilweise` ist kein Punktabzug und `nicht öffentlich dokumentiert`
-keine Funktionsverneinung. Die folgende Verdichtung zeigt die tragenden
-Befunde ohne Rangliste oder Gewichtung:
-
-| Segment | Belegte Stärke im untersuchten Zweck | Wesentliche Grenze |
-| --- | --- | --- |
-| Ruhestand-Suite | deutsche Kapitalertragsteuer auf Lot-/Eigentümerebene, Paar-/Pflegepfade, mehrere Simulationsarten, lokale Daten und Diagnose ([MKT-RS-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-01), [MKT-RS-02](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-02), [MKT-RS-03](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-03)) | keine vollständige Einkommensteuer, keine freie Ereignisliste, keine externe Wirksamkeits- oder formale WCAG-Prüfung ([MKT-RS-99](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-99)) |
-| Consumer Planner | ProjectionLab und Boldin dokumentieren planzentrierte Varianten, Szenarien und Ergebnisdarstellung ([MKT-PL-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-pl-01), [MKT-PL-03](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-pl-03), [MKT-BD-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-bd-01), [MKT-BD-05](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-bd-05)) | deutsche Steuer-, Pflegegrad- und Hinterbliebenendetails sind nicht vollständig nativ belegt ([MKT-PL-04](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-pl-04), [MKT-BD-02](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-bd-02), [MKT-BD-06](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-bd-06)) |
-| Deutsche Werkzeuge | BVI und Finanzfluss fokussieren Kapitalentnahme; die Digitale Rentenübersicht aggregiert autoritative Vorsorgeansprüche ([MKT-BVI-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-bvi-01), [MKT-FF-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-ff-01), [MKT-DR-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-dr-01)) | die schmalen Produktzwecke sind keine Gesamtplanung; fehlende öffentliche Angaben bleiben neutrale Lücken |
-| Beratersoftware | MoneyGuide und eMoney stützen kollaborative, breite Beraterplanung ([MKT-MG-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-mg-01), [MKT-EM-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-em-01)) | US-Rechtsraum und nicht freigegebene Beraterzugänge begrenzen die stufenscharfe öffentliche Prüfung ([MKT-EM-99](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-em-99)) |
-| FIRE/Offline | FI Calc und FIRECalc dokumentieren historische Entnahmeverfahren; Pralana verbindet lokale Tabellenplanung mit Szenarien und Optimierung ([MKT-FI-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-fi-01), [MKT-FC-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-fc-01), [MKT-PR-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-pr-01), [MKT-PR-04](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-pr-04)) | überwiegend US-Daten/-Steuern, enger Haushaltsumfang oder ohne Kauf ungeprüfte Workbook-UX |
-
-## D.14 Segmentbefunde: Stärken und Grenzen
-
-Die Segmente erfüllen verschiedene Zwecke. Consumer Planner sind bei
-Planvarianten und Szenariovergleich stärker; Beratersoftware bei
-Kollaboration und Datenaggregation; deutsche Einzelwerkzeuge bei fokussierter
-Entnahme oder autoritativer Vorsorgeanspruchs-Aggregation; FIRE- und
-Tabellenwerkzeuge bei transparenter historischer Methodik beziehungsweise
-lokaler Modellbreite. Diese Stärken dürfen nicht als Mängel bewertet werden,
-nur weil sie außerhalb des Suite-Schwerpunkts liegen.
-
-Die Ruhestand-Suite bündelt dagegen deutsche Kapitalertragsteuer auf
-Lot-/Eigentümerebene, Paar-, Witwen- und Pflegepfade, mehrere Simulationsarten
-und einen lokalen Jahresworkflow. Ihre Grenzen bleiben persönliche
-Einkommensteuer, frei definierbare Ereignisfolgen, planzentrierter
-Szenariovergleich, autoritative Datenaggregation und formale UX-/WCAG- sowie
-externe Wirksamkeitsnachweise. Die Belege und stufenscharfen Einschränkungen
-stehen in D.13 und im Evidenzregister; die Positionierungsfolgen folgen in
-D.16.
-
-## D.15 Modellierbarkeit des Referenzhaushalts RH-01 bis RH-04
-
-Der konservativste wesentliche Input bestimmt den Gesamtbefund. `Nativ`
-verlangt die Probe ohne fachliche Umdeutung; ein allgemeines Ausgabenfeld ist
-kein natives Pflegegradmodell. `N`, `W`, `G` und `O` bedeuten nativ,
-dokumentierter Workaround, grobe Näherung und nicht modellierbar/nicht
-prüfbar.
-
-| Produktstufe | RH-01 | RH-02 | RH-03 | RH-04 | Entscheidende Grenze |
-| --- | --- | --- | --- | --- | --- |
-| Ruhestand-Suite | G | G | G | W | freie Ereignis-/Schockfolge und fixer Pflegeeintritt fehlen ([MKT-RS-99](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-99)) |
-| ProjectionLab Premium | W | N | W | W | deutsche Steuer- und Pflegefachlichkeit nur angenähert ([MKT-PL-03](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-pl-03), [MKT-PL-04](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-pl-04)) |
-| Boldin PlannerPlus | G | G | W | W | US-Steuer-, LTC- und Survivor-Vertrag ([MKT-BD-02](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-bd-02)) |
-| BVI Entnahme-Rechner | G | O | O | O | fokussierter Kapitalentnahmezweck ([MKT-BVI-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-bvi-01)) |
-| Finanzfluss Entnahmeplan | G | O | O | O | deterministischer Einzelrechner ([MKT-FF-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-ff-01)) |
-| Digitale Rentenübersicht | G | O | O | O | Vorsorgeinput statt Gesamtplanung ([MKT-DR-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-dr-01)) |
-| MoneyGuide | W | W | W | W | breite US-Beratermodellierung ([MKT-MG-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-mg-01)) |
-| eMoney Pro | W | O | O | O | Proben ohne Beraterzugang nicht stufenscharf belegt ([MKT-EM-99](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-em-99)) |
-| FI Calc | G | G | W | W | US-Historie, keine Steuer-/Personenlogik ([MKT-FI-05](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-fi-05)) |
-| FIRECalc 3.0 | G | G | W | W | keine deutsche Steuer-/Pflege- oder freie Schockfolge ([MKT-FC-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-fc-01)) |
-| Pralana Gold 2026 | W | W | W | W | US-Mapping; gekaufte Mappe nicht ausgeführt ([MKT-PR-99](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-pr-99)) |
-
-Nur ProjectionLabs RH-02 ist nativ belegt; das ist keine Gesamtwertung. Es
-werden keine Ergebnisbeträge oder Erfolgsquoten verglichen, weil Datenregion,
-Inflation, Steuern, Reihenfolge, Kosten, Mortalität und Erfolgsdefinition
-nicht harmonisiert sind.
-
-## D.16 Positionierung der Ruhestand-Suite
-
-### D.16.1 Zielgruppe und Nutzenversprechen
-
-Die Ruhestand-Suite ist als lokal betriebene, deutschsprachige
-DIY-Entnahme- und Jahressteuerungsumgebung für Einzelpersonen und
-Paarhaushalte positioniert, die Annahmen selbst pflegen und Ergebnisse
-fachlich hinterfragen. Ihr Kernnutzen ist die Verbindung aus:
-
-- deutscher kapitalertragsteuerlicher Entnahmelogik auf Lot-/Eigentümerebene;
-- Floor-/Flex-, Liquiditäts-, Guardrail- und Jahresabschlussworkflow;
-- Paar-, Witwen-, Pflegegrad- und zweckgebundener Pflegevorsorgelogik;
-- historischen, stochastischen, Stress-, Sensitivitäts- und
-  Optimierungspfaden;
-- lokaler Datenhaltung, Recovery, Export und Diagnose.
-
-Das Produkt ist Planungs- und Lernsoftware, keine Anlage-, Steuer-,
-Versicherungs- oder Pflegeberatung. Modellinterne Erfolgsquoten sind keine
-Garantie.
-
-### D.16.2 Begrenzt zulässige Differenzierung
-
-Nur für die zehn ausgewählten Stufen und öffentlichen Quellen vom 2026-07-15
-ist keine zweite Stufe belegt, die deutsche Lot-/Kapitalertragsteuer,
-Pflegegrad mit gesperrter Reserve, Paar-/Witwenpfad, mehrere
-Simulationsmethoden, Auto-Optimierung und lokalen Jahresworkflow kombiniert
-([MKT-RS-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-01),
-[MKT-RS-02](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-02)). Das ist keine
-universelle Exklusivitäts-, Prognosegüte- oder Wirksamkeitsaussage.
-Geschlossene Stufen bleiben unbekannt; Pralana ist ebenfalls lokal und FI
-Calc hält Eingaben gerätelokal. Andere Produkte sind bei Planvarianten,
-Kollaboration, Datenaggregation, Einfachheit oder Methodenführung breiter.
-
-### D.16.3 Wettbewerberstärken, die nicht relativiert werden dürfen
-
-Unverkürzt anzuerkennen sind planzentrierte Varianten bei ProjectionLab und
-Boldin, Berater-Kunden-Kollaboration bei MoneyGuide und eMoney, autoritative
-Vorsorgeansprüche der Digitalen Rentenübersicht, die fokussierte Einfachheit
-von BVI und Finanzfluss, FI Calcs öffentliche Methodenführung sowie Pralanas
-breite lokale Tabellenplanung. D.13 verbindet jeden Befund mit seinem Record.
-
-### D.16.4 Eigene Grenzen und strategische Lücken
-
-| ID | Lücke | Evidenz | Positionierungsfolge |
-| --- | --- | --- | --- |
-| GAP-MKT-01 | keine vollständige persönliche Einkommensteuer-/Sozialabgabenrechnung | K-02, [MKT-RS-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-01), [MKT-RS-02](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-02) | Netto-Cashflows und Kapitalertragsteuer klar trennen; keine „vollständige deutsche Steuerplanung“ bewerben |
-| GAP-MKT-02 | keine frei definierbare, versionierte Ereignis- und Jahrespfadliste für Einmalbeträge, Rendite und Inflation | RH-01/RH-02, [MKT-RS-99](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-99) | feste Referenzschocks nur als Näherung ausweisen; ProjectionLab hat hier einen belegten Vorteil |
-| GAP-MKT-03 | fixer Pflegeeintritt/Grad/Person nicht als deterministische Probe konfigurierbar | RH-03, [MKT-RS-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-01), [MKT-RS-99](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-99) | stochastische Pflegeanalyse nicht als exakter Pflegeplan darstellen |
-| GAP-MKT-04 | allgemeines Speichern, Kopieren und Side-by-side-Vergleichen vollständiger Pläne fehlt | K-09, [MKT-RS-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-01), [MKT-RS-99](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-99) | Sweep/Backtest nicht mit vollwertigem Szenariomanagement gleichsetzen |
-| GAP-MKT-05 | keine formale Usability-, Screenreader- oder WCAG-Prüfung | K-15/K-16, [MKT-RS-99](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-99) | Barrierefreiheit nur auf Ebene einzelner Hilfen beschreiben |
-| GAP-MKT-06 | geschlossen am 2026-07-17: Projektlizenz in Lizenztext, npm- und Cargo-Metadaten einheitlich MIT | K-18, [MKT-RS-04](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-04), [MKT-RS-05](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-05) | Regressionstest trennt Root-Projektmetadaten von eigenen Lizenzangaben der Abhängigkeiten |
-| GAP-MKT-07 | keine autoritative Rentenanspruchs- oder Kontenaggregation | [MKT-DR-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-dr-01), [MKT-EM-02](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-em-02) | manuelle Eingaben als Nutzerverantwortung kennzeichnen; Import wäre eine separate Produktentscheidung |
-| GAP-MKT-08 | keine externe Prognose-, Kalibrierungs- oder Entscheidungsvalidierung | D.1, [MKT-RS-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-01), [MKT-RS-02](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-02) | Implementierung, Tests und Transparenz nicht als Wirksamkeitsbeleg formulieren |
-
-### D.16.5 Nicht-Zielsegmente
-
-Nicht-Ziele sind B2B-Berater- und staatliche Aggregationsplattformen,
-internationale Gesamtsteuer-/Estateplanung, automatische Kontoaggregation,
-Depotvollmacht, aktuarielle Pflege- oder medizinische Prognose, ein
-detailfreier Ein-Feld-Rechner und jede Erfolgsgarantie. Eine Expansion wäre
-ein eigener Produktauftrag mit Daten-, Sicherheits-, Rechts- und
-UX-Verträgen.
-
-## D.17 Evidenzlücken und Aktualisierungsroutine
-
-### D.17.1 Offene Evidenzlücken
-
-Offen bleiben bei der Suite externe Validierung und formale UX/WCAG-Prüfung;
-bei Web- und Beraterprodukten insbesondere geschlossene Bedienpfade,
-Accessibility, Offline-, Export-, Preis-, Lizenz- und Methodendetails. FI Calc
-und FIRECalc sind nicht allein wegen freien Zugangs Open Source; Pralanas
-Workbook wurde nicht gekauft oder ausgeführt.
-Die stufenscharfen Lücken und Konsequenzen stehen in den `99`-Records und der
-vollständigen Kriterienmatrix. Schweigen bleibt stets neutral.
-
-### D.17.2 Pflege des Vergleichs
-
-Der eingefrorene Stichtagsbefund bleibt als historische Version erhalten.
-Eine Aktualisierung überschreibt ihn nicht still, sondern ergänzt Datum,
-geänderte Quelle und Auswirkung auf Matrix beziehungsweise Positionierung.
-
-Nächste turnusmäßige Prüfung ist spätestens 2026-10-15, zusätzlich vor
-öffentlichen Markt-/Differenzierungsaussagen und Releases mit Marktbezug.
-Tarif-, Stufen-, Dienst-, Lizenz-, Offline- oder wesentliche
-Suite-Änderungen lösen eine Sofortprüfung aus: erst Identität/Stufe, dann
-Preis, Terms, Methode, Datenschutz, Export, Offline und Accessibility.
-Betroffene Records erhalten Abrufdatum und Änderungsnotiz; verlorene Quellen
-werden historisch oder `nicht erneut verifiziert`, nicht gelöscht oder als
-Funktionsfehlen gewertet. Statusänderungen brauchen einen Beleg; Änderungen
-an Ereignis-, Steuer-, Pflege-, Haushalts- oder Szenariofunktionen erzwingen
-eine neue RH- und Differenzierungsprüfung.
-
-## D.18 Ergebnisstand des Marktvergleichs
-
-Der dokumentierte Ergebnisstand umfasst:
-
-- Erhebungsstichtag, Produktstufen, Preis-/Lizenzstand und Quellenrecords;
-- die im Evidenzregister geführten K-01-bis-K-18-Matrizen ohne Score oder
-  Rangliste;
-- die Modellierbarkeitskarte RH-01 bis RH-04;
-- Konkurrenzstärken, eigene Grenzen, strategische Lücken,
-  Ziel-/Nicht-Zielsegmente und Aktualisierungsroutine;
-- die Aussagegrenze, dass Differenzierung nur für Stichprobe, Stufe,
-  öffentliche Evidenz und Stichtag gilt.
-
-Die Aussagen bleiben auf Erhebungsstichtag, untersuchte Stufen und öffentlich
-zugängliche Evidenz begrenzt. D.17 beschreibt die erforderliche
-Aktualisierungsroutine.
+| Methodik, Stichprobe, Kriterienkatalog, Referenzhaushalt | [`MARKTVERGLEICH.md`](MARKTVERGLEICH.md) D.1 bis D.10 |
+| Ergebnisse, Modellierbarkeitskarte, Positionierung, Lücken | [`MARKTVERGLEICH.md`](MARKTVERGLEICH.md) D.11 bis D.18 |
+| die 69 Einzelbelege | [`MARKTVERGLEICH_EVIDENZREGISTER.md`](MARKTVERGLEICH_EVIDENZREGISTER.md) |
+
+Für das vorliegende Hauptdokument sind zwei Ergebnisse des Vergleichs bindend:
+
+- Differenzierungsaussagen gelten ausschließlich für die untersuchte
+  Stichprobe, Produktstufe und öffentliche Dokumentation am Stichtag. Ein
+  fehlender öffentlicher Nachweis bei einem anderen Produkt ist nie ein Beleg
+  dafür, dass dieses Produkt etwas nicht kann.
+- Implementierung, Tests und Transparenz der Ruhestand-Suite belegen keine
+  bessere Prognosegüte und keine besseren realen Ruhestandsentscheidungen.
 
 ---
 
-# Wissenschaftlicher Rahmen, Quellenkorpus und Tiefeneinordnung
+# Wissenschaftlicher Rahmen und Quellenkorpus
 
 <a id="forschungsrahmen"></a>
 
-**Forschungs- und Quellenstand:** 2026-07-15<br>
-**Zweck dieses Blocks:** Evidenzvertrag, kompakter Mechanismusabgleich,
-Ergebnisgrenzen und offene Prüfungen; keine Wirksamkeitsfreigabe der Suite<br>
-**Normativer Beleganhang:**
-[`FORSCHUNGSABGLEICH_EVIDENZREGISTER.md`](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md)
+> **Ausgegliedert.** Der vollständige wissenschaftliche Rahmen steht seit
+> 2026-08-05 im eigenständigen Dokument
+> **[`WISSENSCHAFTLICHER_RAHMEN.md`](WISSENSCHAFTLICHER_RAHMEN.md)**.
+> Die Abschnittsnummern E.1 bis E.8 sind dort unverändert erhalten.
 
-## E.1 Erkenntnisziel und Aussagegrenze
+**Forschungs- und Quellenstand:** 2026-07-15 · **Status:** Evidenzvertrag, keine
+Wirksamkeitsfreigabe
 
-Der Forschungsrahmen ordnet ein, welche wissenschaftlichen,
-institutionellen, amtlichen und methodischen Quellen für 17 Suite-Mechanismen
-einschlägig sind. Er trennt Methodenursprung, empirischen Befund,
-Kalibrierungsinput, Gegenbefund und Anwendungskontext. Die Einordnung gilt für
-den dokumentierten Code-, Daten- und Quellenstand, nicht zeitlos für jede
-Parametrisierung oder jeden Haushalt.
+Der Forschungsrahmen ordnet ein, welche wissenschaftlichen, institutionellen,
+amtlichen und methodischen Quellen für die 17 Suite-Mechanismen MAP-01 bis
+MAP-17 einschlägig sind. Er trennt Methodenursprung, empirischen Befund,
+Kalibrierungsinput, Gegenbefund und Anwendungskontext und benennt je Mechanismus
+die Suite-Abweichung, die lokale Validierungsgrenze und das Restrisiko.
 
-Eine Quelle im Korpus beweist weder, dass die Suite dieselbe Methode identisch
-umsetzt, noch dass deren Literaturergebnis reproduziert wird. Eine
-implementierte Formel ist kein Wirksamkeitsnachweis; ein grüner Test belegt
-keine externe Kalibrierung; ein historischer oder simulierter Erfolgsanteil
-ist keine Garantie. Zahlen aus anderen Rechts-, Daten- oder Währungsräumen
-dürfen nicht ungeprüft auf deutsche Haushalte übertragen werden.
-
-Das [Forschungs-Evidenzregister](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md)
-besitzt die normative Detail-Ownership für 55 FOR-Records, Taxonomie,
-Versionsstandard, Quellen-Mapping und die vollständigen MAP-Dossiers. Dieser
-Hauptblock besitzt die normative Ownership für die kompakte Einordnung, das
-Ergebnisbündel, FR-01 bis FR-12 und FQ-01 bis FQ-10. Beide Dokumente müssen bei
-einer Neubewertung gemeinsam gepflegt werden. Der interne
-[Forschungsvalidierungs-Backlog](../internal/archive/FORSCHUNGSVALIDIERUNGS_BACKLOG.md)
-operationalisiert die offenen FR-/FQ-Nachweise, ohne ihren Status oder den
-Evidenzstatus der MAP-Dossiers anzuheben.
-
-## E.2 Evidenz-, Übertragbarkeits- und Statusvertrag
-
-Quellenklasse und Evidenzstufe beschreiben Herkunft und Belastbarkeit, nicht
-automatisch die Übertragbarkeit. W1/W2 stehen für peer-reviewte Original- oder
-Synthesearbeiten, I1/I2 für amtliche Standards beziehungsweise institutionelle
-Forschung, P1/WP für Practitioner Research oder Working Papers und B1/C1 für
-Fachbuch- beziehungsweise Community-Kontext. Stufe A darf einen klar
-versionierten Methoden-, Theorie- oder Datenanker tragen, B nur eine begrenzte
-Position und C nur Begriffe oder operative Herkunft. Keine Stufe allein
-validiert die konkrete Suite-Policy.
-
-| Code | Aussage im Mechanismusabgleich |
+| Was Sie suchen | Wo es steht |
 | --- | --- |
-| T1 | Methodenbaustein und Zielgröße sind direkt prüfbar; verbleibende Implementierungsabweichungen müssen genannt werden. |
-| T2 | Das Konzept ist strukturell relevant, aber Datenraum, Assetset, Horizont, Rechtsraum oder Zielfunktion weichen ab. |
-| T3 | Die Quelle liefert Definition, Basisrate oder Szenariokontext, nicht die Wirkung einer Policy. |
-| T4 | Die Quelle begründet eine Robustheits-, Bias-, Alternativmodell- oder Gegenbefundprüfung. |
+| Evidenzvertrag, Übertragbarkeit, Statusbegriffe | [`WISSENSCHAFTLICHER_RAHMEN.md`](WISSENSCHAFTLICHER_RAHMEN.md) E.1 bis E.3 |
+| Mechanismusabgleich MAP-01 bis MAP-17 | [`WISSENSCHAFTLICHER_RAHMEN.md`](WISSENSCHAFTLICHER_RAHMEN.md) E.4 |
+| Ergebnisinterpretation, Risiken FR-01 bis FR-12, Fragen FQ-01 bis FQ-10 | [`WISSENSCHAFTLICHER_RAHMEN.md`](WISSENSCHAFTLICHER_RAHMEN.md) E.5 bis E.8 |
+| die 55 Quellenrecords und die vollständigen MAP-Dossiers | [`FORSCHUNGSABGLEICH_EVIDENZREGISTER.md`](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md) |
 
-Die Statusbezeichnung bewertet die konkrete Suite-Ausprägung: `etabliert`
-bezeichnet einen im Wesentlichen anerkannten Methodenbaustein, `adaptiert`
-eine für Suite-Ziele veränderte Methode, `heuristisch` eine transparente und
-technisch reproduzierbare Regel ohne passende externe Kalibrierung und
-`experimentell` einen Analyse-, Stress- oder Suchpfad ohne belastbare
-Wahrscheinlichkeits- oder Empfehlungsaussage. Auch `etabliert` ist keine
-Produktempfehlung.
+Für das vorliegende Hauptdokument sind drei Ergebnisse des Rahmens bindend:
 
-Lokale Tests können V1 Contract, V2 Rechenregression und V3 Pfadparität
-belegen. Offen bleiben je nach Mechanismus V4 historische Plausibilität, V5
-externe Kalibrierung und V6 Eignung für den konkreten Haushaltsfall. Identische
-Main-/Worker-Ergebnisse können auf allen Pfaden gleich verzerrt sein.
-
-## E.3 Korpus und Pflegegrenze
-
-Das Register führt 55 eindeutige Quellenrecords: FOR-ENT-01 bis FOR-ENT-10,
-FOR-LCF-01 bis FOR-LCF-08, FOR-STO-01 bis FOR-STO-10, FOR-AST-01 bis
-FOR-AST-07, FOR-PFL-01 bis FOR-PFL-03, FOR-VAL-01 bis FOR-VAL-10 und FOR-DE-01
-bis FOR-DE-07. Das Korpus ist kuratiert und keine erschöpfende systematische
-Literaturübersicht. Publikationsstand, Datenstand und Abrufdatum sind getrennt
-zu führen; dynamische oder amtliche Quellen sind nach dem Pflegevertrag neu zu
-erheben. Der hier dokumentierte Stand bleibt auf den 2026-07-15 eingefroren.
-
-Konkrete Zahlen benötigen direkt an der Aussage Population, Zeitraum,
-Portfolio, Horizont, Erfolgsdefinition und Modellart. Mehrere Fassungen
-desselben Ergebnisses zählen nicht als unabhängige Evidenz. Marketing-, Blog-
-und Community-Texte dürfen nur Praxisposition oder operative Herkunft tragen.
-
-### E.3.1 Gemeinsame Aktualisierungsroutine
-
-Eine Quellenänderung ist nicht mit dem Austausch eines Links erledigt. Zuerst
-werden Publikations-, Daten- und Abrufstand des FOR-Records aktualisiert;
-danach sind Quellenrolle, Evidenzstufe und T-Code zu prüfen. Anschließend
-müssen alle betroffenen MAP-Dossiers und ihre Kurzzeilen auf geänderten
-Befund, Suite-Abweichung und offene Prüfung bewertet werden. Erst zuletzt
-werden FR-/FQ-Folgen und Aussagen außerhalb des Forschungsblocks angepasst.
-
-Ist eine dynamische Quelle vorübergehend nicht erreichbar, bleibt der letzte
-datierte Stand sichtbar und wird als nicht neu erhoben markiert; er darf nicht
-still durch eine Sekundärdarstellung ersetzt werden. Widerlegt oder begrenzt
-eine neue Quelle eine zentrale Aussage, wird der Gegenbefund dokumentiert und
-die Aussage bis zur Neubewertung enger formuliert. Änderungen am Code allein
-heben keinen Evidenzstatus an: Dafür ist ein neuer, zur beanspruchten
-Validierungsstufe passender Nachweis erforderlich.
-
-Die strukturelle Vollständigkeit dieses Vertrags wird in Slice 4 durch ein
-Offline-Gate abgesichert. Live-HTTP-Prüfung bleibt ein separater, datierter
-Erhebungsschritt und ist keine Voraussetzung für normale lokale Tests.
-
-## E.4 Kompakter Mechanismusabgleich
-
-Die vollständigen Dossiers im Register führen je Mechanismus
-Implementierungsanker, Forschungsanker mit Rolle und T-Code, Suite-Umsetzung,
-Abweichung, Evidenzstatus, lokale Validierung sowie Restrisiko. Die folgende
-Einordnung hält die entscheidenden Grenzen im Hauptdokument sichtbar.
-
-### E.4.1 Entnahme-, Konsum- und Asset-Policies
-
-MAP-01 bis MAP-07 bilden keine voneinander unabhängigen Produktfunktionen.
-Floor und Flex bestimmen zunächst, welcher Bedarf überhaupt finanziert werden
-soll; Guardrails, `minimumFlexAnnual` und Dynamic Flex verändern anschließend
-Höhe oder zeitliche Verteilung dieses Bedarfs. Runway, 3-Bucket-Logik und Gold
-betreffen dagegen die Finanzierung und Vermögensstruktur. Eine Verbesserung
-in einer Stufe darf daher nicht ohne unveränderte Folge- und Nebenbedingungen
-der nächsten Stufen zugerechnet werden.
-
-Besonders wichtig ist die Trennung zwischen Methodenursprung und konkreter
-Policy. Historische Safe-Withdrawal-Arbeiten tragen die Fragestellung eines
-real fortgeschriebenen Bedarfs, nicht automatisch Suite-Steuern, Renten,
-Assetklassen oder Erfolgsdefinition. Guardrail-Arbeiten tragen regelbasierte
-Anpassungen, aber nicht die konkrete Kombination aus Drawdown, CAPE, Runway,
-Inflation und Recovery. Annuitätenrechnung trägt einen VPW-Kern, nicht die
-zusätzlichen EMA-, Clamp-, Floor-/Flex- und Langlebigkeitsregeln. Diese
-Abweichungen sind keine redaktionellen Fußnoten, sondern begrenzen jede
-Ergebnisübertragung.
-
-Bei Runway, Bonds, Gold und Pflegebucket muss außerdem zwischen
-Verhaltensnutzen, operativer Liquidität und Portfoliowirkung unterschieden
-werden. Ein zweckgebundener oder mental leichter verständlicher Topf kann
-Nutzerverhalten strukturieren, ohne bei identischer Gesamtallokation Rendite
-oder Floor-Erfolg zu erhöhen. Eine andere Verkaufsreihenfolge kann
-Liquiditätsstress verschieben, zugleich aber Kosten, Steuer oder
-Opportunitätsverlust erzeugen. Belastbare Aussagen benötigen deshalb
-Ablationen mit identischem Anfangsvermögen, identischen Cashflows und
-expliziter Gegenstrategie.
-
-### E.4.2 Stochastik, CAPE und Validierungswerkzeuge
-
-MAP-08 bis MAP-13 erzeugen keine zusätzliche historische Wahrheit. Bootstrap
-ordnet vorhandene Jahresrecords neu, Regime-Signale beschriften oder glätten
-Policyzustände, ein Tail-Overlay ergänzt konfigurierte Szenarien und CAPE
-verändert erwartete Renditeannahmen. Backtest, Sweep und Auto-Optimize werten
-diese Modellwelt aus. Wenn Datenraum, Rekonstruktion oder gemeinsame
-Generatorannahme verzerrt sind, kann jeder nachgelagerte Pfad technisch
-korrekt und dennoch fachlich irreführend sein.
-
-Sampler- und Worker-Parität belegen Reproduzierbarkeit, nicht statistische
-Eignung. IID-Sampling verwirft zeitliche Abhängigkeit; Blockverfahren setzen
-vertretbare Stationarität und Blockwahl voraus; kein Verfahren erfindet einen
-historisch nicht vorhandenen Extremtyp. Regimebegriffe dürfen nicht den
-Eindruck eines geschätzten Markov- oder Volatilitätsmodells erwecken, wenn sie
-aus festen Schwellen stammen. Tail-Häufigkeit und -Höhe sind ohne gemeinsame
-Kalibrierung Szenarioparameter, keine geschätzten Eintrittswahrscheinlichkeiten.
-
-CAPE-Zusammenhänge liegen typischerweise auf langen Horizonten und in einem
-bestimmten Datenraum. Eine jährliche Suite-Policy mit Glättung, Grenzen und
-Fallbacks ist deshalb separat gegen eine konstante Baseline zu prüfen.
-Backtests bleiben auch bei sauberer Chronologie von Auswahl, Datenrevisionen
-und Trialhistorie abhängig. Ein Optimizer-Train/Test-Split mit getrennten
-Seeds bleibt innerhalb desselben historischen Korpus und Generators; häufige
-Nutzerläufe können das angezeigte Testset zudem faktisch wieder in Entwicklung
-verwandeln.
-
-### E.4.3 Langlebigkeit, Rente und Pflege
-
-MAP-14 bis MAP-17 verbinden Haushaltsinputs mit populationsbezogenen Daten.
-Eine Periodensterbetafel beschreibt nicht automatisch die künftige Kohorte
-oder eine konkrete Person. Joint-Life-Logik, Quantil und Puffer sind
-Vorsichtsentscheidungen; zu kurze und zu lange Horizonte haben asymmetrische
-Folgen für heutigen Konsum und spätere Deckung. Für V6 müssen Alter,
-Partnerkonstellation, reale Unterlagen und gewählte Sicherheitsziele zum Fall
-passen.
-
-Renten- und Witwenbeträge sind Szenarioinputs. Amtliche Zeitreihen tragen den
-Populations- und Rechtskontext, ersetzen aber weder individuellen Bescheid
-noch aktuelle Prüfung von Beginn, Abschlägen, Besteuerung, Sozialabgaben oder
-Hinterbliebenenanspruch. Ergebnisse müssen Brutto-/Nettoannahme und
-Indexierung offenlegen.
-
-Beim Pflegeprozess sind Bestand, Eintritt, Übergang, Dauer, Versorgungsform,
-Kosten, Leistung und Mortalität getrennte Größen. Eine Bestandsstatistik darf
-nicht still als jährliche individuelle Eintrittsrate verwendet werden. Der
-Pflegebucket ändert daran nichts: Er steuert nur, wann ein separierter Betrag
-verfügbar wird. Ohne gemeinsame Kalibrierung und Opportunitätskostenvergleich
-ist er eine transparente Selbstversicherungs-Policy, keine Bedarfs- oder
-Versicherungsprognose.
-
-| Mechanismus und Status | Quellenbefund und Suite-Abweichung | Lokaler Nachweis und offene Prüfung |
-| --- | --- | --- |
-| [MAP-01](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md#map-01) real konstanter Floor – **adaptiert** | Bengen ist Methodenursprung, internationale Daten und deutscher VPI sind T2/T4 beziehungsweise T3. Suite-Steuer, Rente, Gold, Liquidität und Erfolgsdefinition weichen ab; es entsteht keine universelle sichere Rate. | V1–V3 prüfen Jahrespfad und Aggregation. V4/V5 offen: Datenprovenienz, internationale Teilperioden, Kosten-/Steuersensitivität und Shortfalltiefe. |
-| [MAP-02](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md#map-02) Floor-Flex – **adaptiert** | Flexible Entnahme und Lifecycle-Forschung tragen nur das Strukturprinzip T2. Prioritäten, Flex-Kürzung, Alarmreihenfolge und deutsche Cashflows sind suiteeigene Policies; Literatur-Nutzenwerte werden nicht übertragen. | V1–V3 prüfen Budget und Pfadparität. V4/V5 offen: identische Daten-/Seed-Vergleiche, Konsumkürzungsverteilungen und externe Präferenzgewichte. |
-| [MAP-03](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md#map-03) Guardrails/Recovery – **adaptiert, Schwellen heuristisch** | Guyton/Klinger und institutionelle Vergleiche sind T2, aber Suite-Trigger kombinieren Entnahmequote, Inflation, Drawdown, CAPE, Runway und Recovery anders. Namensähnlichkeit ist keine Replikation. | V1–V3 prüfen Reihenfolge und Determinismus. V4/V5 offen: Reproduktionsbenchmark, Schwellenstabilität, Kosten und gehaltene Out-of-sample-Daten. |
-| [MAP-04](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md#map-04) `minimumFlexAnnual` – **heuristisch** | Konsum-, Floor-/Upside- und Mental-Accounting-Quellen sind T2/T3; keine Quelle begründet den konkreten Mindestbetrag. Der Wert ist eine Nutzerpräferenz unter Notbremsen, kein Sicherheitsfloor. | V1–V3 prüfen Validierung und Notbremsen. V5/V6 offen: Präferenzstudie, Kürzungsakzeptanz und Haushaltsunterlagen; niemals still begrenzen. |
-| [MAP-05](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md#map-05) Dynamic Flex/VPW – **adaptiert** | Annuitätenrechnung, US-RMD und Community-VPW haben verschiedene Rollen T1 bis T3. Suite-CAPE, EMA, Clamps, Floor/Flex und Langlebigkeitshorizont bilden eine eigene Policy; VPW ist nicht pauschal risikosenkend. | V1–V3 prüfen Formel und Runner-Parität. V4/V5 offen: Return-/Horizon-Sensitivität, internationale Holdouts und Konsum-/Nachlass-Trade-offs. |
-| [MAP-06](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md#map-06) Runway/3-Bucket – **heuristisch** | Sequenzrisiko und Asset-Allokation sind T2, Bucket-Forschung liefert auch T4-Gegenbefunde. Operative Liquiditätssteuerung und Bond-Verkaufsreihenfolge belegen keinen Rendite- oder Sicherheitsvorteil. | V1–V3 prüfen Refill und Transaktionen. V4/V5 offen: Ablation bei gleicher Gesamtallokation, Kosten, Rebalancing und Liquidität. |
-| [MAP-07](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md#map-07) Gold – **heuristisch** | Hedge-, Safe-Haven- und Diversifikationsbefunde sind zeit-, markt- und währungsabhängig T2/T4. Feste Goldquote, Floorquote und Stresspfad sind keine Literaturparameter. | V1–V3 prüfen Bestände und Parität. V4/V5 offen: EUR-Datenprovenienz, Teilperioden, gemeinsame Krisen und Ablation gegen Aktien/Bonds/Cash. |
-| [MAP-08](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md#map-08) IID-/Block-/Stationary-Bootstrap – **adaptiert** | Bootstrap-Methoden sind T1/T2; Stationarität, Blocklänge, Randbehandlung und enge Historie bleiben T4. Resampling erzeugt keine neuen historischen Extremtypen. | V1–V3 prüfen Seed und Worker-Parität. V4/V5 offen: Abhängigkeitsdiagnostik, Blocklängen-Sensitivität und breitere Daten. |
-| [MAP-09](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md#map-09) Regime-Signale – **heuristisch** | Markov-, ARCH-/GARCH- und stylized-facts-Quellen sind T4-Prüfmaßstab. Suite-Zustände und Severities sind Policylabels, kein statistisch geschätztes Regime- oder Volatilitätsmodell. | V1–V3 prüfen Signalgrenzen. V4/V5 offen: Schwellenstabilität, Persistenz, Fehlklassifikation und Vergleich mit einfacheren Baselines. |
-| [MAP-10](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md#map-10) Tail-Overlay – **experimentell** | Heavy-Tail-Befunde und Stress-Governance begründen T2/T4-Szenarien, nicht die konkrete Schockrate, Höhe oder Dauer. Skip-Regeln verhindern nur ausgewählte Doppelüberlagerungen. | V1–V3 prüfen Seed, Ereignisplan und Parität. V4/V5 offen: gemeinsame Asset-/Makroschocks, Kalibrierung, Doppelzählung und Challenge-Protokoll. |
-| [MAP-11](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md#map-11) CAPE-Policy – **heuristisch** | Langfristige Bewertungsrelationen sind T2; Out-of-sample-Gegenbefunde und US-Datenraum sind T4. Jährliche EMA-/Clamp-Returnwerte und Fallbacks sind suiteeigene Policies. | V1–V3 prüfen Kontinuität und Fallback. V4/V5 offen: internationale/zeitliche Holdouts, Horizontabgleich und konstante Baseline. |
-| [MAP-12](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md#map-12) Backtest – **etabliert als Diagnoseverfahren** | Chronologische Historienprüfung ist anerkannt, aber Data-Snooping, Survivorship, Easy-Data-Bias und Trialauswahl sind T4. Der Lauf bleibt In-sample und keine Zukunftsvalidierung. | V1–V3 prüfen Chronologie und Aggregation. V4 offen: Return-Manifest, Look-ahead-Audit, vollständiges Trial-Inventar und unangetastete Daten. |
-| [MAP-13](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md#map-13) Sweep/Auto-Optimize – **experimentell** | Suchverfahren ordnen Kandidaten innerhalb eines Nutzerraums; Mehrfachtests und Backtest-Overfitting sind T4. Getrennte Seeds aus demselben Generator bilden keinen unabhängigen Markt-Holdout. | V1–V3 prüfen Sampling, Constraints und Champion-Shape. V4/V5 offen: Trial-Logging, nested Holdouts, Stabilitätsintervalle und unveränderte Baseline. |
-| [MAP-14](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md#map-14) Single-/Joint-Life-Horizont – **adaptiert** | Lebensdauertheorie und Periodensterbetafel sind T2/T3; Kohortenunterschiede sind T4. Quantil, Joint-Konstruktion und Puffer sind keine individuelle Lebensdauerprognose. | V1–V3 prüfen Monotonie und Pfadweitergabe. V4/V5 offen: Kohorten-/Verbesserungsszenarien, Partnerabhängigkeit und asymmetrische Horizonfehler. |
-| [MAP-15](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md#map-15) Rente/Witwenanteil – **adaptiert** | Amtliche Populations- und Rentenreihen liefern T3/T4-Kontext, keine Individualleistung. Eingabebetrag, Indexierung und Witwenquote ersetzen weder Bescheid noch Rechts-, Steuer- oder Abgabenprüfung. | V1–V3 prüfen Cashflow und Todespfad. V5/V6 offen: aktuelle Unterlagen, Brutto/Netto-Vertrag und externe Anspruchsprüfung. |
-| [MAP-16](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md#map-16) Pflegeprozess – **heuristisch** | Deutsche Bestände und Leistungen sind T3/T4; Bestände sind keine individuellen Eintritts- oder Übergangsraten. Dauer, Progression, Kosten und Mortalität sind nicht gemeinsam extern kalibriert; der PD-02-Einheitenpfad ist korrigiert, aber nicht extern kalibriert. | V1–V3 prüfen Zustände, Einheiten und Aggregation. V4/V5 offen: getrennte Quellenketten, Übergänge, Dauer, Versorgung, Kosten, Leistungen und Tod auf dem korrigierten Einheitenvertrag. |
-| [MAP-17](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md#map-17) Pflegebucket – **experimentell** | Mental Accounting, Selbstversicherung und Pflegekontext sind T2 bis T4. Algorithmische Zweckbindung ist weder Versicherung noch vollständiges Liability Matching; Höhe und Trigger sind nicht extern validiert. | V1–V3 prüfen Carve-out, Trigger und KPIs. V4/V5 offen: gleiche Gesamtvermögen, Leistungen, Cash-Opportunitätskosten, Steuer und Alternativregeln. |
-
-### E.4.4 Mechanismen gemeinsam bewerten
-
-Ein Mechanismusvergleich muss vorab angeben, was unverändert bleibt und
-welche Zielgröße entscheiden darf. Werden beispielsweise CAPE-Policy,
-Guardrails und Bucket-Regel gleichzeitig geändert, ist ein Ergebnisdelta
-keinem Einzelmechanismus zurechenbar. Für kausal engere Aussagen sind
-Einzelfaktor-Ablationen, anschließend vorab definierte Interaktionen und
-schließlich ein unveränderter Gesamtvergleich nötig. Negative oder instabile
-Ergebnisse gehören zum Nachweis und dürfen nicht durch nachträgliche Auswahl
-von Seeds, Startjahren oder Kennzahlen verschwinden.
-
-Auch Statuswerte dürfen nicht über Mechanismen hinweg zu einem Gesamtscore
-addiert werden. `adaptiert` kann für einen klaren Methodenursprung mit großer
-Suite-Abweichung stehen; `heuristisch` kann technisch sehr gut getestet, aber
-extern unkalibriert sein. Entscheidend sind konkrete offene Prüfungen und die
-Frage, ob eine Aussage V1–V3, V4, V5 oder V6 beansprucht. Das vollständige
-Dossier bleibt bei jeder Änderung der Kurzzeile maßgeblich.
-
-Querwirkungen sind besonders bei gemeinsam genutzten Größen zu protokollieren:
-Inflation beeinflusst Floor, Rente, reale Ergebniswerte und Pflegekosten;
-Langlebigkeit verändert VPW und Pflegeexposition; Liquiditätsregeln verändern
-Verkaufszeitpunkt und damit Steuern. Ein Test eines Einzelmoduls reicht für
-solche Ketten nicht. Die behauptete Wirkung muss bis zu allen betroffenen
-Ergebnissen und Runnerpfaden verfolgt werden, bevor eine Mechanismuszeile oder
-ein Risikostatus geändert wird.
-
-## E.5 Ergebnisinterpretation jenseits der Floor-Deckungsquote
-
-Die Floor-Deckungsquote zeigt nur, bei welchem Anteil der angeforderten Läufe
-im gewählten Horizont kein implementierter Floor-Deckungsbruch eintrat. Das
-terminale Outcome-Inventar trennt Ruin, Tod, Horizontende und technischen
-Fehler disjunkt; bei technischen Fehlern wird die Quote nicht ausgewiesen.
-Zwei Policies sind nur unter identischen Daten, Seeds, Horizonten,
-Haushaltsinputs, Kosten- und Steuerannahmen vergleichbar. Eine höhere
-Floor-Deckung bei häufigeren Flex-Kürzungen ist ein Trade-off; höheres
-Endvermögen kann aus zu niedriger Entnahme stammen.
-
-| Dimension | Heute zulässige Aussage | Offene Mess- oder Vertragsgrenze |
-| --- | --- | --- |
-| Floor-Verletzung | `failCount`, `isRuin`, die Floor-Deckungsquote im gewählten Horizont und das disjunkte Outcome-Inventar beschreiben den implementierten Deckungsbruch und den terminalen Laufstatus. | Vollständige Verteilung von Höhe, Dauer und kumulierter realer Lücke fehlt. |
-| Konsumkürzung | Anteil abgeschlossener Dekumulationsjahre mit Kürzung `>= 10 %`, maximale Flex-Kürzung, Jahre ohne Flex und die laufbasierte „Reale Depotentnahme P10“ zur Preisbasis des Simulationsstarts zeigen modellierte Einschränkungen. | Individuelle Akzeptanz- oder Nutzengewichte, ein Quantil-Konfidenzintervall und eine vollständige reale Haushaltskonsum-Lückenverteilung fehlen. |
-| Stressdauer | Stress-Kürzungsjahre und `recoveryYears` gelten für das gewählte Preset. | Keine allgemeine Regime-Verweildauer oder vollständige Erholungsverteilung. |
-| Nachlass/Restvermögen | P10/P50/P90 und Median erfolgreicher Läufe beschreiben modelliertes aktives Endvermögen. | Kein Nachlassziel und keine vollständigen externen Assets, Immobilien-, Versicherungs- oder Pflegebucketwerte. |
-| Steuerlast | Median kumulierter Modellsteuern und Verlusttopf-Effekt gelten für den implementierten Settlement-Vertrag. | Keine vollständige Einkommensteuer-, Sozialabgaben-, Rechts- oder Kostenlogik. |
-| Liquidität | Runway, Mindest-/Zielwerte und Logs zeigen operative Cash-Deckung. | Keine einheitliche Monte-Carlo-Verteilung von Tiefe und Dauer aller Unterschreitungen. |
-| Pflegewirkung | Eintritt, Pflegejahre, Kosten, Shortfall- und Bucket-KPIs vergleichen Modellpfade. | Keine extern kalibrierte Wahrscheinlichkeit oder kausale Gegenfaktualität bei gemeinsamem Pfad. |
-
-Für die Auswertung gilt eine feste Reihenfolge: zuerst Contract- und
-Validierungsfehler ausschließen, danach Floor-Lücken und Liquidität prüfen,
-anschließend Konsumkürzung, Steuer, Pflegewirkung und Restvermögen gemeinsam
-lesen. Erst dann dürfen Policies verglichen werden. Ein Median ohne
-Tailverteilung oder ein Endvermögen ohne konsumierte Leistungen genügt nicht.
-Reale und nominale Größen sowie Prozent- und Verhältniswerte müssen dabei
-vertragstreu getrennt bleiben. PD-01 ist durch den kumulierten Simulator-State
-behoben; PD-02 durch die einmalige In-memory-Normalisierung an DOM- und
-Profilgrenze. Aussagen zur Eignung von Pflegeparametern bleiben dennoch durch
-MR-07 und FR-10 begrenzt.
-
-## E.6 Forschungs- und Modellrisiken
-
-`hoch` bedeutet: Ohne zusätzliche V5-Prüfung darf keine Wirksamkeits- oder
-Parametereignung behauptet werden. Die IDs vertiefen MR-01 bis MR-12 und
-bleiben bis zu einem dokumentierten Nachweis offen.
-
-| ID | Priorität | Risiko und Fehlinterpretation | Erforderliche Behandlung |
-| --- | --- | --- | --- |
-| FR-01 | hoch | Verkürzter Safe-Withdrawal-Kontext macht Suite-Erfolg zur universellen Rate. | Horizont, Assetset, Daten, Kosten/Steuer und Erfolgsbegriff immer mitführen. |
-| FR-02 | hoch | Enge oder rekonstruierte Historie erscheint marktübergreifend. | Datenprovenienz, geschätzte Jahre, Teilperioden und internationale Daten getrennt prüfen. |
-| FR-03 | hoch | Unvollständige Kosten-, Steuer- und Rechtslogik überschätzt Entnahmefähigkeit. | Sensitivitäten und externe Rechtsprüfung; MR-03/MR-05 sichtbar halten. |
-| FR-04 | mittel | Samplername wird mit passender Stationarität und Blockwahl verwechselt. | Abhängigkeit, Block-/Filter-Sensitivität und Alternativmodelle vergleichen. |
-| FR-05 | mittel | Policyzustände klingen wie geschätzte Marktregime. | Labels als Heuristik führen und Schwellenstabilität vorab testen. |
-| FR-06 | hoch | Tail-Eventrate wird zur Crashwahrscheinlichkeit und Schocks werden doppelt gezählt. | Nur Szenarioaussage; gemeinsame Schocks und Doppelzählung challengen. |
-| FR-07 | hoch | CAPE-Horizont-, Datenraum- und Forecast-Mismatch wird übersehen. | Internationale/zeitliche Holdouts und konstante Baseline verwenden. |
-| FR-08 | hoch | Unbekanntes Trial-Universum macht den Champion scheinbar robust oder optimal. | Alle Trials loggen, locked/nested Holdouts, Stabilitätsintervalle und Baseline. |
-| FR-09 | hoch | Perioden-/Kohorten- und Joint-Life-Fehler wirken wie individuelle Prognose. | Verbesserungs-/Kohortenszenarien, Quantilsensitivität und Partnerabhängigkeit. |
-| FR-10 | hoch | Unkalibrierte Pflegeübergänge, Kosten und Drift wirken individuell prognostisch. | Quellenketten je Parameter, Kalibrierung und Sensitivität auf dem korrigierten PD-02-Einheitenvertrag. |
-| FR-11 | mittel | Bucket- oder Goldwirkung wird mit Allokationseffekt vermischt. | Ablation bei gleicher Allokation, Kosten, Rebalancing und Liquidität. |
-| FR-12 | hoch | Erfolgsquote verdeckt Konsumkürzung, Liquiditätsstress oder Nachlasslücke. | Ergebnisbündel aus E.5 nutzen und Shortfalltiefe/-dauer entwickeln. |
-
-## E.7 Priorisierte Forschungsfragen
-
-Die zehn Fragen sind im
-[Forschungsvalidierungs-Backlog](../internal/archive/FORSCHUNGSVALIDIERUNGS_BACKLOG.md)
-in getrennte Folgevorhaben mit Eingangsgates, Owner-Rollen, Mindestnachweisen,
-Abbruchkriterien und Ergebnisartefakten zerlegt. Alle Pakete stehen auf FV0
-und bleiben offen; ihre Planung ist kein Wirksamkeitsnachweis.
-
-| ID | Priorität | Frage | Mindestnachweis für eine belastbarere Aussage |
-| --- | --- | --- | --- |
-| FQ-01 | 1 | Wie ändern definierte Return-Indizes, Kosten und internationale Daten die Entnahmeergebnisse? | Datenmanifest, Kostenvertrag und vorab definierte Länder-/Teilperiodenläufe. |
-| FQ-02 | 1 | Welche Guardrail-/VPW-/CAPE-Verbesserungen halten auf unangetasteten Daten und Seeds? | Baseline, vollständiges Trial-Log und zeitlich/länderweise Holdouts. |
-| FQ-03 | 1 | Wie oft, tief und lange werden Floor, Flex und Runway verletzt? | Verteilungen für Shortfall, Kürzung und Liquiditätslücke. |
-| FQ-04 | 1 | Welche deutschen Quellen tragen Pflegeeintritt, Übergang, Dauer, Kosten, Leistungen und Mortalität? | Getrennte Parameterherkunft und Rekalibrierung auf dem korrigierten PD-02-Einheitenvertrag. |
-| FQ-05 | 2 | Welche Bootstrap-Blocklänge und Filter passen zu den Jahresdaten? | Abhängigkeitsdiagnostik, Sensitivitätsband und Samplervergleich. |
-| FQ-06 | 2 | Wie lässt sich Tail-Stress ohne inkonsistente oder doppelte Schocks formulieren? | Kalibrierte gemeinsame Szenarien, Challenge-Protokoll und Anti-Doppelpessimismus-Test. |
-| FQ-07 | 2 | Verbessert die CAPE-Policy Ergebnisse außerhalb der Entwicklungsdaten? | Internationale/zeitliche Out-of-sample-Studie mit konstanter Baseline. |
-| FQ-08 | 2 | Welchen eigenständigen Effekt haben Gold-, Runway-, Bond- und Pflegebucket-Regeln? | Ablation mit gleicher Gesamtallokation und Opportunitätskosten. |
-| FQ-09 | 2 | Wie sensitiv ist Dynamic Flex auf Kohortenmortalität, Joint-Life und Quantil? | Perioden-/Kohorten-/Verbesserungsszenarien und asymmetrische Horizonfehler. |
-| FQ-10 | 3 | Welche Konsum- und Nachlass-Trade-offs akzeptieren die tatsächlichen Nutzer? | Dokumentierte Präferenzen oder Nutzwertgewichte statt Portfolio-KPIs allein. |
-
-## E.8 Mindeststandard und Ergebnisstand
-
-Vor Aussagen wie „verbessert Robustheit“, „senkt Risiko“ oder „optimiert
-Entnahmen“ müssen mindestens Baseline, Datenmanifest, Kosten- und
-Steuervertrag, vollständiges Trial-Universum, Holdout-Regel, Seeds, das
-Ergebnisbündel aus E.5 sowie negative und instabile Resultate dokumentiert
-sein. Ohne diesen Nachweis sind Formulierungen auf „implementiert“, „technisch
-getestet“, „im gewählten Szenario beobachtet“ oder „experimentell“ begrenzt.
-
-Frühere konkrete Kitces-/Morningstar-Zahlen zu Einkommensrückgang, sicherer
-Entnahmerate oder Risikoreduktion bleiben entfernt, solange kein
-reproduzierbarer Suite-Lauf und kein vollständiger Quellenkontext vorliegen.
-Floor-Flex wird nicht mit Guyton-Klinger gleichgesetzt; implementierter
-Bootstrap, Regime-Signal, CAPE-Policy oder Tail-Overlay gelten nicht allein
-wegen ihrer Existenz als extern kalibriert. Für einen Pflegebucket wird keine
-normativ richtige Vermögenshöhe behauptet.
-
-Der Forschungsrahmen enthält damit eine kompakte Einordnung von MAP-01 bis
-MAP-17, die mehrdimensionale Ergebnisinterpretation, FR-01 bis FR-12 und
-FQ-01 bis FQ-10. Alle offenen V4-/V5-Prüfungen bleiben bestehen. Vollständige
-Quellen- und Dossierdetails stehen im
-[normativen Forschungs-Evidenzregister](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md);
-Priorität, Startgates und gesperrte Wirksamkeitsaussagen im
-[internen Forschungsvalidierungs-Backlog](../internal/archive/FORSCHUNGSVALIDIERUNGS_BACKLOG.md).
+- Eine Quelle im Korpus belegt weder, dass die Suite dieselbe Methode identisch
+  umsetzt, noch dass deren Literaturergebnis reproduziert wird.
+- Lokale Tests können V1 Contract, V2 Rechenregression und V3 Pfadparität
+  belegen. V4 historische Plausibilität, V5 externe Kalibrierung und V6 Eignung
+  für den konkreten Haushaltsfall bleiben je nach Mechanismus offen; identische
+  Main-/Worker-Ergebnisse können auf allen Pfaden gleich verzerrt sein.
+- Aussagen wie „verbessert Robustheit", „senkt Risiko" oder „optimiert
+  Entnahmen" sind ohne den in E.8 festgelegten Mindestnachweis unzulässig.
 
 ---
 
@@ -4295,30 +3670,23 @@ Buildstand sind releaseabhängig und keine Architekturkennzahl.
 
 ### Produktquellen des Marktvergleichs
 
-*Abruf jeweils 2026-07-15. Die vollständigen stufenscharfen Quellenrecords
-einschließlich Evidenzklasse, Fundstelle und Einschränkung stehen in D.12;
-die folgenden Links sind die Einstiegspunkte der Stichprobe.*
-
-- [ProjectionLab: Pricing & Subscriptions](https://projectionlab.com/pricing)
-- [Boldin: Pricing](https://www.boldin.com/retirement/pricing/)
-- [BVI: Rechner](https://www.bvi.de/service/rechner/)
-- [Finanzfluss: Entnahmeplan-Rechner](https://www.finanzfluss.de/rechner/entnahmeplan/)
-- [Digitale Rentenübersicht](https://www.rentenuebersicht.de/DE/01_startseite/home_node.html)
-- [MoneyGuide](https://www.moneyguidepro.com/)
-- [eMoney Pro](https://emoneyadvisor.com/products/emoney-pro/)
-- [FI Calc Guide](https://guide.ficalc.app/)
-- [FIRECalc 3.0](https://firecalc.com/)
-- [Pralana Retirement Calculator](https://pralanaretirementcalculator.com/)
+Die zehn Einstiegspunkte der Marktvergleichs-Stichprobe stehen im
+[Marktvergleich](MARKTVERGLEICH.md#produktquellen-im-überblick); die
+vollständigen stufenscharfen Quellenrecords einschließlich Evidenzklasse,
+Fundstelle und Einschränkung führt das
+[Marktvergleich-Evidenzregister](MARKTVERGLEICH_EVIDENZREGISTER.md).
+Abrufstand ist einheitlich 2026-07-15.
 
 ### Forschung und deutsche Referenzdaten
 
 Das vollständige wissenschaftliche Korpus steht mit Quellenklasse,
-Evidenzstufe, dauerhaftem Link, Aussagebeitrag und Übertragbarkeitsgrenze in
-E.4. Es umfasst 55 Records aus peer-reviewter Original- und
-Übersichtsliteratur, amtlichen beziehungsweise institutionellen Quellen,
-Practitioner Research, einem Fachbuch und einem Community-Kontext sowie
-deutschen Referenzdaten. E.5 ordnet diese Quellen 17 Suite-Mechanismen als
-Mapping-Grundlage zu; E.9 bis E.11 führen den Abgleich aus. Diese zentrale
+Evidenzstufe, dauerhaftem Link, Aussagebeitrag und Übertragbarkeitsgrenze im
+[Forschungs-Evidenzregister](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md). Es umfasst
+55 Records aus peer-reviewter Original- und Übersichtsliteratur, amtlichen
+beziehungsweise institutionellen Quellen, Practitioner Research, einem Fachbuch
+und einem Community-Kontext sowie deutschen Referenzdaten. Das Register ordnet
+diese Quellen den 17 Suite-Mechanismen zu; die kompakte Einordnung steht im
+[Wissenschaftlichen Rahmen](WISSENSCHAFTLICHER_RAHMEN.md). Diese zentrale
 Record-Liste ersetzt die frühere unspezifische Linksammlung.
 
 ---
@@ -4326,5 +3694,8 @@ Record-Liste ersetzt die frühere unspezifische Linksammlung.
 *Technische Dokumentation der Ruhestand-Suite. Algorithmusbeschreibungen sind
 konzeptionell; konkrete Implementierungsdetails stehen in den genannten
 Modulen und Tests. Dokumentstand: 2026-07-15, redaktionell integrierter
-Abschlussstand für Architektur, Fachkonzept, Modellgrenzen, Marktvergleich und
-wissenschaftliche Tiefeneinordnung.*
+Abschlussstand für Architektur, Fachkonzept und Modellgrenzen; Marktvergleich
+und wissenschaftliche Tiefeneinordnung sind am 2026-08-05 in
+[`MARKTVERGLEICH.md`](MARKTVERGLEICH.md) beziehungsweise
+[`WISSENSCHAFTLICHER_RAHMEN.md`](WISSENSCHAFTLICHER_RAHMEN.md) ausgegliedert
+worden.*

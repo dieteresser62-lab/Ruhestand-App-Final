@@ -4,9 +4,10 @@
 **Quellen- und Erhebungsstand:** 2026-07-15<br>
 **Letzte Aktualitätsstichprobe dynamischer/amtlicher Anker:** 2026-07-17, Europe/Berlin<br>
 **Status:** normativer Beleganhang zum Architektur- und Fachkonzept<br>
-**Hauptdokument:** [Architektur und Fachkonzept](ARCHITEKTUR_UND_FACHKONZEPT.md#forschungsrahmen)
+**Kompakte Einordnung:** [Wissenschaftlicher Rahmen](WISSENSCHAFTLICHER_RAHMEN.md)<br>
+**Übergeordnetes Hauptdokument:** [Architektur und Fachkonzept](ARCHITEKTUR_UND_FACHKONZEPT.md#forschungsrahmen)
 
-Dieses Register führt das vollständige kuratierte Korpus mit 55 FOR-Records und die ausführlichen Dossiers MAP-01 bis MAP-17. Es ist kein Archiv: Quellenrolle, Übertragbarkeit, Abweichung, Evidenzstatus, lokale Validierungsgrenze und offene V4-/V5-Prüfung sind hier normativ. Das Hauptdokument bleibt für Ergebnisgrenzen, FR-01 bis FR-12 und FQ-01 bis FQ-10 maßgeblich. Der [archivierte Forschungsvalidierungs-Backlog](../internal/archive/FORSCHUNGSVALIDIERUNGS_BACKLOG.md) definiert deren weiterhin offene Nachweise und Freigabegates. Das [archivierte Simulator-Backtest-Forschungsprotokoll](../internal/archive/2026-simulator-backtest-hardening/SIMULATOR_BACKTEST_FORSCHUNGSPROTOKOLL.md) inventarisiert fuer MAP-12/13 Daten-, Kosten-, Trial-, Holdout- und Owner-Blockaden; der Archivstatus schließt keine Frage und hebt keinen Evidenzstatus an.
+Dieses Register führt das vollständige kuratierte Korpus mit 55 FOR-Records und die ausführlichen Dossiers MAP-01 bis MAP-17. Es ist kein Archiv: Quellenrolle, Übertragbarkeit, Abweichung, Evidenzstatus, lokale Validierungsgrenze und offene V4-/V5-Prüfung sind hier normativ. Der [Wissenschaftliche Rahmen](WISSENSCHAFTLICHER_RAHMEN.md) bleibt für Ergebnisgrenzen, FR-01 bis FR-12 und FQ-01 bis FQ-10 maßgeblich. Der [archivierte Forschungsvalidierungs-Backlog](../internal/archive/FORSCHUNGSVALIDIERUNGS_BACKLOG.md) definiert deren weiterhin offene Nachweise und Freigabegates. Das [archivierte Simulator-Backtest-Forschungsprotokoll](../internal/archive/2026-simulator-backtest-hardening/SIMULATOR_BACKTEST_FORSCHUNGSPROTOKOLL.md) inventarisiert fuer MAP-12/13 Daten-, Kosten-, Trial-, Holdout- und Owner-Blockaden; der Archivstatus schließt keine Frage und hebt keinen Evidenzstatus an.
 
 Die Aufnahme einer Quelle belegt weder eine identische Suite-Umsetzung noch deren Wirksamkeit. Literaturzahlen sind keine Suite-Ergebnisse; lokale Tests belegen höchstens V1 bis V3 und ersetzen keine externe Kalibrierung oder Wirksamkeitsprüfung.
 
@@ -566,4 +567,4 @@ Nachlass erreicht oder reale Kaufkraft ohne Unterbrechung gehalten wurde.
 
 ---
 
-Zur kompakten Einordnung, zum Ergebnisbündel sowie zu FR- und FQ-Ownership: [Forschungsrahmen im Hauptdokument](ARCHITEKTUR_UND_FACHKONZEPT.md#forschungsrahmen).
+Zur kompakten Einordnung, zum Ergebnisbündel sowie zu FR- und FQ-Ownership: [Wissenschaftlicher Rahmen](WISSENSCHAFTLICHER_RAHMEN.md).

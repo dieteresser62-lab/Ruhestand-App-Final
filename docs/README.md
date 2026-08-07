@@ -39,6 +39,10 @@ Diese Datei dient als Uebersicht und Bestandsaufnahme fuer die Dokumentation.
 
 - `docs/reference/TECHNICAL.md` (technische Referenz)
 - `docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md` (fachlich-technische Vertiefung)
+- `docs/reference/MARKTVERGLEICH.md` (Marktvergleich D.1 bis D.18; seit 2026-08-05 aus dem Fachkonzept ausgegliedert)
+- `docs/reference/MARKTVERGLEICH_EVIDENZREGISTER.md` (69 Quellenrecords und Kriterienmatrix des Marktvergleichs)
+- `docs/reference/WISSENSCHAFTLICHER_RAHMEN.md` (Forschungsrahmen E.1 bis E.8; seit 2026-08-05 aus dem Fachkonzept ausgegliedert)
+- `docs/reference/FORSCHUNGSABGLEICH_EVIDENZREGISTER.md` (55 Quellenrecords und MAP-Dossiers)
 - `docs/reference/BALANCE_MODULES_README.md`, `docs/reference/SIMULATOR_MODULES_README.md` und `docs/reference/TRANCHEN_MODULES_README.md` (Modulreferenzen)
 
 Diese Root-Dateien bleiben vorerst erhalten, damit bestehende Links und externe Referenzen stabil bleiben.

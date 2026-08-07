@@ -433,12 +433,18 @@ function buildBasicInputs() {
     });
 
     assert(ruinRow.aktionUndGrund === '>>> RUIN <<<', 'Ruin log builder should set ruin marker');
+    assert(ruinRow.recordType === 'terminal_ruin' && ruinRow.financiallyEvaluable === false,
+        'Ruin log builder should type a non-evaluable terminal record');
     assert(ruinRow.RunwayCoveragePct === null && ruinRow.RunwayMeasurementPhase === 'not_applicable_terminal_ruin', 'Ruin log builder should not invent runway stress');
     assert(normalRow.taxSavedByLossCarry === 12, 'Year log builder should preserve result log fields');
+    assert(normalRow.recordType === 'financial_year' && normalRow.financiallyEvaluable === true,
+        'Year log builder should type a financially evaluable record');
     assert(normalRow.RunwayCoveragePct === 100 && normalRow.runway_after_transaction_before_payout_months === 60, 'Year log builder should preserve canonical pre-payout runway fields');
     assert(normalRow.entnahme_plan === 100 && normalRow.liq_after_payout === 410, 'Year log builder should preserve payout transparency fields');
     assert(normalRow.CareP1_Active === 1 && normalRow.CareP2_Active === 0, 'Year log builder should write care activity fields');
     assert(deathRow.aktionUndGrund.includes('Alle Personen verstorben'), 'Death log builder should set death marker');
+    assert(deathRow.recordType === 'terminal_death' && deathRow.financiallyEvaluable === false,
+        'Death log builder should type a non-evaluable terminal record');
     assert(deathRow.RunwayCoveragePct === null && deathRow.RunwayMeasurementPhase === 'not_applicable_all_persons_deceased', 'Death log builder should not invent runway stress');
     assert(deathRow.Person2Alive === 0, 'Death log builder should preserve partner alive flag');
 }

@@ -187,9 +187,11 @@ DOM-freier, versionierter Raw-Vertrag fuer einen vollstaendigen Monte-Carlo-Lauf
 
 **Hauptfunktionen / Exporte:**
 - `createMonteCarloRunRequestV1()` / `validateMonteCarloRunRequestV1()` – normalisieren und validieren Seed, Methoden, Szenario, Datenfingerprint, Worker-/Chunkkonfiguration und Snapshotpolicy; lokale Pfade, Secret-Felder und nicht endliche Zahlen werden abgewiesen.
-- `createMonteCarloRunResultV1()` / `validateMonteCarloRunResultV1()` – projizieren Outcome-Inventar, kanonische KPIs mit expliziten `NominalEur`-/`RealEur`-Namen, Unsicherheit, Missingness, Warnungen und Diagnostik ohne Displayformatierung.
+- `createMonteCarloRunResultV1()` / `validateMonteCarloRunResultV1()` – erhalten den historischen Ergebnisvertrag fuer Reproduzierbarkeit und Replay.
+- `createMonteCarloRunResultV2()` / `projectMonteCarloRunResultV2()` / `validateMonteCarloRunResultV2()` – projizieren Outcome-Inventar, Heatmap-Intervalle, explizite Ratio-/Prozentpunktsemantik, Observation-Counts sowie nominalen und realen Maximum-Drawdown fail-closed in den aktuellen Exportvertrag.
 - `extractMonteCarloReplayArgsV1()` – rekonstruiert die DOM-freien Runnerargumente fuer einen deterministischen Re-Run.
-- `buildMonteCarloExportV1()` / `readMonteCarloExportV1()` / `createMonteCarloExportDownload()` – erzeugen und lesen `MonteCarloExportV1` mit SHA-256-Runfingerprint, App-/Engineprovenienz, Forward-Policy und eindeutigem sicheren Dateinamen. Das befristete Legacy-Read-Aliasregister ist seit Slice 11 leer; nur kanonische KPI-Felder werden erkannt.
+- `buildMonteCarloExportV2()` / `readMonteCarloExport()` / `createMonteCarloExportDownload()` – schreiben den aktuellen `MonteCarloExportV2` mit SHA-256-Runfingerprint, App-/Engineprovenienz und sicherem Dateinamen. V2 besitzt den expliziten Bezeichner `MONTE_CARLO_EXPORT_V2_VERSION`; der deprecated unqualifizierte Altbezeichner behaelt seine historische V1-Bedeutung. Der Dispatcher liest V1 nur mit Kompatibilitaetswarnung, V2 direkt und weist unbekannte Versionen fail-closed ab. `buildMonteCarloExportV1()` / `readMonteCarloExportV1()` bleiben fuer historische Artefakte erhalten.
+- `projectScenarioLogV2()` / `serializeScenarioLogExportV2()` / `serializeScenarioLogCsvV2()` – bilden den gemeinsamen semantischen Projektor fuer Szenario-JSON und -CSV. `ScenarioLogExportV2` typisiert Finanz- und Terminalrecords, trennt Ratio- von Prozentpunktfeldern sowie Post-Policy- von Erfuellungswerten und erzeugt den CSV-Header aus der sortierten Vereinigungsmenge aller Recordschluessel. Akkumulationsjahre markieren Entnahme- und Mindest-Flex-Gruppen als nicht anwendbar, ohne beobachtete Returns zu verwerfen.
 
 **Snapshotlinie:** `MonteCarloSnapshotPolicyV1` trennt die unveraenderliche
 Referenz `pre-hardening-v1`, versionierte semantische Post-Slice-Referenzen
@@ -206,7 +208,7 @@ und Backtest-Datenreferenzen werden nicht ueberschrieben. Fixture-spezifische
 Vergleichsausnahmen stehen nur in der Messfixture, nie im produktiven
 Runtimevertrag. Unerklaerte Deltas blockieren die Fortschreibung.
 
-**Einbindung:** `simulator-monte-carlo.js` erzeugt Request und Resultat direkt aus den tatsaechlich verwendeten Laufdaten. `monte-carlo-ui.js` stellt den Download erst danach bereit; es gibt keine automatische Persistenz oder Uebertragung.
+**Einbindung:** `simulator-monte-carlo.js` erzeugt Request und internes Resultat direkt aus den tatsaechlich verwendeten Laufdaten. `monte-carlo-ui.js` stellt den MC-Download erst danach bereit; die V2-Projektion erfolgt an der Exportgrenze. `simulator-results.js` verwendet fuer Szenario-JSON und -CSV denselben V2-Projektor. Es gibt keine automatische Persistenz oder Uebertragung.
 
 ---
 
@@ -476,7 +478,7 @@ Aggregation der Monte-Carlo-Ausgabe, Orchestrierung von KPI-Berechnung und Rende
 - Checkboxen für Pflege-Details und detailliertes Log
 - Detailspalten fuer Entnahme-/Payout-/VPW-Transparenz (`EntPlan`, `EntEff`, `VPW€`, `VPWFlex`, `StatFlex`, `Liq>P`, `Liq<P`, `Liq>Z`, `Port>P`, `PortEnd`)
 - Mindest-Flex-Spalten: `MinFlex€`, `MinFIst€`, `MinFGap€`, `MinFSt` sowie im Detailmodus `MinFBlock` und der Policy-Zwischenwert `MinFEff`
-- JSON/CSV-Export für ausgewählte Szenarien
+- JSON/CSV-Export fuer ausgewaehlte Szenarien als `ScenarioLogExportV2`; beide Formate verwenden dieselbe lazy beim Klick erzeugte validierte Projektion und tragen Contractversionen je Export beziehungsweise CSV-Zeile. Ein Szenariowechsel verwirft den alten Exportzustand vor dem Rendern; Projektionsfehler erzeugen einen sichtbaren Hinweis statt eines alten oder partiellen Downloads.
 - Pflege-KPI-Dashboard mit getrennten P1-/P2-Verteilungen, Stichprobengroessen, nullable bedingten Kennzahlen und realen Haushalts-Mehrbedarfen
 - enthält zusätzlich Metriken für `taxSavedByLossCarry` aus Sweep/MC-Ergebnissen
 - enthält zusätzlich Pflegebucket-KPIs aus MC-Ergebnissen: Nutzungsquote, Erschoepfungsquote, Median-/P90-Nutzung, Median-Restbucket, Zieldeckung und Zielluecke
@@ -1370,4 +1372,4 @@ Nach jeder Monte-Carlo-Simulation werden bis zu 31 Szenarien gespeichert:
 
 ---
 
-**Last Updated:** 2026-07-18
+**Last Updated:** 2026-08-07

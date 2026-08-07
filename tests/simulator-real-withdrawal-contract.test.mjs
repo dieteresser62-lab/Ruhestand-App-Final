@@ -2,6 +2,7 @@ import { EngineAPI } from '../engine/index.mjs';
 import { simulateOneYear } from '../app/simulator/simulator-engine-direct.js';
 import {
     advanceSimulatorCumulativeInflationFactor,
+    computeRunStatsFromSeries,
     prepareHistoricalDataOnce,
     resolveSimulatorCumulativeInflationFactor
 } from '../app/simulator/simulator-engine-helpers.js';
@@ -384,5 +385,30 @@ assertClose(
     1e-9,
     'Per-run withdrawal P10 should use the logged real-withdrawal contract without year sampling'
 );
+const nominalPortfolioSeries = [
+    1000000,
+    ...mcRows.map(row => row.wertAktien + row.wertGold + row.liquiditaet)
+];
+const realPortfolioSeries = [
+    1000000,
+    ...mcRows.map(row => (
+        (row.wertAktien + row.wertGold + row.liquiditaet)
+        / (row.inflation_factor_cum * (1 + row.inflation / 100))
+    ))
+];
+assertClose(
+    mcChunk.pathSummaries.maxDrawdownPct[0],
+    computeRunStatsFromSeries(nominalPortfolioSeries).maxDDpct,
+    1e-5,
+    'Nominal drawdown should use the selected path portfolio points'
+);
+assertClose(
+    mcChunk.pathSummaries.maxDrawdownRealPct[0],
+    computeRunStatsFromSeries(realPortfolioSeries).maxDDpct,
+    1e-5,
+    'Real drawdown should use the same path and time boundaries at start prices'
+);
+assertEqual(mcChunk.pathSummaries.maxDrawdownRealObservationCount[0], nominalPortfolioSeries.length,
+    'Real drawdown should count the same portfolio points as nominal drawdown');
 
 console.log('--- Simulator Real Withdrawal Contract Tests Completed ---');

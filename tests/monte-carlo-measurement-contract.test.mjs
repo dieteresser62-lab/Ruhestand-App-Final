@@ -336,8 +336,20 @@ function compactWorstRun(value) {
     };
 }
 
+const V2_ADDITIONAL_BUFFER_FIELDS = new Set([
+    'realMaxDrawdowns',
+    'realMaxDrawdownObservationCount',
+    'realMaxDrawdownMissingness'
+]);
+
+function legacyV1BufferBytes(result) {
+    return Object.entries(result.buffers).reduce((sum, [field, buffer]) => (
+        V2_ADDITIONAL_BUFFER_FIELDS.has(field) ? sum : sum + buffer.byteLength
+    ), 0);
+}
+
 function snapshotProjection(result) {
-    const bufferBytes = Object.values(result.buffers).reduce((sum, buffer) => sum + buffer.byteLength, 0);
+    const bufferBytes = legacyV1BufferBytes(result);
     const aggregates = result.aggregates;
     return canonicalize({
         bufferBytes,
@@ -376,7 +388,7 @@ function snapshotProjection(result) {
 }
 
 function riskKpiSnapshotProjection(result) {
-    const bufferBytes = Object.values(result.buffers).reduce((sum, buffer) => sum + buffer.byteLength, 0);
+    const bufferBytes = legacyV1BufferBytes(result);
     return canonicalize({
         bufferBytes,
         bufferBytesPerRun: bufferBytes / result.totalRuns,
@@ -407,7 +419,7 @@ function riskKpiSnapshotProjection(result) {
 }
 
 function outcomeHorizonSnapshotProjection(result) {
-    const bufferBytes = Object.values(result.buffers).reduce((sum, buffer) => sum + buffer.byteLength, 0);
+    const bufferBytes = legacyV1BufferBytes(result);
     return canonicalize({
         bufferBytes,
         bufferBytesPerRun: bufferBytes / result.totalRuns,
@@ -433,7 +445,7 @@ function outcomeHorizonSnapshotProjection(result) {
 }
 
 function samplingSnapshotProjection(result) {
-    const bufferBytes = Object.values(result.buffers).reduce((sum, buffer) => sum + buffer.byteLength, 0);
+    const bufferBytes = legacyV1BufferBytes(result);
     return canonicalize({
         bufferBytes,
         bufferBytesPerRun: bufferBytes / result.totalRuns,
@@ -458,7 +470,7 @@ function samplingSnapshotProjection(result) {
 }
 
 function carUncertaintySnapshotProjection(result) {
-    const bufferBytes = Object.values(result.buffers).reduce((sum, buffer) => sum + buffer.byteLength, 0);
+    const bufferBytes = legacyV1BufferBytes(result);
     return canonicalize({
         bufferBytes,
         bufferBytesPerRun: bufferBytes / result.totalRuns,
@@ -487,7 +499,7 @@ function carUncertaintySnapshotProjection(result) {
 }
 
 function autoOptimizeMetricsSnapshotProjection(result) {
-    const bufferBytes = Object.values(result.buffers).reduce((sum, buffer) => sum + buffer.byteLength, 0);
+    const bufferBytes = legacyV1BufferBytes(result);
     return canonicalize({
         resourceContract: {
             measuredWorkerResultBytesPerRun: MONTE_CARLO_PARAMETER_LIMITS.measuredWorkerResultBytesPerRun
@@ -563,7 +575,7 @@ function careKpiSnapshotProjection() {
 }
 
 function finalCandidateSnapshotProjection(result) {
-    const bufferBytes = Object.values(result.buffers).reduce((sum, buffer) => sum + buffer.byteLength, 0);
+    const bufferBytes = legacyV1BufferBytes(result);
     const samplingDiagnostics = result.samplingDiagnostics;
     const {
         currentReference: _mutableCurrentReference,

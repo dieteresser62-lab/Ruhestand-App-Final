@@ -398,6 +398,9 @@ export async function runMonteCarloChunk({
         kpiMaxKuerzung,
         volatilities,
         maxDrawdowns,
+        realMaxDrawdowns,
+        realMaxDrawdownObservationCount,
+        realMaxDrawdownMissingness,
         depotErschoepft,
         alterBeiErschoepfung,
         alterBeiErschoepfungMissingness,
@@ -473,7 +476,10 @@ export async function runMonteCarloChunk({
             annualData
         });
 
-        const depotWertHistorie = [portfolioTotal(simState.portfolio)];
+        const initialPortfolioTotal = portfolioTotal(simState.portfolio);
+        const depotWertHistorie = [initialPortfolioTotal];
+        const depotWertHistorieReal = [initialPortfolioTotal];
+        let realDrawdownInflationComplete = true;
         const shouldLogRun = !logIndexSet || logIndexSet.has(runIdx);
         const currentRunLog = shouldLogRun ? [] : null;
         const tailRiskEntriesThisRun = [];
@@ -832,7 +838,17 @@ export async function runMonteCarloChunk({
                     retirementYearCounter++;
                 }
 
-                depotWertHistorie.push(portfolioTotal(simState.portfolio));
+                const currentPortfolioTotal = portfolioTotal(simState.portfolio);
+                depotWertHistorie.push(currentPortfolioTotal);
+                if (realDrawdownInflationComplete) {
+                    if (typeof yearData.inflation === 'number' && Number.isFinite(yearData.inflation)) {
+                        depotWertHistorieReal.push(
+                            currentPortfolioTotal / resolveSimulatorCumulativeInflationFactor(simState)
+                        );
+                    } else {
+                        realDrawdownInflationComplete = false;
+                    }
+                }
 
                 if (stressTracker.stressYears > 0) {
                     recordMonteCarloStressYear(
@@ -950,6 +966,15 @@ export async function runMonteCarloChunk({
         const { volPct, maxDDpct } = computeRunStatsFromSeries(depotWertHistorie);
         volatilities[i] = volPct;
         maxDrawdowns[i] = maxDDpct;
+        realMaxDrawdownObservationCount[i] = depotWertHistorieReal.length;
+        if (realDrawdownInflationComplete) {
+            const { maxDDpct: realMaxDDpct } = computeRunStatsFromSeries(depotWertHistorieReal);
+            realMaxDrawdowns[i] = realMaxDDpct;
+            realMaxDrawdownMissingness[i] = MONTE_CARLO_MISSINGNESS_CODE.OBSERVED;
+        } else {
+            realMaxDrawdowns[i] = 0;
+            realMaxDrawdownMissingness[i] = MONTE_CARLO_MISSINGNESS_CODE.MISSING_INFLATION;
+        }
 
         writeMonteCarloStressMetrics(
             stressTracker,
@@ -1017,6 +1042,9 @@ export async function runMonteCarloChunk({
             finalValueRealEur,
             volatilityPct: volatilities[i],
             maxDrawdownPct: maxDrawdowns[i],
+            maxDrawdownRealPct: realDrawdownInflationComplete ? realMaxDrawdowns[i] : null,
+            maxDrawdownRealObservationCount: realMaxDrawdownObservationCount[i],
+            maxDrawdownRealMissingnessCode: realMaxDrawdownMissingness[i],
             cutYearsNumerator: cutYearsNumeratorThisRun,
             cutYearsDenominator: cutDecisionYearsThisRun,
             realWithdrawalP10RealEur: realWithdrawalsThisRun.length > 0

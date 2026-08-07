@@ -89,7 +89,7 @@ Bekannte Coverage-Ausnahmen:
 npm run test:browser
 ```
 
-Das Browser-Gate nutzt Playwright mit einem vom Test verwalteten lokalen HTTP-Server. Jeder Fall erhaelt einen isolierten Browser-Context und eine eigene Storage-Baseline. Neben den zentralen Einstiegspunkten (`index.html`, `Balance.html`, `Simulator.html`, `depot-tranchen-manager.html`, `Handbuch.html`) prueft es in `Balance.html` Profilabwahl nach Reload, Engine-Mismatch, mutationsfreien Jahres-Preflight, sichtbare korrupte Ausgaben, sichtbaren Import-Reject, einen Markt-CSV-Roundtrip mit periodengebundener Provenienz/`windowHigh`/sichtbarer gerichteter ATH-Untergrenze samt Anwendungsstatus/Boolean-Reload, einen Doppelklick mit genau einem Jahrescommit und Recovery-Snapshot sowie die 3-Bucket-Bear-Diagnose aus der realen Engine-Rendite. Die Simulatorfaelle warten auf fachliche Statuswerte statt auf feste Millisekunden: Sie pruefen Hybridprofile fail-closed, versionierte Sweep-Request-/Resultprovenienz mit allen sieben sichtbaren Parametern und den Evaluate-/Apply-Fingerprint des experimentellen Optimizers. Der Backtestfall reconciliiert sichtbare Periode, Outcome, Jahrinventar, exakte 10-%-Metrik, Pflegebucket und Cohort-Inventar mit Raw-JSON und deckt die Negativpfade ab. Die Tranchenkette prueft mit synthetischen Profilen A/B Manager-Handoff, CRUD, Dialogfokus und Tastaturbedienung, EUR-Quote, Reload, 390-Pixel-Layout, schreibfreie Balance-/Simulatorlaeufe, bestaetigten Reconcile genau einmal, Quote-Teilerfolg/Offline und raw-preserving Corrupt-Recovery. Inflation, Yahoo-Proxy und CAPE werden deterministisch geroutet; andere externe Requests werden blockiert. Das Gate ersetzt keine Node-Unit-Tests und laeuft bewusst getrennt von `npm test`.
+Das Browser-Gate nutzt Playwright mit einem vom Test verwalteten lokalen HTTP-Server. Jeder Fall erhaelt einen isolierten Browser-Context und eine eigene Storage-Baseline. Neben den zentralen Einstiegspunkten (`index.html`, `Balance.html`, `Simulator.html`, `depot-tranchen-manager.html`, `Handbuch.html`) prueft es in `Balance.html` Profilabwahl nach Reload, Engine-Mismatch, mutationsfreien Jahres-Preflight, sichtbare korrupte Ausgaben, sichtbaren Import-Reject, einen Markt-CSV-Roundtrip mit periodengebundener Provenienz/`windowHigh`/sichtbarer gerichteter ATH-Untergrenze samt Anwendungsstatus/Boolean-Reload, einen Doppelklick mit genau einem Jahrescommit und Recovery-Snapshot sowie die 3-Bucket-Bear-Diagnose aus der realen Engine-Rendite. Die Simulatorfaelle warten auf fachliche Statuswerte statt auf feste Millisekunden: Sie pruefen Hybridprofile fail-closed, versionierte Sweep-Request-/Resultprovenienz mit allen sieben sichtbaren Parametern und den Evaluate-/Apply-Fingerprint des experimentellen Optimizers. Der MC-E2E-Fall prueft zusaetzlich den V2-Szenariodownload und adversarial, dass nach Szenario A ein nicht projizierbares Szenario B weder A noch einen partiellen Export herunterladen kann. Der Backtestfall reconciliiert sichtbare Periode, Outcome, Jahrinventar, exakte 10-%-Metrik, Pflegebucket und Cohort-Inventar mit Raw-JSON und deckt die Negativpfade ab. Die Tranchenkette prueft mit synthetischen Profilen A/B Manager-Handoff, CRUD, Dialogfokus und Tastaturbedienung, EUR-Quote, Reload, 390-Pixel-Layout, schreibfreie Balance-/Simulatorlaeufe, bestaetigten Reconcile genau einmal, Quote-Teilerfolg/Offline und raw-preserving Corrupt-Recovery. Inflation, Yahoo-Proxy und CAPE werden deterministisch geroutet; andere externe Requests werden blockiert. Das Gate ersetzt keine Node-Unit-Tests und laeuft bewusst getrennt von `npm test`.
 
 Wichtig fuer CI/Release: Weil `npm test` dieses Gate nicht ausfuehrt, muss `npm run test:browser` explizit als eigener Job oder Release-Schritt laufen, wenn Browser-Regressionen blockierend sein sollen.
 
@@ -311,6 +311,7 @@ Inventar liegen bewusst in den jeweiligen Fachtests.
 
 #### `monte-carlo-measurement-contract.test.mjs`
 **Zweck:** Validiert Golden Cases, unveraenderliche Snapshot-Linie, Delta-Ledger, Same-Runtime-Exaktheit sowie Direct-/Worker-/Chunk-Paritaet.
+- **V2-Ressourcenerweiterung:** Die drei neuen Real-Drawdown-Buffer werden separat auf Registrierung und Paritaet geprueft. Die eingefrorene V1-Snapshotprojektion misst weiterhin nur den historischen V1-Bufferbestand, damit eine additive V2-Ressource keinen semantisch unveraenderten V1-Hash umdeutet.
 - **Aktuelle Referenz:** Die oeffentliche `currentReference` ist `null`,
   solange kein extern freigegebener Nachfolger vorliegt;
   `post-backtest-data-07-v1` ist der neueste getrennte, noch extern zu
@@ -1056,6 +1057,7 @@ Pflege-/Todes-/Hinterbliebenenpfade werden getrennt geprueft.
 - genau einmal fortgeschriebener App-State und Engine-`lastState`-Spiegel
 - Ansparjahre und erstes Entnahmejahr beziehen sich auf die Kaufkraft des ersten Simulatorjahres
 - deterministische MC-Log- und Realentnahmestichprobe verwenden denselben Faktorvertrag
+- nominaler und realer MC-Maximum-Drawdown verwenden dieselben erfolgreichen Portfoliopunkte; die reale Serie deflationiert jeden Punkt mit dem zugehoerigen kumulierten Inflationsfaktor
 
 #### `simulator-heatmap.test.mjs`
 **Zweck:** Testet Heatmap-Rendering.
@@ -1343,7 +1345,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `balance-ui-orchestration.test.mjs` | ~225 | Balance-UI-Bindings, Import-/Export-Control-Pfade, Schema-V1/V2-Migration, CSV-Provenienz und Profilverbund-Hooks |
 | `browser-smoke.test.mjs` | ~1070 | Playwright-Gate fuer HTML-Einstiege, MC-/Backtest-UI, A11y/Negativpfade sowie zentrale Balance-/Tranchenflows |
 | `suite-data-integration-contract.test.mjs` | ~330 | 65 Findings, I-01 bis I-08, O-01 bis O-22, Browser-/Paritaetsinventar, fail-closed Parameterpfade, Gate-Zuordnung und unveraenderte Delta-Baselines |
-| `simulator-monte-carlo-browser.mjs` | ~360 | Vier isolierte MC-Browserfaelle fuer Worker, Fallback, Technikfehler, Cancel/Restart, Download und A11y |
+| `simulator-monte-carlo-browser.mjs` | ~430 | Vier isolierte MC-Browserfaelle fuer Worker, Fallback, Technikfehler, Cancel/Restart, V2-Download, adversarialen Szenariowechsel und A11y |
 | `care-meta.test.mjs` | ~200 | Pflegefall-Logik |
 | `health-bucket.test.mjs` | ~160 | Pflegebucket-Trigger, Deckung, Verzinsung und Diagnose |
 | `core-engine.test.mjs` | ~150 | EngineAPI-Basisvalidierung |
@@ -1382,7 +1384,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `liquidity-runway-contract.test.mjs` | ~480 | Reiner Slice-08-Runwayvertrag: Default, Domain, Schritt, Fehlerwerte, Legacy-Migration und abgeleitete Policy |
 | `market-analyzer.test.mjs` | ~150 | Markt-Regime-Klassifizierung |
 | `mc-worker-contract.test.mjs` | ~170 | MC-Worker-Entrypoint, Lifecycle und Fehlervertraege |
-| `monte-carlo-export-contract.test.mjs` | ~520 | Request-/Result-/Export-Provenienz, Fingerprint, Replay und Downloadvertrag |
+| `monte-carlo-export-contract.test.mjs` | ~900 | V1-/V2-Request-, Result- und Exportprovenienz, Heatmap-/Einheitenvertrag, Drawdown-Domaene, ScenarioLog-V2-JSON/CSV, Akkumulations-Missingness, Mindest-Flex-Quelltrennung, Legacy-Warnungen und fail-closed Dispatcher |
 | `monte-carlo-measurement-contract.test.mjs` | ~1100 | Golden Cases, Snapshot-Linie, Delta-Ledger, Ressourcen-/Worker-Paritaet |
 | `monte-carlo-sampling.test.mjs` | ~200 | Bootstrap, Regime-Transitions |
 | `monte-carlo-startyear.test.mjs` | ~100 | Startjahr-Auswahl |
@@ -1410,8 +1412,8 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `simulator-heatmap.test.mjs` | ~60 | Heatmap-Rendering |
 | `simulator-input-readers.test.mjs` | ~160 | DOM-freie Simulator-Input-Reader |
 | `simulator-log-columns.test.mjs` | ~110 | Logspalten für Entnahme, VPW, Bonds und Steuer |
-| `simulator-monte-carlo.test.mjs` | ~460 | MC-Kern, Buffers, Merge |
-| `simulator-real-withdrawal-contract.test.mjs` | ~300 | Realentnahme, kumulierter Inflationsfaktor, Anspar-Transition und MC-Vertrag |
+| `simulator-monte-carlo.test.mjs` | ~1300 | MC-Kern, Buffers, Merge sowie typisierte finanziell auswertbare und terminale Logrecords |
+| `simulator-real-withdrawal-contract.test.mjs` | ~415 | Realentnahme, kumulierter Inflationsfaktor, Anspar-Transition sowie punktgleicher nominaler/realer MC-Drawdown |
 | `simulator-multiprofile-aggregation.test.mjs` | ~190 | Simulator Multi-Profil, Tranchen-Merge |
 | `simulator-sweep.test.mjs` | ~470 | Parameter-Sweep |
 | `simulator-tax-settlement.test.mjs` | ~180 | Simulator Settlement-Recompute |

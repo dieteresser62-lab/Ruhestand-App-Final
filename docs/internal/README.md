@@ -6,6 +6,7 @@ Aktive interne Uebersichten:
 
 - `PROJEKTUEBERSICHT.md` - detaillierte technische und organisatorische Projektübersicht.
 - `SLICE_EXECUTION_RULES.md` - verbindlicher Review-, Branch-, Risiko- und Abnahmeprozess für Slices.
+- `MC_LAUF_ANALYSE_2026-08-04_DATENPRUEFUNG_ROBUSTHEIT.md` - adversariale Daten- und Vertragsprüfung eines produktiven Monte-Carlo-Exportlaufs inkl. Robustheitsbewertung; drei offene Blocker im Exportvertrag.
 - Der weiterhin offene Forschungsvalidierungs-Backlog liegt unter `archive/FORSCHUNGSVALIDIERUNGS_BACKLOG.md`; sein Archivstatus ist keine fachliche Freigabe.
 - Monte-Carlo-GAP-Analyse und Hardening-Arbeitsplan liegen im Archiv unter `archive/2026-simulator-monte-carlo-hardening/`.
 - Backtest-GAP-Analyse, Hardening-Plan und Forschungsprotokoll liegen unter `archive/2026-simulator-backtest-hardening/`.

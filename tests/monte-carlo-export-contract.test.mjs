@@ -3,22 +3,34 @@ import { EngineAPI } from '../engine/index.mjs';
 import {
     MONTE_CARLO_RUN_REQUEST_VERSION,
     MONTE_CARLO_RUN_RESULT_VERSION,
+    MONTE_CARLO_RUN_RESULT_V2_VERSION,
     MONTE_CARLO_LEGACY_READ_ALIASES,
     createMonteCarloRunRequestV1,
     createMonteCarloRunResultV1,
+    projectMonteCarloRunResultV2,
     extractMonteCarloReplayArgsV1,
     validateMonteCarloRunRequestV1,
-    validateMonteCarloRunResultV1
+    validateMonteCarloRunResultV1,
+    validateMonteCarloRunResultV2
 } from '../app/simulator/monte-carlo-contracts.js';
 import {
     MONTE_CARLO_APP_VERSION,
     MONTE_CARLO_EXPORT_SCHEMA_ID,
+    MONTE_CARLO_EXPORT_V1_VERSION,
     MONTE_CARLO_EXPORT_VERSION,
+    MONTE_CARLO_EXPORT_V2_VERSION,
     buildMonteCarloExportV1,
+    buildMonteCarloExportV2,
     captureMonteCarloEngineProvenance,
     createMonteCarloExportDownload,
+    projectScenarioLogV2,
+    readMonteCarloExport,
     readMonteCarloExportV1,
-    serializeMonteCarloExportV1
+    readScenarioLogExport,
+    serializeMonteCarloExportV1,
+    serializeMonteCarloExportV2,
+    serializeScenarioLogCsvV2,
+    serializeScenarioLogExportV2
 } from '../app/simulator/monte-carlo-export.js';
 import { createMonteCarloUI, triggerMonteCarloDownload } from '../app/simulator/monte-carlo-ui.js';
 import {
@@ -162,6 +174,8 @@ const result = createMonteCarloRunResultV1({
 const engine = captureMonteCarloEngineProvenance(EngineAPI);
 const exportedAt = '2026-07-22T12:34:56.789Z';
 const document = buildMonteCarloExportV1({ request, result, engine, exportedAt });
+const resultV2 = projectMonteCarloRunResultV2(result);
+const documentV2 = buildMonteCarloExportV2({ request, result: resultV2, engine, exportedAt });
 const legacyV1Request = JSON.parse(JSON.stringify(request));
 delete legacyV1Request.stress.provenance;
 delete legacyV1Request.stress.pool;
@@ -180,7 +194,7 @@ const schemaGolden = JSON.parse(fs.readFileSync(
     assertEqual(schemaGolden.schemaId, MONTE_CARLO_EXPORT_SCHEMA_ID, 'schema golden fixes the export schema id');
     assertEqual(schemaGolden.contracts.request, MONTE_CARLO_RUN_REQUEST_VERSION, 'schema golden fixes the request version');
     assertEqual(schemaGolden.contracts.result, MONTE_CARLO_RUN_RESULT_VERSION, 'schema golden fixes the result version');
-    assertEqual(schemaGolden.contracts.export, MONTE_CARLO_EXPORT_VERSION, 'schema golden fixes the export version');
+    assertEqual(schemaGolden.contracts.export, MONTE_CARLO_EXPORT_V1_VERSION, 'schema golden fixes the V1 export version');
     assertEqual(schemaGolden.moneyFieldSuffixes.nominal, result.unitContract.nominalMoneyFieldSuffix, 'schema golden fixes nominal money units');
     assertEqual(schemaGolden.moneyFieldSuffixes.real, result.unitContract.realMoneyFieldSuffix, 'schema golden fixes real money units');
     assert(schemaGolden.requiredRequestFields.every(field => Object.hasOwn(request, field)), 'schema golden required request fields are present');
@@ -273,7 +287,7 @@ const schemaGolden = JSON.parse(fs.readFileSync(
 
 {
     assertEqual(document.schemaId, MONTE_CARLO_EXPORT_SCHEMA_ID, 'export uses the stable Monte-Carlo schema id');
-    assertEqual(document.schemaVersion, MONTE_CARLO_EXPORT_VERSION, 'export uses the V1 schema');
+    assertEqual(document.schemaVersion, MONTE_CARLO_EXPORT_V1_VERSION, 'export uses the V1 schema');
     assertEqual(document.exportedAtUtc, exportedAt, 'export timestamp is normalized to UTC');
     assertEqual(document.app.packageVersion, MONTE_CARLO_APP_VERSION.packageVersion, 'export identifies the app package version');
     assertEqual(document.engine.apiVersion, EngineAPI.getVersion().api, 'export identifies the Engine API version');
@@ -327,9 +341,308 @@ const schemaGolden = JSON.parse(fs.readFileSync(
 }
 
 {
+    assertEqual(resultV2.schemaVersion, MONTE_CARLO_RUN_RESULT_V2_VERSION, 'V2 result uses its own schema');
+    assertEqual(MONTE_CARLO_EXPORT_VERSION, MONTE_CARLO_EXPORT_V1_VERSION,
+        'deprecated unqualified export version retains its historical V1 meaning');
+    assertEqual(documentV2.schemaVersion, MONTE_CARLO_EXPORT_V2_VERSION, 'V2 export uses the explicit V2 schema');
+    const heatmap = resultV2.diagnostics.withdrawalRateHeatmap;
+    assertEqual(heatmap.bins.length, 11, 'V2 heatmap projects eleven intervals from twelve boundaries');
+    assert(heatmap.countsByPlanYear.every(row => row.length === heatmap.bins.length),
+        'Every V2 heatmap count row has exactly one value per interval');
+    assertEqual(heatmap.bins[0].lowerBoundPct, 0, 'First heatmap interval includes zero');
+    assertEqual(heatmap.bins.at(-1).upperBoundPct, null, 'Last heatmap interval is open ended');
+    assertEqual(heatmap.bins.at(-1).openEnded, true, 'Open-ended heatmap interval is explicit');
+    for (const bin of heatmap.bins) {
+        const valueAtLowerBoundary = bin.lowerBoundPct;
+        const matchingIndex = heatmap.bins.findIndex(candidate => (
+            valueAtLowerBoundary >= candidate.lowerBoundPct
+            && (candidate.upperBoundPct === null || valueAtLowerBoundary < candidate.upperBoundPct)
+        ));
+        assertEqual(matchingIndex, bin.index, `Lower boundary ${valueAtLowerBoundary} belongs to interval ${bin.index}`);
+        const expectedCount = heatmap.countsByPlanYear.reduce((sum, row) => sum + row[bin.index], 0);
+        assertEqual(bin.observationCount.total, expectedCount, `Heatmap interval ${bin.index} carries its exact count`);
+    }
+    const unit = resultV2.unitContract;
+    assertEqual(unit.withdrawalRateHeatmap.basisField, 'realizedWithdrawalRatePct', 'Heatmap names the realized-rate basis');
+    assertEqual(unit.withdrawalRateHeatmap.thresholdPct, 4.5, 'Heatmap contract fixes the 4.5 percent reporting reference');
+    assertEqual(unit.withdrawalRateHeatmap.comparison, 'greater_than_or_equal_at_bin_resolution', 'Heatmap overlay uses bin-resolution >=');
+    assertEqual(unit.timeShareRealizedWithdrawalRateAbove45Ratio.comparison, 'strictly_greater_than', 'Time-share KPI retains strict >');
+    assertEqual(unit.withdrawalRateHeatmap.thresholdRole, 'reporting_reference_not_guardrail_trigger', 'Threshold is not presented as a guardrail trigger');
+    assertEqual(4.5 > unit.timeShareRealizedWithdrawalRateAbove45Ratio.thresholdPct, false, 'Exactly 4.5 is excluded from the strict KPI');
+    assertEqual(heatmap.bins.find(bin => bin.lowerBoundPct === 4.5)?.index, 4, 'Exactly 4.5 starts the heatmap overlay interval');
+    assertEqual(resultV2.kpis.timeShareRealizedWithdrawalRateAbove45Ratio, result.kpis.timeShareWithdrawalRateAbove45Ratio,
+        'Ratio KPI is renamed without a factor change');
+    assertEqual(unit.ratioFieldSuffix, 'Ratio', 'Ratios have an explicit suffix');
+    assertEqual(unit.percentagePointFieldSuffix, 'Pct', 'Percentage points have an explicit suffix');
+
+    const assertIntegerLeaves = (value, label) => {
+        assert(value && typeof value === 'object' && !Array.isArray(value), `${label} is a JSON object`);
+        let leaves = 0;
+        const visit = node => {
+            for (const child of Object.values(node)) {
+                if (child && typeof child === 'object' && !Array.isArray(child)) visit(child);
+                else {
+                    assert(Number.isSafeInteger(child) && child >= 0, `${label} contains only non-negative integer leaves`);
+                    leaves++;
+                }
+            }
+        };
+        visit(value);
+        assert(leaves > 0, `${label} is not an empty object lost from a Map`);
+    };
+    assertIntegerLeaves(resultV2.kpis.realWithdrawalP10RealEur.observationCount, 'Withdrawal observationCount');
+    assertIntegerLeaves(resultV2.kpis.maximumDrawdownRealPct.observationCount, 'Real drawdown observationCount');
+    assertIntegerLeaves(heatmap.observationCount, 'Heatmap observationCount');
+
+    const v2Roundtrip = readMonteCarloExport(serializeMonteCarloExportV2(documentV2));
+    assertEqual(v2Roundtrip.document.schemaVersion, MONTE_CARLO_EXPORT_V2_VERSION, 'Version dispatcher reads V2');
+    assertEqual(v2Roundtrip.compatibilityWarnings.length, 0, 'V2 read has no legacy warning');
+    const v1Dispatch = readMonteCarloExport(serializeMonteCarloExportV1(document));
+    assert(v1Dispatch.compatibilityWarnings.some(warning => warning.code === 'monte_carlo_v1_legacy_bin_and_unit_semantics'),
+        'Version dispatcher visibly warns about V1 bin and unit semantics');
+    const unknownDispatchError = expectThrow(
+        () => readMonteCarloExport({ schemaVersion: 'MonteCarloExportV999' }),
+        'MC_EXPORT_VERSION_UNSUPPORTED',
+        'dispatcher rejects unknown Monte Carlo versions'
+    );
+    assert(unknownDispatchError.message.startsWith('MonteCarloExportV2:'),
+        'Current dispatcher errors use the explicit V2 context');
+}
+
+{
+    for (const accepted of [0, 34.25, 100]) {
+        const candidate = clone(resultV2);
+        candidate.kpis.maximumDrawdownNominalPct.p50 = accepted;
+        candidate.kpis.maximumDrawdownRealPct.p50 = accepted;
+        validateMonteCarloRunResultV2(candidate);
+        assertEqual(candidate.kpis.maximumDrawdownRealPct.p50, accepted, `Drawdown ${accepted} is preserved without repair`);
+    }
+    for (const rejected of [-0.01, -34.25, 100.01, Number.NaN, Number.POSITIVE_INFINITY]) {
+        const candidate = clone(resultV2);
+        candidate.kpis.maximumDrawdownRealPct.p50 = rejected;
+        expectThrow(
+            () => validateMonteCarloRunResultV2(candidate),
+            'MC_RESULT_V2_DRAWDOWN_DOMAIN_INVALID',
+            `real drawdown ${String(rejected)} fails closed`
+        );
+    }
+    const projectorMustNotRepair = clone(result);
+    projectorMustNotRepair.kpis.maximumDrawdownPct.p50 = -34.25;
+    expectThrow(
+        () => projectMonteCarloRunResultV2(projectorMustNotRepair),
+        'MC_RESULT_V2_DRAWDOWN_DOMAIN_INVALID',
+        'V2 projector does not apply absolute value to a signed drawdown'
+    );
+    const mapObservationCount = clone(resultV2);
+    mapObservationCount.kpis.realWithdrawalP10RealEur.observationCount = new Map([['years', 3]]);
+    expectThrow(
+        () => validateMonteCarloRunResultV2(mapObservationCount),
+        'MC_RESULT_V2_OBSERVATION_COUNT_EMPTY',
+        'Map observationCount cannot disappear into an empty JSON object'
+    );
+    const wrongHeatmapBoundary = clone(resultV2);
+    wrongHeatmapBoundary.diagnostics.withdrawalRateHeatmap.bins[4].lowerBoundPct = 4.4;
+    expectThrow(
+        () => validateMonteCarloRunResultV2(wrongHeatmapBoundary),
+        'MC_RESULT_V2_HEATMAP_INTERVAL_INVALID',
+        'V2 reader rejects a shifted heatmap interval'
+    );
+    const wrongDrawdownUnit = clone(resultV2);
+    wrongDrawdownUnit.unitContract.drawdowns.maximumDrawdownRealPct.priceBasis = 'nominal';
+    const wrongDrawdownUnitError = expectThrow(
+        () => validateMonteCarloRunResultV2(wrongDrawdownUnit),
+        'MC_RESULT_V2_UNIT_CONTRACT_INVALID',
+        'V2 reader rejects mutated real-drawdown unit semantics'
+    );
+    assert(wrongDrawdownUnitError.message.startsWith('MonteCarloRunResultV2:'),
+        'V2 result errors retain their explicit V2 contract context');
+}
+
+{
+    const financialRow = {
+        recordType: 'financial_year',
+        financiallyEvaluable: true,
+        jahr: 1,
+        RealReturnEquityPct: 0.08,
+        RealReturnGoldPct: -0.03,
+        NominalReturnEquityPct: 0.10,
+        NominalReturnGoldPct: -0.01,
+        entnahmequote: 0.045,
+        QuoteEndPct: 4.25,
+        minimumFlexAnnual: 1200,
+        minimumFlexEffectiveAfter: 800,
+        minimumFlexEffectiveFinal: 650,
+        entscheidung: {
+            note: 'A;"B"\r\nC',
+            details: {
+                minimumFlexEffectiveFinal: 775,
+                retainedDiagnostic: 'kept'
+            }
+        }
+    };
+    const terminalRow = {
+        recordType: 'terminal_death',
+        financiallyEvaluable: false,
+        jahr: 2,
+        terminalOnlyNote: 'Ende;"jetzt"\r\nzweite Zeile',
+        RealReturnEquityPct: 0,
+        RealReturnGoldPct: 0,
+        NominalReturnEquityPct: 0,
+        NominalReturnGoldPct: 0,
+        entnahmequote: 0,
+        QuoteEndPct: 0,
+        minimumFlexAnnual: 0,
+        minimumFlexEffectiveAfter: 0,
+        minimumFlexEffectiveFinal: 0
+    };
+    const scenario = projectScenarioLogV2([financialRow, terminalRow]);
+    assertEqual(scenario.schemaVersion, 'ScenarioLogExportV2', 'Scenario JSON uses a V2 envelope');
+    assertEqual(scenario.unitContract.schemaVersion, 'ScenarioLogUnitContractV2', 'Scenario unit contract is versioned');
+    assertEqual(scenario.records[0].realReturnEquityRatio, 0.08, 'Return ratio is renamed without scaling');
+    assertEqual(scenario.records[0].realizedWithdrawalRatePct, 4.5, 'Realized withdrawal ratio is converted to percentage points');
+    assertEqual(scenario.records[0].preDecisionWithdrawalRatePct, 4.25, 'Pre-decision percentage points are not scaled twice');
+    assertEqual(scenario.records[0].minimumFlexPolicyEffectiveAnnualEur, 775,
+        'Policy minimum flex comes from the post-policy planning value rather than the earlier minimum-flex step');
+    assertEqual(scenario.records[0].minimumFlexFulfilledAnnualEur, 650, 'Fulfilled minimum flex has its own V2 field');
+    assertEqual(scenario.records[0].entscheidung.details.retainedDiagnostic, 'kept',
+        'Unrelated decision diagnostics remain available');
+    assert(!Object.hasOwn(scenario.records[0].entscheidung.details, 'minimumFlexEffectiveFinal'),
+        'Ambiguous nested minimumFlexEffectiveFinal is removed from V2');
+    assert(scenario.unitContract.percentagePointFields.preDecisionWithdrawalRatePct.description.includes('Vorjahres-Flexrate'),
+        'Pre-decision rate contract names the previous-year flex rate');
+    assert(scenario.unitContract.percentagePointFields.preDecisionWithdrawalRatePct.description.includes('vor Transaktions- und Auszahlungsphase'),
+        'Pre-decision rate contract names the measurement phase');
+    assert(scenario.unitContract.percentagePointFields.preDecisionWithdrawalRatePct.description.includes('ohne Liquiditaet und Health-Bucket'),
+        'Pre-decision rate contract names the denominator scope');
+    assertEqual(scenario.records[1].financiallyEvaluable, false, 'Terminal record is not financially evaluable');
+    assertEqual(scenario.records[1].realizedWithdrawalRatePct, null, 'Terminal rate is null instead of a synthetic zero');
+    assertEqual(scenario.records[1].minimumFlexFulfilledAnnualEur, null, 'Terminal minimum-flex fulfillment is null');
+    assertEqual(scenario.records[1].measurementMissingness.withdrawalRates.reason, 'not_applicable_terminal_record',
+        'Terminal measurements carry a stable non-applicability reason');
+    assertEqual(scenario.records[1].measurementMissingness.withdrawalRates.observationCount.observations, 0,
+        'Terminal measurements carry an explicit zero observation count');
+
+    const accumulationScenario = projectScenarioLogV2([{
+        ...financialRow,
+        Regime: 'accumulation',
+        entnahmequote: 0,
+        QuoteEndPct: 0
+    }]);
+    const accumulationRecord = accumulationScenario.records[0];
+    assertEqual(accumulationRecord.realizedWithdrawalRatePct, null,
+        'Accumulation placeholder withdrawal ratio is not exported as an observed zero');
+    assertEqual(accumulationRecord.preDecisionWithdrawalRatePct, null,
+        'Accumulation placeholder pre-decision rate is not exported as an observed zero');
+    assertEqual(accumulationRecord.minimumFlexPolicyEffectiveAnnualEur, null,
+        'Minimum-flex policy measurement is not applicable during accumulation');
+    assertEqual(accumulationRecord.measurementMissingness.withdrawalRates.reason, 'not_applicable_accumulation_year',
+        'Accumulation withdrawal rates carry a stable non-applicability reason');
+    assertEqual(accumulationRecord.measurementMissingness.withdrawalRates.observationCount.observations, 0,
+        'Accumulation withdrawal rates carry zero observations');
+    assertEqual(accumulationRecord.measurementMissingness.minimumFlex.reason, 'not_applicable_accumulation_year',
+        'Accumulation minimum-flex measurements carry their non-applicability reason');
+    assertEqual(accumulationRecord.realReturnEquityRatio, 0.08,
+        'Actual accumulation-year market returns remain financially observable');
+    const fabricatedAccumulationZero = clone(accumulationScenario);
+    fabricatedAccumulationZero.records[0].realizedWithdrawalRatePct = 0;
+    expectThrow(
+        () => readScenarioLogExport(fabricatedAccumulationZero),
+        'SCENARIO_LOG_ACCUMULATION_MISSINGNESS_INVALID',
+        'Scenario reader rejects fabricated observed withdrawal zero during accumulation'
+    );
+
+    const json = serializeScenarioLogExportV2(scenario);
+    assertEqual(JSON.parse(json).records.length, 2, 'Scenario JSON roundtrip preserves every record');
+    const csv = serializeScenarioLogCsvV2(scenario);
+    const [header] = csv.split('\r\n');
+    const headers = header.split(';');
+    assertEqual(JSON.stringify(headers), JSON.stringify([...headers].sort()), 'Scenario CSV header is deterministically sorted');
+    assert(headers.includes('terminalOnlyNote'), 'Scenario CSV union header retains terminal-only fields');
+    assert(headers.includes('scenarioLogSchemaVersion'), 'Every CSV row exposes the scenario contract version');
+    assert(headers.includes('unitContractVersion'), 'Every CSV row exposes the unit contract version');
+    assertEqual((csv.match(/ScenarioLogExportV2/g) || []).length, 2, 'Scenario CSV contains every projected record');
+    assert(csv.includes('""jetzt""'), 'Scenario CSV doubles quotes inside quoted cells');
+    assert(csv.includes('""note"":') && csv.includes('A;') && csv.includes('\\r\\nC'),
+        'Nested object cells use canonical JSON and CSV quoting');
+
+    const legacyRead = readScenarioLogExport(JSON.stringify([financialRow]));
+    const warningCodes = legacyRead.compatibilityWarnings.map(warning => warning.code);
+    for (const code of [
+        'scenario_log_v1_unversioned',
+        'legacy_ratio_field_names',
+        'legacy_withdrawal_rate_ambiguity',
+        'legacy_terminal_rows_untyped',
+        'legacy_minimum_flex_name_collision'
+    ]) assert(warningCodes.includes(code), `Legacy scenario reader emits ${code}`);
+    assertEqual(readScenarioLogExport(json).compatibilityWarnings.length, 0, 'Scenario dispatcher reads V2 without legacy warnings');
+    const wrongScenarioUnit = clone(scenario);
+    wrongScenarioUnit.unitContract.percentagePointFields.preDecisionWithdrawalRatePct.measurementTime = 'after_payout';
+    expectThrow(
+        () => readScenarioLogExport(wrongScenarioUnit),
+        'SCENARIO_LOG_UNIT_CONTRACT_INVALID',
+        'Scenario V2 reader rejects mutated measurement timing'
+    );
+    const wrongScenarioMissingness = clone(scenario);
+    wrongScenarioMissingness.records[0].measurementMissingness.withdrawalRates.observationCount.observations = 0;
+    expectThrow(
+        () => readScenarioLogExport(wrongScenarioMissingness),
+        'SCENARIO_LOG_MISSINGNESS_INVALID',
+        'Scenario V2 reader rejects observation counts inconsistent with projected values'
+    );
+    expectThrow(
+        () => readScenarioLogExport({ schemaVersion: 'ScenarioLogExportV999', records: [] }),
+        'SCENARIO_LOG_VERSION_UNSUPPORTED',
+        'Scenario dispatcher rejects unknown object versions'
+    );
+    expectThrow(
+        () => projectScenarioLogV2([{ ...terminalRow, recordType: 'unknown_terminal' }]),
+        'SCENARIO_LOG_RECORD_TYPE_INVALID',
+        'Scenario projector never infers record type from localized text'
+    );
+
+    const upperDurationRows = Array.from({ length: 46 }, (_, index) => ({
+        ...financialRow,
+        jahr: index + 1
+    }));
+    const upperDurationExport = projectScenarioLogV2(upperDurationRows);
+    assertEqual(JSON.parse(serializeScenarioLogExportV2(upperDurationExport)).records.length, 46,
+        'Upper valid age-65 duration retains every JSON record');
+    assertEqual((serializeScenarioLogCsvV2(upperDurationExport).match(/ScenarioLogExportV2/g) || []).length, 46,
+        'Upper valid age-65 duration retains every CSV record');
+}
+
+{
+    const runtimeRows = firstRun.worstRun?.logDataRows || [];
+    assert(runtimeRows.length > 0, 'Deterministic Monte Carlo run materializes a selected scenario path');
+    assert(runtimeRows.every(row => ['financial_year', 'terminal_ruin', 'terminal_death'].includes(row.recordType)),
+        'Every runtime scenario row is typed by its builder');
+    const runtimeScenarioV2 = projectScenarioLogV2(runtimeRows);
+    assertEqual(runtimeScenarioV2.records.length, runtimeRows.length,
+        'V2 scenario projector accepts and preserves the actual selected runtime path');
+    const policySourceIndex = runtimeRows.findIndex(row => (
+        row.recordType === 'financial_year'
+        && Number.isFinite(row.entscheidung?.details?.minimumFlexEffectiveFinal)
+    ));
+    assert(policySourceIndex >= 0, 'Actual runtime path exposes a post-policy minimum-flex planning value');
+    assertEqual(
+        runtimeScenarioV2.records[policySourceIndex].minimumFlexPolicyEffectiveAnnualEur,
+        runtimeRows[policySourceIndex].entscheidung.details.minimumFlexEffectiveFinal,
+        'Actual runtime V2 projection uses the post-policy value as its policy measurement'
+    );
+    assert(!Object.hasOwn(runtimeScenarioV2.records[policySourceIndex].entscheidung.details, 'minimumFlexEffectiveFinal'),
+        'Actual runtime V2 record removes the ambiguous nested legacy name');
+}
+
+{
     const wrongExportVersion = clone(document);
     wrongExportVersion.schemaVersion = 'MonteCarloExportV2';
-    expectThrow(() => readMonteCarloExportV1(wrongExportVersion), 'MC_EXPORT_VERSION_UNSUPPORTED', 'unknown export version');
+    const v1VersionError = expectThrow(
+        () => readMonteCarloExportV1(wrongExportVersion),
+        'MC_EXPORT_VERSION_UNSUPPORTED',
+        'unknown export version'
+    );
+    assert(v1VersionError.message.startsWith('MonteCarloExportV1:'),
+        'Explicit V1 reader retains the historical V1 error context');
 
     const wrongRequestVersion = clone(request);
     wrongRequestVersion.schemaVersion = 'MonteCarloRunRequestV2';
@@ -532,7 +845,7 @@ const schemaGolden = JSON.parse(fs.readFileSync(
     assertEqual(filename, download.filename, 'explicit UI action reports the downloaded filename');
     assertEqual(clicked, 1, 'explicit UI action triggers exactly one browser download');
     assertEqual(revoked, 1, 'browser download revokes its object URL');
-    assertEqual(JSON.parse(await capturedBlob.text()).schemaVersion, MONTE_CARLO_EXPORT_VERSION, 'browser download contains the versioned V1 document');
+    assertEqual(JSON.parse(await capturedBlob.text()).schemaVersion, MONTE_CARLO_EXPORT_V2_VERSION, 'browser download contains the current V2 document');
 }
 
 {

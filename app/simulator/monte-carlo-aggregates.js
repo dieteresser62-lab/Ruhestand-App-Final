@@ -50,6 +50,63 @@ function buildFinancialRunDistribution(values, pathMissingness, totalRuns, unit)
     };
 }
 
+function assertDrawdownPct(value, label) {
+    if (!Number.isFinite(value) || value < 0 || value > 100) {
+        throw new RangeError(`${label} must be a finite positive loss magnitude inside 0..100 percentage points.`);
+    }
+}
+
+function buildRealDrawdownDistribution(values, observationCounts, missingness, totalRuns) {
+    if (!values || !observationCounts || !missingness
+        || values.length !== totalRuns
+        || observationCounts.length !== totalRuns
+        || missingness.length !== totalRuns) {
+        throw new TypeError('Real drawdown arrays must match totalRuns.');
+    }
+    const observedValues = [];
+    const inventory = {
+        missing_inflation: 0,
+        no_observations: 0,
+        technical_error: 0
+    };
+    let pathPointsAvailable = 0;
+    for (let index = 0; index < totalRuns; index++) {
+        const count = observationCounts[index];
+        if (!Number.isSafeInteger(count) || count < 0) {
+            throw new TypeError(`Real drawdown observation count ${index} must be a non-negative integer.`);
+        }
+        pathPointsAvailable += count;
+        const state = missingness[index];
+        if (state === MONTE_CARLO_MISSINGNESS_CODE.OBSERVED) {
+            if (count < 1) throw new TypeError(`Observed real drawdown run ${index} has no path points.`);
+            const value = Number(values[index]);
+            assertDrawdownPct(value, `Real drawdown run ${index}`);
+            observedValues.push(value);
+        } else if (state === MONTE_CARLO_MISSINGNESS_CODE.MISSING_INFLATION) {
+            inventory.missing_inflation++;
+        } else if (state === MONTE_CARLO_MISSINGNESS_CODE.TECHNICAL_ERROR) {
+            inventory.technical_error++;
+        } else {
+            inventory.no_observations++;
+        }
+    }
+    return {
+        definitionVersion: FINANCIAL_DISTRIBUTION_DEFINITION_VERSION,
+        values: observedValues,
+        requestedRuns: totalRuns,
+        sampleSize: observedValues.length,
+        excludedRuns: totalRuns - observedValues.length,
+        missingness: inventory,
+        observationCount: {
+            requestedPaths: totalRuns,
+            observedPaths: observedValues.length,
+            pathPointsAvailable
+        },
+        unit: 'percent_loss_from_prior_peak_real_start_prices',
+        quantileMethod: QUANTILE_METHOD
+    };
+}
+
 function buildPersonCareAggregate({
     triggeredCount,
     totalRuns,
@@ -176,6 +233,9 @@ export function buildMonteCarloAggregates({
         kpiMaxKuerzung,
         volatilities,
         maxDrawdowns,
+        realMaxDrawdowns,
+        realMaxDrawdownObservationCount,
+        realMaxDrawdownMissingness,
         depotErschoepft,
         alterBeiErschoepfung,
         alterBeiErschoepfungMissingness,
@@ -354,6 +414,15 @@ export function buildMonteCarloAggregates({
         totalRuns,
         'percent_loss_from_prior_peak'
     );
+    for (const [index, value] of maxDrawdownDistribution.values.entries()) {
+        assertDrawdownPct(value, `Nominal drawdown run ${index}`);
+    }
+    const realMaxDrawdownDistribution = buildRealDrawdownDistribution(
+        realMaxDrawdowns,
+        realMaxDrawdownObservationCount,
+        realMaxDrawdownMissingness,
+        totalRuns
+    );
     const finalOutcomeValues = finalOutcomeDistribution.values;
     const maxDrawdownValues = maxDrawdownDistribution.values;
     return {
@@ -402,6 +471,17 @@ export function buildMonteCarloAggregates({
             p50: maxDrawdownValues.length > 0 ? quantile(maxDrawdownValues, 0.5) : null,
             p90: maxDrawdownValues.length > 0 ? quantile(maxDrawdownValues, 0.9) : null,
             distribution: maxDrawdownDistribution
+        },
+        realMaxDrawdowns: {
+            p50: realMaxDrawdownDistribution.values.length > 0
+                ? quantile(realMaxDrawdownDistribution.values, 0.5)
+                : null,
+            p90: realMaxDrawdownDistribution.values.length > 0
+                ? quantile(realMaxDrawdownDistribution.values, 0.9)
+                : null,
+            distribution: realMaxDrawdownDistribution,
+            missingness: realMaxDrawdownDistribution.missingness,
+            observationCount: realMaxDrawdownDistribution.observationCount
         },
         realWithdrawalP10,
         medianWithdrawalRate,

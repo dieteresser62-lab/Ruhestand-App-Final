@@ -108,7 +108,8 @@ export const MONTE_CARLO_MISSINGNESS_CODE = Object.freeze({
     NOT_APPLICABLE: 2,
     TECHNICAL_ERROR: 3,
     NO_OBSERVATIONS: 4,
-    DIED_BEFORE_FIRST_OBLIGATION: 5
+    DIED_BEFORE_FIRST_OBLIGATION: 5,
+    MISSING_INFLATION: 6
 });
 
 export const MONTE_CARLO_BUFFER_FIELDS = Object.freeze({
@@ -121,6 +122,9 @@ export const MONTE_CARLO_BUFFER_FIELDS = Object.freeze({
     kpiMaxKuerzung: Float32Array,
     volatilities: Float32Array,
     maxDrawdowns: Float32Array,
+    realMaxDrawdowns: Float32Array,
+    realMaxDrawdownObservationCount: Uint32Array,
+    realMaxDrawdownMissingness: Uint8Array,
     depotErschoepft: Uint8Array,
     alterBeiErschoepfung: Uint32Array,
     alterBeiErschoepfungMissingness: Uint8Array,
@@ -199,6 +203,8 @@ export const MONTE_CARLO_PATH_SUMMARY_FIELDS = Object.freeze({
     finalValueRealEur: Float64Array,
     volatilityPct: Float32Array,
     maxDrawdownPct: Float32Array,
+    maxDrawdownRealPct: Float32Array,
+    maxDrawdownRealObservationCount: Uint32Array,
     cutYearsNumerator: Uint32Array,
     cutYearsDenominator: Uint32Array,
     cutYearShareRatio: Float32Array,
@@ -232,6 +238,7 @@ export const MONTE_CARLO_PATH_SUMMARY_FIELDS = Object.freeze({
 
 export const MONTE_CARLO_PATH_MISSINGNESS_FIELDS = Object.freeze({
     path: Uint8Array,
+    maxDrawdownRealPct: Uint8Array,
     cutYearShareRatio: Uint8Array,
     realWithdrawalP10RealEur: Uint8Array,
     meanWithdrawalRateRatio: Uint8Array,
@@ -285,6 +292,9 @@ function attachPathTransferBuffers(buffers, pathSummaries, pathMissingness) {
 
 function ensureWithdrawalBuffers(buffers, runCount) {
     const required = {
+        realMaxDrawdowns: Float32Array,
+        realMaxDrawdownObservationCount: Uint32Array,
+        realMaxDrawdownMissingness: Uint8Array,
         realWithdrawalP10RealEur: Float64Array,
         realWithdrawalObservationCount: Uint32Array,
         realWithdrawalP10Missingness: Uint8Array,
@@ -318,6 +328,8 @@ export function createMonteCarloPathSummaryV1(runCount, {
         pathSummaries.finalValueNominalEur = buffers.finalOutcomes;
         pathSummaries.volatilityPct = buffers.volatilities;
         pathSummaries.maxDrawdownPct = buffers.maxDrawdowns;
+        pathSummaries.maxDrawdownRealPct = buffers.realMaxDrawdowns;
+        pathSummaries.maxDrawdownRealObservationCount = buffers.realMaxDrawdownObservationCount;
         pathSummaries.cutYearShareRatio = buffers.cutYearShareRatio;
         pathSummaries.realWithdrawalP10RealEur = buffers.realWithdrawalP10RealEur;
         pathSummaries.realWithdrawalObservationCount = buffers.realWithdrawalObservationCount;
@@ -326,6 +338,7 @@ export function createMonteCarloPathSummaryV1(runCount, {
     }
     const pathMissingness = createTypedFields(MONTE_CARLO_PATH_MISSINGNESS_FIELDS, runCount);
     if (buffers) {
+        pathMissingness.maxDrawdownRealPct = buffers.realMaxDrawdownMissingness;
         pathMissingness.cutYearShareRatio = buffers.cutYearShareMissingness;
         pathMissingness.realWithdrawalP10RealEur = buffers.realWithdrawalP10Missingness;
         pathMissingness.meanWithdrawalRateRatio = buffers.meanWithdrawalRateMissingness;
@@ -358,6 +371,9 @@ export function recordMonteCarloPathSummaryV1({
     finalValueRealEur = 0,
     volatilityPct = 0,
     maxDrawdownPct = 0,
+    maxDrawdownRealPct = null,
+    maxDrawdownRealObservationCount = 0,
+    maxDrawdownRealMissingnessCode = MONTE_CARLO_MISSINGNESS_CODE.NO_OBSERVATIONS,
     cutYearsNumerator = 0,
     cutYearsDenominator = 0,
     realWithdrawalP10RealEur = null,
@@ -408,6 +424,15 @@ export function recordMonteCarloPathSummaryV1({
     pathSummaries.finalValueRealEur[localIndex] = Number(finalValueRealEur) || 0;
     pathSummaries.volatilityPct[localIndex] = Number(volatilityPct) || 0;
     pathSummaries.maxDrawdownPct[localIndex] = Number(maxDrawdownPct) || 0;
+    assertNonNegativeInteger(maxDrawdownRealObservationCount, 'maxDrawdownRealObservationCount');
+    pathSummaries.maxDrawdownRealObservationCount[localIndex] = maxDrawdownRealObservationCount;
+    setOptionalValue(
+        pathSummaries.maxDrawdownRealPct,
+        pathMissingness.maxDrawdownRealPct,
+        localIndex,
+        maxDrawdownRealPct,
+        maxDrawdownRealMissingnessCode
+    );
     assertNonNegativeInteger(cutYearsNumerator, 'cutYearsNumerator');
     assertNonNegativeInteger(cutYearsDenominator, 'cutYearsDenominator');
     if (cutYearsNumerator > cutYearsDenominator) {
@@ -712,6 +737,29 @@ export function assertMonteCarloChunkResultV1(result, {
                 if (field !== 'path' && values[localIndex] === MONTE_CARLO_MISSINGNESS_CODE.TECHNICAL_ERROR) {
                     throw contractError(`financial path ${globalIndex} cannot contain technical missingness.`);
                 }
+            }
+            const nominalDrawdown = result.pathSummaries.maxDrawdownPct[localIndex];
+            if (!Number.isFinite(nominalDrawdown) || nominalDrawdown < 0 || nominalDrawdown > 100) {
+                throw contractError(`financial path ${globalIndex} has a nominal drawdown outside 0..100.`);
+            }
+            const realDrawdown = result.pathSummaries.maxDrawdownRealPct[localIndex];
+            const realDrawdownCount = result.pathSummaries.maxDrawdownRealObservationCount[localIndex];
+            const realDrawdownMissingness = result.pathMissingness.maxDrawdownRealPct[localIndex];
+            if (realDrawdownMissingness === MONTE_CARLO_MISSINGNESS_CODE.OBSERVED) {
+                if (realDrawdownCount < 1 || !Number.isFinite(realDrawdown)
+                    || realDrawdown < 0 || realDrawdown > 100) {
+                    throw contractError(`financial path ${globalIndex} has an invalid observed real drawdown.`);
+                }
+            } else if (realDrawdownMissingness === MONTE_CARLO_MISSINGNESS_CODE.MISSING_INFLATION) {
+                if (realDrawdownCount < 1 || realDrawdown !== 0) {
+                    throw contractError(`financial path ${globalIndex} has inconsistent real-drawdown inflation missingness.`);
+                }
+            } else if (realDrawdownMissingness === MONTE_CARLO_MISSINGNESS_CODE.NO_OBSERVATIONS) {
+                if (realDrawdownCount !== 0 || realDrawdown !== 0) {
+                    throw contractError(`financial path ${globalIndex} has inconsistent empty real-drawdown observations.`);
+                }
+            } else {
+                throw contractError(`financial path ${globalIndex} has unsupported real-drawdown missingness.`);
             }
             const cutNumerator = result.pathSummaries.cutYearsNumerator[localIndex];
             const cutDenominator = result.pathSummaries.cutYearsDenominator[localIndex];

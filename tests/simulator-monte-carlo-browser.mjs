@@ -1,5 +1,10 @@
 import fs from 'node:fs';
-import { validateMonteCarloExportV1 } from '../app/simulator/monte-carlo-export.js';
+import {
+    MONTE_CARLO_EXPORT_V2_VERSION,
+    readMonteCarloExport,
+    validateMonteCarloExportV2,
+    validateScenarioLogExportV2
+} from '../app/simulator/monte-carlo-export.js';
 
 const EXTERNAL_HOSTS = new Set([
     'fonts.googleapis.com',
@@ -221,14 +226,31 @@ async function downloadRunExport(page) {
     const downloadPath = await download.path();
     assert(downloadPath, 'MC browser export exposes a readable temporary file');
     const document = JSON.parse(fs.readFileSync(downloadPath, 'utf8'));
-    validateMonteCarloExportV1(document);
+    validateMonteCarloExportV2(document);
+    const read = readMonteCarloExport(document);
+    assert(read.document === document, 'current browser export is accepted by the version dispatcher');
+    assert(document.schemaVersion === MONTE_CARLO_EXPORT_V2_VERSION, 'browser export writes the current V2 schema');
+    assert(read.compatibilityWarnings.length === 0, 'current V2 browser export needs no compatibility warning');
     const serialized = JSON.stringify(document);
     for (const removedAlias of [
         'kpiKuerzungsjahre',
         'consumptionAtRiskP10Real'
     ]) {
-        assert(!serialized.includes(removedAlias), `new V1 browser export omits removed alias ${removedAlias}`);
+        assert(!serialized.includes(removedAlias), `current V2 browser export omits removed alias ${removedAlias}`);
     }
+    return document;
+}
+
+async function downloadSelectedScenarioJson(page) {
+    const button = page.locator('#exportScenarioLogJson');
+    await button.waitFor({ state: 'visible' });
+    const downloadPromise = page.waitForEvent('download');
+    await button.click();
+    const download = await downloadPromise;
+    const downloadPath = await download.path();
+    assert(downloadPath, 'Scenario browser export exposes a readable temporary file');
+    const document = JSON.parse(fs.readFileSync(downloadPath, 'utf8'));
+    validateScenarioLogExportV2(document);
     return document;
 }
 
@@ -267,7 +289,51 @@ async function runWorkerSuccessCase(browser, baseUrl) {
         const inventory = exported.result.outcomeInventory;
         assert(inventory.ruin + inventory.all_dead + inventory.horizon_exhausted + inventory.technical_error === 8, 'browser outcome inventory accounts for every requested run');
         assert(exported.result.uncertainty.floorCoverage?.confidenceInterval95, 'browser export contains floor-coverage uncertainty');
-        test.assertNoUnexpectedErrors();
+
+        const selectedScenario = await downloadSelectedScenarioJson(page);
+        assert(selectedScenario.records.length > 0, 'valid selected scenario exports through the lazy V2 projection');
+        const invalidSelection = await page.evaluate(() => {
+            const previousRows = window.globalCurrentScenarioData?.rows;
+            const source = window.globalScenarioLogs?.characteristic?.find(entry => entry.logDataRows?.length > 0);
+            if (!source) return { prepared: false };
+            const invalidRows = source.logDataRows.map((row, index) => ({
+                ...row,
+                ...(index === 0 ? { invalidExportProbe: Number.NaN } : {})
+            }));
+            window.globalScenarioLogs.characteristic.push({
+                ...source,
+                key: 'invalid_export_probe',
+                label: 'Invalid export probe',
+                logDataRows: invalidRows
+            });
+            const select = document.getElementById('scenarioSelect');
+            const option = document.createElement('option');
+            option.value = 'char_invalid_export_probe';
+            option.textContent = 'Invalid export probe';
+            select.appendChild(option);
+            select.value = option.value;
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+            return {
+                prepared: true,
+                oldStateReused: window.globalCurrentScenarioData?.rows === previousRows,
+                currentContainsInvalidProbe: Number.isNaN(window.globalCurrentScenarioData?.rows?.[0]?.invalidExportProbe),
+                cachedExportDocument: Object.hasOwn(window.globalCurrentScenarioData || {}, 'exportDocument')
+            };
+        });
+        assert(invalidSelection.prepared, 'browser regression prepares a second non-projectable scenario');
+        assert(invalidSelection.oldStateReused === false, 'selecting scenario B invalidates scenario A export state');
+        assert(invalidSelection.currentContainsInvalidProbe, 'scenario B becomes the current raw export source');
+        assert(invalidSelection.cachedExportDocument === false, 'scenario selection does not cache a stale projected document');
+
+        const unexpectedDownload = page.waitForEvent('download', { timeout: 1000 })
+            .then(() => true)
+            .catch(() => false);
+        await page.locator('#exportScenarioLogJson').click();
+        assert(await unexpectedDownload === false, 'invalid scenario B cannot download the previous scenario A');
+        await page.locator('#toastContainer').filter({ hasText: 'Szenario-Export nicht möglich' }).waitFor({ state: 'visible' });
+        assert(await page.evaluate(() => Number.isNaN(window.globalCurrentScenarioData?.rows?.[0]?.invalidExportProbe)),
+            'failed export keeps scenario B selected instead of restoring scenario A');
+        test.assertNoUnexpectedErrors(['Szenario-Export fehlgeschlagen']);
     } finally {
         await test.context.close();
     }

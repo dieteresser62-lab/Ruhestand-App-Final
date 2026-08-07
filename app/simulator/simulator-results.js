@@ -14,6 +14,11 @@ import {
 import { EngineAPI } from '../../engine/index.mjs';
 import { STRATEGY_OPTIONS } from '../../types/strategy-options.js';
 import { persistenceStorage } from '../shared/persistence-facade.js';
+import {
+    projectScenarioLogV2,
+    serializeScenarioLogCsvV2,
+    serializeScenarioLogExportV2
+} from './monte-carlo-export.js';
 
 const formatPercent = (value, digits = 1) => formatPercentValue(Number(value) || 0, { fractionDigits: digits, invalid: '0.0%' });
 const formatPercentFromRatio = (value, digits = 1) => formatPercentRatio(Number(value) || 0, { fractionDigits: digits, invalid: '0.0%' });
@@ -144,11 +149,13 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
 
         // Funktion zum Rendern des ausgewählten Szenarios
         const renderSelectedScenario = () => {
+            // Invalidate the previous selection before any rendering work. A
+            // render failure must never leave an older path exportable.
+            window.globalCurrentScenarioData = null;
+            exportButtons.style.display = 'none';
             const val = select.value;
             if (!val) {
                 output.style.display = 'none';
-                exportButtons.style.display = 'none';
-                window.globalCurrentScenarioData = null;
                 return;
             }
 
@@ -172,13 +179,14 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
                     goldAktiv: inputs?.goldAktiv
                 });
                 output.style.display = 'block';
+                window.globalCurrentScenarioData = {
+                    rows: scenario.logDataRows,
+                    caR_Threshold: caR
+                };
                 exportButtons.style.display = 'flex';
-                window.globalCurrentScenarioData = { rows: scenario.logDataRows, caR_Threshold: caR };
             } else {
                 output.innerHTML = '<p style="color: var(--text-muted); padding: 10px;">Keine Log-Daten für dieses Szenario verfügbar.</p>';
                 output.style.display = 'block';
-                exportButtons.style.display = 'none';
-                window.globalCurrentScenarioData = null;
             }
         };
 
@@ -209,46 +217,52 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
         // Export-Buttons Event-Handler
         const jsonBtn = document.getElementById('exportScenarioLogJson');
         const csvBtn = document.getElementById('exportScenarioLogCsv');
+        const projectCurrentScenarioForExport = () => {
+            const rows = window.globalCurrentScenarioData?.rows;
+            return Array.isArray(rows) ? projectScenarioLogV2(rows) : null;
+        };
+        const reportScenarioExportError = error => {
+            console.error('Szenario-Export fehlgeschlagen:', error);
+            showToast('Szenario-Export nicht möglich: Die Logdaten verletzen den V2-Vertrag.', { duration: 5000 });
+        };
 
         if (jsonBtn) {
             jsonBtn.onclick = () => {
-                if (window.globalCurrentScenarioData?.rows) {
-                    // JSON export preserves full row structure.
-                    const blob = new Blob([JSON.stringify(window.globalCurrentScenarioData.rows, null, 2)], { type: 'application/json' });
+                try {
+                    const exportDocument = projectCurrentScenarioForExport();
+                    if (!exportDocument) return;
+                    const blob = new Blob([
+                        serializeScenarioLogExportV2(exportDocument)
+                    ], { type: 'application/json' });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = 'scenario-log.json';
+                    a.download = 'scenario-log-v2.json';
                     a.click();
                     URL.revokeObjectURL(url);
-                    showToast('Export gespeichert: scenario-log.json');
+                    showToast('Export gespeichert: scenario-log-v2.json');
+                } catch (error) {
+                    reportScenarioExportError(error);
                 }
             };
         }
 
         if (csvBtn) {
             csvBtn.onclick = () => {
-                if (window.globalCurrentScenarioData?.rows && window.globalCurrentScenarioData.rows.length > 0) {
-                    const rows = window.globalCurrentScenarioData.rows;
-                    const headers = Object.keys(rows[0]);
-                    // CSV export flattens object cells via JSON to keep structure.
-                    const csvContent = [
-                        headers.join(';'),
-                        ...rows.map(row => headers.map(h => {
-                            const val = row[h];
-                            if (val === null || val === undefined) return '';
-                            if (typeof val === 'object') return JSON.stringify(val);
-                            return String(val);
-                        }).join(';'))
-                    ].join('\n');
+                try {
+                    const exportDocument = projectCurrentScenarioForExport();
+                    if (!exportDocument) return;
+                    const csvContent = serializeScenarioLogCsvV2(exportDocument);
                     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = 'scenario-log.csv';
+                    a.download = 'scenario-log-v2.csv';
                     a.click();
                     URL.revokeObjectURL(url);
-                    showToast('Export gespeichert: scenario-log.csv');
+                    showToast('Export gespeichert: scenario-log-v2.csv');
+                } catch (error) {
+                    reportScenarioExportError(error);
                 }
             };
         }

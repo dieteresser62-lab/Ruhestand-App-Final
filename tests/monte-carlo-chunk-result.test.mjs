@@ -23,6 +23,7 @@ import {
     recordMonteCarloSampledYearV1,
     recordMonteCarloSamplingStartV1
 } from '../app/simulator/mc-year-sampling.js';
+import { buildMonteCarloAggregates } from '../app/simulator/monte-carlo-aggregates.js';
 
 console.log('--- Monte Carlo Chunk Result Contract Tests ---');
 
@@ -202,6 +203,10 @@ function makeChunk(start, selectedRows) {
             finalValueRealEur: row.finalValueReal,
             volatilityPct: row.volatility,
             maxDrawdownPct: row.drawdown,
+            maxDrawdownRealPct: row.realDrawdown ?? null,
+            maxDrawdownRealObservationCount: row.realDrawdownCount ?? 0,
+            maxDrawdownRealMissingnessCode: row.realDrawdownMissingness
+                ?? MONTE_CARLO_MISSINGNESS_CODE.NO_OBSERVATIONS,
             cutYearsNumerator: row.cutNumerator,
             cutYearsDenominator: row.cutDenominator,
             realWithdrawalP10RealEur: row.withdrawalP10,
@@ -331,6 +336,48 @@ function expectContractError(callback, message) {
     assertMonteCarloChunkResultV1(chunk, { expectedStart: 0, expectedCount: 1 });
     assertEqual(chunk.pathSummaries.globalRunIndex[0], 0, 'Single chunk should use its global run index');
     assertEqual(chunk.pathMissingness.path[0], MONTE_CARLO_MISSINGNESS_CODE.OBSERVED, 'Single path should be observed');
+}
+
+{
+    const missingInflationChunk = makeChunk(0, [{
+        outcomeCode: MONTE_CARLO_OUTCOME_CODE.HORIZON_EXHAUSTED,
+        finalValue: 1000,
+        finalValueReal: 900,
+        volatility: 4,
+        drawdown: 20,
+        realDrawdown: null,
+        realDrawdownCount: 2,
+        realDrawdownMissingness: MONTE_CARLO_MISSINGNESS_CODE.MISSING_INFLATION,
+        cutNumerator: 0,
+        cutDenominator: 1,
+        withdrawalP10: 100,
+        withdrawalCount: 1,
+        taxSaved: 0,
+        simulatedYears: 2,
+        care: false,
+        healthUsed: 0
+    }]);
+    assertEqual(missingInflationChunk.pathSummaries.maxDrawdownPct[0], 20,
+        'Nominal drawdown remains observed when inflation is missing');
+    assertEqual(missingInflationChunk.pathSummaries.maxDrawdownRealPct[0], 0,
+        'Typed buffer keeps only a placeholder for unavailable real drawdown');
+    assertEqual(missingInflationChunk.pathMissingness.maxDrawdownRealPct[0], MONTE_CARLO_MISSINGNESS_CODE.MISSING_INFLATION,
+        'Real drawdown carries explicit missing-inflation state');
+    const aggregate = buildMonteCarloAggregates({
+        inputs: { stressPreset: 'NONE' },
+        totalRuns: 1,
+        buffers: missingInflationChunk.buffers,
+        heatmap: missingInflationChunk.heatmap,
+        bins: missingInflationChunk.bins,
+        totals: missingInflationChunk.totals,
+        lists: missingInflationChunk.lists
+    });
+    assertEqual(aggregate.maxDrawdowns.p50, 20, 'Nominal drawdown aggregate remains available');
+    assertEqual(aggregate.realMaxDrawdowns.p50, null, 'Real drawdown aggregate exports null, never zero, for missing inflation');
+    assertEqual(aggregate.realMaxDrawdowns.missingness.missing_inflation, 1,
+        'Real drawdown aggregate counts missing inflation');
+    assertEqual(aggregate.realMaxDrawdowns.observationCount.pathPointsAvailable, 2,
+        'Real drawdown aggregate preserves the available path-point count');
 }
 
 {

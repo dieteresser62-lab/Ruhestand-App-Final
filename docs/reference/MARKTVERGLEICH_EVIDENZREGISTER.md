@@ -4,14 +4,17 @@
 **Vollerhebung der externen Records:** 2026-07-15, Europe/Berlin<br>
 **Letzte volatile Aktualitätsprüfung:** 2026-07-17, Europe/Berlin<br>
 **Methodik und Ergebniszusammenfassung:**
+[`MARKTVERGLEICH.md`](MARKTVERGLEICH.md)<br>
+**Übergeordnetes Hauptdokument:**
 [`ARCHITEKTUR_UND_FACHKONZEPT.md`](ARCHITEKTUR_UND_FACHKONZEPT.md#marktvergleich)<br>
 **Status:** normativer Beleganhang; kein Archiv
 
 ## Zweck und Aussagegrenze
 
 Dieses Register enthält die 69 Quellenrecords des Marktvergleichs. Das
-Hauptdokument führt Methodik, Stichprobe, Kernergebnisse, Positionierung und
-Grenzen; dieses Register ist die vollständige Belegebene. Jede Quellen-ID
+Marktvergleichs-Dokument [`MARKTVERGLEICH.md`](MARKTVERGLEICH.md) führt
+Methodik, Stichprobe, Kernergebnisse, Positionierung und Grenzen; dieses
+Register ist die vollständige Belegebene. Jede Quellen-ID
 besitzt einen stabilen HTML-Anker. Ein Record darf aktualisiert, aber nicht
 still umgedeutet oder gelöscht werden. Geänderte Quellen erhalten Abrufdatum
 und Änderungsnotiz; nicht mehr erreichbare Quellen werden als historisch oder

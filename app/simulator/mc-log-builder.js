@@ -71,6 +71,8 @@ export function buildMonteCarloRuinLogRow({
     tailRiskOverlay = null
 }) {
     return {
+        recordType: 'terminal_ruin',
+        financiallyEvaluable: false,
         jahr: simulationsJahr + 1,
         histJahr: yearData.jahr,
         inflation: yearData.inflation,
@@ -116,6 +118,8 @@ export function buildMonteCarloYearLogRow({
         inflation: yearData.inflation,
         ...buildTailRiskLogFields(tailRiskOverlay),
         ...result.logData,
+        recordType: 'financial_year',
+        financiallyEvaluable: true,
         ...buildMonteCarloLifeLogFields(lifeLogContext),
         vpw: result.ui?.vpw || null
     };
@@ -129,6 +133,8 @@ export function buildMonteCarloDeathLogRow({
     lifeLogContext
 }) {
     return {
+        recordType: 'terminal_death',
+        financiallyEvaluable: false,
         jahr: deathLogContext?.jahr ?? (currentRunLogLength + 1),
         histJahr: deathLogContext?.histJahr ?? null,
         inflation: deathLogContext?.inflation ?? null,
