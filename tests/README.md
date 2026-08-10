@@ -77,7 +77,7 @@ Backtest-Kernmodule im Slice-10-Abschlussgate:
 | `historical-backtest-ui.js` | 265/327 | 81,04% |
 | `simulator-backtest.js` | 225/313 | 71,88% |
 
-Das Coverage-Inventar fuehrt zentrale Tranchenmodule auch bei 0% sichtbar auf und markiert einen geladenen, aber nicht ausgefuehrten Page-Pfad als `runtime-loaded-uncovered`. `app/tranches/tranchen-manager-page.js` ist im aktuellen Node-Coverage-Lauf mit 59,61% (611/1025 Zeilen) erfasst; der separate Browser-Smoke bleibt fuer echte DOM- und Navigationspfade erforderlich.
+Das Coverage-Inventar fuehrt zentrale Tranchenmodule auch bei 0% sichtbar auf und markiert einen geladenen, aber nicht ausgefuehrten Page-Pfad als `runtime-loaded-uncovered`. `app/tranches/tranchen-manager-page.js` ist im aktuellen Node-Coverage-Lauf mit 66,51% (844/1269 Zeilen) erfasst; der separate Browser-Smoke bleibt fuer echte DOM- und Navigationspfade erforderlich.
 
 Bekannte Coverage-Ausnahmen:
 - UI-nahe Renderer und Page-Module koennen trotz Browser-Smoke in der V8-Zeilenmetrik niedrig oder 0% erscheinen, wenn ihre Logik nur ueber echte Browserinteraktion relevant ist.
@@ -89,7 +89,7 @@ Bekannte Coverage-Ausnahmen:
 npm run test:browser
 ```
 
-Das Browser-Gate nutzt Playwright mit einem vom Test verwalteten lokalen HTTP-Server. Jeder Fall erhaelt einen isolierten Browser-Context und eine eigene Storage-Baseline. Neben den zentralen Einstiegspunkten (`index.html`, `Balance.html`, `Simulator.html`, `depot-tranchen-manager.html`, `Handbuch.html`) prueft es in `Balance.html` Profilabwahl nach Reload, Engine-Mismatch, mutationsfreien Jahres-Preflight, sichtbare korrupte Ausgaben, sichtbaren Import-Reject, einen Markt-CSV-Roundtrip mit periodengebundener Provenienz/`windowHigh`/sichtbarer gerichteter ATH-Untergrenze samt Anwendungsstatus/Boolean-Reload, einen Doppelklick mit genau einem Jahrescommit und Recovery-Snapshot sowie die 3-Bucket-Bear-Diagnose aus der realen Engine-Rendite. Die Simulatorfaelle warten auf fachliche Statuswerte statt auf feste Millisekunden: Sie pruefen Hybridprofile fail-closed, versionierte Sweep-Request-/Resultprovenienz mit allen sieben sichtbaren Parametern und den Evaluate-/Apply-Fingerprint des experimentellen Optimizers. Der MC-E2E-Fall prueft zusaetzlich den V2-Szenariodownload und adversarial, dass nach Szenario A ein nicht projizierbares Szenario B weder A noch einen partiellen Export herunterladen kann. Der Backtestfall reconciliiert sichtbare Periode, Outcome, Jahrinventar, exakte 10-%-Metrik, Pflegebucket und Cohort-Inventar mit Raw-JSON und deckt die Negativpfade ab. Die Tranchenkette prueft mit synthetischen Profilen A/B Manager-Handoff, CRUD, Dialogfokus und Tastaturbedienung, EUR-Quote, Reload, 390-Pixel-Layout, schreibfreie Balance-/Simulatorlaeufe, bestaetigten Reconcile genau einmal, Quote-Teilerfolg/Offline und raw-preserving Corrupt-Recovery. Inflation, Yahoo-Proxy und CAPE werden deterministisch geroutet; andere externe Requests werden blockiert. Das Gate ersetzt keine Node-Unit-Tests und laeuft bewusst getrennt von `npm test`.
+Das Browser-Gate nutzt Playwright mit einem vom Test verwalteten lokalen HTTP-Server. Jeder Fall erhaelt einen isolierten Browser-Context und eine eigene Storage-Baseline. Neben den zentralen Einstiegspunkten (`index.html`, `Balance.html`, `Simulator.html`, `depot-tranchen-manager.html`, `Handbuch.html`) prueft es in `Balance.html` Profilabwahl nach Reload, Engine-Mismatch, mutationsfreien Jahres-Preflight, sichtbare korrupte Ausgaben, sichtbaren Import-Reject, einen Markt-CSV-Roundtrip mit periodengebundener Provenienz/`windowHigh`/sichtbarer gerichteter ATH-Untergrenze samt Anwendungsstatus/Boolean-Reload, einen Doppelklick mit genau einem Jahrescommit und Recovery-Snapshot sowie die 3-Bucket-Bear-Diagnose aus der realen Engine-Rendite. Die Simulatorfaelle warten auf fachliche Statuswerte statt auf feste Millisekunden: Sie pruefen Hybridprofile fail-closed, versionierte Sweep-Request-/Resultprovenienz mit allen sieben sichtbaren Parametern und den Evaluate-/Apply-Fingerprint des experimentellen Optimizers. Der MC-E2E-Fall prueft zusaetzlich den V2-Szenariodownload und adversarial, dass nach Szenario A ein nicht projizierbares Szenario B weder A noch einen partiellen Export herunterladen kann. Der Backtestfall reconciliiert sichtbare Periode, Outcome, Jahrinventar, exakte 10-%-Metrik, Pflegebucket und Cohort-Inventar mit Raw-JSON und deckt die Negativpfade ab. Die Tranchenkette prueft mit synthetischen Profilen A/B Manager-Handoff, CRUD, Dialogfokus und Tastaturbedienung, EUR-Quote, Reload, 390-Pixel-Layout, schreibfreie Balance-/Simulatorlaeufe, Reconcile genau einmal, sichtbares Cash-Pending nach Seitenwechsel, append-only Cashabschluss und -korrektur, exakten Retry, Legacy-Anzeige, Quote-Teilerfolg/Offline und raw-preserving Corrupt-Recovery. Inflation, Yahoo-Proxy und CAPE werden deterministisch geroutet; andere externe Requests werden blockiert. Das Gate ersetzt keine Node-Unit-Tests und laeuft bewusst getrennt von `npm test`.
 
 Wichtig fuer CI/Release: Weil `npm test` dieses Gate nicht ausfuehrt, muss `npm run test:browser` explizit als eigener Job oder Release-Schritt laufen, wenn Browser-Regressionen blockierend sein sollen.
 
@@ -1249,6 +1249,35 @@ maschinenlesbares Traceability-Inventar.
   - Mehrere Kategorien (Aktien, Gold, Geldmarkt)
   - Profilbezogene Tranche-IDs verhindern Cost-Basis-Vermischung bei identischen Positionen aus verschiedenen Profilen
 
+#### `tranche-reconciliation.test.mjs`
+**Zweck:** Testet Realverkauf und append-only Cashnachweis als heterogenen
+`schemaVersion: 1`-Auditvertrag.
+- schreibfreie Teil-/Vollverkaufsvorschau, exakte Lot-/Profilidentitaet,
+  Ueberverkaufs- und Stale-Gates sowie atomarer Flush/Rollback;
+- Default `pending_manual_posting` und explizite Initialbestaetigung
+  `confirmed_already_reflected` ohne automatische Cashbuchung;
+- kanonische 128-/149-/154-Zeichen-IDs, reservierte Prefixe, globale
+  Eindeutigkeit und Konflikt-/Duplicate-Semantik;
+- append-only `cash_posting_confirmed` sowie lineare
+  `cash_posting_corrected`-Revisionen fuer beide Startformen;
+- adversariale Fail-closed-Matrix fuer fehlende Bestaetigung, Luecke, Fork,
+  veralteten Rueckverweis, Ziel-/Nettoerloesabweichung, leeren Grund und
+  nichtkanonische ID sowie eine fremde Legacy-Recordversion;
+- fachliche Duplicate-Semantik bei neu erzeugten Submit-Zeitstempeln unter
+  Erhalt des zuerst gespeicherten Nachweiszeitpunkts;
+- Legacy-v1-Projektion als `legacy_unknown` ohne Rewrite und ohne falschen
+  Pending- beziehungsweise Cash-bestaetigt-Status.
+
+#### `tranchen-manager-page.test.mjs` (Cashstatus-Ergaenzung)
+**Zweck:** Testet die Seitenorchestrierung des manuellen Cashstatus-Workflows.
+- Zwei-Dialog-Zeuge: Eine parallel belegte Korrekturrevision blockiert vor dem
+  finalen `confirm()` und schreibt weder eine neue Revision noch einen alten
+  Cashstand;
+- unlesbarer Audit wird als unvollstaendige, blockierte Liste statt als leere
+  Verkaufshistorie gerendert;
+- echter Bestaetigungs-Submit bis zum Facade-Flush haengt genau ein Event an und
+  laesst den Verkaufsrecord unveraendert.
+
 ### 11. Worker-Pool & Parallelisierung
 
 #### `worker-pool.test.mjs`
@@ -1381,7 +1410,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `balance-storage-contract.test.mjs` | ~180 | Echte StorageManager-Migrationen und Snapshot-Contracts |
 | `balance-storage.test.mjs` | ~490 | localStorage-Persistenz |
 | `balance-ui-orchestration.test.mjs` | ~225 | Balance-UI-Bindings, Import-/Export-Control-Pfade, Schema-V1/V2-Migration, CSV-Provenienz und Profilverbund-Hooks |
-| `browser-smoke.test.mjs` | ~1070 | Playwright-Gate fuer HTML-Einstiege, MC-/Backtest-UI, A11y/Negativpfade sowie zentrale Balance-/Tranchenflows |
+| `browser-smoke.test.mjs` | ~2170 | Playwright-Gate fuer HTML-Einstiege, MC-/Backtest-UI, A11y/Negativpfade sowie zentrale Balance-/Tranchenflows einschliesslich Reconcile-Pending, Seitenwechsel, Cashabschluss, append-only Korrektur, Retry und Legacy-Anzeige |
 | `suite-data-integration-contract.test.mjs` | ~330 | 65 Findings, I-01 bis I-08, O-01 bis O-22, Browser-/Paritaetsinventar, fail-closed Parameterpfade, Gate-Zuordnung und unveraenderte Delta-Baselines |
 | `simulator-monte-carlo-browser.mjs` | ~520 | Vier isolierte MC-Browserfaelle fuer Worker, Fallback, Technikfehler, Cancel/Restart, V2-Download, adversarialen Szenariowechsel, A11y, sichtbare Pflege-/4,5-Prozent-Titel sowie centgenaue Exaktwert-/Drawdown-Layouts und die vollstaendige reale Simulatorseite nach einem Lauf bei 320 px |
 | `care-meta.test.mjs` | ~200 | Pflegefall-Logik |
@@ -1469,10 +1498,11 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `transaction-quantization.test.mjs` | ~250 | Transaktions-Rundung |
 | `tax-settlement.test.mjs` | ~70 | Jahres-Settlement, Verlusttopf |
 | `tranchen-manager-modal.test.mjs` | ~120 | Tranchenmanager-Modal und Form-Parsing |
-| `tranchen-manager-page.test.mjs` | ~170 | Tranchenmanager-Seitenentrypoint, App-Bindings und UI-Contract |
+| `tranchen-manager-page.test.mjs` | ~850 | Tranchenmanager-Seitenentrypoint, App-Bindings, Persistenz-/Profilgates sowie Cashstatus-Stale-, Fehler- und Submit-Contract |
 | `tranchen-manager-renderer.test.mjs` | ~100 | Tranchenmanager-Rendering |
 | `tranchen-manager-state.test.mjs` | ~120 | Tranchenmanager-State und Derived Values |
 | `tranchen-price-service.test.mjs` | ~160 | Preisservice-Proxy, Symbolauflösung, Timeout und degradierter Status |
+| `tranche-reconciliation.test.mjs` | ~750 | Realverkauf, heterogener v1-Audit, Cashstatus, kanonische IDs, lineare Korrekturkette, Legacy-Schemaversion, semantische Idempotenz und Persistenz-Rollback |
 | `transaction-tax.test.mjs` | ~340 | Steuerberechnung, Roh-Aggregate |
 | `utils.test.mjs` | ~100 | Hilfsfunktionen |
 | `vpw-dynamic-flex.test.mjs` | ~230 | VPW-Formel, Smoothing, Safety und Go-Go |

@@ -22,26 +22,44 @@ import {
 } from '../profile/profile-asset-values.js';
 import {
     calculateTrancheDerivedValues,
+    loadReconciliationRegistryFromStorage,
     loadTranchesFromStorage,
     normalizeTranches,
     saveTranchesToStorage
 } from './tranchen-manager-state.js';
-import { renderTranchenStats, renderTranchenTable } from './tranchen-manager-renderer.js';
+import {
+    ensureReconciliationCashControls,
+    renderReconciliationCashStatuses,
+    renderTranchenStats,
+    renderTranchenTable
+} from './tranchen-manager-renderer.js';
 import { checkProxyHealth, fetchProxyPrice, fetchProxySymbol, LOCAL_YAHOO_PROXY } from './tranchen-price-service.js';
 import {
     bindTrancheModalLifecycle,
+    bindCashPostingModalLifecycle,
+    closeCashPostingModal,
     clearTrancheFormError,
     closeTrancheModal,
     formatTrancheValidationError,
     openCreateTrancheModal,
     openEditTrancheModal,
+    openCashPostingModal,
+    readCashPostingForm,
     readTrancheFromForm,
+    showCashPostingFormError,
     showTrancheFormError
 } from './tranchen-manager-modal.js';
 import { PersistenceFacade, persistenceStorage } from '../shared/persistence-facade.js';
 import {
+    commitCashPostingConfirmation,
+    commitCashPostingCorrection,
     commitTrancheReconciliation,
+    deriveCashConfirmationActionId,
+    deriveCashCorrectionActionId,
+    previewCashPostingConfirmation,
+    previewCashPostingCorrection,
     previewTrancheReconciliation,
+    projectReconciliationCashStatuses,
     TrancheReconciliationError
 } from './tranche-reconciliation.js';
 
@@ -68,6 +86,10 @@ const state = {
     pendingReconciliation: null,
     reconciliationStatus: '',
     reconciliationError: '',
+    reconciliationCashStatuses: [],
+    cashStatusError: '',
+    cashPostingInFlight: false,
+    pendingCashPosting: null,
     profileId: null,
     boundDocument: null,
     loader: loadTranchesFromStorage
@@ -85,7 +107,9 @@ const RECONCILIATION_INPUT_IDS = [
     'reconcileGrossProceeds',
     'reconcileFees',
     'reconcileRecommendedShares',
-    'reconcileRecommendedGross'
+    'reconcileRecommendedGross',
+    'reconcileCashStatus',
+    'reconcileInitialCashBalance'
 ];
 
 const PROFILE_INPUT_IDS = [
@@ -142,6 +166,7 @@ function syncGlobalState() {
 }
 
 function render() {
+    refreshReconciliationCashStatuses();
     renderTranchenStats(byId('stats'), state.tranchen);
     renderTranchenTable(byId('tranchenTable'), state.tranchen);
     renderReconciliationState();
@@ -230,9 +255,11 @@ function showProfileValidationStatus(error) {
 
 function processingIsBlocked() {
     return state.commitInFlight
+        || state.cashPostingInFlight
         || state.profileCommitInFlight
         || Boolean(state.quoteBatchPromise)
         || Boolean(state.pendingReconciliation)
+        || Boolean(state.pendingCashPosting)
         || state.loadStatus === 'corrupt'
         || state.loadStatus === 'unavailable';
 }
@@ -246,12 +273,18 @@ function setManagerControlsBlocked(blocked) {
         'reconciliationPreviewBtn',
         'reconciliationConfirmBtn',
         'reconciliationCancelBtn',
+        'cashPostingSubmitBtn',
         ...RECONCILIATION_INPUT_IDS,
         ...PROFILE_INPUT_IDS
     ].forEach(id => {
         const element = byId(id);
         if (element) element.disabled = blocked;
     });
+    byId('reconciliationCashStatuses')?.querySelectorAll?.('[data-cash-action]')?.forEach?.(element => {
+        element.disabled = blocked;
+    });
+    const cashCancel = byId('cashPostingCancelBtn');
+    if (cashCancel) cashCancel.disabled = state.cashPostingInFlight;
 }
 
 function clearRawPreview() {
@@ -276,10 +309,11 @@ function renderPersistenceState() {
     if (retryLoad) retryLoad.hidden = !isUnavailable;
     if (retrySave) retrySave.hidden = !state.pendingCommit
         && !state.pendingProfileValues
-        && !state.pendingReconciliation;
+        && !state.pendingReconciliation
+        && !state.pendingCashPosting;
     setManagerControlsBlocked(processingIsBlocked());
 
-    if (state.commitInFlight || state.profileCommitInFlight) {
+    if (state.commitInFlight || state.profileCommitInFlight || state.cashPostingInFlight) {
         setPersistenceStatus('Änderung wird dauerhaft gespeichert …', 'pending');
         return;
     }
@@ -340,6 +374,38 @@ function setReconciliationStatus(message = '', kind = '') {
     target.dataset.kind = kind;
 }
 
+function refreshReconciliationCashStatuses() {
+    const loaded = loadReconciliationRegistryFromStorage(persistenceStorage);
+    if (loaded.status === 'empty') {
+        state.reconciliationCashStatuses = [];
+        state.cashStatusError = '';
+        return;
+    }
+    if (loaded.status !== 'valid') {
+        state.reconciliationCashStatuses = [];
+        state.cashStatusError = 'Cashstatus-Audit ist nicht lesbar. Bestätigung und Korrektur bleiben blockiert.';
+        return;
+    }
+    try {
+        state.reconciliationCashStatuses = projectReconciliationCashStatuses(loaded.registry, state.profileId);
+        state.cashStatusError = '';
+    } catch (error) {
+        state.reconciliationCashStatuses = [];
+        state.cashStatusError = error instanceof TrancheReconciliationError
+            ? `Cashstatus-Audit blockiert: ${error.message}`
+            : 'Cashstatus-Audit ist beschädigt oder nicht unterstützt.';
+    }
+}
+
+function syncInitialCashStatusControls() {
+    const status = byId('reconcileCashStatus')?.value || 'pending_manual_posting';
+    const group = byId('reconcileInitialCashBalanceGroup');
+    const input = byId('reconcileInitialCashBalance');
+    const confirmed = status === 'confirmed_already_reflected';
+    if (group) group.hidden = !confirmed;
+    if (input) input.required = confirmed;
+}
+
 function renderReconciliationOptions() {
     const select = byId('reconcileTrancheId');
     if (!select || typeof document.createElement !== 'function') return;
@@ -395,6 +461,10 @@ function renderReconciliationPreview() {
         '',
         `Ist-Bestand vorher: ${formatReconciliationNumber(preview.before?.shares)} Stück · ${formatReconciliationNumber(preview.before?.marketValue, { currency: true })} Marktwert · ${formatReconciliationNumber(preview.before?.costBasis, { currency: true })} Einstandskosten`,
         `Tatsächliche Ausführung: ${formatReconciliationNumber(preview.execution?.sharesSold)} Stück · ${formatReconciliationNumber(preview.execution?.grossProceeds, { currency: true })} Brutto · ${formatReconciliationNumber(preview.execution?.fees, { currency: true })} Kosten · ${formatReconciliationNumber(preview.execution?.netProceeds, { currency: true })} Netto`,
+        action.cashStatus === 'confirmed_already_reflected'
+            ? `Cashstatus: bereits berücksichtigt · bestätigter Cashstand ${formatReconciliationNumber(action.cashBalanceAfterPostingEur, { currency: true })} · Nachweiszeitpunkt ${action.cashConfirmedAt}`
+            : 'Cashstatus: offen – Nettoerlös nach dem Lot-Commit manuell in der freien Liquidität nachführen und anschließend bestätigen.',
+        'Es erfolgt keine automatische Cashbuchung der freien Liquidität.',
         after
             ? `Resultierender Bestand: ${formatReconciliationNumber(after.shares)} Stück · ${formatReconciliationNumber(after.marketValue, { currency: true })} Marktwert · ${formatReconciliationNumber(after.costBasis, { currency: true })} Einstandskosten`
             : 'Resultierender Bestand: Tranche vollständig verkauft und entfernt.'
@@ -420,13 +490,20 @@ function renderReconciliationPreview() {
 function renderReconciliationState() {
     const form = byId('reconciliationForm');
     if (!form) return;
+    const cashContainer = ensureReconciliationCashControls(document);
+    syncInitialCashStatusControls();
     renderReconciliationOptions();
     const dateInput = byId('reconcileExecutedAt');
     if (dateInput && !dateInput.value) dateInput.value = localIsoDate();
     const previewButton = byId('reconciliationPreviewBtn');
     if (previewButton) previewButton.disabled = processingIsBlocked() || state.tranchen.length === 0;
     renderReconciliationPreview();
-    if (state.reconciliationError) {
+    renderReconciliationCashStatuses(cashContainer, state.reconciliationCashStatuses, {
+        errorMessage: state.cashStatusError
+    });
+    if (state.cashStatusError) {
+        setReconciliationStatus(state.cashStatusError, 'error');
+    } else if (state.reconciliationError) {
         setReconciliationStatus(state.reconciliationError, 'error');
     } else if (state.reconciliationStatus) {
         setReconciliationStatus(state.reconciliationStatus, 'ok');
@@ -446,6 +523,7 @@ function readOptionalNumber(id) {
 function readReconciliationActionFromDom() {
     const recommendedShares = readOptionalNumber('reconcileRecommendedShares');
     const recommendedGross = readOptionalNumber('reconcileRecommendedGross');
+    const cashStatus = byId('reconcileCashStatus')?.value || 'pending_manual_posting';
     return {
         actionId: byId('reconcileActionId')?.value || '',
         profileId: state.profileId || '',
@@ -454,6 +532,13 @@ function readReconciliationActionFromDom() {
         sharesSold: readOptionalNumber('reconcileSharesSold'),
         grossProceeds: readOptionalNumber('reconcileGrossProceeds'),
         fees: readOptionalNumber('reconcileFees') ?? 0,
+        cashStatus,
+        ...(cashStatus === 'confirmed_already_reflected'
+            ? {
+                cashBalanceAfterPostingEur: readOptionalNumber('reconcileInitialCashBalance'),
+                cashConfirmedAt: new Date().toISOString()
+            }
+            : {}),
         recommendation: recommendedShares === null && recommendedGross === null
             ? null
             : {
@@ -511,8 +596,11 @@ function createReconciliationPreview(event) {
 async function executeReconciliation(pending, { requireConfirmation = true } = {}) {
     if (!pending || state.commitInFlight || state.profileCommitInFlight) return false;
     if (requireConfirmation) {
+        const cashLine = pending.action.cashStatus === 'confirmed_already_reflected'
+            ? `Cashstatus: bereits enthalten; bestätigter Cashstand ${formatReconciliationNumber(pending.action.cashBalanceAfterPostingEur, { currency: true })}.`
+            : `Cashstatus: offen; Nettoerlös ${formatReconciliationNumber(pending.preview?.execution?.netProceeds, { currency: true })} muss anschließend manuell nachgeführt werden.`;
         const confirmed = confirm(
-            `Tatsächliche Ausführung ${pending.action.actionId} für Profil ${pending.profileId} und Tranche ${pending.action.trancheId} dauerhaft anwenden? Der reale Bestand wird dabei geändert.`
+            `Tatsächliche Ausführung ${pending.action.actionId} für Profil ${pending.profileId} und Tranche ${pending.action.trancheId} dauerhaft anwenden? Der reale Bestand wird dabei geändert. ${cashLine} Es erfolgt keine automatische Cashbuchung.`
         );
         if (!confirmed) return false;
     }
@@ -542,7 +630,9 @@ async function executeReconciliation(pending, { requireConfirmation = true } = {
         state.confirmedRaw = JSON.stringify(result.tranches);
         state.loadStatus = result.tranches.length > 0 ? 'valid' : 'empty';
         state.reconciliationPreview = null;
-        state.reconciliationStatus = 'Tatsächliche Ausführung dauerhaft bestätigt und Realbestand aktualisiert.';
+        state.reconciliationStatus = pending.action.cashStatus === 'confirmed_already_reflected'
+            ? 'Tatsächliche Ausführung und bereits berücksichtigter Cashstand dauerhaft dokumentiert; Realbestand aktualisiert.'
+            : 'Tatsächliche Ausführung dauerhaft dokumentiert und Realbestand aktualisiert. Cashbuchung bleibt manuell offen.';
         state.persistenceMessage = 'Reconcile-Commit dauerhaft gespeichert.';
         clearReconciliationPreview({ resetForm: true });
         return true;
@@ -565,6 +655,135 @@ function confirmReconciliation() {
     const pending = state.reconciliationPreview;
     if (!pending || pending.preview?.status !== 'ready') return Promise.resolve(false);
     return executeReconciliation(pending);
+}
+
+function openCashStatusWorkflow(targetActionId, mode, opener = null) {
+    if (processingIsBlocked()) return false;
+    const status = state.reconciliationCashStatuses.find(item => item.targetActionId === targetActionId);
+    if (!status) {
+        state.reconciliationError = `Cashstatus für Zielverkauf ${targetActionId} ist nicht mehr verfügbar.`;
+        renderReconciliationState();
+        return false;
+    }
+    const correctionMode = mode === 'correct';
+    if ((correctionMode && !status.canCorrect) || (!correctionMode && !status.canConfirm)) {
+        state.reconciliationError = 'Der Cashstatus hat sich geändert. Bitte aktuellen Stand neu laden.';
+        renderReconciliationState();
+        return false;
+    }
+    const nextRevision = correctionMode ? status.correctionRevision + 1 : null;
+    return openCashPostingModal({
+        mode: correctionMode ? 'correct' : 'confirm',
+        targetActionId: status.targetActionId,
+        confirmedNetProceedsEur: status.confirmedNetProceedsEur,
+        cashBalanceAfterPostingEur: status.cashBalanceAfterPostingEur,
+        nextRevision,
+        correctsActionId: correctionMode ? status.effectiveActionId : null,
+        nextActionId: correctionMode
+            ? deriveCashCorrectionActionId(status.targetActionId, nextRevision)
+            : deriveCashConfirmationActionId(status.targetActionId)
+    }, document, opener);
+}
+
+async function executeCashPosting(pending, { requireConfirmation = true } = {}) {
+    if (!pending || state.cashPostingInFlight || state.commitInFlight || state.profileCommitInFlight) return false;
+    if (requireConfirmation) {
+        const record = pending.preview.auditRecord;
+        const detail = pending.mode === 'correct'
+            ? `Bisheriger Cashstand ${formatReconciliationNumber(pending.previousCashBalance, { currency: true })}, neuer Cashstand ${formatReconciliationNumber(record.cashBalanceAfterPostingEur, { currency: true })}, Grund: ${record.correctionReason}.`
+            : `Zu bestätigender Cashstand ${formatReconciliationNumber(record.cashBalanceAfterPostingEur, { currency: true })}.`;
+        const accepted = confirm(
+            `Append-only Cashnachweis ${record.actionId} für Zielverkauf ${record.targetActionId} speichern? Nettoerlös ${formatReconciliationNumber(record.confirmedNetProceedsEur, { currency: true })}. ${detail} Es erfolgt keine automatische Cashbuchung.`
+        );
+        if (!accepted) return false;
+    }
+
+    state.cashPostingInFlight = true;
+    state.persistenceMessage = '';
+    state.persistenceError = '';
+    state.reconciliationError = '';
+    state.reconciliationStatus = '';
+    renderPersistenceState();
+    renderReconciliationState();
+    try {
+        const result = pending.mode === 'correct'
+            ? await commitCashPostingCorrection(pending.request)
+            : await commitCashPostingConfirmation(pending.request);
+        state.pendingCashPosting = null;
+        state.reconciliationStatus = result.status === 'duplicate'
+            ? 'Ein inhaltlich gleicher Cashnachweis war bereits gespeichert; es wurde nichts angehängt und der erste Nachweiszeitpunkt bleibt erhalten.'
+            : pending.mode === 'correct'
+                ? 'Cashstandkorrektur append-only gespeichert; Verkauf und frühere Nachweise blieben unverändert.'
+                : 'Manuelle Cashbuchung append-only bestätigt; der Verkauf ist nun mit Cashnachweis abgeschlossen.';
+        state.persistenceMessage = result.status === 'duplicate'
+            ? 'Keine Auditänderung: Ein inhaltlich gleicher Cashnachweis war bereits vorhanden.'
+            : 'Cashstatus dauerhaft im Reconcile-Audit gespeichert.';
+        refreshReconciliationCashStatuses();
+        return true;
+    } catch (error) {
+        state.pendingCashPosting = pending;
+        state.reconciliationError = error instanceof TrancheReconciliationError
+            ? `${error.message}${error.retryable ? ' Retry ist möglich.' : ''}`
+            : 'Der Cashstatus konnte nicht dauerhaft gespeichert werden. Retry ist möglich.';
+        state.persistenceError = 'Cashstatus wurde nicht dauerhaft bestätigt. Der letzte Auditstand bleibt sichtbar.';
+        return false;
+    } finally {
+        state.cashPostingInFlight = false;
+        render();
+        renderPersistenceState();
+    }
+}
+
+async function submitCashPosting(event) {
+    event?.preventDefault?.();
+    if (processingIsBlocked()) return false;
+    const formValue = readCashPostingForm();
+    if (!formValue) return false;
+    const registryRaw = readStoredValue(PROFILE_STORAGE_KEYS.registry);
+    try {
+        const preview = formValue.mode === 'correct'
+            ? previewCashPostingCorrection({
+                profileId: state.profileId,
+                targetActionId: formValue.targetActionId,
+                cashBalanceAfterPostingEur: formValue.cashBalanceAfterPostingEur,
+                correctionReason: formValue.correctionReason,
+                correctionRevision: formValue.nextRevision,
+                correctionActionId: formValue.nextActionId,
+                actionId: formValue.nextActionId,
+                correctsActionId: formValue.correctsActionId,
+                correctedAt: new Date().toISOString(),
+                registry: registryRaw
+            })
+            : previewCashPostingConfirmation({
+                profileId: state.profileId,
+                targetActionId: formValue.targetActionId,
+                cashBalanceAfterPostingEur: formValue.cashBalanceAfterPostingEur,
+                confirmedAt: new Date().toISOString(),
+                registry: registryRaw
+            });
+        const pending = {
+            mode: formValue.mode,
+            preview,
+            previousCashBalance: preview.cashStatus?.cashBalanceAfterPostingEur ?? null,
+            request: {
+                ...preview.auditRecord,
+                profileId: state.profileId,
+                expectedRegistryRaw: registryRaw
+            }
+        };
+        const accepted = await executeCashPosting(pending);
+        if (accepted) closeCashPostingModal();
+        return accepted;
+    } catch (error) {
+        const field = error?.field === 'correctionReason' ? 'cashPostingReason' : 'cashPostingBalance';
+        showCashPostingFormError(
+            error instanceof TrancheReconciliationError
+                ? error.message
+                : 'Cashstatus konnte nicht geprüft werden.',
+            field
+        );
+        return false;
+    }
 }
 
 function updateActiveProfileLabel(profileId = state.profileId) {
@@ -1083,6 +1302,7 @@ function applyLoadResult(result) {
     state.taxMigrationWarning = '';
     state.pendingCommit = null;
     state.pendingReconciliation = null;
+    state.pendingCashPosting = null;
     state.reconciliationPreview = null;
     state.reconciliationStatus = '';
     state.reconciliationError = '';
@@ -1112,6 +1332,10 @@ function retryLoad() {
 }
 
 async function retryPendingCommit() {
+    if (state.pendingCashPosting) {
+        await executeCashPosting(state.pendingCashPosting, { requireConfirmation: false });
+        return;
+    }
     if (state.pendingReconciliation) {
         await executeReconciliation(state.pendingReconciliation, { requireConfirmation: false });
         return;
@@ -1128,6 +1352,7 @@ async function retryPendingCommit() {
 
 function bindControls() {
     bindTrancheModalLifecycle();
+    bindCashPostingModalLifecycle();
     byId('addTrancheBtn')?.addEventListener('click', addTranche);
     byId('updatePricesBtn')?.addEventListener('click', () => updatePrices());
     byId('proxyHealthBtn')?.addEventListener('click', () => checkProxyHealth(byId('priceUpdateStatus')));
@@ -1142,6 +1367,13 @@ function bindControls() {
     byId('reconciliationForm')?.addEventListener('submit', createReconciliationPreview);
     byId('reconciliationConfirmBtn')?.addEventListener('click', () => confirmReconciliation());
     byId('reconciliationCancelBtn')?.addEventListener('click', () => clearReconciliationPreview());
+    byId('cashPostingForm')?.addEventListener('submit', event => submitCashPosting(event));
+    byId('reconciliationCashStatuses')?.addEventListener('click', event => {
+        const target = event.target.closest?.('[data-cash-action]');
+        if (!target) return;
+        openCashStatusWorkflow(target.dataset.targetActionId, target.dataset.cashAction, target);
+    });
+    byId('reconcileCashStatus')?.addEventListener('change', syncInitialCashStatusControls);
     RECONCILIATION_INPUT_IDS.forEach(id => {
         byId(id)?.addEventListener('input', () => {
             if (!state.reconciliationPreview) return;
@@ -1208,8 +1440,12 @@ function resetRuntimeState(profileId) {
     state.rawRevealed = false;
     state.reconciliationPreview = null;
     state.pendingReconciliation = null;
+    state.pendingCashPosting = null;
     state.reconciliationStatus = '';
     state.reconciliationError = '';
+    state.reconciliationCashStatuses = [];
+    state.cashStatusError = '';
+    state.cashPostingInFlight = false;
     state.profileId = profileId;
 }
 

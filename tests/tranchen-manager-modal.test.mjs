@@ -2,10 +2,13 @@
 
 import {
     bindTrancheModalLifecycle,
+    closeCashPostingModal,
     closeTrancheModal,
     createUniqueTrancheId,
     openCreateTrancheModal,
+    openCashPostingModal,
     openEditTrancheModal,
+    readCashPostingForm,
     readTrancheFromForm,
     syncTrancheTypeOptions
 } from '../app/tranches/tranchen-manager-modal.js';
@@ -49,6 +52,9 @@ function createDocumentMock() {
         'modalTitle', 'trancheModal', 'trancheForm', 'name', 'isin', 'ticker', 'shares',
         'purchasePrice', 'currentPrice', 'purchaseDate', 'category', 'type', 'tqf', 'taxExempt', 'notes',
         'trancheFormError', 'closeTrancheModalBtn', 'saveTrancheBtn', 'opener'
+        , 'cashPostingModal', 'cashPostingModalTitle', 'cashPostingModalSummary', 'cashPostingForm',
+        'cashPostingBalance', 'cashPostingReasonGroup', 'cashPostingReason', 'cashPostingFormError',
+        'cashPostingCancelBtn', 'cashPostingSubmitBtn'
     ];
     ids.forEach(id => elements.set(id, createElement(id, doc)));
     elements.get('category').value = 'equity';
@@ -60,6 +66,10 @@ function createDocumentMock() {
         'category', 'type', 'tqf', 'taxExempt', 'notes', 'closeTrancheModalBtn', 'saveTrancheBtn'
     ].map(id => elements.get(id));
     elements.get('trancheModal').querySelectorAll = () => focusOrder;
+    elements.get('cashPostingModal').querySelectorAll = () => [
+        elements.get('cashPostingBalance'), elements.get('cashPostingReason'),
+        elements.get('cashPostingCancelBtn'), elements.get('cashPostingSubmitBtn')
+    ];
     doc.getElementById = id => elements.get(id) || null;
     return doc;
 }
@@ -231,3 +241,48 @@ console.log('Test 10: Escape closes dialog and focus trap returns to opener');
     assertEqual(doc.activeElement.id, 'opener', 'Closing should restore focus to opener');
 }
 console.log('✓ dialog keyboard lifecycle OK');
+
+console.log('Test 11: cash dialog shows immutable evidence and reads explicit confirmation/correction input');
+{
+    const doc = createDocumentMock();
+    const opener = doc.getElementById('opener');
+    openCashPostingModal({
+        mode: 'confirm',
+        targetActionId: 'sale-1',
+        confirmedNetProceedsEur: 95,
+        cashBalanceAfterPostingEur: null,
+        nextRevision: null,
+        nextActionId: 'cash-confirmation:v1:sale-1'
+    }, doc, opener);
+    assert(doc.getElementById('cashPostingModal').classList.has('active'), 'Cash confirmation dialog should open');
+    assert(doc.getElementById('cashPostingModalSummary').textContent.includes('sale-1')
+        && doc.getElementById('cashPostingModalSummary').textContent.includes('95,00')
+        && doc.getElementById('cashPostingModalSummary').textContent.includes('cash-confirmation:v1:sale-1'),
+    'Cash dialog should show target, immutable net proceeds and next audit id');
+    assertEqual(doc.getElementById('cashPostingReasonGroup').hidden, true,
+        'Initial cash confirmation should not ask for a correction reason');
+    doc.getElementById('cashPostingBalance').value = '10095.25';
+    assertEqual(readCashPostingForm(doc).cashBalanceAfterPostingEur, 10095.25,
+        'Cash dialog should read the explicitly entered balance');
+    closeCashPostingModal(doc);
+    assertEqual(doc.activeElement, opener, 'Closing cash dialog should restore opener focus');
+
+    openCashPostingModal({
+        mode: 'correct',
+        targetActionId: 'sale-1',
+        confirmedNetProceedsEur: 95,
+        cashBalanceAfterPostingEur: 10095.25,
+        nextRevision: 1,
+        nextActionId: 'cash-correction:v1:sale-1:1'
+    }, doc, opener);
+    assertEqual(doc.getElementById('cashPostingReasonGroup').hidden, false,
+        'Correction dialog should require a visible reason');
+    assertEqual(doc.getElementById('cashPostingReason').required, true,
+        'Correction reason should be browser-required');
+    doc.getElementById('cashPostingBalance').value = '10090';
+    doc.getElementById('cashPostingReason').value = 'Zahlendreher';
+    const correction = readCashPostingForm(doc);
+    assertEqual(correction.cashBalanceAfterPostingEur, 10090, 'Correction should read the new cash balance');
+    assertEqual(correction.correctionReason, 'Zahlendreher', 'Correction should read the mandatory reason');
+}
+console.log('✓ cash dialog evidence contract OK');

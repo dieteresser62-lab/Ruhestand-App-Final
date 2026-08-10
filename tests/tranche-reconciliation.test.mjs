@@ -1,6 +1,13 @@
 import {
+    commitCashPostingConfirmation,
+    commitCashPostingCorrection,
     commitTrancheReconciliation,
+    deriveCashConfirmationActionId,
+    deriveCashCorrectionActionId,
+    previewCashPostingConfirmation,
+    previewCashPostingCorrection,
     previewTrancheReconciliation,
+    projectReconciliationCashStatuses,
     readReconciliationHistory,
     TrancheReconciliationError
 } from '../app/tranches/tranche-reconciliation.js';
@@ -322,5 +329,428 @@ console.log('Test 7: stale previews and parallel profile context changes write n
     assertEqual(controls.saveCalls || 0, 0, 'Stale-/Tab-Gates rufen keinen Writer auf');
 }
 console.log('✓ stale/two-profile write gate OK');
+
+console.log('Test 8: legacy v1 sales remain untouched and project an operational legacy_unknown status');
+{
+    const initial = [createLot()];
+    const preview = previewTrancheReconciliation({
+        profileId: PROFILE_ID,
+        tranches: initial,
+        action: createAction(),
+        registry: createRegistry(initial)
+    });
+    const legacy = JSON.parse(JSON.stringify(preview.auditRecord));
+    delete legacy.eventType;
+    delete legacy.cashStatus;
+    const registry = createRegistry(preview.nextTranches, {
+        trancheReconciliation: { schemaVersion: 1, actions: [legacy] }
+    });
+    const rawBefore = JSON.stringify(registry.trancheReconciliation.actions[0]);
+    const history = readReconciliationHistory(registry);
+    const statuses = projectReconciliationCashStatuses(registry, PROFILE_ID);
+
+    assertEqual(history[0].eventType, 'sale_reconciled', 'Legacy-Verkauf wird nur im Leser als Verkauf projiziert');
+    assertEqual(history[0].cashStatus, 'legacy_unknown', 'Legacy-Verkauf erhält keinen erfundenen Cashnachweis');
+    assertEqual(statuses[0].operationallyComplete, true, 'Legacy-Verkauf blockiert den laufenden Workflow nicht');
+    assertEqual(statuses[0].isPending, false, 'Legacy-Verkauf erscheint nicht als offener Rückstand');
+    assertEqual(statuses[0].canConfirm, true, 'Freiwillige spätere Nachbestätigung bleibt möglich');
+    assertEqual(JSON.stringify(registry.trancheReconciliation.actions[0]), rawBefore, 'Lesen schreibt den Legacy-Record nicht um');
+}
+console.log('✓ legacy projection contract OK');
+
+console.log('Test 9: pending sale, confirmation and corrections form one append-only linear chain');
+{
+    const initial = [createLot()];
+    const salePreview = previewTrancheReconciliation({
+        profileId: PROFILE_ID,
+        tranches: initial,
+        action: createAction(),
+        registry: createRegistry(initial)
+    });
+    const saleRecord = { ...salePreview.auditRecord, reconciledAt: '2026-07-14T12:00:00.000Z' };
+    const registry = createRegistry(salePreview.nextTranches, {
+        trancheReconciliation: { schemaVersion: 1, actions: [saleRecord] }
+    });
+    const confirmation = previewCashPostingConfirmation({
+        profileId: PROFILE_ID,
+        targetActionId: saleRecord.actionId,
+        cashBalanceAfterPostingEur: 12500.25,
+        confirmedAt: '2026-07-15T08:00:00.000Z',
+        registry
+    });
+    assertEqual(confirmation.status, 'ready', 'Offener Verkauf kann manuell abgeschlossen werden');
+    assertEqual(confirmation.auditRecord.actionId, confirmation.auditRecord.confirmationActionId,
+        'Abschluss verwendet dieselbe globale und fachliche Action-ID');
+    assertEqual(confirmation.auditRecord.confirmedNetProceedsEur, 500,
+        'Abschluss kopiert den Nettoerlös unverändert aus dem Verkauf');
+    registry.trancheReconciliation.actions.push(confirmation.auditRecord);
+
+    const confirmationDuplicate = previewCashPostingConfirmation({
+        profileId: PROFILE_ID,
+        targetActionId: saleRecord.actionId,
+        cashBalanceAfterPostingEur: 12500.25,
+        confirmedAt: '2026-07-15T08:00:05.000Z',
+        registry
+    });
+    assertEqual(confirmationDuplicate.status, 'duplicate', 'Semantisch gleicher Abschluss bleibt trotz neu erzeugtem Zeitstempel idempotent');
+    assertEqual(confirmationDuplicate.auditRecord.confirmedAt, '2026-07-15T08:00:00.000Z',
+        'Idempotenter Abschluss bewahrt den zuerst gespeicherten Nachweiszeitpunkt');
+    await expectCode(
+        () => previewCashPostingConfirmation({
+            profileId: PROFILE_ID,
+            targetActionId: saleRecord.actionId,
+            cashBalanceAfterPostingEur: 12501.25,
+            confirmedAt: '2026-07-15T08:00:00.000Z',
+            registry
+        }),
+        'RECONCILIATION_ACTION_CONFLICT',
+        'Gleiche Abschluss-ID mit anderem Cashstand wird blockiert'
+    );
+
+    const correction1 = previewCashPostingCorrection({
+        profileId: PROFILE_ID,
+        targetActionId: saleRecord.actionId,
+        cashBalanceAfterPostingEur: 12490.25,
+        correctionReason: 'Übertragungsfehler korrigiert',
+        correctedAt: '2026-07-15T09:00:00.000Z',
+        registry
+    });
+    assertEqual(correction1.auditRecord.correctionRevision, 1, 'Erste Korrektur beginnt bei Revision 1');
+    assertEqual(correction1.auditRecord.correctsActionId, confirmation.auditRecord.actionId,
+        'Erste Korrektur verweist auf den wirksamen Abschluss');
+    registry.trancheReconciliation.actions.push(correction1.auditRecord);
+    const correctionDuplicate = previewCashPostingCorrection({
+        profileId: PROFILE_ID,
+        targetActionId: saleRecord.actionId,
+        cashBalanceAfterPostingEur: 12490.25,
+        correctionReason: 'Übertragungsfehler korrigiert',
+        correctionRevision: 1,
+        correctionActionId: correction1.auditRecord.actionId,
+        actionId: correction1.auditRecord.actionId,
+        correctsActionId: confirmation.auditRecord.actionId,
+        correctedAt: '2026-07-15T09:00:05.000Z',
+        registry
+    });
+    assertEqual(correctionDuplicate.status, 'duplicate',
+        'Semantisch gleiche Korrektur bleibt trotz neu erzeugtem Zeitstempel idempotent');
+    assertEqual(correctionDuplicate.auditRecord.correctedAt, '2026-07-15T09:00:00.000Z',
+        'Idempotente Korrektur bewahrt den zuerst gespeicherten Nachweiszeitpunkt');
+
+    const correction2 = previewCashPostingCorrection({
+        profileId: PROFILE_ID,
+        targetActionId: saleRecord.actionId,
+        cashBalanceAfterPostingEur: 12495.25,
+        correctionReason: 'Bankvaluta nachgetragen',
+        correctedAt: '2026-07-16T09:00:00.000Z',
+        registry
+    });
+    assertEqual(correction2.auditRecord.correctionRevision, 2, 'Zweite Korrektur erhöht die Revision lückenlos');
+    assertEqual(correction2.auditRecord.correctsActionId, correction1.auditRecord.actionId,
+        'Zweite Korrektur verweist auf die aktuell wirksame Korrektur');
+    registry.trancheReconciliation.actions.push(correction2.auditRecord);
+
+    const status = projectReconciliationCashStatuses(registry, PROFILE_ID)[0];
+    assertEqual(status.cashStatus, 'confirmed_corrected', 'Effektive Projektion kennzeichnet die Korrektur');
+    assertEqual(status.cashBalanceAfterPostingEur, 12495.25, 'Nur der letzte Cashstand ist effektiv');
+    assertEqual(status.correctionRevision, 2, 'Effektive Projektion zeigt die letzte Revision');
+    assertEqual(readReconciliationHistory(registry).length, 4, 'Verkauf, Abschluss und beide Korrekturen bleiben im Audit');
+
+    const duplicateSale = previewTrancheReconciliation({
+        profileId: PROFILE_ID,
+        tranches: salePreview.nextTranches,
+        action: createAction({ cashStatus: 'confirmed_already_reflected', cashBalanceAfterPostingEur: 1,
+            cashConfirmedAt: '2026-07-20T10:00:00.000Z' }),
+        registry
+    });
+    assertEqual(duplicateSale.status, 'duplicate', 'Cashstatusänderungen verändern die Verkaufsduplikat-Semantik nicht');
+}
+console.log('✓ append-only confirmation/correction chain OK');
+
+console.log('Test 10: initial confirmation, event-specific lengths and corrupt mixed events fail closed');
+{
+    const initial = [createLot()];
+    const confirmedSale = previewTrancheReconciliation({
+        profileId: PROFILE_ID,
+        tranches: initial,
+        action: createAction({
+            cashStatus: 'confirmed_already_reflected',
+            cashBalanceAfterPostingEur: 9000,
+            cashConfirmedAt: '2026-07-14T12:00:00.000Z'
+        }),
+        registry: createRegistry(initial)
+    });
+    assertEqual(confirmedSale.auditRecord.cashStatus, 'confirmed_already_reflected',
+        'Initiale Bestätigung wird am Verkaufsrecord gespeichert');
+    assertEqual(confirmedSale.auditRecord.cashBalanceAfterPostingEur, 9000,
+        'Initial bestätigter Cashstand bleibt im Verkaufsrecord');
+
+    const maxTarget = 'x'.repeat(128);
+    assertEqual(deriveCashConfirmationActionId(maxTarget).length, 149,
+        '128-Zeichen-Ziel erzeugt exakt 149-Zeichen-Abschluss-ID');
+    assertEqual(deriveCashCorrectionActionId(maxTarget, 999999).length, 154,
+        'Maximale Revision erzeugt exakt 154-Zeichen-Korrektur-ID');
+    await expectCode(
+        () => Promise.resolve(deriveCashConfirmationActionId('x'.repeat(129))),
+        'RECONCILIATION_ID_INVALID',
+        '129-Zeichen-Ziel wird abgewiesen'
+    );
+    await expectCode(
+        () => Promise.resolve(deriveCashCorrectionActionId(maxTarget, 1000000)),
+        'RECONCILIATION_CORRECTION_REVISION_INVALID',
+        'Revision 1000000 wird abgewiesen'
+    );
+    await expectCode(
+        () => Promise.resolve(previewTrancheReconciliation({
+            profileId: PROFILE_ID,
+            tranches: initial,
+            action: createAction({ actionId: 'cash-confirmation:v1:not-a-sale' }),
+            registry: createRegistry(initial)
+        })),
+        'RECONCILIATION_ACTION_ID_RESERVED',
+        'Reservierter Cash-Prefix ist für neue Verkäufe gesperrt'
+    );
+
+    const corruptRegistry = createRegistry([], {
+        trancheReconciliation: {
+            schemaVersion: 1,
+            actions: [{ ...confirmedSale.auditRecord, eventType: 'future_event' }]
+        }
+    });
+    await expectCode(
+        () => Promise.resolve(readReconciliationHistory(corruptRegistry)),
+        'RECONCILIATION_EVENT_TYPE_UNSUPPORTED',
+        'Unbekannter Eventtyp blockiert den Leser fail-closed'
+    );
+}
+console.log('✓ mixed-event boundary contract OK');
+
+console.log('Test 11: cash commits persist without lot mutation and exact retry remains idempotent');
+{
+    const initial = [createLot()];
+    const storage = createStorage(initial);
+    const controls = {};
+    await commitTrancheReconciliation({
+        profileId: PROFILE_ID,
+        action: createAction(),
+        expectedTranchesRaw: storage.getItem('depot_tranchen')
+    }, createCommitOptions(storage, controls));
+    const lotsAfterSale = storage.getItem('depot_tranchen');
+    const confirmationRequest = {
+        profileId: PROFILE_ID,
+        targetActionId: createAction().actionId,
+        cashBalanceAfterPostingEur: 15000,
+        confirmedAt: '2026-07-15T08:00:00.000Z',
+        expectedRegistryRaw: storage.getItem('rs_profiles_v1')
+    };
+    const confirmed = await commitCashPostingConfirmation(
+        confirmationRequest,
+        createCommitOptions(storage, controls)
+    );
+    assertEqual(confirmed.status, 'applied', 'Cashabschluss wird append-only persistiert');
+    assertEqual(storage.getItem('depot_tranchen'), lotsAfterSale, 'Cashabschluss mutiert keine Lots');
+
+    const correctionPreview = previewCashPostingCorrection({
+        profileId: PROFILE_ID,
+        targetActionId: createAction().actionId,
+        cashBalanceAfterPostingEur: 14990,
+        correctionReason: 'Zahlendreher',
+        correctedAt: '2026-07-15T09:00:00.000Z',
+        registry: storage.getItem('rs_profiles_v1')
+    });
+    const correctionRequest = {
+        ...correctionPreview.auditRecord,
+        expectedRegistryRaw: storage.getItem('rs_profiles_v1')
+    };
+    const corrected = await commitCashPostingCorrection(correctionRequest, createCommitOptions(storage, controls));
+    assertEqual(corrected.status, 'applied', 'Cashkorrektur wird als drittes Event persistiert');
+    const retried = await commitCashPostingCorrection(correctionRequest, createCommitOptions(storage, controls));
+    assertEqual(retried.status, 'duplicate', 'Exakter Korrektur-Retry hängt kein weiteres Event an');
+    assertEqual(readReconciliationHistory(storage.getItem('rs_profiles_v1')).length, 3,
+        'Idempotenter Retry lässt die Auditlänge unverändert');
+    assertEqual(storage.getItem('depot_tranchen'), lotsAfterSale, 'Cashkorrektur mutiert keine Lots');
+}
+console.log('✓ cash persistence and retry contract OK');
+
+console.log('Test 12: correction-chain corruption and global ID collisions fail closed');
+{
+    const initial = [createLot()];
+    const salePreview = previewTrancheReconciliation({
+        profileId: PROFILE_ID,
+        tranches: initial,
+        action: createAction(),
+        registry: createRegistry(initial)
+    });
+    const sale = { ...salePreview.auditRecord, reconciledAt: '2026-07-14T12:00:00.000Z' };
+    const baseRegistry = createRegistry(salePreview.nextTranches, {
+        trancheReconciliation: { schemaVersion: 1, actions: [sale] }
+    });
+    const confirmation = previewCashPostingConfirmation({
+        profileId: PROFILE_ID,
+        targetActionId: sale.actionId,
+        cashBalanceAfterPostingEur: 1000,
+        confirmedAt: '2026-07-15T08:00:00.000Z',
+        registry: baseRegistry
+    }).auditRecord;
+    const confirmedRegistry = JSON.parse(JSON.stringify(baseRegistry));
+    confirmedRegistry.trancheReconciliation.actions.push(confirmation);
+    const correction1 = previewCashPostingCorrection({
+        profileId: PROFILE_ID,
+        targetActionId: sale.actionId,
+        cashBalanceAfterPostingEur: 999,
+        correctionReason: 'erste Korrektur',
+        correctedAt: '2026-07-15T09:00:00.000Z',
+        registry: confirmedRegistry
+    }).auditRecord;
+
+    const failHistory = async (actions, code, message) => {
+        await expectCode(
+            () => Promise.resolve(readReconciliationHistory(createRegistry([], {
+                trancheReconciliation: { schemaVersion: 1, actions }
+            }))),
+            code,
+            message
+        );
+    };
+    await failHistory(
+        [sale, { ...correction1, correctsActionId: sale.actionId }],
+        'RECONCILIATION_CORRECTION_WITHOUT_CONFIRMATION',
+        'Korrektur ohne wirksame Bestätigung wird blockiert'
+    );
+    await failHistory(
+        [sale, confirmation, {
+            ...correction1,
+            actionId: deriveCashCorrectionActionId(sale.actionId, 2),
+            correctionActionId: deriveCashCorrectionActionId(sale.actionId, 2),
+            correctionRevision: 2
+        }],
+        'RECONCILIATION_CORRECTION_CHAIN_INVALID',
+        'Revisionslücke wird blockiert'
+    );
+    const withCorrection1 = JSON.parse(JSON.stringify(confirmedRegistry));
+    withCorrection1.trancheReconciliation.actions.push(correction1);
+    const correction2 = previewCashPostingCorrection({
+        profileId: PROFILE_ID,
+        targetActionId: sale.actionId,
+        cashBalanceAfterPostingEur: 998,
+        correctionReason: 'zweite Korrektur',
+        correctedAt: '2026-07-15T10:00:00.000Z',
+        registry: withCorrection1
+    }).auditRecord;
+    await failHistory(
+        [sale, confirmation, correction1, { ...correction2, correctsActionId: confirmation.actionId }],
+        'RECONCILIATION_CORRECTION_CHAIN_INVALID',
+        'Veralteter Rückverweis wird blockiert'
+    );
+    await failHistory(
+        [sale, confirmation, { ...correction1, confirmedNetProceedsEur: 501 }],
+        'RECONCILIATION_NET_PROCEEDS_MISMATCH',
+        'Geänderter Nettoerlös in Korrektur wird blockiert'
+    );
+    await failHistory(
+        [sale, confirmation, { ...correction1, correctionReason: '   ' }],
+        'RECONCILIATION_CORRECTION_REASON_REQUIRED',
+        'Leerer Korrekturgrund wird blockiert'
+    );
+    await failHistory(
+        [sale, confirmation, { ...correction1, actionId: `${correction1.actionId}-falsch`,
+            correctionActionId: `${correction1.actionId}-falsch` }],
+        'RECONCILIATION_CORRECTION_ID_INVALID',
+        'Nichtkanonische Korrektur-ID wird blockiert'
+    );
+    await failHistory(
+        [sale, confirmation, correction1, correction1],
+        'RECONCILIATION_HISTORY_INVALID',
+        'Doppelter Korrektur-Fork mit gleicher globaler ID wird blockiert'
+    );
+    const saleWithoutCashStatus = { ...sale };
+    delete saleWithoutCashStatus.cashStatus;
+    await failHistory(
+        [saleWithoutCashStatus],
+        'RECONCILIATION_CASH_STATUS_INVALID',
+        'Expliziter neuer Verkauf ohne Cashstatus wird blockiert'
+    );
+    const legacyWithUnsupportedSchema = { ...sale, schemaVersion: 99 };
+    delete legacyWithUnsupportedSchema.eventType;
+    delete legacyWithUnsupportedSchema.cashStatus;
+    await failHistory(
+        [legacyWithUnsupportedSchema],
+        'RECONCILIATION_HISTORY_INVALID',
+        'Legacy-Verkauf mit nicht unterstützter Record-Schemaversion wird blockiert'
+    );
+
+    const targetSale = { ...sale, actionId: 'target-sale' };
+    const collidingLegacySale = { ...sale, actionId: deriveCashConfirmationActionId('target-sale') };
+    delete collidingLegacySale.eventType;
+    delete collidingLegacySale.cashStatus;
+    const collisionRegistry = createRegistry([], {
+        trancheReconciliation: { schemaVersion: 1, actions: [targetSale, collidingLegacySale] }
+    });
+    await expectCode(
+        () => Promise.resolve(previewCashPostingConfirmation({
+            profileId: PROFILE_ID,
+            targetActionId: 'target-sale',
+            cashBalanceAfterPostingEur: 1000,
+            confirmedAt: '2026-07-15T08:00:00.000Z',
+            registry: collisionRegistry
+        })),
+        'RECONCILIATION_ACTION_CONFLICT',
+        'Kanonische Abschluss-ID-Kollision mit Legacy-Verkauf wird blockiert'
+    );
+
+    const initiallyConfirmed = { ...sale, cashStatus: 'confirmed_already_reflected',
+        cashBalanceAfterPostingEur: 1000, cashConfirmedAt: '2026-07-15T08:00:00.000Z' };
+    const initialRegistry = createRegistry([], {
+        trancheReconciliation: { schemaVersion: 1, actions: [initiallyConfirmed] }
+    });
+    const initialCorrection = previewCashPostingCorrection({
+        profileId: PROFILE_ID,
+        targetActionId: initiallyConfirmed.actionId,
+        cashBalanceAfterPostingEur: 999,
+        correctionReason: 'Initialstand korrigiert',
+        correctedAt: '2026-07-15T09:00:00.000Z',
+        registry: initialRegistry
+    });
+    assertEqual(initialCorrection.auditRecord.correctsActionId, initiallyConfirmed.actionId,
+        'Erste Korrektur einer Initialbestätigung verweist auf den Verkauf');
+}
+console.log('✓ adversarial correction-chain contract OK');
+
+console.log('Test 13: cash flush failure restores the exact audit and remains retryable');
+{
+    const initial = [createLot()];
+    const storage = createStorage(initial);
+    const controls = {};
+    await commitTrancheReconciliation({
+        profileId: PROFILE_ID,
+        action: createAction(),
+        expectedTranchesRaw: storage.getItem('depot_tranchen')
+    }, createCommitOptions(storage, controls));
+    const registryBeforeCash = storage.getItem('rs_profiles_v1');
+    const lotsBeforeCash = storage.getItem('depot_tranchen');
+    const request = {
+        profileId: PROFILE_ID,
+        targetActionId: createAction().actionId,
+        cashBalanceAfterPostingEur: 1000,
+        confirmedAt: '2026-07-15T08:00:00.000Z',
+        expectedRegistryRaw: registryBeforeCash
+    };
+    controls.failFlush = true;
+    const error = await expectCode(
+        () => commitCashPostingConfirmation(request, createCommitOptions(storage, controls)),
+        'RECONCILIATION_PERSISTENCE_FAILED',
+        'Cashabschluss-Flushfehler wird strukturiert gemeldet'
+    );
+    assertEqual(error.retryable, true, 'Cashabschluss-Flushfehler bleibt retryfähig');
+    assertEqual(storage.getItem('rs_profiles_v1'), registryBeforeCash,
+        'Cashabschluss-Flushfehler stellt den exakten Auditstand wieder her');
+    assertEqual(storage.getItem('depot_tranchen'), lotsBeforeCash,
+        'Cashabschluss-Flushfehler berührt den bestätigten Lotbestand nicht');
+    controls.failFlush = false;
+    const retried = await commitCashPostingConfirmation(request, createCommitOptions(storage, controls));
+    assertEqual(retried.status, 'applied', 'Cashabschluss kann nach Flushfehler exakt wiederholt werden');
+    assertEqual(readReconciliationHistory(storage.getItem('rs_profiles_v1')).length, 2,
+        'Retry hängt den Cashabschluss genau einmal an');
+}
+console.log('✓ cash flush recovery contract OK');
 
 console.log('--- Tranche Reconciliation Tests Completed ---');

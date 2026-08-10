@@ -1,7 +1,7 @@
 # Fokussierte Abschlusshaertung der Ruhestand-Suite: Arbeitsplan
 
-**Stand:** 2026-08-07<br>
-**Status:** Slice 1 mit Commit `55bdd84` und Slice 2 mit Commit `c322bbe` abgeschlossen; Slice 3 nach dem Opus-Code-Review am 2026-08-07 korrigiert und intern vollstaendig validiert; externe Re-Review/Freigabe ausstehend<br>
+**Stand:** 2026-08-09<br>
+**Status:** Slice 1 mit Commit `55bdd84`, Slice 2 mit Commit `c322bbe` und Slice 3 nach Claude-/Gemini-Abnahme mit Commit `68e9e0f` abgeschlossen; Slice 4 im Claude-Re-Review freigegeben, S4-08 nach Nutzerentscheidung umgesetzt und S4-09 als niedriges Restrisiko akzeptiert. 19.507/19.507 Assertions, 29/29 Browserworkflows und Coverage-Gates gruen; finale Gemini-Scope-/Abnahmepruefung und lokaler Commit ausstehend<br>
 **Autor:** Codex<br>
 **Entscheider und einziger Produktnutzer:** Nutzer<br>
 **Vorgesehener Feature-Branch:** `codex/fokussierte-abschlusshaertung`<br>
@@ -50,6 +50,16 @@ Anweisung ersetzt fuer den Umsetzungsstart das im Plan noch offene
 Gemini-Re-Review; sie wird nicht als tatsaechlich erfolgte Gemini-Freigabe
 dargestellt. C-16 ist eine nicht blockierende Testergänzung fuer Slice 3 und
 beruehrt den Start von Slice 1 nicht.
+
+### 1.2 Umsetzungsfreigabe fuer Slice 4 vom 2026-08-07
+
+Nach lokaler Abnahme und Commit von Slice 3 hat der Nutzer ausdruecklich
+angewiesen, Slice 4 zu beginnen und das Slice-03-Dokument als Eingangsgröße zu
+verwenden. Diese Anweisung ersetzt fuer den Umsetzungsstart das im Slice-04-
+Entwurf noch offene Gemini-Re-Review; sie wird nicht als tatsaechlich erfolgte
+Gemini-Freigabe dargestellt. Der technische Preflight muss die slice-eigene
+Dateigrenze weiterhin einhalten und erkannte Scopeabweichungen vor Coding
+stoppen.
 
 ## 2. Grundlage der Entscheidung
 
@@ -397,8 +407,8 @@ Nach Abschluss der vier Slices gilt:
 | ---: | --- | --- | --- | --- |
 | 1 | [SLICE_ABSCHLUSSHAERTUNG_01_MC_EXPORTVERTRAG_V2.md](SLICE_ABSCHLUSSHAERTUNG_01_MC_EXPORTVERTRAG_V2.md) | einmaliger MC- und Szenario-V2-Schnitt inklusive realem Drawdown, Mindest-Flex- und 4,5-Prozent-Messcontract | keine | mit Commit `55bdd84` abgeschlossen und Baseline fuer Slice 2 |
 | 2 | [SLICE_ABSCHLUSSHAERTUNG_02_RISIKOANZEIGEN.md](SLICE_ABSCHLUSSHAERTUNG_02_RISIKOANZEIGEN.md) | exakte KPI-Anzeige mit Nutzen-/Kostenorakel und eindeutiger 4,5-Prozent-Beschriftung | Slice 1 | mit Commit `c322bbe` abgeschlossen; 168 Testdateien/19.222 Assertions und 29 Browserworkflows gruen |
-| 3 | [SLICE_ABSCHLUSSHAERTUNG_03_SAFETY_POLICY_PRIORITAET.md](SLICE_ABSCHLUSSHAERTUNG_03_SAFETY_POLICY_PRIORITAET.md) | struktureller Safety-Cap mit konjunktivem Null-Flex-Notfallgate und absolutem Floor-Schutz | Slice 2 abgeschlossen; fachlich unabhaengig | nach Opus-Findings korrigiert; 169 Testdateien/19.382 Assertions, 29 Browserworkflows und Delta gruen; externe Re-Review/Freigabe ausstehend |
-| 4 | [SLICE_ABSCHLUSSHAERTUNG_04_RECONCILE_CASHSTATUS.md](SLICE_ABSCHLUSSHAERTUNG_04_RECONCILE_CASHSTATUS.md) | append-only Cashstatus nach Realverkauf | Slice 3 abgeschlossen; fachlich unabhaengig | append-only Korrekturkette fuer Cashnachweise ergaenzt; Gemini-Re-Review ausstehend |
+| 3 | [SLICE_ABSCHLUSSHAERTUNG_03_SAFETY_POLICY_PRIORITAET.md](SLICE_ABSCHLUSSHAERTUNG_03_SAFETY_POLICY_PRIORITAET.md) | struktureller Safety-Cap mit konjunktivem Null-Flex-Notfallgate und absolutem Floor-Schutz | Slice 2 abgeschlossen; fachlich unabhaengig | nach Opus-Findings korrigiert, durch Claude/Gemini abgenommen und mit Commit `68e9e0f` abgeschlossen |
+| 4 | [SLICE_ABSCHLUSSHAERTUNG_04_RECONCILE_CASHSTATUS.md](SLICE_ABSCHLUSSHAERTUNG_04_RECONCILE_CASHSTATUS.md) | append-only Cashstatus nach Realverkauf | Slice 3 mit Commit `68e9e0f` abgeschlossen; fachlich unabhaengig | Claude-Re-Review freigegeben; S4-08 umgesetzt, S4-09 als niedriges datenwirkungsfreies Restrisiko akzeptiert; 169 Testdateien/19.507 Assertions, 40 fokussierte S4-08-Assertions und 29 Browserworkflows gruen; finale Gemini-Abnahme und Commit offen |
 
 Die Slices werden seriell umgesetzt. Dadurch besitzt jeder Slice einen eigenen
 Review- und Commit-Sicherheitspunkt. Ein dauerhaft roter Zwischenstand ist
@@ -816,7 +826,9 @@ ein spaeterer Cashabschluss wird als eigenes Folgeereignis dokumentiert.
   Marktdatenbereich bleiben ausgeschlossen.
 - Das Folgeereignis speichert den aus dem Verkauf centgleich uebernommenen
   Nettoerloes, den bestaetigten Cashstand und den Zeitpunkt. Wiederholung ist
-  idempotent, widerspruechlicher Betrag/Zielbezug blockiert fail-closed.
+  fachlich idempotent: Ein nur neu erzeugter Submit-Zeitstempel erzeugt keinen
+  Konflikt, und der erste Nachweiszeitpunkt bleibt erhalten. Widerspruechlicher
+  Betrag, Cashstand oder Zielbezug blockiert fail-closed.
 - Ein falsch erfasster bestaetigter Cashstand wird niemals ueberschrieben,
   sondern durch `cash_posting_corrected` berichtigt. Der Record traegt
   `actionId === correctionActionId`, `targetActionId`, `correctsActionId`, eine
@@ -837,9 +849,11 @@ ein spaeterer Cashabschluss wird als eigenes Folgeereignis dokumentiert.
   `cash-correction:` sind fuer neue Verkaufs-IDs reserviert; die globale
   Kollisionspruefung umfasst alle Eventtypen.
 - Eine exakte Wiederholung desselben Korrekturrecords ist idempotent. Gleiche ID
-  mit anderem Payload, eine Korrektur ohne wirksame Bestaetigung oder Revision
-  1000000 blockiert. Der Dialog zeigt bisherigen und neuen Cashstand,
-  unveraenderten Nettoerloes und den Korrekturgrund vor dem Commit.
+  mit anderem fachlichem Payload, eine Korrektur ohne wirksame Bestaetigung oder
+  Revision 1000000 blockiert. Der Dialog haelt Revision, kanonische Action-ID
+  und Vorgaenger bis zum Submit stabil; ein inzwischen fortgeschriebener Verlauf
+  scheitert vor der Nutzerbestaetigung. Der bisherige Cashstand fuer den finalen
+  Dialog stammt aus dem beim Submit frisch gelesenen Verlauf.
 - Cashstatus und Folgeereignis bleiben aus `comparableAction` ausgeschlossen,
   damit die bisherige Duplicate-/Conflict-Semantik des Verkaufs erhalten bleibt.
 - Jede Verarbeitung der heterogenen `actions`-Historie filtert explizit nach
@@ -850,6 +864,13 @@ ein spaeterer Cashabschluss wird als eigenes Folgeereignis dokumentiert.
   Rueckstand, bleibt aber sichtbar „Cashstatus nicht dokumentiert“ und darf
   nicht als Cash bestaetigt erscheinen; freiwillige Nachbestaetigung ist
   moeglich.
+- Jeder Legacy-Verkaufsrecord muss weiterhin `schemaVersion: 1` tragen. Eine
+  abweichende Recordversion wird nicht als Altfall akzeptiert.
+- Ein unlesbarer Audit wird im Manager als unvollstaendige, blockierte Liste und
+  niemals als leere Historie angezeigt. Balance, Simulator und Manager nennen
+  `legacy_unknown`-Faelle in der Zusammenfassung; ein Legacy-only-Stand erhaelt
+  keinen gruenen Cash-All-clear-Marker, bleibt aber ein neutraler Hinweis und
+  oeffnet die Detailanzeige nicht zwangsweise.
 - Die bestehende atomare Lot-/Registry-Persistenz und Recovery bleiben erhalten.
 - Vor Erstnutzung wird unter `index.html` -> „Profile“ -> „Erweitert“ ->
   „Backup exportieren“ (`#fullBackupBtn`) ein Komplettbackup erstellt. Der
@@ -882,6 +903,26 @@ ein spaeterer Cashabschluss wird als eigenes Folgeereignis dokumentiert.
   fail-closed Forks, Luecken und veraltete Rueckverweise. Ein gueltiges
   128-Zeichen-Ziel erzeugt bei Revision 999999 eine 154-Zeichen-Korrektur-ID;
   Revision 1000000 ist ungueltig.
+
+### Umsetzungsstand vom 2026-08-09
+
+- Claudes zweites Code-Re-Review hat Slice 4 ohne Blocker freigegeben und
+  S4-01 bis S4-07 einzeln bestaetigt.
+- Das mittlere Darstellungsfinding S4-08 ist auf Nutzerentscheidung umgesetzt:
+  Abgeschlossene Legacy-Verkaeufe bleiben neutral sichtbar, oeffnen Balance-
+  und Simulator-Details aber nicht mehr alle fuenf Sekunden zwangsweise.
+- Das niedrige Finding S4-09 ist bewusst nicht umgesetzt. Der seltene veraltete
+  Korrekturdialog wird sicher vor Bestaetigung und Schreiben blockiert; offen
+  bleibt nur eine technisch korrekte, aber weniger handlungsleitende Meldung.
+  Wiederaufnahme erfolgt nur bei realer Fehlinterpretation im persoenlichen
+  Betrieb.
+- Nach der letzten Codeaenderung sind der fokussierte Test mit 40/40 Assertions,
+  `npm test` mit 19.507/19.507 Assertions, 29/29 Browserworkflows und die
+  Coverage-Pflichtgates bei 79,33 Prozent gruen. Der produktive Scope bleibt bei
+  sieben Dateien; Engine, `dist` und EXE bleiben unberuehrt.
+- Offen sind nur noch die finale Gemini-Scope-/Abnahmepruefung und der lokale
+  Commit durch Gemini. Ein Push bleibt von einer ausdruecklichen
+  Nutzerfreigabe abhaengig.
 
 ## 12. Bewusst nicht realisierte Punkte
 

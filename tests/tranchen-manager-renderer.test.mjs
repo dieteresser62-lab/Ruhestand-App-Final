@@ -2,6 +2,7 @@
 
 import {
     buildEmptyTranchenHtml,
+    buildReconciliationCashStatusesHtml,
     buildTranchenStatsHtml,
     buildTranchenTableHtml
 } from '../app/tranches/tranchen-manager-renderer.js';
@@ -82,3 +83,73 @@ console.log('Test 5: empty state does not claim FIFO activity');
     assert(!html.includes('FIFO aktiv'), 'Empty state must not report FIFO as active');
 }
 console.log('✓ empty FIFO semantics OK');
+
+console.log('Test 6: cash-status renderer distinguishes pending, corrected and legacy evidence safely');
+{
+    const html = buildReconciliationCashStatusesHtml([
+        {
+            targetActionId: 'sale-<unsafe>',
+            cashStatus: 'pending_manual_posting',
+            statusLabel: 'Offen – manuell nachführen',
+            confirmedNetProceedsEur: 500,
+            cashBalanceAfterPostingEur: null,
+            effectiveActionId: null,
+            correctionRevision: 0,
+            isPending: true,
+            isLegacy: false,
+            canConfirm: true,
+            canCorrect: false
+        },
+        {
+            targetActionId: 'sale-2',
+            cashStatus: 'confirmed_corrected',
+            statusLabel: 'Cash bestätigt – korrigiert',
+            confirmedNetProceedsEur: 95,
+            cashBalanceAfterPostingEur: 10090,
+            effectiveActionId: 'cash-correction:v1:sale-2:1',
+            correctionRevision: 1,
+            correctionReason: 'Zahlendreher',
+            isPending: false,
+            isLegacy: false,
+            canConfirm: false,
+            canCorrect: true
+        },
+        {
+            targetActionId: 'legacy-sale',
+            cashStatus: 'legacy_unknown',
+            statusLabel: 'Abgeschlossen (Altfall – Cashstatus nicht dokumentiert)',
+            confirmedNetProceedsEur: 42,
+            cashBalanceAfterPostingEur: null,
+            effectiveActionId: null,
+            correctionRevision: 0,
+            isPending: false,
+            isLegacy: true,
+            canConfirm: true,
+            canCorrect: false
+        }
+    ]);
+    assert(html.includes('1 Verkauf/Verkäufe mit offener manueller Cashbuchung'),
+        'Renderer should count only true pending sales');
+    assert(html.includes('data-cash-action="confirm"') && html.includes('data-cash-action="correct"'),
+        'Renderer should expose explicit append-only workflow actions');
+    assert(html.includes('Revision 1') && html.includes('10.090,00'),
+        'Renderer should show only the effective corrected balance and revision');
+    assert(html.includes('Altfall – Cashstatus nicht dokumentiert'),
+        'Renderer should keep legacy evidence distinct from confirmed cash');
+    assert(html.includes('1 Altverkauf/Altverkäufe ohne dokumentierten Cashstatus')
+        && html.includes('nicht als cashbestätigt'),
+    'Renderer summary must disclose legacy sales instead of implying confirmed cash');
+    assert(!html.includes('sale-<unsafe>') && html.includes('sale-&lt;unsafe&gt;'),
+        'Cash target ids must be HTML-escaped in text and attributes');
+
+    const errorHtml = buildReconciliationCashStatusesHtml([], {
+        errorMessage: 'Audit <nicht lesbar>'
+    });
+    assert(errorHtml.includes('Cashstatus-Audit nicht lesbar – die Liste ist unvollständig'),
+        'Unreadable audit should render a dedicated incomplete-list state');
+    assert(!errorHtml.includes('Noch keine dokumentierten Realverkäufe'),
+        'Unreadable audit must never masquerade as an empty history');
+    assert(errorHtml.includes('Audit &lt;nicht lesbar&gt;') && !errorHtml.includes('Audit <nicht lesbar>'),
+        'Audit error details must be HTML-escaped');
+}
+console.log('✓ cash-status rendering contract OK');

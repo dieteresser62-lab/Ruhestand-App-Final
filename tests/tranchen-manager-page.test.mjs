@@ -52,6 +52,7 @@ class MockElement {
     }
     closest(selector) {
         if (selector === '[data-action]' && this.dataset.action) return this;
+        if (selector === '[data-cash-action]' && this.dataset.cashAction) return this;
         return null;
     }
 }
@@ -141,7 +142,22 @@ function createTranchenPageDom() {
         'type',
         'tqf',
         'taxExempt',
-        'notes'
+        'notes',
+        'reconciliationForm',
+        'reconciliationStatus',
+        'reconciliationCashChoice',
+        'reconciliationCashStatuses',
+        'reconcileCashStatus',
+        'reconcileInitialCashBalanceGroup',
+        'reconcileInitialCashBalance',
+        'cashPostingModal',
+        'cashPostingModalTitle',
+        'cashPostingModalSummary',
+        'cashPostingForm',
+        'cashPostingBalance',
+        'cashPostingReasonGroup',
+        'cashPostingReason',
+        'cashPostingFormError'
     ].forEach(id => doc.register(new MockElement(id)));
     [
         'addTrancheBtn',
@@ -153,7 +169,12 @@ function createTranchenPageDom() {
         'copyCorruptPayloadBtn',
         'resetCorruptPayloadBtn',
         'retryTrancheLoadBtn',
-        'retryTrancheSaveBtn'
+        'retryTrancheSaveBtn',
+        'reconciliationPreviewBtn',
+        'reconciliationConfirmBtn',
+        'reconciliationCancelBtn',
+        'cashPostingCancelBtn',
+        'cashPostingSubmitBtn'
     ].forEach(id => doc.register(new MockElement(id, 'button')));
     profileInputIds.forEach(id => {
         const tagName = id.includes('Aktiv') || id.includes('Steuerfrei') || id.includes('Mode') || id.includes('Source') || id.includes('Enabled') ? 'select' : 'input';
@@ -161,9 +182,47 @@ function createTranchenPageDom() {
     });
     doc.getElementById('category').value = 'equity';
     doc.getElementById('type').value = 'aktien_neu';
+    doc.getElementById('reconcileCashStatus').value = 'pending_manual_posting';
     doc.getElementById('type').options = ['aktien_alt', 'aktien_neu', 'anleihe', 'geldmarkt', 'gold']
         .map(value => ({ value, disabled: false, hidden: false }));
     return doc;
+}
+
+function createCashSale(overrides = {}) {
+    return {
+        schemaVersion: 1,
+        eventType: 'sale_reconciled',
+        actionId: 'page-cash-sale',
+        profileId: 'page-cash-profile',
+        trancheId: 'page-cash-lot',
+        executedAt: '2026-07-14',
+        actual: { sharesSold: 1, grossProceeds: 100, fees: 5, netProceeds: 95 },
+        cashStatus: 'confirmed_already_reflected',
+        cashBalanceAfterPostingEur: 5000,
+        cashConfirmedAt: '2026-07-14T12:00:00.000Z',
+        result: { beforeShares: 2, remainingShares: 1, trancheRemoved: false },
+        reconciledAt: '2026-07-14T12:00:00.000Z',
+        ...overrides
+    };
+}
+
+function createCashRegistry(actions) {
+    return {
+        version: 1,
+        profiles: {
+            'page-cash-profile': {
+                meta: {
+                    id: 'page-cash-profile',
+                    name: 'Cashprofil',
+                    createdAt: '2026-07-14T00:00:00.000Z',
+                    updatedAt: '2026-07-14T00:00:00.000Z',
+                    belongsToHousehold: true
+                },
+                data: {}
+            }
+        },
+        trancheReconciliation: { schemaVersion: 1, actions }
+    };
 }
 
 async function waitFor(predicate, message, timeoutMs = 1500) {
@@ -658,6 +717,124 @@ async function runTranchenManagerPageTests() {
         assertEqual(doc.getElementById('retryTrancheSaveBtn').hidden, true, 'Successful queued save should not require manual retry');
     }
     console.log('✓ slow-flush profile queue OK');
+
+    console.log('Test 10: stale cash-correction dialog is blocked before confirmation and preserves the newer audit');
+    {
+        const storageRef = createLocalStorageMock();
+        const doc = createTranchenPageDom();
+        installGlobals(doc, storageRef);
+        PersistenceFacade.resetPersistenceForTests();
+        const sale = createCashSale();
+        persistenceStorage.setItem('rs_profiles_v1', JSON.stringify(createCashRegistry([sale])));
+
+        await initTranchenManagerPage({ profileId: 'page-cash-profile' });
+        const actionButton = new MockElement('correct-page-cash', 'button');
+        actionButton.dataset.cashAction = 'correct';
+        actionButton.dataset.targetActionId = sale.actionId;
+        doc.getElementById('reconciliationCashStatuses').listeners.click[0]({ target: actionButton });
+        assert(doc.getElementById('cashPostingModalSummary').textContent.includes('Nächste Korrekturrevision: 1'),
+            'Correction dialog should pin the displayed revision');
+        assert(doc.getElementById('cashPostingModalSummary').textContent.includes('cash-correction:v1:page-cash-sale:1'),
+            'Correction dialog should pin the displayed canonical action id');
+
+        const registryAfterOtherTab = createCashRegistry([sale, {
+            schemaVersion: 1,
+            eventType: 'cash_posting_corrected',
+            actionId: 'cash-correction:v1:page-cash-sale:1',
+            correctionActionId: 'cash-correction:v1:page-cash-sale:1',
+            targetActionId: sale.actionId,
+            correctsActionId: sale.actionId,
+            correctionRevision: 1,
+            profileId: sale.profileId,
+            confirmedNetProceedsEur: 95,
+            cashBalanceAfterPostingEur: 4000,
+            correctionReason: 'Parallel in Tab B korrigiert',
+            correctedAt: '2026-07-15T09:00:00.000Z'
+        }]);
+        persistenceStorage.setItem('rs_profiles_v1', JSON.stringify(registryAfterOtherTab));
+        doc.getElementById('cashPostingBalance').value = '4500';
+        doc.getElementById('cashPostingReason').value = 'Veraltete Annahme aus Tab A';
+        let confirmCalls = 0;
+        global.confirm = () => { confirmCalls += 1; return true; };
+
+        const submitted = await doc.getElementById('cashPostingForm').listeners.submit[0]({ preventDefault() {} });
+        const persisted = JSON.parse(persistenceStorage.getItem('rs_profiles_v1'));
+        assertEqual(submitted, false, 'Stale correction dialog should be rejected');
+        assertEqual(confirmCalls, 0, 'Stale correction must fail before the final confirmation dialog');
+        assertEqual(persisted.trancheReconciliation.actions.length, 2,
+            'Stale correction must not append a silently re-derived revision');
+        assertEqual(persisted.trancheReconciliation.actions[1].cashBalanceAfterPostingEur, 4000,
+            'Newer effective cash balance must remain unchanged');
+        assertEqual(doc.getElementById('cashPostingFormError').hidden, false,
+            'Stale correction should expose an actionable modal error');
+        assert(doc.getElementById('cashPostingFormError').textContent.includes('abweichenden Payload')
+            || doc.getElementById('cashPostingFormError').textContent.includes('aktuellen Stand'),
+        'Stale correction error should explain the conflict or request a current reload');
+    }
+    console.log('✓ stale cash-dialog gate OK');
+
+    console.log('Test 11: unreadable cash audit renders an incomplete-list warning instead of an empty history');
+    {
+        const storageRef = createLocalStorageMock();
+        const doc = createTranchenPageDom();
+        installGlobals(doc, storageRef);
+        PersistenceFacade.resetPersistenceForTests();
+        persistenceStorage.setItem('rs_profiles_v1', JSON.stringify(createCashRegistry([{
+            ...createCashSale(),
+            eventType: 'unknown_future_event'
+        }])));
+
+        await initTranchenManagerPage({ profileId: 'page-cash-profile' });
+        const panel = doc.getElementById('reconciliationCashStatuses').innerHTML;
+        assert(panel.includes('Cashstatus-Audit nicht lesbar – die Liste ist unvollständig'),
+            'Manager panel should expose its unreadable audit state');
+        assert(!panel.includes('Noch keine dokumentierten Realverkäufe'),
+            'Unreadable audit must not be rendered as an empty sale history');
+        assert(doc.getElementById('reconciliationStatus').textContent.includes('blockiert'),
+            'Manager form should keep cash confirmation and correction visibly blocked');
+    }
+    console.log('✓ unreadable cash-audit panel contract OK');
+
+    console.log('Test 12: cash confirmation uses the page orchestrator and appends exactly one audit event');
+    {
+        const storageRef = createLocalStorageMock();
+        const doc = createTranchenPageDom();
+        installGlobals(doc, storageRef);
+        PersistenceFacade.resetPersistenceForTests();
+        await PersistenceFacade.init();
+        const pendingSale = createCashSale({ cashStatus: 'pending_manual_posting' });
+        delete pendingSale.cashBalanceAfterPostingEur;
+        delete pendingSale.cashConfirmedAt;
+        const registry = createCashRegistry([pendingSale]);
+        const saleBefore = JSON.stringify(registry.trancheReconciliation.actions[0]);
+        persistenceStorage.setItem('rs_profiles_v1', JSON.stringify(registry));
+        persistenceStorage.setItem('rs_current_profile', 'page-cash-profile');
+        persistenceStorage.setItem('rs_active_profile', 'page-cash-profile');
+
+        await initTranchenManagerPage({ profileId: 'page-cash-profile' });
+        const actionButton = new MockElement('confirm-page-cash', 'button');
+        actionButton.dataset.cashAction = 'confirm';
+        actionButton.dataset.targetActionId = pendingSale.actionId;
+        doc.getElementById('reconciliationCashStatuses').listeners.click[0]({ target: actionButton });
+        doc.getElementById('cashPostingBalance').value = '5095';
+        let confirmationText = '';
+        global.confirm = message => { confirmationText = message; return true; };
+
+        const submitted = await doc.getElementById('cashPostingForm').listeners.submit[0]({ preventDefault() {} });
+        const persisted = JSON.parse(persistenceStorage.getItem('rs_profiles_v1'));
+        assertEqual(submitted, true, 'Page orchestrator should commit a confirmed cash posting');
+        assert(confirmationText.includes('Nettoerlös') && confirmationText.includes('keine automatische Cashbuchung'),
+            'Final confirmation should name the evidence and manual-only effect');
+        assertEqual(persisted.trancheReconciliation.actions.length, 2,
+            'Page orchestrator should append exactly one confirmation event');
+        assertEqual(JSON.stringify(persisted.trancheReconciliation.actions[0]), saleBefore,
+            'Page orchestrator must preserve the original sale record exactly');
+        assertEqual(persisted.trancheReconciliation.actions[1].eventType, 'cash_posting_confirmed',
+            'Page orchestrator should persist the explicit confirmation event');
+        assertEqual(doc.getElementById('cashPostingModal').classList.contains('active'), false,
+            'Successful confirmation should close the cash modal');
+    }
+    console.log('✓ cash page orchestration contract OK');
 
     console.log('✅ Tranchen manager page contract validated');
     console.log('--- Tranchen Manager Page Tests Completed ---');

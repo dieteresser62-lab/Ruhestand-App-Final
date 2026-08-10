@@ -1454,8 +1454,10 @@ async function runTranchesSmoke(browser, baseUrl) {
         'Reconcile-Vorschau muss exakte Profil-/Tranche-/Action-Identitaet zeigen');
     assert(previewText.includes('Resultierender Bestand') && previewText.includes('Abweichung'),
         'Reconcile-Vorschau muss resultierenden Bestand und Empfehlungsabweichung zeigen');
+    assert(previewText.includes('Cashstatus: offen') && previewText.includes('keine automatische Cashbuchung'),
+        'Reconcile-Vorschau muss den offenen manuellen Cashprozess unmissverständlich zeigen');
     await page.locator('#reconciliationConfirmBtn').click();
-    await page.locator('#reconciliationStatus').filter({ hasText: 'dauerhaft bestätigt' }).waitFor();
+    await page.locator('#reconciliationStatus').filter({ hasText: 'Cashbuchung bleibt manuell offen' }).waitFor();
 
     const reconciledRow = await readIndexedDb(page, 'kv', 'depot_tranchen');
     assert(JSON.parse(reconciledRow.value)[0].shares === 1,
@@ -1464,6 +1466,10 @@ async function runTranchesSmoke(browser, baseUrl) {
     const reconciledRegistry = JSON.parse(reconciledRegistryRow.value);
     assert(reconciledRegistry.trancheReconciliation.actions[0].actionId === 'browser-order-1',
         'Bestaetigung muss stabile Action-ID fuer Reload-Idempotenz speichern');
+    assert(reconciledRegistry.trancheReconciliation.actions[0].eventType === 'sale_reconciled'
+        && reconciledRegistry.trancheReconciliation.actions[0].cashStatus === 'pending_manual_posting',
+    'Neuer Realverkauf muss explizit als offener Cashstatus gespeichert werden');
+    const saleRecordBeforeCash = JSON.stringify(reconciledRegistry.trancheReconciliation.actions[0]);
 
     await page.locator('#reconcileActionId').fill('browser-order-1');
     await page.locator('#reconcileTrancheId').selectOption(afterEditId);
@@ -1481,6 +1487,106 @@ async function runTranchesSmoke(browser, baseUrl) {
     const duplicateRow = await readIndexedDb(page, 'kv', 'depot_tranchen');
     assert(JSON.parse(duplicateRow.value)[0].shares === 1,
         'Identische Action-ID darf den Bestand nicht ein zweites Mal reduzieren');
+
+    await page.locator('#managerBackLink').click();
+    await page.locator('a[href="Balance.html"]').click();
+    await page.getByText(/1 Realverkauf\/Realverkäufe mit offener manueller Cashbuchung/).waitFor({ state: 'visible' });
+    assert((await readIndexedDb(page, 'kv', 'depot_tranchen')).value === duplicateRow.value,
+        'Seitenwechsel mit sichtbarem Cashrückstand darf den Realbestand nicht verändern');
+    await page.locator('a[href="index.html"]').first().click();
+    await page.locator('a[href="depot-tranchen-manager.html"]').click();
+    await page.locator('#reconciliationCashStatuses').waitFor({ state: 'visible' });
+    await page.reload({ waitUntil: 'load' });
+    await page.locator('#reconciliationCashStatuses').filter({ hasText: 'offener manueller Cashbuchung' }).waitFor();
+    assert(await page.locator('[data-cash-action="confirm"][data-target-action-id="browser-order-1"]').isVisible(),
+        'Offener Cashstatus muss Reload ueberleben und eine explizite Bestaetigung anbieten');
+    await page.locator('[data-cash-action="confirm"][data-target-action-id="browser-order-1"]').click();
+    await page.locator('#cashPostingModal.active').waitFor({ state: 'visible' });
+    const confirmationSummary = await page.locator('#cashPostingModalSummary').textContent();
+    assert(confirmationSummary.includes('browser-order-1') && confirmationSummary.includes('95,00')
+        && confirmationSummary.includes('cash-confirmation:v1:browser-order-1'),
+    'Cashdialog muss Zielverkauf, unveraenderten Nettoerloes und kanonische Abschluss-ID zeigen');
+    await page.locator('#cashPostingBalance').fill('10095');
+    await page.locator('#cashPostingSubmitBtn').click();
+    await page.locator('#reconciliationStatus').filter({ hasText: 'append-only bestätigt' }).waitFor();
+
+    const confirmedCashRegistry = JSON.parse((await readIndexedDb(page, 'kv', 'rs_profiles_v1')).value);
+    assert(confirmedCashRegistry.trancheReconciliation.actions.length === 2,
+        'Manueller Cashabschluss muss genau ein Folgeereignis anhaengen');
+    assert(JSON.stringify(confirmedCashRegistry.trancheReconciliation.actions[0]) === saleRecordBeforeCash,
+        'Cashabschluss darf den Verkaufsrecord byte-/wertgleich nicht mutieren');
+    const cashConfirmation = confirmedCashRegistry.trancheReconciliation.actions[1];
+    assert(cashConfirmation.eventType === 'cash_posting_confirmed'
+        && cashConfirmation.actionId === cashConfirmation.confirmationActionId
+        && cashConfirmation.targetActionId === 'browser-order-1'
+        && cashConfirmation.confirmedNetProceedsEur === 95,
+    'Cashabschluss muss kanonisch auf Verkauf und Nettoerloes verweisen');
+
+    await page.reload({ waitUntil: 'load' });
+    await page.locator('#reconciliationCashStatuses').filter({ hasText: 'Kein offener manueller Cashrückstand' }).waitFor();
+    await page.locator('[data-cash-action="correct"][data-target-action-id="browser-order-1"]').click();
+    await page.locator('#cashPostingModal.active').waitFor({ state: 'visible' });
+    const correctionSummary = await page.locator('#cashPostingModalSummary').textContent();
+    assert(correctionSummary.includes('10.095,00') && correctionSummary.includes('Korrekturrevision: 1')
+        && correctionSummary.includes('cash-correction:v1:browser-order-1:1'),
+    'Korrekturdialog muss bisherigen Cashstand, naechste Revision und kanonische ID zeigen');
+    await page.locator('#cashPostingBalance').fill('10090');
+    await page.locator('#cashPostingReason').fill('Browser-Test: Zahlendreher korrigiert');
+    await page.locator('#cashPostingSubmitBtn').click();
+    await page.locator('#reconciliationStatus').filter({ hasText: 'Cashstandkorrektur append-only gespeichert' }).waitFor();
+
+    const correctedCashRegistry = JSON.parse((await readIndexedDb(page, 'kv', 'rs_profiles_v1')).value);
+    assert(correctedCashRegistry.trancheReconciliation.actions.length === 3,
+        'Cashkorrektur muss genau ein drittes Folgeereignis anhaengen');
+    assert(JSON.stringify(correctedCashRegistry.trancheReconciliation.actions[0]) === saleRecordBeforeCash
+        && JSON.stringify(correctedCashRegistry.trancheReconciliation.actions[1]) === JSON.stringify(cashConfirmation),
+    'Cashkorrektur darf weder Verkauf noch bestaetigten Vorgänger mutieren');
+    const cashCorrection = correctedCashRegistry.trancheReconciliation.actions[2];
+    assert(cashCorrection.eventType === 'cash_posting_corrected'
+        && cashCorrection.correctionRevision === 1
+        && cashCorrection.correctsActionId === cashConfirmation.actionId
+        && cashCorrection.cashBalanceAfterPostingEur === 10090,
+    'Cashkorrektur muss als lineare Revision auf den wirksamen Vorgänger zeigen');
+
+    const duplicateCorrectionStatus = await page.evaluate(async () => {
+        const { commitCashPostingCorrection } = await import('./app/tranches/tranche-reconciliation.js');
+        const { persistenceStorage } = await import('./app/shared/persistence-facade.js');
+        const registryRaw = persistenceStorage.getItem('rs_profiles_v1');
+        const registry = JSON.parse(registryRaw);
+        const record = registry.trancheReconciliation.actions[2];
+        const result = await commitCashPostingCorrection({ ...record, expectedRegistryRaw: registryRaw });
+        return result.status;
+    });
+    assert(duplicateCorrectionStatus === 'duplicate',
+        'Byte-/wertgleiche Korrekturwiederholung muss idempotent bleiben');
+    assert(JSON.parse((await readIndexedDb(page, 'kv', 'rs_profiles_v1')).value)
+        .trancheReconciliation.actions.length === 3,
+    'Idempotente Korrekturwiederholung darf kein viertes Event erzeugen');
+
+    await page.reload({ waitUntil: 'load' });
+    const correctedStatusText = await page.locator('#reconciliationCashStatuses').textContent();
+    assert(correctedStatusText.includes('Revision 1') && correctedStatusText.includes('10.090,00'),
+        'Reload muss ausschließlich den letzten wirksamen korrigierten Cashstand anzeigen');
+
+    await page.evaluate(async () => {
+        const { persistenceStorage, PersistenceFacade } = await import('./app/shared/persistence-facade.js');
+        const registry = JSON.parse(persistenceStorage.getItem('rs_profiles_v1'));
+        const legacy = JSON.parse(JSON.stringify(registry.trancheReconciliation.actions[0]));
+        legacy.actionId = 'legacy-browser-sale';
+        legacy.executedAt = '2025-01-02';
+        delete legacy.eventType;
+        delete legacy.cashStatus;
+        delete legacy.cashBalanceAfterPostingEur;
+        delete legacy.cashConfirmedAt;
+        registry.trancheReconciliation.actions.push(legacy);
+        persistenceStorage.setItem('rs_profiles_v1', JSON.stringify(registry));
+        await PersistenceFacade.flush();
+    });
+    await page.reload({ waitUntil: 'load' });
+    const legacyStatusText = await page.locator('#reconciliationCashStatuses').textContent();
+    assert(legacyStatusText.includes('Abgeschlossen (Altfall – Cashstatus nicht dokumentiert)')
+        && legacyStatusText.includes('Kein offener manueller Cashrückstand'),
+    'Legacy-Verkauf muss sichtbar, operativ abgeschlossen und nicht als pending dargestellt werden');
 
     await page.setViewportSize({ width: 390, height: 844 });
     const mobileLayout = await page.evaluate(() => {

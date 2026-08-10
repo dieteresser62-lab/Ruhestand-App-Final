@@ -1,11 +1,12 @@
 import {
     TRANCHE_STATUS_STATES,
     calculateAggregatedValues,
+    getReconciliationCashStatus,
     getTranchenStatus,
     renderTranchenStatusBadge,
     syncTranchenToInputs
 } from '../app/tranches/depot-tranchen-status.js';
-import { PersistenceFacade } from '../app/shared/persistence-facade.js';
+import { PersistenceFacade, persistenceStorage } from '../app/shared/persistence-facade.js';
 
 console.log('--- Depot Tranchen Status Tests ---');
 
@@ -177,6 +178,85 @@ console.log('Test 5: input synchronization keeps hidden fields canonical and rep
     assertEqual(elements.get('depotwertAlt').value, '1234', 'Hidden depot value should remain a canonical numeric string');
     assertEqual(elements.get('einstandAlt').value, '1000', 'Hidden cost basis should remain a canonical numeric string');
 }
+
+console.log('Test 6: suite-wide cash status counts pending sales and fails closed on corrupt audit');
+{
+    const storage = createStorage();
+    const sale = {
+        schemaVersion: 1,
+        eventType: 'sale_reconciled',
+        actionId: 'status-sale-1',
+        profileId: 'profile-status',
+        trancheId: 'lot-status',
+        executedAt: '2026-07-14',
+        actual: { sharesSold: 1, grossProceeds: 100, fees: 5, netProceeds: 95 },
+        cashStatus: 'pending_manual_posting',
+        result: { beforeShares: 2, remainingShares: 1, trancheRemoved: false },
+        reconciledAt: '2026-07-14T12:00:00.000Z'
+    };
+    storage.setItem('rs_profiles_v1', JSON.stringify({
+        version: 1,
+        profiles: { 'profile-status': { data: {} } },
+        trancheReconciliation: { schemaVersion: 1, actions: [sale] }
+    }));
+    const status = getReconciliationCashStatus({ storage, profileId: 'profile-status' });
+    assertEqual(status.state, 'valid', 'Valid mixed-event registry should produce a cash status');
+    assertEqual(status.pendingCount, 1, 'Only pending_manual_posting should count as an open cash backlog');
+    assertEqual(status.confirmedCount, 0, 'Pending sale must not masquerade as confirmed cash');
+
+    const corrupt = JSON.parse(storage.getItem('rs_profiles_v1'));
+    corrupt.trancheReconciliation.actions[0].eventType = 'unknown_future_event';
+    storage.setItem('rs_profiles_v1', JSON.stringify(corrupt));
+    const failed = getReconciliationCashStatus({ storage, profileId: 'profile-status' });
+    assertEqual(failed.state, 'error', 'Unknown audit events should fail closed in suite status');
+    assertEqual(failed.pendingCount, 0, 'Corrupt audit must not invent a pending count');
+    assertEqual(failed.legacyCount, 0, 'Corrupt audit should keep the status object shape complete');
+    assertEqual(failed.confirmedCount, 0, 'Corrupt audit should define a zero confirmed count');
+
+    const notLoaded = getReconciliationCashStatus({ storage: createStorage(), profileId: null });
+    assertEqual(notLoaded.legacyCount, 0, 'Not-loaded status should define a zero legacy count');
+    assertEqual(notLoaded.confirmedCount, 0, 'Not-loaded status should define a zero confirmed count');
+
+    const legacySale = { ...sale };
+    delete legacySale.eventType;
+    delete legacySale.cashStatus;
+    storage.setItem('rs_profiles_v1', JSON.stringify({
+        version: 1,
+        profiles: {
+            'profile-status': {
+                meta: {
+                    id: 'profile-status',
+                    name: 'Status',
+                    createdAt: '2026-07-14T00:00:00.000Z',
+                    updatedAt: '2026-07-14T00:00:00.000Z',
+                    belongsToHousehold: true
+                },
+                data: {}
+            }
+        },
+        trancheReconciliation: { schemaVersion: 1, actions: [legacySale] }
+    }));
+    storage.setItem('rs_current_profile', 'profile-status');
+    storage.setItem('rs_active_profile', 'profile-status');
+    storage.setItem('depot_tranchen', '[]');
+    PersistenceFacade.resetPersistenceForTests();
+    await PersistenceFacade.init();
+    persistenceStorage.setItem('rs_profiles_v1', storage.getItem('rs_profiles_v1'));
+    persistenceStorage.setItem('rs_current_profile', 'profile-status');
+    persistenceStorage.setItem('rs_active_profile', 'profile-status');
+    const details = { open: false };
+    const container = { innerHTML: '', closest: selector => selector === 'details' ? details : null };
+    global.document = { getElementById: id => id === 'cash-status' ? container : null };
+    renderTranchenStatusBadge('cash-status');
+    assert(container.innerHTML.includes('1 Altverkauf/Altverkäufe besitzen keinen dokumentierten Cashstatus'),
+        'Suite badge should disclose legacy sales without documented cash evidence');
+    assert(!container.innerHTML.includes('✅ Kein offener manueller Cashrückstand'),
+        'Legacy-only badge must not use the all-clear cash marker');
+    assert(container.innerHTML.includes('<div style="margin-top: 8px;">ℹ️ Kein offener manueller Cashrückstand.'),
+        'Legacy-only badge should remain visible in a neutral informational style when details are open');
+    assertEqual(details.open, false, 'Completed legacy sales must not force collapsed Balance details open');
+}
+console.log('✓ suite-wide cash-status contract OK');
 
 PersistenceFacade.resetPersistenceRuntimeForTests();
 Object.entries(previousGlobals).forEach(([key, value]) => {

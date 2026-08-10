@@ -9,7 +9,10 @@
 
 import { EUR_NO_DEC_FORMATTER } from '../shared/shared-formatting.js';
 import { persistenceStorage } from '../shared/persistence-facade.js';
+import { getActiveProfileId, getCurrentProfileId } from '../profile/profile-storage.js';
+import { PROFILE_STORAGE_KEYS } from '../profile/profile-state.js';
 import { loadTranchesFromStorage } from './tranchen-manager-state.js';
+import { projectReconciliationCashStatuses } from './tranche-reconciliation.js';
 import {
     classifyTranche,
     normalizeTrancheCollection
@@ -21,6 +24,77 @@ export const TRANCHE_STATUS_STATES = Object.freeze({
     VALID: 'valid',
     ERROR: 'error'
 });
+
+export function getReconciliationCashStatus({ storage = persistenceStorage, profileId = undefined } = {}) {
+    let resolvedProfileId = profileId;
+    if (resolvedProfileId === undefined) {
+        try {
+            resolvedProfileId = getActiveProfileId() || getCurrentProfileId() || null;
+        } catch {
+            resolvedProfileId = null;
+        }
+    }
+    if (!resolvedProfileId) {
+        return Object.freeze({
+            state: 'not_loaded', profileId: null, statuses: [], pendingCount: 0,
+            legacyCount: 0, confirmedCount: 0, errorCode: null
+        });
+    }
+    let raw;
+    try {
+        raw = storage.getItem(PROFILE_STORAGE_KEYS.registry);
+    } catch {
+        return Object.freeze({
+            state: 'error', profileId: resolvedProfileId, statuses: [], pendingCount: 0,
+            legacyCount: 0, confirmedCount: 0, errorCode: 'RECONCILIATION_REGISTRY_UNAVAILABLE'
+        });
+    }
+    if (!raw) {
+        return Object.freeze({
+            state: 'not_loaded', profileId: resolvedProfileId, statuses: [], pendingCount: 0,
+            legacyCount: 0, confirmedCount: 0, errorCode: null
+        });
+    }
+    try {
+        const statuses = projectReconciliationCashStatuses(raw, resolvedProfileId);
+        return Object.freeze({
+            state: 'valid',
+            profileId: resolvedProfileId,
+            statuses,
+            pendingCount: statuses.filter(status => status.isPending).length,
+            legacyCount: statuses.filter(status => status.isLegacy).length,
+            confirmedCount: statuses.filter(status => status.isConfirmed).length,
+            errorCode: null
+        });
+    } catch (error) {
+        return Object.freeze({
+            state: 'error',
+            profileId: resolvedProfileId,
+            statuses: [],
+            pendingCount: 0,
+            legacyCount: 0,
+            confirmedCount: 0,
+            errorCode: error?.code || 'RECONCILIATION_HISTORY_INVALID'
+        });
+    }
+}
+
+function buildCashStatusNotice(status) {
+    if (status.state === 'error') {
+        return '<div class="tranchen-warning">⚠️ Cashstatus-Audit ist beschädigt oder nicht unterstützt; Cashaussagen sind blockiert.</div>';
+    }
+    if (status.state !== 'valid' || status.statuses.length === 0) return '';
+    const legacyNotice = status.legacyCount > 0
+        ? ` ${status.legacyCount} Altverkauf/Altverkäufe besitzen keinen dokumentierten Cashstatus; sie gelten operativ als abgeschlossen, nicht als cashbestätigt.`
+        : '';
+    if (status.pendingCount > 0) {
+        return `<div class="tranchen-warning">⚠️ ${status.pendingCount} Realverkauf/Realverkäufe mit offener manueller Cashbuchung.${legacyNotice}</div>`;
+    }
+    if (status.legacyCount > 0) {
+        return `<div style="margin-top: 8px;">ℹ️ Kein offener manueller Cashrückstand.${legacyNotice}</div>`;
+    }
+    return '<div style="margin-top: 8px;">✅ Kein offener manueller Cashrückstand aus Realverkäufen.</div>';
+}
 
 function emptyWarnings() {
     return {
@@ -176,6 +250,13 @@ export function renderTranchenStatusBadge(containerId) {
     }
 
     const status = getTranchenStatus();
+    const reconciliationCashStatus = getReconciliationCashStatus();
+    const cashStatusNotice = buildCashStatusNotice(reconciliationCashStatus);
+    if (reconciliationCashStatus.pendingCount > 0
+        || reconciliationCashStatus.state === 'error') {
+        const collapsedDetails = container.closest?.('details');
+        if (collapsedDetails) collapsedDetails.open = true;
+    }
 
     if (status.state !== TRANCHE_STATUS_STATES.VALID) {
         const variants = {
@@ -216,6 +297,7 @@ export function renderTranchenStatusBadge(containerId) {
                 <span style="font-size: 0.85rem;">
                     ${variant.detail}
                 </span>
+                ${cashStatusNotice}
             </div>
         `;
         return;
@@ -253,6 +335,7 @@ export function renderTranchenStatusBadge(containerId) {
                     <div style="font-weight: 600; font-size: 0.95rem;">${status.gainPct > 0 ? '+' : ''}${status.gainPct.toFixed(1)}%</div>
                 </div>
             </div>
+            ${cashStatusNotice}
 
             ${status.warnings && (status.warnings.missingMarketValueCount > 0 || status.warnings.missingCostBasisCount > 0)
             ? `<div class="tranchen-warning">

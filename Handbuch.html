@@ -901,7 +901,9 @@
                             <li><strong>Wirkung:</strong> Simulierte Verkäufe werden steueroptimiert aus Kopien der
                                 Tranchen ausgewählt und behalten ihre Profilherkunft.</li>
                             <li><strong>Backup:</strong> Das zentrale Komplettbackup unter „Profile &gt; Erweitert“
-                                verwenden; es gibt keinen separaten Tranchen-Teilimport/-export.</li>
+                                verwenden; es gibt keinen separaten Tranchen-Teilimport/-export. Vor dem ersten Einsatz
+                                des Cashstatus-Workflows auf der Startseite „Profile“ öffnen, „Erweitert“ aufklappen und
+                                „Backup exportieren“ wählen.</li>
                         </ul>
                     </div>
                     <div class="detail-block" id="simulator-pflegebucket">
@@ -1294,6 +1296,27 @@
                             <li><strong>Reale Ausführung:</strong> Erst nach dem Brokerverkauf im Manager Vorschau und
                                 separate Bestätigung des Reconcile-Schritts durchführen. Eine identische Action-ID wird
                                 nur einmal angewandt.</li>
+                            <li><strong>Cashstatus beim Verkauf:</strong> Standardmäßig „Nein / noch unklar“ wählen.
+                                Der Verkauf reduziert dann das Lot, bleibt aber als manuell offene Cashbuchung sichtbar.
+                                Nur wenn der Nettoerlös bereits sicher im erfassten Cashstand enthalten ist,
+                                „bereits berücksichtigt“ wählen und den Cashstand eingeben.</li>
+                            <li><strong>Offenen Cashstatus schließen:</strong> Den Nettoerlös selbst in den Rahmendaten
+                                beziehungsweise im tatsächlich geführten Cashbestand nachtragen. Danach beim
+                                Zielverkauf „Cashbuchung manuell bestätigen“ wählen, unveränderten Nettoerlös,
+                                kanonische Nachweis-ID und Cashstand prüfen und explizit bestätigen. Die Suite bucht
+                                nichts automatisch.</li>
+                            <li><strong>Tippfehler korrigieren:</strong> „Bestätigten Cashstand korrigieren“ wählen,
+                                bisherigen und neuen Stand prüfen und einen nichtleeren Grund erfassen. Verkauf,
+                                Abschluss und frühere Korrekturen bleiben unverändert sichtbar; nur die letzte
+                                lückenlose Revision ist der wirksame Cashstand.</li>
+                            <li><strong>Paralleles Fenster:</strong> Hat ein anderes Fenster den Cashstatus seit dem
+                                Öffnen des Dialogs verändert, wird die alte Korrektur vor der Bestätigung blockiert.
+                                Dialog schließen, den aktuellen Stand neu laden und die Korrektur erneut prüfen; die
+                                Suite leitet niemals still eine neue Revision aus dem veralteten Dialog ab.</li>
+                            <li><strong>Altbestand:</strong> Frühere Verkäufe ohne Cashstatus erscheinen als
+                                „Abgeschlossen (Altfall – Cashstatus nicht dokumentiert)“. Sie sind kein offener
+                                Rückstand und keine Cashbestätigung; der Nachweis kann freiwillig ergänzt werden.
+                                Balance und Simulator weisen solche Altverkäufe ebenfalls gesondert aus.</li>
                         </ul>
                         <p style="color: var(--text-light); margin-top: 0.5rem;">Ohne gepflegte Tranchen fallen die
                             Steuerwerte auf eine vereinfachte Schätzung zurück.</p>
@@ -1429,6 +1452,9 @@
                         <li><strong>Profil löschen:</strong> Profil auswählen und löschen (mit Sicherheitsabfrage).</li>
                         <li><strong>Backup erstellen/importieren:</strong> Unter „Erweitert“ ein zentrales
                             Komplettbackup aller Persistenzdaten exportieren oder wiederherstellen.</li>
+                        <li><strong>Vor dem ersten Reconcile-Cashstatus:</strong> „Profile &gt; Erweitert &gt; Backup
+                            exportieren“ ausführen. Das Komplettbackup enthält auch die Profilregistry mit Verkaufs-,
+                            Cashabschluss- und Korrekturhistorie.</li>
                         <li><strong>Pflegebucket:</strong> Optionalen Pflegebucket als Haushaltsreserve im Profil
                             pflegen. Bei Paaren ist das Hauptprofil die maßgebliche Definition.</li>
                     </ul>
@@ -1703,7 +1729,10 @@
                     <dt>Wird ein bestätigter Verkaufserlös automatisch als Liquidität gebucht?</dt>
                     <dd>Nein. Die Reconciliation entfernt die bestätigten Stücke und protokolliert Nettoerlös und
                         Gebühr, erhöht aber nicht automatisch die freie Liquidität. Wenn der Erlös als Cash verbleibt,
-                        führen Sie ihn in den Rahmendaten separat nach.</dd>
+                        führen Sie ihn in den Rahmendaten separat nach. Der Verkauf bleibt bis zur anschließenden
+                        manuellen Cashbestätigung sichtbar offen. War der Erlös bereits im Cashstand enthalten, kann
+                        dies beim Verkaufscommit mit Cashstand bestätigt werden. Einen Tippfehler überschreiben Sie
+                        nicht: Sie erfassen eine sichtbare append-only Korrektur mit altem/neuem Stand und Grund.</dd>
 
                     <dt>Kann der Simulator mehr als zwei Personen abbilden?</dt>
                     <dd>Finanzwerte aus mehr als zwei Profilen können aggregiert werden. Individuelle Demografie-,

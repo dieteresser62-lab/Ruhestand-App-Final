@@ -147,3 +147,103 @@ export function renderTranchenStats(container, tranchen) {
 export function renderTranchenTable(container, tranchen) {
     container.innerHTML = buildTranchenTableHtml(tranchen);
 }
+
+export function ensureReconciliationCashControls(doc = document) {
+    const form = doc.getElementById?.('reconciliationForm');
+    if (!form || typeof doc.createElement !== 'function') return null;
+    let choice = doc.getElementById?.('reconciliationCashChoice');
+    if (!choice) {
+        choice = doc.createElement('fieldset');
+        choice.id = 'reconciliationCashChoice';
+        choice.className = 'reconciliation-cash-choice';
+        choice.setAttribute?.('style', 'margin:0;padding:1rem;border:1px solid rgba(0,0,0,0.16);border-radius:8px;');
+        choice.innerHTML = `
+            <legend>Cashstatus nach dem Verkauf *</legend>
+            <div class="form-group">
+                <label for="reconcileCashStatus">Ist der Nettoerlös bereits in der freien Liquidität enthalten?</label>
+                <select id="reconcileCashStatus">
+                    <option value="pending_manual_posting" selected>Nein / noch unklar – manuell offen halten</option>
+                    <option value="confirmed_already_reflected">Ja – bereits im erfassten Cashstand enthalten</option>
+                </select>
+                <small>Es erfolgt niemals eine automatische Cashbuchung.</small>
+            </div>
+            <div id="reconcileInitialCashBalanceGroup" class="form-group" hidden>
+                <label for="reconcileInitialCashBalance">Bestätigter Cashstand nach Berücksichtigung (€) *</label>
+                <input id="reconcileInitialCashBalance" type="number" step="0.01">
+                <small>Dieser Stand wird zusammen mit Nettoerlös und Zeitpunkt append-only dokumentiert.</small>
+            </div>`;
+        const firstActions = form.querySelector?.('.reconciliation-actions');
+        if (firstActions?.parentNode?.insertBefore) firstActions.parentNode.insertBefore(choice, firstActions);
+        else form.appendChild?.(choice);
+    }
+
+    let statusContainer = doc.getElementById?.('reconciliationCashStatuses');
+    if (!statusContainer) {
+        statusContainer = doc.createElement('div');
+        statusContainer.id = 'reconciliationCashStatuses';
+        statusContainer.className = 'reconciliation-preview';
+        statusContainer.setAttribute?.('aria-live', 'polite');
+        form.parentNode?.appendChild?.(statusContainer);
+    }
+    return statusContainer;
+}
+
+export function buildReconciliationCashStatusesHtml(statuses = [], { errorMessage = '' } = {}) {
+    if (errorMessage) {
+        return `
+            <h3>Cashstatus der Realverkäufe</h3>
+            <p class="reconciliation-status" data-kind="error" role="alert"><strong>Cashstatus-Audit nicht lesbar – die Liste ist unvollständig.</strong><br>${escapeHtml(errorMessage)}</p>`;
+    }
+    if (!Array.isArray(statuses) || statuses.length === 0) {
+        return `
+            <h3>Cashstatus der Realverkäufe</h3>
+            <p>Noch keine dokumentierten Realverkäufe für dieses Profil.</p>`;
+    }
+    const rows = statuses.map(status => {
+        const targetActionId = escapeHtml(status.targetActionId);
+        const label = escapeHtml(status.statusLabel || 'Cashstatus unbekannt');
+        const net = formatMoney(status.confirmedNetProceedsEur);
+        const cashBalance = status.cashBalanceAfterPostingEur === null
+            ? '-'
+            : `${formatMoney(status.cashBalanceAfterPostingEur)} €`;
+        const evidence = status.effectiveActionId
+            ? `<div><strong>Wirksamer Auditnachweis:</strong> ${escapeHtml(status.effectiveActionId)}</div>`
+            : '';
+        const correction = status.correctionRevision > 0
+            ? `<div><strong>Korrektur:</strong> Revision ${Number(status.correctionRevision)} · ${escapeHtml(status.correctionReason || '')}</div>`
+            : '';
+        const confirmLabel = status.isLegacy ? 'Cashnachweis freiwillig ergänzen' : 'Cashbuchung manuell bestätigen';
+        const action = status.canConfirm
+            ? `<button type="button" class="btn-primary" data-cash-action="confirm" data-target-action-id="${targetActionId}">${confirmLabel}</button>`
+            : status.canCorrect
+                ? `<button type="button" class="btn-secondary" data-cash-action="correct" data-target-action-id="${targetActionId}">Bestätigten Cashstand korrigieren</button>`
+                : '';
+        return `
+            <article data-cash-status="${escapeHtml(status.cashStatus)}" style="padding: 0.8rem 0; border-top: 1px solid rgba(0,0,0,0.12);">
+                <div><strong>${label}</strong></div>
+                <div><strong>Zielverkauf:</strong> ${targetActionId}</div>
+                <div><strong>Nettoerlös:</strong> ${net} € · <strong>bestätigter Cashstand:</strong> ${cashBalance}</div>
+                ${evidence}${correction}
+                <div class="reconciliation-actions">${action}</div>
+            </article>`;
+    }).join('');
+    const pendingCount = statuses.filter(status => status.isPending).length;
+    const legacyCount = statuses.filter(status => status.isLegacy).length;
+    const summary = [
+        pendingCount > 0
+            ? `${pendingCount} Verkauf/Verkäufe mit offener manueller Cashbuchung.`
+            : 'Kein offener manueller Cashrückstand.',
+        legacyCount > 0
+            ? `${legacyCount} Altverkauf/Altverkäufe ohne dokumentierten Cashstatus; operativ abgeschlossen, aber nicht als cashbestätigt ausgewiesen.`
+            : ''
+    ].filter(Boolean).join(' ');
+    return `
+        <h3>Cashstatus der Realverkäufe</h3>
+        <p>${summary}</p>
+        ${rows}`;
+}
+
+export function renderReconciliationCashStatuses(container, statuses = [], options = {}) {
+    if (!container) return;
+    container.innerHTML = buildReconciliationCashStatusesHtml(statuses, options);
+}

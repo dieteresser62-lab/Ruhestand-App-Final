@@ -4,7 +4,7 @@ Dieses Dokument beschreibt die Architektur und zentrale Datenflüsse der Ruhesta
 
 **Dokumentrolle:** Operative Entwickler-Referenz für aktuelle Modulzuständigkeiten, Datenflüsse und Laufzeitverhalten.
 **Abgrenzung:** Vertiefte fachliche Herleitungen, Marktvergleiche und Forschungsabgleich stehen in `ARCHITEKTUR_UND_FACHKONZEPT.md`.
-**Dokumentstand:** 2026-08-04; bestehender Architekturstand ergaenzt um die technisch nachgebesserte, extern noch nicht freigegebene Runway-Semantik aus Suite-Datenintegritaet Slice 17.
+**Dokumentstand:** 2026-08-07; bestehender Architekturstand ergaenzt um den append-only Reconcile-Cashstatus aus Abschlusshaertung Slice 04.
 
 ---
 
@@ -17,7 +17,7 @@ Dieses Dokument beschreibt die Architektur und zentrale Datenflüsse der Ruhesta
 | Balance-App | `Balance.html`, `app/balance/*.js`, `css/balance.css` | Jahresabschluss, Liquiditäts- und Entnahmeplanung, Diagnosen, Ausgaben-Check mit Jahreshistorie |
 | Simulator | `Simulator.html`, `app/simulator/*.js`, `simulator.css` | Monte Carlo, Backtest, Sweeps, Auto-Optimize, Stationary Bootstrap, Tail-Risk-Stresstest, Pflegefall- und Pflegebucket-Wirklogik |
 | Profil/Verbund | `index.html`, `app/profile/*.js` | Profilverwaltung, Handoff/Flush, Profilverbund und Pflegebucket-Definition |
-| Tranchen | `depot-tranchen-manager.html`, `types/tranche-contract.js`, `app/tranches/*.js` | Kanonischer Lotvertrag, CRUD/Recovery, EUR-Quotes, Consumerstatus und bestaetigter Realbestandsabgleich |
+| Tranchen | `depot-tranchen-manager.html`, `types/tranche-contract.js`, `app/tranches/*.js` | Kanonischer Lotvertrag, CRUD/Recovery, EUR-Quotes, Consumerstatus, bestaetigter Realbestandsabgleich und append-only Cashnachweis |
 | Shared | `app/shared/*.js` | Gemeinsame Formatter, Feature-Flags, CAPE-Helfer, Persistenz-Facade |
 | Engine | `engine/` (ESM) → `engine.js` | Validierung, Marktanalyse, diskrete und kontinuierliche Regime-Signale, VPW-Rendite-Policy, Spending- und Transaktionslogik |
 
@@ -262,8 +262,41 @@ ID mit abweichenden Daten ist ein Konflikt.
 
 Der Reconcile-Write veraendert ausschliesslich Lot-/Profilbestand und Auditstate.
 Er bucht den erfassten Nettoerloes nicht automatisch in die freie Liquiditaet.
-Ein nach der Broker-Ausfuehrung verbleibender Cashbetrag muss bis zur offenen
-Fachentscheidung D-15 separat in den Rahmendaten nachgefuehrt werden.
+Der Default eines neuen `sale_reconciled`-Records ist deshalb
+`pending_manual_posting`; nur eine explizite Initialwahl mit Cashstand und
+Zeitpunkt speichert `confirmed_already_reflected`. Nach manueller Aktualisierung
+der Rahmendaten wird ein offener Verkauf durch ein eigenes
+`cash_posting_confirmed`-Event abgeschlossen. Ein falscher Cashstand wird als
+`cash_posting_corrected` mit lueckenloser Revision, Rueckverweis, Pflichtgrund
+und neuem Cashstand angehaengt. Kein vorhandener Record wird mutiert.
+Revision, kanonische Action-ID und Vorgaenger bleiben vom Oeffnen des Dialogs
+bis zum Submit stabil. Eine zwischenzeitliche Kettenfortschreibung in einem
+anderen Tab blockiert vor der Nutzerbestaetigung, statt still die naechste
+Revision abzuleiten. Der finale bisherige Cashstand stammt aus dem beim Submit
+frisch validierten Verlauf.
+
+Die Historie bleibt kompatibel auf `schemaVersion: 1` und ist nun heterogen.
+Jeder Consumer muss vor einer fachlichen Auswertung nach `eventType` filtern.
+Fehlendes `eventType` wird nur im Leser als Legacy-Verkauf mit
+`cashStatus: legacy_unknown` projiziert; der persistierte Record bleibt
+unveraendert und wird nicht als Cashbestaetigung ausgegeben. Auch Legacy-
+Verkaufsrecords muessen `schemaVersion: 1` tragen. IDs sind global
+eindeutig. Abschluss- und Korrektur-IDs werden direkt und kanonisch aus Ziel-ID
+beziehungsweise Ziel-ID plus Revision abgeleitet; unbekannte Eventtypen,
+abweichende Nettoerloese, nichtkanonische IDs, Kettenluecken, Forks und veraltete
+Rueckverweise blockieren fail-closed.
+
+Cashabschluss und -korrektur schreiben nur die Profilregistry und laufen ueber
+denselben Flush-/Rollback-Vertrag. Fachlich gleiche Retries ignorieren einen neu
+erzeugten UI-Zeitstempel und bewahren den zuerst gespeicherten
+Nachweiszeitpunkt. Offene Rueckstaende und Legacy-Faelle werden im Manager sowie
+in den Tranchenstatusanzeigen von Balance und Simulator unterscheidbar sichtbar;
+eingeklappte Balance-Details werden bei einem offenen, Legacy- oder korrupten
+Cashstatus automatisch geoeffnet. Ein unlesbarer Manager-Audit wird als
+unvollstaendige Liste statt als leere Historie gerendert. Vor dem ersten Einsatz
+wird unter
+`index.html > Profile > Erweitert > Backup exportieren` ein Komplettbackup
+erstellt, das `rs_profiles_v1` einschliesst.
 
 ### Entscheidungsdiagnose (Balance)
 

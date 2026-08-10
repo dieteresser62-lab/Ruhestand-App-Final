@@ -2,6 +2,7 @@
 
 import {
     calculateTrancheDerivedValues,
+    loadReconciliationRegistryFromStorage,
     loadTranchesFromStorage,
     normalizeTranches,
     saveTranchesToStorage
@@ -154,3 +155,26 @@ console.log('Test 5: invalid and duplicate records fail before storage mutation'
     assertEqual(storage.getItem('depot_tranchen'), 'unchanged', 'Failed validation should not mutate storage');
 }
 console.log('✓ invalid records fail before storage mutation OK');
+
+console.log('Test 6: reconciliation registry load is explicit and raw-preserving');
+{
+    const storage = createLocalStorageMock();
+    assertEqual(loadReconciliationRegistryFromStorage(storage).status, 'empty',
+        'Missing profile registry should report empty');
+    const registryRaw = JSON.stringify({ version: 1, profiles: { p1: { data: {} } } });
+    storage.setItem('rs_profiles_v1', registryRaw);
+    const loaded = loadReconciliationRegistryFromStorage(storage);
+    assertEqual(loaded.status, 'valid', 'Valid profile registry should be available to cash projection');
+    assertEqual(loaded.raw, registryRaw, 'Registry loader must preserve the exact persisted input');
+    const writesBeforeCorruptRead = storage.setCalls;
+    storage.setItem('rs_profiles_v1', '{broken');
+    const corrupt = loadReconciliationRegistryFromStorage(storage);
+    assertEqual(corrupt.status, 'corrupt', 'Broken registry should report corrupt instead of empty');
+    assertEqual(corrupt.raw, '{broken', 'Broken registry raw value should remain recoverable');
+    assertEqual(storage.setCalls, writesBeforeCorruptRead + 1, 'Registry read must not perform a repair write');
+    const unavailable = loadReconciliationRegistryFromStorage({
+        getItem() { throw new Error('offline'); }
+    });
+    assertEqual(unavailable.status, 'unavailable', 'Storage rejection should stay distinct from corrupt data');
+}
+console.log('✓ reconciliation registry load contract OK');
