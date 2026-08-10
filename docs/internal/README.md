@@ -16,6 +16,7 @@ Abgeschlossene Umsetzungen und frühere Arbeitspläne liegen im Archiv.
 
 ## Archive
 
+- `archive/2026-fokussierte-abschlusshaertung/`
 - `archive/2026-backtest-datenpruefung/`
 - `archive/2026-suite-datenintegritaet-hardening/`
 - `archive/2026-simulator-monte-carlo-hardening/`
