@@ -926,6 +926,20 @@ async function runSimulatorSmoke(browser, baseUrl) {
     const smoke = await openSmokePage(browser, baseUrl, 'Simulator.html');
     const { page } = smoke;
     await page.locator('h1').filter({ hasText: 'Ruhestand-Simulator' }).waitFor({ state: 'visible' });
+    const tabStripLayout = await page.locator('.tab-buttons').evaluate(strip => {
+        const tabs = [...strip.querySelectorAll('.tab-btn')];
+        return {
+            clientWidth: strip.clientWidth,
+            scrollWidth: strip.scrollWidth,
+            tabWidths: tabs.map(tab => tab.getBoundingClientRect().width)
+        };
+    });
+    assert(tabStripLayout.tabWidths.length === 4,
+        `Simulator muss vier Haupttabs anzeigen: ${JSON.stringify(tabStripLayout)}`);
+    assert(tabStripLayout.tabWidths.every(width => width < tabStripLayout.clientWidth),
+        `Kein einzelner Haupttab darf die gesamte Stripleiste belegen: ${JSON.stringify(tabStripLayout)}`);
+    assert(tabStripLayout.scrollWidth <= tabStripLayout.clientWidth + 1,
+        `Alle vier Haupttabs muessen im Desktop-Viewport ohne horizontales Scrollen sichtbar sein: ${JSON.stringify(tabStripLayout)}`);
     const mcCancelButton = page.locator('#mcCancelButton');
     assert(await mcCancelButton.count() === 1, 'Simulator must expose exactly one Monte-Carlo cancel control');
     assert(await mcCancelButton.isHidden(), 'Monte-Carlo cancel control must stay hidden before a run starts');
