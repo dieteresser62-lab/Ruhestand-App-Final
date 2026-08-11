@@ -76,6 +76,11 @@ const safetyPolicySlice03FixturePath = path.join(
     'fixtures',
     'safety-policy-slice-03-measurement-v1.json'
 );
+const minimumFlexAffordabilityFixturePath = path.join(
+    testDir,
+    'fixtures',
+    'minimum-flex-severe-affordability-measurement-v1.json'
+);
 
 function runtimeModule(relativePath) {
     return import(pathToFileURL(path.join(runtimeRoot, relativePath)).href);
@@ -455,13 +460,15 @@ if (captureMode) {
         slice17Fixture.targetMeasurementSha256,
         'Slice-19 demography evidence must name the Slice-17 runtime projection'
     );
-    const safetyPolicySlice03DemographyMeasurement = {
-        schemaVersion: 'SafetyPolicySlice03DemographyMeasurementV1',
-        sourceReference: 'post-backtest-data-19-v1',
-        sourceFixtureSha256: crypto.createHash('sha256').update(slice19FixtureBytes).digest('hex'),
-        targetResultDocument: 'docs/internal/SLICE_ABSCHLUSSHAERTUNG_03_SAFETY_POLICY_PRIORITAET.md',
+    const safetyPolicySlice03FixtureBytes = fs.readFileSync(safetyPolicySlice03FixturePath);
+    const safetyPolicySlice03Fixture = JSON.parse(safetyPolicySlice03FixtureBytes.toString('utf8'));
+    const minimumFlexAffordabilityDemographyMeasurement = {
+        schemaVersion: 'MinimumFlexSevereAffordabilityDemographyMeasurementV1',
+        sourceReference: safetyPolicySlice03Fixture.snapshotId,
+        sourceFixtureSha256: crypto.createHash('sha256').update(safetyPolicySlice03FixtureBytes).digest('hex'),
+        targetResultDocument: 'docs/internal/MINDEST_FLEX_NOTFALLGATE_TRAGFAEHIGKEIT.md',
         reviewStatus: 'pending_external_review',
-        sourceMeasurementSha256: slice19Fixture.demography.targetMeasurementSha256,
+        sourceMeasurementSha256: safetyPolicySlice03Fixture.demography.targetMeasurementSha256,
         targetMeasurementSha256: sha256(actualMeasurement),
         targetSummary: {
             outcomeCounts: actualMeasurement.monteCarlo.outcomeCounts,
@@ -483,20 +490,20 @@ if (captureMode) {
                 evidenceHash: entry.evidenceHash
             }))
         },
-        cause: 'safety_policy_changes_financial_paths_while_demography_care_and_survivor_models_remain_unchanged'
+        cause: 'protected_withdrawal_capacity_prevents_zero_flex_when_minimum_spending_remains_affordable'
     };
-    if (process.env.DEMOGRAPHY_PRINT_SAFETY_POLICY_SLICE_03 === '1') {
-        console.log('__SAFETY_POLICY_SLICE_03_DEMOGRAPHY_START__');
-        console.log(JSON.stringify(safetyPolicySlice03DemographyMeasurement, null, 2));
-        console.log('__SAFETY_POLICY_SLICE_03_DEMOGRAPHY_END__');
+    if (process.env.DEMOGRAPHY_PRINT_MINIMUM_FLEX_AFFORDABILITY === '1') {
+        console.log('__MINIMUM_FLEX_AFFORDABILITY_DEMOGRAPHY_START__');
+        console.log(JSON.stringify(minimumFlexAffordabilityDemographyMeasurement, null, 2));
+        console.log('__MINIMUM_FLEX_AFFORDABILITY_DEMOGRAPHY_END__');
     } else {
-        const expectedSafetyPolicySlice03 = JSON.parse(
-            fs.readFileSync(safetyPolicySlice03FixturePath, 'utf8')
+        const expectedMinimumFlexAffordability = JSON.parse(
+            fs.readFileSync(minimumFlexAffordabilityFixturePath, 'utf8')
         ).demography;
         assert.deepEqual(
-            safetyPolicySlice03DemographyMeasurement,
-            expectedSafetyPolicySlice03,
-            'Slice-03 Safety-Policy demography projection must reproduce exactly'
+            minimumFlexAffordabilityDemographyMeasurement,
+            expectedMinimumFlexAffordability,
+            'Minimum-Flex affordability demography projection must reproduce exactly'
         );
     }
     assert.deepEqual(

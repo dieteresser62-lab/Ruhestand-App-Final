@@ -184,6 +184,9 @@ setupDom();
         severeFlexEmergencyActive: true,
         realTotalWealthDrawdownRatio: 0.2501,
         realTotalWealthDrawdownThresholdRatio: 0.25,
+        protectedPortfolioWithdrawalRate: 0.035,
+        protectedPortfolioWithdrawalRateThreshold: 0.035,
+        protectedPortfolioWithdrawalCapacityCritical: true,
         alarmActiveDiagnostic: false,
         minimumFlexAnnual: 30000,
         minimumFlexStatus: 'overridden_by_severe_flex_emergency',
@@ -198,6 +201,7 @@ setupDom();
     assert(txt.includes('Safety-Flex-Obergrenze'), 'Safety cap should be visible as its own metric');
     assert(txt.includes('Schwere Flex-Notlage'), 'Severe flex emergency should be visible');
     assert(txt.includes('aktiven Gesamtvermögens'), 'Emergency copy should name the total-wealth basis');
+    assert(txt.includes('geschützte Portfolioentnahmequote'), 'Emergency copy should name the protected-withdrawal capacity gate');
     assert(txt.includes('Mindest-Flex bewusst überstimmt; Floor bleibt geschützt'), 'Emergency copy should separate flex from floor');
     assert(txt.includes('Alarm-Diagnose'), 'Suppressed alarm should remain a separate diagnostic');
     assert(minimumCard?.dataset?.trend === 'down', 'Overridden minimum flex should be marked as warning trend');

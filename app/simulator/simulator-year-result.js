@@ -318,6 +318,17 @@ export function buildSimulatorYearResult({
                 ? keyParams.alarmWealthSufficientThreshold
                 : null,
             WithdrawalBurdenGateRole: keyParams.withdrawalBurdenGateRole || '',
+            ProtectedPortfolioWithdrawalAnnual: Number.isFinite(keyParams.protectedPortfolioWithdrawalAnnual)
+                ? keyParams.protectedPortfolioWithdrawalAnnual
+                : null,
+            ProtectedPortfolioWithdrawalRatePct: Number.isFinite(keyParams.protectedPortfolioWithdrawalRate)
+                ? keyParams.protectedPortfolioWithdrawalRate * 100
+                : null,
+            ProtectedPortfolioWithdrawalRateThresholdPct: Number.isFinite(keyParams.protectedPortfolioWithdrawalRateThreshold)
+                ? keyParams.protectedPortfolioWithdrawalRateThreshold * 100
+                : null,
+            ProtectedPortfolioWithdrawalCapacityCritical: keyParams.protectedPortfolioWithdrawalCapacityCritical === true,
+            ProtectedPortfolioWithdrawalGateRole: keyParams.protectedPortfolioWithdrawalGateRole || '',
             BaseAlarmCutPct: Number.isFinite(keyParams.baseAlarmCutPct) ? keyParams.baseAlarmCutPct : null,
             EffectiveAlarmCutPct: Number.isFinite(keyParams.effectiveAlarmCutPct) ? keyParams.effectiveAlarmCutPct : null,
             FloorProtectionPolicy: keyParams.floorProtectionPolicy || '',

@@ -90,6 +90,7 @@ const slice09MeasurementPath = path.join(fixtureDir, 'minimum-flex-slice-09-v1.j
 const slice10MeasurementPath = path.join(fixtureDir, 'tax-logic-slice-10-v1.json');
 const slice17MeasurementPath = path.join(fixtureDir, '..', 'liquidity-runway-basis-slice-17-measurement-v1.json');
 const safetyPolicySlice03MeasurementPath = path.join(fixtureDir, '..', 'safety-policy-slice-03-measurement-v1.json');
+const minimumFlexAffordabilityMeasurementPath = path.join(fixtureDir, '..', 'minimum-flex-severe-affordability-measurement-v1.json');
 
 function getGolden(id) {
     return goldenFixture.cases.find(entry => entry.id === id);
@@ -1706,42 +1707,44 @@ assertEqual(
     'Immutable Slice-17 combined measurement must remain byte-identical for Slice-03'
 );
 const expectedSlice17 = JSON.parse(slice17FixtureBytes.toString('utf8')).monteCarlo;
-const safetyPolicySlice03MonteCarloMeasurement = {
-    schemaVersion: 'SafetyPolicySlice03MonteCarloMeasurementV1',
-    sourceReference: 'post-backtest-data-17-v1',
-    sourceFixtureSha256: createHash('sha256').update(slice17FixtureBytes).digest('hex'),
-    targetResultDocument: 'docs/internal/SLICE_ABSCHLUSSHAERTUNG_03_SAFETY_POLICY_PRIORITAET.md',
+const safetyPolicySlice03MeasurementBytes = fs.readFileSync(safetyPolicySlice03MeasurementPath);
+const safetyPolicySlice03Measurement = JSON.parse(safetyPolicySlice03MeasurementBytes.toString('utf8'));
+const minimumFlexAffordabilityMonteCarloMeasurement = {
+    schemaVersion: 'MinimumFlexSevereAffordabilityMonteCarloMeasurementV1',
+    sourceReference: safetyPolicySlice03Measurement.snapshotId,
+    sourceFixtureSha256: createHash('sha256').update(safetyPolicySlice03MeasurementBytes).digest('hex'),
+    targetResultDocument: 'docs/internal/MINDEST_FLEX_NOTFALLGATE_TRAGFAEHIGKEIT.md',
     reviewStatus: 'pending_external_review',
-    sourceProjectionHashes: expectedSlice17.targetProjectionHashes,
+    sourceProjectionHashes: safetyPolicySlice03Measurement.monteCarlo.targetProjectionHashes,
     targetProjectionHashes: slice17TargetProjectionHashes,
     changedProjectionCount: Object.entries(slice17TargetProjectionHashes)
-        .filter(([key, value]) => expectedSlice17.targetProjectionHashes[key] !== value)
+        .filter(([key, value]) => safetyPolicySlice03Measurement.monteCarlo.targetProjectionHashes[key] !== value)
         .length,
     measuredProjectionCount: Object.keys(slice17TargetProjectionHashes).length,
     technicalErrorCount: actualFinalProjection?.result?.technicalInventory?.technicalError ?? null,
     requestedRuns: actualFinalProjection?.result?.technicalInventory?.requested ?? null,
     financiallyEvaluableRuns: actualFinalProjection?.result?.technicalInventory?.financiallyEvaluable ?? null,
-    cause: 'structural_safety_cap_changes_withdrawals_without_changing_sampling_or_worker_contracts'
+    cause: 'protected_withdrawal_capacity_changes_financial_paths_without_changing_sampling_or_worker_contracts'
 };
-assertEqual(safetyPolicySlice03MonteCarloMeasurement.technicalErrorCount, 0,
-    'Slice-03 fixed Monte Carlo evidence must contain no technical path errors');
+assertEqual(minimumFlexAffordabilityMonteCarloMeasurement.technicalErrorCount, 0,
+    'Minimum-Flex affordability Monte Carlo evidence must contain no technical path errors');
 assertEqual(
-    safetyPolicySlice03MonteCarloMeasurement.financiallyEvaluableRuns,
-    safetyPolicySlice03MonteCarloMeasurement.requestedRuns,
-    'Slice-03 fixed Monte Carlo evidence must retain every requested run as financially evaluable'
+    minimumFlexAffordabilityMonteCarloMeasurement.financiallyEvaluableRuns,
+    minimumFlexAffordabilityMonteCarloMeasurement.requestedRuns,
+    'Minimum-Flex affordability Monte Carlo evidence must retain every requested run as financially evaluable'
 );
-if (process.env.MC_PRINT_SAFETY_POLICY_SLICE_03 === '1') {
-    console.log('__SAFETY_POLICY_SLICE_03_MONTE_CARLO_START__');
-    console.log(JSON.stringify(safetyPolicySlice03MonteCarloMeasurement, null, 2));
-    console.log('__SAFETY_POLICY_SLICE_03_MONTE_CARLO_END__');
+if (process.env.MC_PRINT_MINIMUM_FLEX_AFFORDABILITY === '1') {
+    console.log('__MINIMUM_FLEX_AFFORDABILITY_MONTE_CARLO_START__');
+    console.log(JSON.stringify(minimumFlexAffordabilityMonteCarloMeasurement, null, 2));
+    console.log('__MINIMUM_FLEX_AFFORDABILITY_MONTE_CARLO_END__');
 } else {
-    const expectedSafetyPolicySlice03 = JSON.parse(
-        fs.readFileSync(safetyPolicySlice03MeasurementPath, 'utf8')
+    const expectedMinimumFlexAffordability = JSON.parse(
+        fs.readFileSync(minimumFlexAffordabilityMeasurementPath, 'utf8')
     ).monteCarlo;
     compareSnapshotNode(
-        safetyPolicySlice03MonteCarloMeasurement,
-        expectedSafetyPolicySlice03,
-        'safetyPolicySlice03.monteCarlo',
+        minimumFlexAffordabilityMonteCarloMeasurement,
+        expectedMinimumFlexAffordability,
+        'minimumFlexAffordability.monteCarlo',
         sameRuntime,
         activeSnapshot.metadata.numericTolerance
     );

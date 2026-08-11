@@ -661,6 +661,11 @@ try {
                     withdrawalBurdenFactor: 0,
                     alarmWealthSufficient: true,
                     withdrawalBurdenGateRole: 'diagnostic_only',
+                    protectedPortfolioWithdrawalAnnual: 35_000,
+                    protectedPortfolioWithdrawalRate: 0.035,
+                    protectedPortfolioWithdrawalRateThreshold: 0.035,
+                    protectedPortfolioWithdrawalCapacityCritical: true,
+                    protectedPortfolioWithdrawalGateRole: 'required',
                     baseAlarmCutPct: 10,
                     effectiveAlarmCutPct: 0,
                     floorProtectionPolicy: 'planned_floor_unchanged'
@@ -674,6 +679,11 @@ try {
     assertEqual(safetyLogResult.logData.SevereFlexEmergencyActive, true, 'Year result should expose the severe-flex gate');
     assertClose(safetyLogResult.logData.RealTotalWealthDrawdownPct, 25.01, 1e-12, 'Year result should expose total-wealth drawdown in percentage points');
     assertEqual(safetyLogResult.logData.WithdrawalBurdenGateRole, 'diagnostic_only', 'Year result should keep withdrawal burden diagnostic only');
+    assertEqual(safetyLogResult.logData.ProtectedPortfolioWithdrawalAnnual, 35_000, 'Year result should expose the protected portfolio withdrawal amount');
+    assertClose(safetyLogResult.logData.ProtectedPortfolioWithdrawalRatePct, 3.5, 1e-12, 'Year result should expose the protected portfolio withdrawal rate');
+    assertClose(safetyLogResult.logData.ProtectedPortfolioWithdrawalRateThresholdPct, 3.5, 1e-12, 'Year result should expose the protected portfolio withdrawal threshold');
+    assertEqual(safetyLogResult.logData.ProtectedPortfolioWithdrawalCapacityCritical, true, 'Year result should expose the protected capacity gate result');
+    assertEqual(safetyLogResult.logData.ProtectedPortfolioWithdrawalGateRole, 'required', 'Year result should expose the protected capacity gate role');
     assertEqual(safetyLogResult.logData.AlarmActiveDiagnostic, false, 'Year result should preserve the separate suppressed-alarm diagnostic');
     assertEqual(safetyLogResult.logData.FloorProtectionPolicy, 'planned_floor_unchanged', 'Year result should expose floor protection');
 

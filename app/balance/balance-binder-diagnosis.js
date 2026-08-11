@@ -33,9 +33,9 @@ export function createDiagnosisHandlers({ dom, appState }) {
             text += `Final begrenzende Policy: ${diagnosis.general.finalLimitingPolicy || 'n/a'}\n`;
         }
         if (diagnosis.general.severeFlexEmergencyActive === true) {
-            text += `Schwere Flex-Notlage: AKTIV – aktueller tiefer Bärenmarkt UND realer Drawdown des aktiven Gesamtvermögens ${UIUtils.formatPercentRatio(diagnosis.general.realTotalWealthDrawdownRatio, { fractionDigits: 1, invalid: 'n/a' })} > ${UIUtils.formatPercentRatio(diagnosis.general.realTotalWealthDrawdownThresholdRatio, { fractionDigits: 1, invalid: 'n/a' })}\n`;
+            text += `Schwere Flex-Notlage: AKTIV – aktueller tiefer Bärenmarkt UND realer Drawdown des aktiven Gesamtvermögens ${UIUtils.formatPercentRatio(diagnosis.general.realTotalWealthDrawdownRatio, { fractionDigits: 1, invalid: 'n/a' })} > ${UIUtils.formatPercentRatio(diagnosis.general.realTotalWealthDrawdownThresholdRatio, { fractionDigits: 1, invalid: 'n/a' })} UND geschützte Portfolioentnahmequote ${UIUtils.formatPercentRatio(diagnosis.general.protectedPortfolioWithdrawalRate, { fractionDigits: 1, invalid: 'n/a' })} ≥ ${UIUtils.formatPercentRatio(diagnosis.general.protectedPortfolioWithdrawalRateThreshold, { fractionDigits: 1, invalid: 'n/a' })}\n`;
             text += `Folge: Flex einschließlich Mindest-Flex 0%; geplanter Floor bleibt geschützt.\n`;
-            text += `Alarm-Diagnose separat: ${diagnosis.general.alarmActiveDiagnostic ? 'aktiv' : 'inaktiv/unterdrückt'}; Entnahmebelastung steuert das Notfallgate nicht.\n`;
+            text += `Alarm-Diagnose separat: ${diagnosis.general.alarmActiveDiagnostic ? 'aktiv' : 'inaktiv/unterdrückt'}; historische Entnahmebelastung ist Diagnose, die geschützte aktuelle Quote ist Gate.\n`;
         }
         const formatCoverage = (value) => UIUtils.formatPercentValue(value, { fractionDigits: 0, invalid: 'n/a' });
         const coverageLine = `Liquiditätsdeckung: ${formatCoverage(diagnosis.general.deckungVorher)} → ${formatCoverage(diagnosis.general.deckungNachher)} (Ziel: 100%)`;

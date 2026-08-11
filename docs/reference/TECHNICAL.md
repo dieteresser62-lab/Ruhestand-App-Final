@@ -133,14 +133,20 @@ Mindest-Flex-Rate angehoben, sofern kein bestehender Alarm-, Solvenz- oder
 Runway-Blocker greift. Der Alarmcut ist eine Basis von 10
 Prozentpunkten multipliziert mit dem vorhandenen Entnahmebelastungsfaktor.
 
-Das separate Null-Flex-Gate verlangt exakt `market.sKey === 'bear_deep'` und
+Das separate Null-Flex-Gate verlangt exakt `market.sKey === 'bear_deep'`,
 einen realen Drawdown des aktiven Gesamtvermoegens von mehr als der
-konfigurierten 25-Prozent-Alarmgrenze. Exakt 25 Prozent reicht nicht;
-`alarmStatus`, Entnahmebelastungsfaktor und Vermoegenssuffizienz sind nur
-Diagnose. Ein endlicher negativer Vor-Peak-Wert bedeutet ein neues reales Hoch
-und wird auf 0 normalisiert, fehlende oder nicht-endliche Gatewerte scheitern
- fail-closed. Im aktiven Gate ueberstimmt die Rate 0 alle Flex-Aufwaertsfloors
- einschliesslich Mindest-Flex und traegt
+konfigurierten 25-Prozent-Alarmgrenze und eine geschuetzte
+Portfolioentnahmequote von mindestens
+`WEALTH_ADJUSTED_REDUCTION.FULL_WITHDRAWAL_RATE` (aktuell 3,5 Prozent). Die
+Quote ist der Netto-Floor aus dem Portfolio plus der nach Rentenueberschuss
+offene Mindest-Flex, geteilt durch das aktive Gesamtvermoegen. Exakt 25 Prozent
+Drawdown reicht nicht; `alarmStatus`, der aus der Vorjahresentnahme abgeleitete
+Entnahmebelastungsfaktor und dessen Vermoegenssuffizienz bleiben Diagnose und
+koennen keine Rueckkopplung durch ein vorheriges Nulljahr erzeugen. Ein
+endlicher negativer Vor-Peak-Wert bedeutet ein neues reales Hoch und wird auf 0
+normalisiert, fehlende oder nicht-endliche Gatewerte scheitern fail-closed. Im
+aktiven Gate ueberstimmt die Rate 0 alle Flex-Aufwaertsfloors einschliesslich
+Mindest-Flex und traegt
  `overridden_by_severe_flex_emergency`. Der Floor liegt ausserhalb dieses
  Flexvertrags und bleibt unveraendert. Persistiert werden die tatsaechliche
  Nullrate und getrennt der normale Vor-Gate-Glaettungsanker; dadurch erzwingt
