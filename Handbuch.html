@@ -364,6 +364,8 @@
                 <li><a class="toc-link" data-tab-target="manual" href="#ansparphase">Ansparphase</a></li>
                 <li><a class="toc-link" data-tab-target="manual" href="#installation-start">Installation &amp; Start</a>
                 </li>
+                <li><a class="toc-link" data-tab-target="manual" href="#datensicherheit">Datensicherheit &amp;
+                        Wiederherstellung</a></li>
                 <li><a class="toc-link" data-tab-target="manual" href="#simulator">Simulator</a>
                     <ol class="toc-sublist">
                         <li><a class="toc-link" data-tab-target="manual" href="#simulator-eingaben">Eingaben</a></li>
@@ -460,25 +462,29 @@
                         <div class="step-number">1</div>
                         <div class="step-content">
                             <h3>Startart wählen</h3>
-                            <p><strong>Option A:</strong> <code>RuhestandSuite.exe</code> starten. <strong>Option B:</strong>
-                                Repository entpacken und <code>start_suite.cmd</code> ausführen.</p>
+                            <p><strong>Desktop:</strong> <code>RuhestandSuite.exe</code> starten.
+                                <strong>Browser:</strong> Repository entpacken und <code>start_suite.cmd</code> oder
+                                <code>start_suite.ps1</code> ausführen; die Startseite öffnet sich über den lokalen
+                                HTTP-Server.</p>
                         </div>
                     </li>
                     <li class="step-item">
                         <div class="step-number">2</div>
                         <div class="step-content">
                             <h3>Profile vorbereiten</h3>
-                            <p>In <code>index.html</code> Profil(e) anlegen und Stammdaten pflegen. Für Paare je Partner ein
-                                eigenes Profil verwenden.</p>
+                            <p>Auf der Startseite das aktive Profil prüfen, Profil(e) anlegen und Stammdaten pflegen.
+                                Vor dem Wechsel speichert die Suite den aktuellen Stand und lädt danach das Zielprofil.
+                                Öffnen Sie Balance, Simulator oder den Profil-Assets-Manager nur über die Links der
+                                Startseite, damit der Profilkontext übergeben wird.</p>
                         </div>
                     </li>
                     <li class="step-item">
                         <div class="step-number">3</div>
                         <div class="step-content">
-                            <h3>Tranchen erfassen</h3>
-                            <p>Im gewählten Profil Depot-Tranchen im Profil-Assets-Manager pflegen und die sichtbare
-                                Profil-ID prüfen. Diese Daten sind die Basis für Teilfreistellung und steueroptimierte
-                                Verkäufe. Empfehlungen verändern den Realbestand nicht.</p>
+                            <h3>Daten sichern, dann Tranchen erfassen</h3>
+                            <p>Unter „Profile &gt; Erweitert &gt; Backup exportieren“ ein Komplettbackup anlegen.
+                                Danach im gewählten Profil Depot-Tranchen im Profil-Assets-Manager pflegen und die
+                                sichtbare Profil-ID prüfen. Empfehlungen verändern den Realbestand nicht.</p>
                         </div>
                     </li>
                 </ol>
@@ -777,27 +783,90 @@
 
             <div class="info-card" id="installation-start">
                 <h2>Installation &amp; Start</h2>
-                <p>Zum Start genügt ein moderner Browser (Chrome, Edge oder Firefox). Laden Sie das Repository lokal
-                    und öffnen Sie <code>index.html</code>. Alternativ nutzen Sie den Windows-Starter
-                    <code>start_suite.cmd</code> (oder <code>start_suite.ps1</code>), um die Suite als lokalen Webserver
-                    inklusive Yahoo-Proxy für Online-Kurse zu starten. Für einen komplett browserfreien Aufruf steht die
-                    portable <code>RuhestandSuite.exe</code> bereit; sie benötigt keine zusätzlichen Abhängigkeiten und
-                    lässt sich direkt per Doppelklick starten. Legen Sie die EXE in einen beliebigen Ordner und kopieren
-                    Sie sie bei Bedarf zusammen mit dem Konfigurationsordner als Backup.
-                </p>
+                <p>Wählen Sie eine der beiden Laufzeitvarianten. Die Daten werden jeweils lokal gespeichert, aber in
+                    getrennten Backends. Ein automatischer Cloud-Sync findet nicht statt.</p>
+                <div class="manual-grid" style="margin-top: 1.25rem;">
+                    <div class="detail-block">
+                        <h3>Desktop-App (Tauri)</h3>
+                        <p>Starten Sie <code>RuhestandSuite.exe</code> per Doppelklick. Die Desktop-App benötigt für
+                            lokale Eingaben und Berechnungen keinen separat gestarteten Browser und kein Node.js. Sie
+                            speichert ihre Daten in einer lokalen Datei im App-Datenverzeichnis.</p>
+                    </div>
+                    <div class="detail-block">
+                        <h3>Browser über lokalen HTTP-Server</h3>
+                        <p>Entpacken Sie das Repository und starten Sie <code>start_suite.cmd</code> oder
+                            <code>start_suite.ps1</code>. Der Starter öffnet die Startseite über
+                            <code>http://localhost:…</code>. Ein direktes Öffnen der HTML-Dateien über
+                            <code>file://</code> ist wegen ES-Modulen und Workern kein regulärer Startweg.</p>
+                    </div>
+                </div>
                 <div class="detail-block" style="margin-top: 1.25rem;">
-                    <h3>Praktische Hinweise</h3>
+                    <h3>Netzwerk und optionale Live-Daten</h3>
                     <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                        <li>Sichern Sie Lese- und Schreibrechte, damit lokale Daten (z.B. Szenarien) gespeichert werden
-                            können.</li>
-                        <li>Für Live-Daten (Inflation, Kurse) ist eine Internetverbindung notwendig; die Simulation
-                            funktioniert auch offline.</li>
+                        <li>Kernrechnung, manuelle Eingaben und lokale Persistenz funktionieren ohne Internet.
+                            Google Fonts sowie Live-Kurse und Inflations-/CAPE-Abrufe sind optionale externe
+                            Netzwerkpfade.</li>
                         <li>Online-ETF-Kurse benötigen in der Browser-Variante Node.js, da der lokale Yahoo-Proxy über
-                            <code>start_suite.cmd</code> gestartet wird; die Tauri-EXE bringt diesen Proxy selbst mit.
-                            Ohne Node.js läuft die Browser-Suite weiter, nur der Kurs-Download ist dort deaktiviert.</li>
+                            den Starter gestartet wird; die Tauri-EXE bringt ihren Loopback-Proxy selbst mit. Ohne
+                            Node.js läuft die Browser-Suite weiter, Online-Kursabrufe stehen dort jedoch nicht zur
+                            Verfügung. Kurse können weiterhin manuell gepflegt werden.</li>
                         <li>Beenden Sie die lokalen Dienste mit <code>stop_suite.cmd</code>, wenn der Browser
                             geschlossen wird.</li>
                     </ul>
+                </div>
+            </div>
+
+            <div class="info-card" id="datensicherheit">
+                <h2>Datensicherheit &amp; Wiederherstellung</h2>
+                <p class="card-intro">Ihre Finanzdaten bleiben lokal. Browser und Desktop verwenden jedoch getrennte
+                    Speicherorte; es gibt weder automatischen Cloud-Sync noch eine automatische Übertragung zwischen
+                    beiden Varianten.</p>
+                <div class="detail-block">
+                    <h3>Speicher und Profilkontext</h3>
+                    <ol style="margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li><strong>Browser:</strong> IndexedDB ist die lokale Source of Truth. Private Fenster,
+                            Browserbereinigung oder ein anderes Browserprofil können den Zugriff auf diese Daten
+                            verhindern.</li>
+                        <li><strong>Desktop:</strong> Tauri speichert lokal im App-Datenverzeichnis. Die EXE-Datei
+                            selbst ist kein Backup Ihrer Nutzerdaten.</li>
+                        <li><strong>Vor einer Eingabe:</strong> Auf der Startseite „Aktiv: …“ und „Profil waehlen“
+                            kontrollieren. Beim Profilwechsel wird zuerst der aktuelle Stand gespeichert und dann das
+                            Zielprofil geladen. Schlägt Speichern oder Laden fehl, nicht im vermeintlichen Zielprofil
+                            weiterarbeiten; den angezeigten Recovery-Hinweis befolgen.</li>
+                        <li><strong>Beim Wechsel in eine Teil-App:</strong> Balance, Simulator und Profil-Assets-Manager
+                            über die Startseite öffnen und den dort übergebenen Profilkontext abwarten.</li>
+                    </ol>
+                </div>
+                <div class="detail-block" style="margin-top: 1.25rem;">
+                    <h3>Drei Sicherungsarten mit unterschiedlichem Zweck</h3>
+                    <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li><strong>Komplettbackup:</strong> Unter „Profile &gt; Erweitert &gt; Backup exportieren“ werden
+                            die zulässigen Persistenzdaten einschließlich Profilregistry in eine JSON-Datei
+                            geschrieben. „Backup importieren“ stellt diesen Datenbestand wieder her. Nutzen Sie das
+                            Komplettbackup vor größeren Änderungen und zur Übertragung zwischen Browser und Desktop.</li>
+                        <li><strong>Jahresabschluss-Snapshot:</strong> Die Balance-App erzeugt vor fachlichen
+                            Jahresabschluss-Writes einen internen Recovery-Punkt. Er dient der Wiederherstellung dieses
+                            Prozesses und ersetzt kein extern aufbewahrtes Komplettbackup.</li>
+                        <li><strong>Ergebnisexport:</strong> Balance-, Monte-Carlo-, Backtest- und Szenarioexporte
+                            dokumentieren einen bestimmten Stand oder Lauf. Sie sind nicht automatisch ein vollständiges
+                            Backup aller Profile und Einstellungen.</li>
+                    </ul>
+                </div>
+                <div class="tip-box" style="margin-top: 1.25rem;">
+                    <span class="tip-icon">🔒</span>
+                    <div><strong>Vertraulich behandeln:</strong> Backups und Ergebnisexporte können persönliche
+                        Finanzwerte, Annahmen und Verlaufsdaten enthalten. Bewahren Sie die Dateien geschützt und
+                        versioniert auf; ein Speicherort bei einem Cloud-Anbieter ist eine eigene Entscheidung und kein
+                        Sync-Dienst der Suite.</div>
+                </div>
+                <div class="detail-block" style="margin-top: 1.25rem;">
+                    <h3>Offlinegrenze bei einem begonnenen Jahresabschluss</h3>
+                    <p>Ein normaler lokaler Rechenlauf kann offline fortgesetzt werden. Anders ist ein bereits
+                        gestarteter, periodengebundener Jahresabschluss: Scheitert danach ein erforderlicher
+                        Datenabruf, kann der verifizierte Recovery-Snapshot zusammen mit einem sichtbaren
+                        unvollständigen Periodenstatus bestehen bleiben. Deuten Sie das nicht als erfolgreichen
+                        Offlineabschluss. Folgen Sie dem Recovery-Hinweis und schließen Sie den Prozess erst nach dem
+                        erfolgreichen erforderlichen Datenschritt ab.</p>
                 </div>
             </div>
 
@@ -1520,14 +1589,14 @@
                 <div class="detail-block" id="onboarding-woche" style="margin-top: 1rem;">
                     <h3>Erste Woche</h3>
                     <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                        <li><strong>Setup & Zugriff:</strong> Repository klonen oder ZIP laden, <code>index.html</code>
-                            öffnen, Tab "Simulator" laden.</li>
+                        <li><strong>Setup & Zugriff:</strong> Desktop-App starten oder den Browser-Starter ausführen,
+                            auf der Startseite das aktive Profil prüfen und anschließend den Simulator öffnen.</li>
                         <li><strong>Datenbasis füllen:</strong> Startvermögen, Sparrate, Rentenalter und Basis-Ausgaben
                             im Simulator eingeben und erste Simulation speichern.</li>
                         <li><strong>Balance-Grundlagen:</strong> In der Balance-App einen Testlauf mit Demo-Werten
                             durchführen, um Diagnose-Panel und Kapitalfluss zu verstehen.</li>
-                        <li><strong>Datenablage klären:</strong> Speicherort für exportierte Szenarien (z.B.
-                            OneDrive/Nextcloud) definieren und Schreibrechte testen.</li>
+                        <li><strong>Datenablage klären:</strong> Komplettbackup exportieren und einen geschützten,
+                            versionierten Speicherort festlegen. Ergebnisexporte getrennt davon ablegen.</li>
                     </ul>
                 </div>
                 <div class="detail-block" id="onboarding-jahr" style="margin-top: 1rem;">
@@ -1577,12 +1646,12 @@
                         <li><strong>Speichern schlägt fehl:</strong> Browser-Storage eventuell blockiert.
                             Drittanbieter-Blocking oder Private Mode deaktivieren, Seite im normalen Modus neu öffnen.
                         </li>
-                        <li><strong>Datei-Export nicht auffindbar:</strong> Download-Ordner des Browsers prüfen und
-                            einheitlich auf Cloud-Speicher umstellen.</li>
+                        <li><strong>Datei-Export nicht auffindbar:</strong> Download-Ordner des Browsers prüfen. Die
+                            Suite verschiebt Dateien nicht automatisch in einen Cloud-Speicher.</li>
                         <li><strong>Laden liefert alte Werte:</strong> Cache leeren (Strg+F5) und sicherstellen, dass
                             die korrekte Datei gewählt wurde; Versionsstempel im Dateinamen verwenden.</li>
-                        <li><strong>Backup-Tipp:</strong> Nach jedem Jahres-Update Export erstellen und in der
-                            Planungs-Dokumentation verlinken.</li>
+                        <li><strong>Backup-Tipp:</strong> Ein Ergebnisexport ersetzt kein Komplettbackup. Erstellen Sie
+                            unter „Profile &gt; Erweitert“ regelmäßig ein versioniertes Komplettbackup.</li>
                     </ul>
                 </div>
             </div>
@@ -1750,8 +1819,12 @@
                         Transaktionskosten sinnvoll aus.</dd>
 
                     <dt>Kann ich die Simulation offline nutzen?</dt>
-                    <dd>Ja. Die Berechnungen laufen lokal im Browser. Nur optionale Echtzeitdaten (Inflation,
-                        Marktpreise) benötigen eine Internetverbindung.</dd>
+                    <dd>Ja. Kernrechnung, manuelle Eingaben und lokale Speicherung funktionieren ohne Internet.
+                        Optionale Live-Abrufe benötigen eine Verbindung. Ein bereits begonnener Jahresabschluss mit
+                        fehlgeschlagenem erforderlichem Datenschritt kann bewusst im Recovery-Zustand bleiben; er ist
+                        dann nicht erfolgreich offline abgeschlossen. Siehe <a class="toc-link"
+                            data-tab-target="manual" href="#datensicherheit">Datensicherheit &amp;
+                            Wiederherstellung</a>.</dd>
 
                     <dt>Wie weit reichen die historischen Daten?</dt>
                     <dd>Die historische Renditebasis reicht bis 1925. Über Startjahr-Filter und Recency-Gewichtung
