@@ -41,7 +41,14 @@ Der Runner sortiert alle Dateien deterministisch und meldet fuer jede Datei Modu
 
 - `in-process`: DOM-freie Standardtests teilen den schnellen Hauptprozess.
 - `isolated`: DOM-/Browser-Globals, Worker-Mocks oder legacy Assertion-Helper laufen in einem eigenen Kindprozess; dessen Assertionzahlen gehen in die Gesamtsumme ein.
-- `separate-gate`: `browser-smoke.test.mjs` wird nicht still importiert, sondern mit dem Pflichtbefehl `npm run test:browser` ausgewiesen.
+- `separate-gate`: Nicht zur aktuellen Laufzeit passende Gates werden nicht still importiert, sondern mit ihrer Pflichtumgebung und dem dort auszufuehrenden Befehl ausgewiesen. Dazu gehoeren der Browser-Smoke sowie unter WSL die echten Windows-PowerShell-/Poppler-Gates und bytegenaue Windows-x64-/Node-v25.2.1-Evidenzmessungen.
+
+Unter Windows x64 mit Node v25.2.1 fuehrt `npm test` die beiden bytegenauen
+Evidenzmessungen direkt aus. Das PowerShell-Provenienzgate und der mit Poppler
+25.07.0 gepinnte Cash-/Geldmarkt-PDF-Oracle laufen auf jeder Windows-Node-
+Version. Unter WSL/Linux erscheinen diese vier Dateien als separate Gates;
+die uebrigen fachlichen, Engine-, FlowDelta- und Portabilitaetsvertraege der
+Standardsuite bleiben aktiv.
 
 Jede tatsaechlich ausgefuehrte Datei muss mindestens eine gezaehlte Assertion liefern. Null Assertions beenden sowohl `npm test` als auch `run-single.mjs` mit Fehler. Der Legacy-Loader gilt nur fuer die im Policy-Manifest benannten Dateien; unbekannte Import-only-Tests erhalten keinen stillen Ausnahmeweg.
 
@@ -876,7 +883,9 @@ Poppler `pdftohtml` ab Version 25.07.0 ist deshalb eine fail-closed
 Testvoraussetzung. Das Programm wird ueber `PATH`,
 `RUHESTANDSAPP_POPPLER_BIN` oder `RUHESTANDSAPP_PDFTOHTML` aufgeloest;
 `npm run verify:poppler-toolchain` prueft die Installation. Der Test bindet
-nicht an eine konkrete Patchversion oder einen lokalen WinGet-Paketpfad.
+nicht an eine konkrete Patchversion oder einen lokalen WinGet-Paketpfad. Er
+ist als Windows-Gate klassifiziert und wird unter WSL/Linux in der
+Standardsuite sichtbar als separates Gate ausgewiesen.
 
 #### `german-cash-money-market-backtest-delta.test.mjs`
 **Zweck:** Validiert die Slice-04-Vorher-/Nachher-Evidenz gegen den

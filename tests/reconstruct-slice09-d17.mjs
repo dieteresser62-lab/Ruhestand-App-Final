@@ -10,9 +10,10 @@ const END_MARKER = '__SLICE09_D17_SOURCE_END__';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const fixturePath = path.join(repoRoot, 'tests', 'fixtures', 'minimum-flex-slice-09-added-case-financial-v1.json');
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ruhestandsapp-slice09-d17-'));
-const archivePath = path.join(tempRoot, 'slice09.zip');
+const archivePath = path.join(tempRoot, 'slice09.tar');
 const sourceRoot = path.join(tempRoot, 'source');
 const windowsTarPath = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe');
+const tarPath = process.platform === 'win32' ? windowsTarPath : '/usr/bin/tar';
 
 function run(command, args, options = {}) {
     const result = spawnSync(command, args, {
@@ -45,11 +46,11 @@ function canonicalize(value) {
 
 try {
     fs.mkdirSync(sourceRoot);
-    run('git', ['archive', '--format=zip', `--output=${archivePath}`, SOURCE_COMMIT]);
-    if (!path.isAbsolute(windowsTarPath) || !fs.existsSync(windowsTarPath)) {
-        throw new Error(`Windows bsdtar is unavailable at the pinned path: ${windowsTarPath}`);
+    run('git', ['archive', '--format=tar', `--output=${archivePath}`, SOURCE_COMMIT]);
+    if (!path.isAbsolute(tarPath) || !fs.existsSync(tarPath)) {
+        throw new Error(`Tar is unavailable at the pinned ${process.platform} path: ${tarPath}`);
     }
-    run(windowsTarPath, ['-xf', archivePath, '-C', sourceRoot]);
+    run(tarPath, ['-xf', archivePath, '-C', sourceRoot]);
 
     const characterizationPath = path.join(sourceRoot, 'tests', 'simulator-backtest-characterization.test.mjs');
     const source = fs.readFileSync(characterizationPath, 'utf8');

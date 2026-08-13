@@ -306,7 +306,7 @@ Die Anwendung ist bewusst minimalistisch gehalten, hat aber für den vollen Funk
 1.  **Browser:** Ein moderner Browser (Chrome, Edge, Firefox) mit Unterstützung für ES6-Module und die File System Access API (für Dateiimport/-export; Jahresabschluss-Snapshots liegen intern in IndexedDB).
 2.  **Node.js (optional, nur Browservariante):** Für den automatischen Abruf von Online-Kursdaten (ETF-Preise) wird dort ein lokaler Proxy benötigt. Dieser setzt eine installierte [Node.js](https://nodejs.org/)-Laufzeitumgebung voraus. Die Tauri-Variante bringt ihren Loopback-Proxy selbst mit.
     *   *Ohne Node.js im Browserbetrieb:* Die App startet normal, aber der Button "Online-Update" im Tranchen-Manager ist ohne Funktion. Manuelle Kurspflege ist weiterhin möglich.
-3.  **Poppler ab 25.07.0 (nur Entwicklung und Tests):** Das
+3.  **Poppler ab 25.07.0 (nur Windows-Entwicklungsgate):** Das
     Primaerquellengate der historischen Cash-/Geldmarktkette liest die
     gepinnte Bundesbank-PDF mit `pdftohtml`. Das Programm muss ueber `PATH`,
     `RUHESTANDSAPP_POPPLER_BIN` oder `RUHESTANDSAPP_PDFTOHTML` erreichbar
@@ -315,7 +315,9 @@ Die Anwendung ist bewusst minimalistisch gehalten, hat aber für den vollen Funk
     Installation laesst sich mit `npm run verify:poppler-toolchain` pruefen.
     Eine neuere kompatible Poppler-Version wird nicht allein wegen ihrer
     Versionsnummer abgewiesen; Quellenhash und extrahierte 77-Jahres-Reihe
-    bleiben fail-closed gepinnt.
+    bleiben fail-closed gepinnt. Unter WSL/Linux weist `npm test` dieses echte
+    Windows-Poppler-Gate als separates Pflichtgate aus, statt eine
+    inkompatible Linux-Toolchain vorauszusetzen.
 
 ---
 
