@@ -5,9 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Benutzerhandbuch | Ruhestand-Apps Suite</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --primary-color: #1a2530;
@@ -30,7 +27,7 @@
         }
 
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             background-color: var(--background-color);
             color: var(--text-color);
             min-height: 100vh;
@@ -292,6 +289,28 @@
             line-height: 1.5;
         }
 
+        img {
+            height: auto;
+        }
+
+        code,
+        pre,
+        td,
+        th {
+            overflow-wrap: anywhere;
+        }
+
+        table {
+            display: block;
+            max-width: 100%;
+            overflow-x: auto;
+        }
+
+        [tabindex="-1"]:focus {
+            outline: 3px solid var(--accent-color);
+            outline-offset: 4px;
+        }
+
         .tip-box {
             background-color: rgba(197, 160, 89, 0.1);
             border: 1px solid rgba(197, 160, 89, 0.3);
@@ -320,8 +339,35 @@
         }
 
         @media (max-width: 768px) {
+            .navbar {
+                gap: 0.75rem;
+                padding: 0.75rem 1rem;
+            }
+
+            .nav-brand,
+            .back-link {
+                font-size: 0.85rem;
+            }
+
+            .container {
+                padding: 0 12px;
+            }
+
             .page-header h1 {
                 font-size: 2rem;
+            }
+
+            .info-card {
+                padding: 1.25rem;
+            }
+
+            .manual-grid {
+                grid-template-columns: minmax(0, 1fr);
+            }
+
+            .step-item,
+            .tip-box {
+                gap: 0.75rem;
             }
 
             .tabs-container {
@@ -359,15 +405,33 @@
             <h2>Inhaltsverzeichnis</h2>
             <ol class="toc-list">
                 <li><a class="toc-link" data-tab-target="manual" href="#ueberblick">Überblick</a></li>
-                <li><a class="toc-link" data-tab-target="manual" href="#ansparer-jung">Ansparer (lange Laufzeit)</a>
-                </li>
-                <li><a class="toc-link" data-tab-target="manual" href="#ansparphase">Ansparphase</a></li>
                 <li><a class="toc-link" data-tab-target="manual" href="#installation-start">Installation &amp; Start</a>
                 </li>
                 <li><a class="toc-link" data-tab-target="manual" href="#datensicherheit">Datensicherheit &amp;
                         Wiederherstellung</a></li>
+                <li><a class="toc-link" data-tab-target="manual" href="#profilverbund">Profile &amp; Depot-Tranchen</a>
+                    <ol class="toc-sublist">
+                        <li><a class="toc-link" data-tab-target="manual"
+                                href="#profilverbund-profilverwaltung">Profilverwaltung</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#profilverbund-haushalt">Finanzen &amp;
+                                Personen</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#profilverbund-balance">Balance-App</a>
+                        </li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#profilverbund-simulator">Simulator</a>
+                        </li>
+                        <li><a class="toc-link" data-tab-target="manual"
+                                href="#tranchen-zustaende">Tranchenzustände &amp; Recovery</a></li>
+                        <li><a class="toc-link" data-tab-target="manual"
+                                href="#tranchen-lebenszyklus">Verkauf &amp; Cashabschluss</a></li>
+                        <li><a class="toc-link" data-tab-target="manual"
+                                href="#tranchen-abgleich-checkliste">Abgleich-Checkliste</a></li>
+                    </ol>
+                </li>
                 <li><a class="toc-link" data-tab-target="manual" href="#simulator">Simulator</a>
                     <ol class="toc-sublist">
+                        <li><a class="toc-link" data-tab-target="manual" href="#ansparer-jung">Einstieg für Ansparer</a>
+                        </li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#ansparphase">Ansparphase</a></li>
                         <li><a class="toc-link" data-tab-target="manual" href="#simulator-eingaben">Eingaben</a></li>
                         <li><a class="toc-link" data-tab-target="manual" href="#simulator-renten">Personen &amp;
                                 Rente</a></li>
@@ -411,20 +475,6 @@
                         </li>
                     </ol>
                 </li>
-                <li><a class="toc-link" data-tab-target="manual" href="#profilverbund">Profilverbund (Multi-Profil)</a>
-                    <ol class="toc-sublist">
-                        <li><a class="toc-link" data-tab-target="manual"
-                                href="#profilverbund-profilverwaltung">Profilverwaltung</a></li>
-                        <li><a class="toc-link" data-tab-target="manual" href="#profilverbund-balance">Balance-App</a>
-                        </li>
-                        <li><a class="toc-link" data-tab-target="manual" href="#profilverbund-simulator">Simulator</a>
-                        </li>
-                        <li><a class="toc-link" data-tab-target="manual"
-                                href="#tranchen-zustaende">Tranchenzustände &amp; Recovery</a></li>
-                        <li><a class="toc-link" data-tab-target="manual"
-                                href="#tranchen-lebenszyklus">Verkauf &amp; Cashabschluss</a></li>
-                    </ol>
-                </li>
                 <li><a class="toc-link" data-tab-target="manual" href="#onboarding-playbook">Onboarding-Playbook</a>
                     <ol class="toc-sublist">
                         <li><a class="toc-link" data-tab-target="manual" href="#onboarding-woche">Erste Woche</a></li>
@@ -432,7 +482,7 @@
                     </ol>
                 </li>
                 <li><a class="toc-link" data-tab-target="manual" href="#haeufige-probleme">Häufige Probleme</a></li>
-                <li><a class="toc-link" data-tab-target="manual" href="#jahrespflege">Best Practices Jahrespflege</a>
+                <li><a class="toc-link" data-tab-target="manual" href="#jahrespflege">Jährliche Pflege</a>
                 </li>
                 <li><a class="toc-link" data-tab-target="manual" href="#anhang">Anhang</a>
                     <ol class="toc-sublist">
@@ -442,8 +492,8 @@
                         </li>
                         <li><a class="toc-link" data-tab-target="manual" href="#anhang-dokumente">Weiterführende
                                 Dokumente</a></li>
-                        <li><a class="toc-link" data-tab-target="manual" href="#anhang-support">Kontakt &amp;
-                                Support</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#anhang-support">Hilfe &amp;
+                                Fehlerbericht</a></li>
                     </ol>
                 </li>
                 <li><a class="toc-link" data-tab-target="manual" href="#faq">FAQ</a></li>
@@ -451,11 +501,13 @@
             </ol>
         </div>
 
-        <div class="tabs-container">
-            <button class="tab-btn" data-tab-id="quickstart" onclick="switchTab('quickstart')">
+        <div class="tabs-container" role="tablist" aria-label="Handbuchansicht">
+            <button class="tab-btn" type="button" role="tab" data-tab-id="quickstart" aria-controls="quickstart"
+                aria-selected="false" onclick="switchTab('quickstart')">
                 🚀 Schnellstart
             </button>
-            <button class="tab-btn active" data-tab-id="manual" onclick="switchTab('manual')">
+            <button class="tab-btn active" type="button" role="tab" data-tab-id="manual" aria-controls="manual"
+                aria-selected="true" onclick="switchTab('manual')">
                 📖 Detailliertes Handbuch
             </button>
         </div>
@@ -463,7 +515,7 @@
         <!-- ============================================= -->
         <!-- TAB 1: SCHNELLSTART                           -->
         <!-- ============================================= -->
-        <div id="quickstart" class="content-section">
+        <div id="quickstart" class="content-section" role="tabpanel" aria-hidden="true">
             <div class="info-card">
                 <h2>⚡ Start in 2 Minuten</h2>
                 <p class="card-intro">Kurzfassung analog zum <code>QUICKSTART.md</code>.</p>
@@ -555,7 +607,7 @@
 
             <!-- Balance App Quick Start -->
             <div class="info-card">
-                <h2>⚖️ Balance App Schnellstart</h2>
+                <h2>⚖️ Balance-App: Schnellstart</h2>
                 <p class="card-intro">Der sichere Jahresablauf von der Vorprüfung bis zur realen Umsetzung.</p>
 
                 <ol class="steps-list">
@@ -621,14 +673,15 @@
         <!-- ============================================= -->
         <!-- TAB 2: DETAILLIERTES HANDBUCH                 -->
         <!-- ============================================= -->
-        <div id="manual" class="content-section active">
+        <div id="manual" class="content-section active" role="tabpanel" aria-hidden="false">
 
             <div class="info-card" id="ueberblick">
                 <h2>Überblick</h2>
-                <p>Die Ruhestand-Apps Suite bündelt zwei Kernwerkzeuge: den <strong>Simulator</strong> für langfristige
-                    Prognosen und die <strong>Balance-App</strong> für laufende Entscheidungen in der Entnahmephase. Das
-                    Handbuch ist nach den typischen Schritten gegliedert und bietet schnelle Sprungmarken über das
-                    Inhaltsverzeichnis.</p>
+                <p>Die Suite verbindet fünf Oberflächen: Die Startseite verwaltet Profile und Komplettbackups, der
+                    Profil-Assets-Manager pflegt Depot-Tranchen, der Simulator untersucht langfristige Szenarien und
+                    Balance unterstützt Jahresabschluss und operative Entnahmeplanung. Dieses Handbuch ist die fünfte
+                    Oberfläche. Folgen Sie für einen neuen Datenbestand der Nutzerreise im Inhaltsverzeichnis: Start
+                    und Datensicherheit, Profile und Tranchen, Simulator, Balance sowie Fehlerhilfe und Begriffe.</p>
                 <figure style="margin-top: 1rem;">
                     <img src="assets/images/system_overview.svg" alt="Systemübersicht: Balance-App, Simulator und Engine"
                         style="width:100%; max-width: 1100px; border: 1px solid #e0e6ed; border-radius: 12px; box-shadow: var(--card-shadow);">
@@ -1734,16 +1787,20 @@
 
             <div class="info-card" id="onboarding-playbook" style="margin-top: 2rem;">
                 <h2>Onboarding-Playbook: Erste Woche/Erstes Jahr mit der Suite</h2>
-                <p class="card-intro">Strukturierte Checkliste, damit neue Nutzer schnell produktiv werden.</p>
+                <p class="card-intro">Kurze Orientierung; die verlinkten Detailkapitel bleiben für Eingaben,
+                    Sicherheitsreaktionen und Ergebnisgrenzen maßgeblich.</p>
                 <div class="detail-block" id="onboarding-woche" style="margin-top: 1rem;">
                     <h3>Erste Woche</h3>
                     <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
                         <li><strong>Setup & Zugriff:</strong> Desktop-App starten oder den Browser-Starter ausführen,
                             auf der Startseite das aktive Profil prüfen und anschließend den Simulator öffnen.</li>
-                        <li><strong>Datenbasis füllen:</strong> Startvermögen, Sparrate, Rentenalter und Basis-Ausgaben
-                            im Simulator eingeben und erste Simulation speichern.</li>
-                        <li><strong>Balance-Grundlagen:</strong> In der Balance-App einen Testlauf mit Demo-Werten
-                            durchführen, um Diagnose-Panel und Kapitalfluss zu verstehen.</li>
+                        <li><strong>Datenbasis füllen:</strong> Die tatsächlich sichtbaren Rahmendaten, Personen,
+                            Renten, Bedarfe und Portfolioannahmen im Simulator prüfen. Den ersten Lauf als
+                            Modellrechnung auswerten, nicht als persönliche Empfehlung.</li>
+                        <li><strong>Abläufe kennenlernen:</strong> Den <a class="toc-link" data-tab-target="manual"
+                                href="#simulator-start">Simulatorablauf</a> und den <a class="toc-link"
+                                data-tab-target="manual" href="#balance-jahresupdate-guide">Balance-Jahresprozess</a>
+                            lesen. Einen echten Jahresabschluss nicht mit erfundenen Ist-Daten starten.</li>
                         <li><strong>Datenablage klären:</strong> Komplettbackup exportieren und einen geschützten,
                             versionierten Speicherort festlegen. Ergebnisexporte getrennt davon ablegen.</li>
                     </ul>
@@ -1751,15 +1808,16 @@
                 <div class="detail-block" id="onboarding-jahr" style="margin-top: 1rem;">
                     <h3>Erstes Jahr</h3>
                     <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                        <li><strong>Quartals-Review:</strong> Simulationen bei Lebensereignissen (Bonus, Umzug,
-                            Gehaltsänderung) aktualisieren und Benchmarks dokumentieren.</li>
+                        <li><strong>Bei Änderungen aktualisieren:</strong> Betroffene Eingaben nach tatsächlichen
+                            Änderungen an Vermögen, Einzahlungen, Renten oder Bedarf prüfen. Die Suite schreibt dafür
+                            keinen festen Quartalsrhythmus vor.</li>
                         <li><strong>Jahres-Update fest einplanen:</strong> Termin im Kalender blocken, um Inflation,
                             Marktwerte und Bedarfe zu aktualisieren.</li>
                         <li><strong>Risiko-Governance:</strong> Rebalancing-Schwellen, Netto-Runway-Ziel,
                             getrennten Brutto-Notfallpuffer und CAPE-Grenzen in einer kurzen Policy-Notiz
                             festhalten.</li>
-                        <li><strong>Backup & Versionierung:</strong> Exporte versionieren (z.B. YYYY-MM) und mindestens
-                            zweifach sichern, um Datenverlust zu vermeiden.</li>
+                        <li><strong>Backup und Exporte trennen:</strong> Ein aktuelles Komplettbackup geschützt und
+                            nachvollziehbar ablegen; Ergebnisexporte sind kein Ersatz dafür.</li>
                     </ul>
                 </div>
             </div>
@@ -1790,20 +1848,22 @@
                         <li><strong>Fehlerbehebung:</strong> Den konkret markierten Wert korrigieren und erneut
                             validieren. Eine Persistenz- oder Quarantänewarnung verlangt eine ausdrückliche
                             Recovery- oder Reset-Entscheidung; Neuladen ersetzt korrupte Daten nicht still.</li>
-                        <li><strong>Dauerhafte Lösung:</strong> Eigene Default-Vorlagen mit validierten Werten als JSON
-                            speichern und beim Start laden.</li>
+                        <li><strong>Weiteres Vorgehen:</strong> Bleibt die Meldung bestehen, keine Werte durch
+                            wiederholtes Laden oder manuelle Dateibearbeitung erzwingen. Den genauen Feldnamen und die
+                            Meldung für die Fehlersuche notieren.</li>
                     </ul>
                 </div>
                 <div class="detail-block" style="margin-top: 1rem;">
                     <h3>Speichern und Laden</h3>
                     <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                        <li><strong>Speichern schlägt fehl:</strong> Browser-Storage eventuell blockiert.
-                            Drittanbieter-Blocking oder Private Mode deaktivieren, Seite im normalen Modus neu öffnen.
-                        </li>
+                        <li><strong>Speichern schlägt fehl:</strong> Aktives Profil und konkrete Meldung prüfen. Im
+                            Browser kann blockierter lokaler Speicher die Persistenz verhindern; vor weiteren
+                            Änderungen nach Möglichkeit ein Komplettbackup exportieren.</li>
                         <li><strong>Datei-Export nicht auffindbar:</strong> Download-Ordner des Browsers prüfen. Die
                             Suite verschiebt Dateien nicht automatisch in einen Cloud-Speicher.</li>
-                        <li><strong>Laden liefert alte Werte:</strong> Cache leeren (Strg+F5) und sicherstellen, dass
-                            die korrekte Datei gewählt wurde; Versionsstempel im Dateinamen verwenden.</li>
+                        <li><strong>Laden liefert alte Werte:</strong> Aktives Profil, Importdatei und sichtbaren
+                            Zeit-/Versionshinweis prüfen. Ein Browser-Reload wechselt das Profil nicht und repariert
+                            keine korrupten Persistenzdaten.</li>
                         <li><strong>Backup-Tipp:</strong> Ein Ergebnisexport ersetzt kein Komplettbackup. Erstellen Sie
                             unter „Profile &gt; Erweitert“ regelmäßig ein versioniertes Komplettbackup.</li>
                     </ul>
@@ -1811,7 +1871,7 @@
             </div>
 
             <div class="info-card" id="jahrespflege" style="margin-top: 2rem;">
-                <h2>Best Practices für die jährliche Pflege</h2>
+                <h2>Jährliche Pflege</h2>
                 <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
                     <li><strong>Abschlussperiode festlegen:</strong> Das abgeschlossene Kalenderjahr im
                         Ausgaben-Check prüfen und denselben periodengebundenen Ablauf nicht doppelt starten.</li>
@@ -1848,12 +1908,10 @@
                     <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
                         <li><strong>Release-Stand:</strong> Siehe <code>README.md</code> für die aktuelle Version und
                             Changelog-Notizen.</li>
-                        <li><strong>Changelog:</strong> Detaillierte Änderungen stehen in <code>CHANGELOG.md</code>
-                            (z. B. neue Steuer-Settlement-Logik mit Verlusttopf).</li>
-                        <li><strong>Breaking Changes:</strong> Bei Modellwechseln (z.B. neue CAPE-Logik) alte Exporte
-                            archivieren und neu simulieren.</li>
-                        <li><strong>Validierung:</strong> Nach Updates mindestens einen Smoke-Test (Simulator + Balance)
-                            durchführen und Ergebnisse kurz protokollieren.</li>
+                        <li><strong>Changelog:</strong> Detaillierte Änderungen stehen in <code>CHANGELOG.md</code>.</li>
+                        <li><strong>Nach einem Update:</strong> Versionshinweise auf geänderte Daten- oder
+                            Modellverträge prüfen. Alte Ergebnisexporte behalten ihren damaligen Modellstand und
+                            werden nicht rückwirkend aktualisiert.</li>
                     </ul>
                 </div>
                 <div class="detail-block" id="anhang-dokumente" style="margin-top: 1rem;">
@@ -1872,14 +1930,16 @@
                     </ul>
                 </div>
                 <div class="detail-block" id="anhang-support" style="margin-top: 1rem;">
-                    <h3>Kontakt &amp; Support</h3>
+                    <h3>Hilfe &amp; Fehlerbericht</h3>
                     <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                        <li><strong>Feedback:</strong> Issues im Repository anlegen oder per E-Mail an das
-                            Maintainer-Team senden.</li>
-                        <li><strong>Hilfesuche:</strong> FAQ und Glossar prüfen; bei technischen Problemen Log-Auszug
-                            (Konsole) beilegen.</li>
-                        <li><strong>Response-Zeiten:</strong> Innerhalb von 3 Werktagen für Fehlerberichte, komplexe
-                            Anfragen nach Aufwand.</li>
+                        <li><strong>Hilfesuche:</strong> Zuerst <a class="toc-link" data-tab-target="manual"
+                                href="#haeufige-probleme">Häufige Probleme</a>, FAQ und Glossar prüfen.</li>
+                        <li><strong>Fehler eingrenzen:</strong> Oberfläche, aktives Profil, auslösenden Schritt,
+                            sichtbare Meldung und App-/Browservariante notieren. Nur notwendige Konsolenmeldungen
+                            weitergeben und persönliche Finanzdaten zuvor entfernen.</li>
+                        <li><strong>Kontaktweg:</strong> Dieses Handbuch verspricht keinen bestimmten Supportkanal und
+                            keine Reaktionszeit. Verwenden Sie ausschließlich einen im jeweiligen Repository- oder
+                            Auslieferungskontext ausdrücklich genannten Kontaktweg.</li>
                     </ul>
                 </div>
             </div>
@@ -1887,10 +1947,11 @@
             <div class="info-card" id="faq" style="margin-top: 2rem;">
                 <h2>Häufige Fragen (FAQ)</h2>
                 <dl class="term-list">
-                    <dt>Warum reichen durchschnittliche 7% Rendite nicht?</dt>
-                    <dd>Verluste zu Beginn der Entnahmephase (Sequence of Return Risk) können das Depot so stark
-                        verkleinern, dass es sich trotz späterer Gewinne nicht erholt. Unsere Simulation zeigt daher
-                        Spannbreiten statt nur Mittelwerte.</dd>
+                    <dt>Warum reicht eine Durchschnittsrendite nicht zur Beurteilung?</dt>
+                    <dd>Verluste zu Beginn der Entnahmephase (Reihenfolgerisiko beziehungsweise Sequence-of-Returns-
+                        Risiko) können einen Entnahmepfad stärker belasten als gleich hohe spätere Verluste. Der
+                        Simulator zeigt deshalb modellinterne Verteilungen und historische Pfade statt nur eines
+                        Mittelwerts; auch diese Ergebnisse sind keine Zukunftsgarantie.</dd>
 
                     <dt>Was bringt das Backtesting zusätzlich zur Monte-Carlo-Simulation?</dt>
                     <dd>Backtests untersuchen konkrete, bereits bekannte historische Zeiträume (z.B. ab 2000) und
@@ -1931,11 +1992,10 @@
                         blockieren mit einem Recovery-Hinweis.</dd>
 
                     <dt>Was ist der Verlustverrechnungstopf?</dt>
-                    <dd>Wenn Sie in einem Jahr Kapitalverluste realisieren (z.B. durch Verkauf bei niedrigeren
-                        Kursen), werden diese Verluste automatisch ins nächste Jahr übertragen. Dort werden sie
-                        mit künftigen Gewinnen verrechnet, sodass Sie weniger Steuern zahlen. Die Suite zeigt
-                        die Steuerersparnis in der Handlungsanweisung an. Im Simulator sehen Sie den
-                        durchschnittlichen Effekt als KPI.</dd>
+                    <dd>Die Suite führt den modellierten Verlusttopf im Jahreszustand fort und berücksichtigt ihn in
+                        späteren modellierten Steuer-Settlements. Das ist eine Planungsrechnung, keine Feststellung
+                        Ihres realen steuerlichen Verlustvortrags oder Ihrer tatsächlichen Steuerersparnis. Details
+                        und Grenzen stehen unter <a href="#balance-verlusttopf">Verlustverrechnungstopf</a>.</dd>
 
                     <dt>Warum blockiert der Parameter-Sweep manche Felder?</dt>
                     <dd>Die Sweep-Logik schützt Partner-Felder (Rente 2) und weitere kritische Eingaben über eine
@@ -2026,7 +2086,7 @@ Tranchen abgleichen → Cashstand manuell nachführen</pre>
                         Die Handlungsschritte im Panel verlinken jede Bewegung zwischen Depot, Geldmarkt und Konto.
                     </dd>
 
-                    <dt><a class="toc-link" data-tab-target="manual" href="#simulator-ergebnisse">Parameter Sweep</a>
+                    <dt><a class="toc-link" data-tab-target="manual" href="#simulator-sweep">Parameter Sweep</a>
                     </dt>
                     <dd>Experimentelle Heatmap für Kombinationen aus Liquiditäts-Runway, Gold-Rebalancing-Band,
                         maximaler Skim-Quote, maximaler Bear-Refill-Quote, Goldziel, VPW-Survival-Quantil und
@@ -2094,7 +2154,9 @@ Tranchen abgleichen → Cashstand manuell nachführen</pre>
 
             // Alle Abschnitte umschalten, damit nur der gewählte Bereich sichtbar ist.
             document.querySelectorAll('.content-section').forEach(section => {
-                section.classList.toggle('active', section.id === normalizedTabId);
+                const isTargetSection = section.id === normalizedTabId;
+                section.classList.toggle('active', isTargetSection);
+                section.setAttribute('aria-hidden', String(!isTargetSection));
             });
 
             const tabButtons = document.querySelectorAll('.tab-btn');
@@ -2104,12 +2166,14 @@ Tranchen abgleichen → Cashstand manuell nachführen</pre>
                 const buttonTabId = button.dataset.tabId;
                 const isTargetButton = buttonTabId === normalizedTabId;
                 button.classList.toggle('active', isTargetButton);
+                button.setAttribute('aria-selected', String(isTargetButton));
             });
 
             // Fallback: Sollte kein Button matchen, markieren wir den ersten, um den UI-Zustand konsistent zu halten.
             const hasActiveButton = Array.from(tabButtons).some(button => button.classList.contains('active'));
             if (!hasActiveButton && tabButtons.length > 0) {
                 tabButtons[0].classList.add('active');
+                tabButtons[0].setAttribute('aria-selected', 'true');
             }
         }
 
@@ -2144,6 +2208,8 @@ Tranchen abgleichen → Cashstand manuell nachführen</pre>
                         if (anchorElement) {
                             requestAnimationFrame(() => {
                                 anchorElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                anchorElement.setAttribute('tabindex', '-1');
+                                anchorElement.focus({ preventScroll: true });
                                 // URL-Hash aktualisieren, damit die Navigation teilbar bleibt.
                                 history.replaceState(null, '', anchorId);
                             });
