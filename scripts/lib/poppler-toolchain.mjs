@@ -8,6 +8,10 @@ function executableFileName(tool, platform = process.platform) {
     return platform === 'win32' ? `${tool}.exe` : tool;
 }
 
+function pathImplementation(platform = process.platform) {
+    return platform === 'win32' ? path.win32 : path;
+}
+
 export function parsePopplerVersion(output, tool = 'pdftohtml') {
     const escapedTool = String(tool).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const match = String(output ?? '').match(
@@ -55,7 +59,7 @@ export function popplerToolCandidates({
         candidates.push(environment[environmentVariable]);
     }
     if (environment.RUHESTANDSAPP_POPPLER_BIN) {
-        candidates.push(path.join(
+        candidates.push(pathImplementation(platform).join(
             environment.RUHESTANDSAPP_POPPLER_BIN,
             executableFileName(tool, platform)
         ));
@@ -122,4 +126,3 @@ export function resolvePopplerTool({
     });
     throw error;
 }
-

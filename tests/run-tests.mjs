@@ -10,6 +10,38 @@ export const QUICK_TESTS_DEPRECATED_MESSAGE =
     'QUICK_TESTS=1 is deprecated; use targeted run-single checks or the slice-specific commands instead.';
 
 export const TEST_EXECUTION_POLICY = Object.freeze({
+    'demography-care-survivor-runtime-measurement.test.mjs': Object.freeze({
+        mode: 'in-process',
+        referenceRuntime: Object.freeze({
+            platform: 'win32',
+            nodeVersion: 'v25.2.1',
+            architecture: 'x64'
+        }),
+        command: 'node tests/run-single.mjs tests/demography-care-survivor-runtime-measurement.test.mjs',
+        reason: 'Byte-exact demography evidence is pinned to its recorded Windows x64 and Node v25.2.1 runtime.'
+    }),
+    'german-cash-money-market-source-reconstruction.test.mjs': Object.freeze({
+        mode: 'in-process',
+        platforms: Object.freeze(['win32']),
+        command: 'node tests/run-single.mjs tests/german-cash-money-market-source-reconstruction.test.mjs',
+        reason: 'The pinned Poppler 25.07.0 PDF oracle is a Windows development gate.'
+    }),
+    'runtime-build-provenance.test.mjs': Object.freeze({
+        mode: 'in-process',
+        platforms: Object.freeze(['win32']),
+        command: 'node tests/run-single.mjs tests/runtime-build-provenance.test.mjs',
+        reason: 'Executes the real Windows PowerShell dist synchronization script.'
+    }),
+    'simulator-backtest-characterization.test.mjs': Object.freeze({
+        mode: 'in-process',
+        referenceRuntime: Object.freeze({
+            platform: 'win32',
+            nodeVersion: 'v25.2.1',
+            architecture: 'x64'
+        }),
+        command: 'node tests/run-single.mjs tests/simulator-backtest-characterization.test.mjs',
+        reason: 'Byte-exact historical evidence is pinned to its recorded Windows x64 and Node v25.2.1 runtime.'
+    }),
     'auto-optimize-worker-contract.test.mjs': Object.freeze({
         mode: 'isolated',
         instrumentAssertions: true,
@@ -77,9 +109,28 @@ export const TEST_EXECUTION_POLICY = Object.freeze({
     })
 });
 
-export function getTestExecutionPolicy(file, { forceIsolated = false } = {}) {
+export function getTestExecutionPolicy(file, {
+    forceIsolated = false,
+    platform = process.platform,
+    nodeVersion = process.version,
+    architecture = process.arch
+} = {}) {
     const configured = TEST_EXECUTION_POLICY[file];
     if (configured?.mode === 'separate-gate') return configured;
+    const platformMatches = !configured?.platforms || configured.platforms.includes(platform);
+    const referenceRuntime = configured?.referenceRuntime;
+    const referenceRuntimeMatches = !referenceRuntime || (
+        referenceRuntime.platform === platform
+        && referenceRuntime.nodeVersion === nodeVersion
+        && referenceRuntime.architecture === architecture
+    );
+    if (configured && (!platformMatches || !referenceRuntimeMatches)) {
+        return {
+            mode: 'separate-gate',
+            command: configured.command,
+            reason: configured.reason
+        };
+    }
     if (forceIsolated) {
         return {
             mode: 'isolated',

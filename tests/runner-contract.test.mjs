@@ -67,6 +67,38 @@ console.log('--- Runner Contract Tests ---');
 }
 
 {
+    const windowsOnlyPolicy = getTestExecutionPolicy(
+        'german-cash-money-market-source-reconstruction.test.mjs',
+        { platform: 'linux', nodeVersion: 'v22.23.2', architecture: 'x64' }
+    );
+    assertEqual(windowsOnlyPolicy.mode, 'separate-gate',
+        'Windows-only software gate should be explicit on Linux');
+    assert(windowsOnlyPolicy.reason.includes('Windows'),
+        'Windows-only software gate should name its required platform');
+
+    const windowsPolicy = getTestExecutionPolicy(
+        'german-cash-money-market-source-reconstruction.test.mjs',
+        { platform: 'win32', nodeVersion: 'v22.23.2', architecture: 'x64' }
+    );
+    assertEqual(windowsPolicy.mode, 'in-process',
+        'Windows-only software gate should execute on Windows');
+
+    const mismatchedReferencePolicy = getTestExecutionPolicy(
+        'demography-care-survivor-runtime-measurement.test.mjs',
+        { platform: 'linux', nodeVersion: 'v22.23.2', architecture: 'x64' }
+    );
+    assertEqual(mismatchedReferencePolicy.mode, 'separate-gate',
+        'Byte-exact evidence should be separate outside its reference runtime');
+
+    const matchingReferencePolicy = getTestExecutionPolicy(
+        'demography-care-survivor-runtime-measurement.test.mjs',
+        { platform: 'win32', nodeVersion: 'v25.2.1', architecture: 'x64' }
+    );
+    assertEqual(matchingReferencePolicy.mode, 'in-process',
+        'Byte-exact evidence should execute in its recorded reference runtime');
+}
+
+{
     const dir = createTempTestDir();
     try {
         writeTest(dir, 'zero.test.mjs', "console.log('import-only fixture');\n");
