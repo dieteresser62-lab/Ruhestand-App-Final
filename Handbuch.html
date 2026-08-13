@@ -392,6 +392,10 @@
                     <ol class="toc-sublist">
                         <li><a class="toc-link" data-tab-target="manual" href="#balance-jahresupdate">Jahres-Update</a>
                         </li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#balance-marktdaten-csv">Marktdaten</a>
+                        </li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#balance-snapshots">Snapshots &amp;
+                                Recovery</a></li>
                         <li><a class="toc-link" data-tab-target="manual" href="#balance-diagnose">Diagnose</a></li>
                         <li><a class="toc-link" data-tab-target="manual" href="#balance-pflegebucket">Pflegebucket</a>
                         </li>
@@ -545,50 +549,55 @@
             <!-- Balance App Quick Start -->
             <div class="info-card">
                 <h2>⚖️ Balance App Schnellstart</h2>
-                <p class="card-intro">Das jährliche Ritual für Ihr Portfolio (Prime Harvesting).</p>
+                <p class="card-intro">Der sichere Jahresablauf von der Vorprüfung bis zur realen Umsetzung.</p>
 
                 <ol class="steps-list">
                     <li class="step-item">
                         <div class="step-number">1</div>
                         <div class="step-content">
-                            <h3>Jahres-Update starten</h3>
-                            <p>Klicken Sie oben auf den Button <strong>"🌐 Jahres-Update"</strong>. Die App ruft
-                                automatisch die aktuelle Inflation (EZB/World Bank/OECD) und ETF-Kurse ab,
-                                aktualisiert Ihr Alter und rückt die Marktdaten (Shiller-CAPE Basis) um ein Jahr
-                                weiter.</p>
+                            <h3>Profil, Ausgabenjahr und Backup prüfen</h3>
+                            <p>Öffnen Sie Balance aus dem richtigen aktiven Profil. Prüfen Sie, ob der
+                                Ausgaben-Check auf dem abzuschließenden Vorjahr steht, und erstellen Sie vor dem
+                                Jahresprozess ein aktuelles Komplettbackup.</p>
                         </div>
                     </li>
                     <li class="step-item">
                         <div class="step-number">2</div>
                         <div class="step-content">
-                            <h3>Aktuelle Werte prüfen</h3>
-                            <p>Kontrollieren Sie die aktualisierten Felder. Tragen Sie den <strong>heutigen
-                                    Marktwert</strong> Ihrer Depots und Cash-Konten ein. Die neuen Bedarfswerte
-                                (Floor/Flex) wurden bereits automatisch um die Inflation erhöht.</p>
+                            <h3>Jahresabschluss starten</h3>
+                            <p>Klicken Sie auf <strong>„🌐 Jahres-Update“</strong> oder
+                                <strong>„⭐ Jahresabschluss“</strong>. Beide starten denselben periodengebundenen
+                                Abschluss. Nach der Vorprüfung legt die App vor dem ersten Schreibvorgang einen
+                                geprüften Recovery-Snapshot an.</p>
                         </div>
                     </li>
                     <li class="step-item">
                         <div class="step-number">3</div>
                         <div class="step-content">
-                            <h3>Diagnose & Handlung</h3>
-                            <p>Schauen Sie auf das Panel "Ergebnisse & Handlungsschritte". Folgen Sie genau der
-                                Anweisung (z.B. "Kein Handlungsbedarf" oder "Rebalancing durchführen").</p>
+                            <h3>Datenlauf und Abschluss prüfen</h3>
+                            <p>Warten Sie Inflation, periodengebundene Marktdaten, Fortschreibung und
+                                Post-Write-Validierung vollständig ab. Bei einem Fehler nach Prozessbeginn stellen
+                                Sie zuerst den benannten Recovery-Snapshot wieder her; starten Sie nicht einfach
+                                offline erneut.</p>
                         </div>
                     </li>
                     <li class="step-item">
                         <div class="step-number">4</div>
                         <div class="step-content">
-                            <h3>Ausgaben-Check</h3>
-                            <p>Im Tab "Ausgaben-Check" pro Monat CSV importieren, Monatsampel prüfen und
-                                Soll/Ist auf Basis importierter Monate bewerten.</p>
+                            <h3>Ist-Werte und Ausgaben kontrollieren</h3>
+                            <p>Pflegen Sie Depot- und Cashstände im Profil-Assets-Manager und kehren Sie zu Balance
+                                zurück. Prüfen Sie im „Ausgaben-Check“ das neue Jahr sowie die erhaltene Historie;
+                                Monats-CSV-Importe dienen der laufenden Soll/Ist-Kontrolle.</p>
                         </div>
                     </li>
                     <li class="step-item">
                         <div class="step-number">5</div>
                         <div class="step-content">
-                            <h3>Kapitalfluss umsetzen</h3>
-                            <p>Führen Sie die angezeigten Transaktionen bei Ihrer Bank durch (z.B. Verkauf von XX € um
-                                Cash aufzufüllen).</p>
+                            <h3>Diagnose lesen und real umsetzen</h3>
+                            <p>Prüfen Sie im Panel „Ergebnisse &amp; Handlungsschritte“ Messphase, Zielwerte und
+                                Blockiergründe. Die Anzeige ist ein Plan: Führen Sie Bank- oder Brokeraktionen selbst
+                                aus, gleichen Sie bestätigte Tranchenverkäufe im Manager ab und führen Sie den
+                                tatsächlichen Cashstand anschließend manuell nach.</p>
                         </div>
                     </li>
                 </ol>
@@ -770,7 +779,9 @@
                         <h3>Beispielwerte (Orientierung)</h3>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Cash-Puffer:</strong> 3-6 Monatsausgaben als Reserve neben dem Depot.</li>
+                            <li><strong>Liquiditätsparameter:</strong> In Balance das Nettoziel „Liquiditäts-Runway
+                                (Jahre)“ und den getrennten Brutto-Notfallpuffer „Min. Cash-Puffer (Monate)“ passend
+                                zur eigenen Planung setzen; die Suite gibt hier keine pauschale Monatszahl vor.</li>
                             <li><strong>Sparrate:</strong> 10-20% des Nettoeinkommens als Zielkorridor.</li>
                             <li><strong>Sparsteigerung:</strong> 2-3% pro Jahr oder Inflationsrate als Automatismus.
                             </li>
@@ -1197,19 +1208,34 @@
                 <div class="manual-grid" style="margin-top: 1.5rem;">
                     <div class="detail-block" id="balance-jahresupdate">
                         <h3>Jahres-Update</h3>
-                        <p>Starten Sie das Jahres-Update, um alle automatischen Schritte gebündelt auszulösen und
-                            danach nur noch die geprüften Werte zu ergänzen.</p>
+                        <p>„🌐 Jahres-Update“ und „⭐ Jahresabschluss“ führen in denselben fail-safe,
+                            periodengebundenen Abschluss. Der Prozess darf für ein Kalenderjahr nur einmal
+                            erfolgreich abgeschlossen werden.</p>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Automatisch aktualisiert:</strong> Inflation (ECB/World Bank/OECD),
-                                daraus abgeleitete Floor-, Flex- und Mindest-Flex-Bedarfe, Altersfelder beider Personen sowie
-                                Markt-Kontext (CAPE-Rotation, ATH-Status, Shiller-Daten nachgerückt).</li>
-                            <li><strong>Manuell zu prüfen:</strong> aktuelle Depotwerte (Aktien, Anleihen,
-                                ETFs), Cash- und Tagesgeldstände. Korrigieren Sie Tippfehler sofort, damit Guardrails
-                                korrekt greifen.</li>
-                            <li><strong>Prozesskette:</strong> Daten abrufen → Inflation anwenden → Guardrails
-                                neu berechnen → Diagnose aktualisieren → Kapitalfluss-Vorschläge anzeigen.</li>
+                            <li><strong>Vorprüfung:</strong> Das aktive Profil muss stimmen, der Ausgaben-Check muss
+                                auf dem abzuschließenden Kalenderjahr stehen, Alter und Eingaben müssen gültig sein.
+                                Bei Altdaten fragt die App einmalig, ob die Periode noch offen oder bereits
+                                abgeschlossen ist.</li>
+                            <li><strong>Recovery vor Writes:</strong> Die App speichert und bestätigt zuerst einen
+                                Jahresabschluss-Snapshot. Erst danach markiert sie die Periode als laufend und beginnt
+                                mit Änderungen.</li>
+                            <li><strong>Automatische Fortschreibung:</strong> Alter, Inflation, daraus abgeleitete
+                                Floor-, Flex- und Mindest-Flex-Bedarfe, periodengebundene ETF-/CAPE-Daten und das
+                                Ausgabenjahr werden fortgeschrieben.</li>
+                            <li><strong>Abschlussprüfung:</strong> Die App validiert unter anderem das erwartete Alter
+                                und das neue Ausgabenjahr und persistiert anschließend den periodengebundenen Stand.
+                                Erst die Erfolgsmeldung kennzeichnet den Abschluss als vollständig.</li>
+                            <li><strong>Manuell danach:</strong> Depot-, Geldmarkt- und Cash-Iststände werden im
+                                Profil-Assets-Manager gepflegt. Öffnen Sie Balance danach erneut und prüfen Sie
+                                Diagnose und Handlungsschritte.</li>
                         </ul>
+                        <div class="warning-box" style="margin-top: 1rem;">
+                            <strong>Fehler nach dem Snapshot:</strong> Ein fehlgeschlagener erforderlicher Online- oder
+                            Schreibschritt hinterlässt bewusst einen unvollständigen Jahresprozess. Stellen Sie den in
+                            der Fehlermeldung genannten Recovery-Snapshot wieder her, bevor Sie erneut beginnen. Ein
+                            manueller Wert oder Offlinebetrieb ist in diesem Zustand kein stiller Fallback.
+                        </div>
                     </div>
                     <div class="detail-block" id="balance-marktdaten-csv">
                         <h3>Marktdaten per CSV importieren</h3>
@@ -1242,6 +1268,12 @@
                                 Formularwerten moeglich und fuehrt die konkrete Abweichung als
                                 <code>validationWarnings</code> auf.</li>
                         </ul>
+                        <p style="color: var(--text-light); margin-top: 0.5rem;"><strong>Drei getrennte Wege:</strong>
+                            Der periodengebundene Jahresabschluss ruft die benötigten Jahresdaten als Teil seiner
+                            Commit-Kette ab. „🗓️ Nachr.“ verschiebt Marktdaten separat und ist kein Jahresabschluss.
+                            Der CSV-Import ist ein kontrollierter manueller Datenweg mit eigener Periode,
+                            Stichtagsprüfung, Vorschau, Provenienz und Recovery-Snapshot; er schließt keine
+                            Jahresperiode.</p>
                     </div>
                     <div class="detail-block" id="balance-snapshots">
                         <h3>Jahresabschluss-Snapshots</h3>
@@ -1274,6 +1306,13 @@
                             nicht genutzten Rahmen. Ein gesetzter Mindest-Flex wird dort ebenfalls mit Betrag, Status,
                             erforderlicher Rate, Blockiergrund und Effekt vor/nach dem Policy-Schritt angezeigt. Die
                             Hauptansicht bleibt bewusst kompakt.</p>
+                        <p style="color: var(--text-light);"><strong>Runway-Messung:</strong> Das konfigurierbare
+                            Runway-Ziel von 1 bis 10 Jahren bezieht sich auf die final geplante Netto-Entnahme nach
+                            Renten und Spending-Policies. Die kanonische Anzeige misst freie Liquidität nach der
+                            geplanten Transaktion und vor der Jahresauszahlung. Davon getrennt schützt „Min.
+                            Cash-Puffer (Monate)“ einen Bruttobetrag aus ungekürztem Floor plus Flex; die
+                            Ziel-Liquidität ist der höhere, auf volle 100 Euro aufgerundete Wert. Eine interne harte
+                            Runway-Untergrenze ist ebenfalls nicht dieser Brutto-Notfallpuffer.</p>
                     </div>
                     <div class="detail-block" id="balance-pflegebucket">
                         <h3>Pflegebucket</h3>
@@ -1286,6 +1325,10 @@
                                 Liquidität, Zieldeckung und Ziellücke erscheinen in Übersicht und Diagnose.</li>
                             <li><strong>Keine automatische Freigabe:</strong> Balance kennt derzeit keinen aktuellen
                                 Pflegegrad-Ist-Zustand. Deshalb bleibt die Policy <code>diagnostic_only</code>.</li>
+                            <li><strong>Keine Runway-Gleichsetzung:</strong> Pflegebucket, Brutto-Notfallpuffer,
+                                Runway-Ziel und übrige freie Liquidität sind getrennte Größen. Die
+                                Pflegebucket-Anzeige ist in Balance eine Diagnose und löst keine automatische
+                                Entsperrung oder Transaktion aus.</li>
                             <li><strong>Jahresplanung:</strong> Reale Pflegeausgaben tragen Sie weiterhin über Bedarf
                                 und Jahresplanung ein. Die Zweckbindung zeigt, welcher Liquiditätsanteil nicht normal
                                 verfügbar ist.</li>
@@ -1295,7 +1338,8 @@
                         <h3>Handlungsschritte</h3>
                         <p>Im Panel „Ergebnisse &amp; Handlungsschritte“ sehen Sie klare Aufgaben inklusive Reihenfolge.
                             Jede Aufgabe verweist auf die benötigten Konten (Aktien-Depot, Geldmarkt, Ausgabenkonto)
-                            und nennt Zielbeträge, sodass Sie jede Transaktion 1:1 umsetzen können.</p>
+                            und nennt modellierte Zielbeträge. Prüfen Sie Beträge, Messphase, Steuern und
+                            Kontozuordnung vor jeder realen Ausführung.</p>
                         <p style="color: var(--text-light);">Design-Entscheidung: Die Reihenfolge folgt dem
                             Entscheidungsbaum (erst Liquidität, dann Quote, dann eventuelle CAPE-Bremsen), um
                             unnötige Trades zu vermeiden.</p>
@@ -1303,8 +1347,11 @@
                     <div class="detail-block" id="balance-kapitalfluss">
                         <h3>Kapitalfluss</h3>
                         <p>Die App fasst zusammen, welche Beträge zwischen Aktien, Cash und Entnahmekonten fließen
-                            sollen. Nutzen Sie die Checkliste im Panel, um Verkäufe, Umbuchungen und Auszahlungen in
-                            exakt dieser Reihenfolge abzuwickeln.</p>
+                            sollen. Diese Empfehlung verändert weder Bank- noch Brokerbestand. Führen Sie den realen
+                            Auftrag selbst aus, prüfen Sie die tatsächliche Abrechnung und bestätigen Sie einen
+                            Tranchenverkauf erst danach per Vorschau und Reconcile. Der Reconcile reduziert Lots,
+                            bucht den Erlös aber nicht automatisch in freie Liquidität; den Cashstand führen und
+                            bestätigen Sie separat manuell nach.</p>
                     </div>
 
                     <div class="detail-block" id="balance-ausgaben-check">
@@ -1415,35 +1462,39 @@
             </div>
 
             <div class="info-card" id="balance-jahresupdate-guide" style="margin-top: 1.5rem;">
-                <h2>Jahres-Update-Kette im Detail</h2>
-                <p class="card-intro">Diese Schrittfolge beschreibt, welche Felder automatisch aktualisiert werden und
-                    welche Eingaben Sie nach dem Update prüfen oder ergänzen müssen.</p>
+                <h2>Jahresabschluss von der Vorbereitung bis zur Umsetzung</h2>
+                <p class="card-intro">Halten Sie diese Reihenfolge ein, damit Periode, Recovery-Punkt, Marktdaten und
+                    reale Kontostände nachvollziehbar bleiben.</p>
                 <div class="manual-grid" style="margin-top: 1.5rem;">
                     <div class="detail-block">
-                        <h3>Automatische Fortschreibungen</h3>
-                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light);">
-                            <li><strong>Inflation &amp; Bedarf:</strong> Der neu abgerufene Inflationswert indexiert
-                                Floor
-                                und Flex-Bedarf. Die Vorjahreswerte bleiben zum Vergleich sichtbar.</li>
-                            <li><strong>Alter:</strong> Startalter aller Personen erhöht sich um ein Jahr; abhängige
-                                Renten- und Pflege-Trigger werden neu berechnet.</li>
-                            <li><strong>Marktkontext:</strong> CAPE-Reihe rückt um ein Jahr weiter, das Allzeithoch wird
-                                ggf. aktualisiert, und der Entscheidungsbaum erhält den neuen CAPE-Overlay-Status.</li>
-                        </ul>
+                        <h3>1. Vorbereiten und abschließen</h3>
+                        <ol style="margin-left: 20px; color: var(--text-light);">
+                            <li>Aktives Profil und gespeicherten Stand prüfen; anschließend ein versioniertes
+                                Komplettbackup erstellen.</li>
+                            <li>Im „Ausgaben-Check“ das abzuschließende Vorjahr wählen und fehlende Monatsdaten oder
+                                Sonderausgaben prüfen.</li>
+                            <li>Jahresabschluss starten und Periode bestätigen. Die App führt Preflight und Flush
+                                aus und erstellt danach den Recovery-Snapshot.</li>
+                            <li>Inflations-, ETF- und CAPE-Schritte vollständig abwarten. Stichtag und Quelle im
+                                Update-Protokoll beziehungsweise in der Marktdaten-Provenienz prüfen.</li>
+                            <li>Erfolgsmeldung, neues Alter und neues Ausgabenjahr kontrollieren. Bei Recovery-Hinweis
+                                abbrechen und den genannten Snapshot wiederherstellen.</li>
+                        </ol>
                     </div>
                     <div class="detail-block">
-                        <h3>Manuelle Prüfungen</h3>
-                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light);">
-                            <li><strong>Depotwerte:</strong> Tragen Sie den aktuellen Marktwert je Depot/ETF ein. Nutzen
-                                Sie getrennte Felder für Aktien und Anleihen, damit die Zielquote korrekt berechnet
-                                wird.</li>
-                            <li><strong>Cash &amp; Tagesgeld:</strong> Hinterlegen Sie Ist-Stände (inkl.
-                                Zinsgutschriften),
-                                damit Runway und Liquiditätspuffer stimmen.</li>
-                            <li><strong>Sonstige Zuflüsse:</strong> Prüfen Sie Sonderzahlungen oder Ausgaben, die nicht
-                                im
-                                Standardbedarf liegen, bevor Sie den Kapitalfluss ausführen.</li>
-                        </ul>
+                        <h3>2. Ist-Stände und Diagnose prüfen</h3>
+                        <ol style="margin-left: 20px; color: var(--text-light);">
+                            <li>Aktuelle Depot-, Geldmarkt- und Cashstände im Profil-Assets-Manager nachführen und den
+                                bestätigten Speicherstatus abwarten.</li>
+                            <li>Balance neu öffnen. Prüfen, ob die Marktdaten-Provenienz zur abgeschlossenen Periode
+                                passt und keine Persistenz- oder Quarantänewarnung angezeigt wird.</li>
+                            <li>Floor, Flex und optionalen Mindest-Flex prüfen. Mindest-Flex muss nichtnegativ sein
+                                und darf den Flex-Bedarf nicht übersteigen; ungültige Werte werden abgelehnt und nicht
+                                still begrenzt.</li>
+                            <li>Runway vor/nach Plantransaktion, Brutto-Notfallpuffer, Pflegebucket-Diagnose und freie
+                                Liquidität getrennt lesen.</li>
+                            <li>Erst danach die modellierten Handlungsschritte beurteilen.</li>
+                        </ol>
                     </div>
                 </div>
 
@@ -1476,15 +1527,19 @@
                 <div class="detail-block" style="margin-top: 1rem;" id="balance-kapitalfluss-guide">
                     <h3>Kapitalfluss praktisch umsetzen</h3>
                     <ol style="margin-left: 20px; color: var(--text-light);">
-                        <li><strong>Verkauf/Rebalancing:</strong> Entnehmen Sie die genannten Beträge aus dem
-                            Aktien-Depot, falls die Quote über Ziel liegt oder der Runway unter das Ziel fällt.</li>
-                        <li><strong>Geldmarkt auffüllen:</strong> Überweisen Sie Verkaufserlöse auf Tagesgeld/
-                            Geldmarkt, bis der Runway (z.B. 12 Monate) wieder erreicht ist.</li>
-                        <li><strong>Monatsbedarf auszahlen:</strong> Transferieren Sie den Floor/Flex-Betrag vom
-                            Geldmarkt auf das Ausgabenkonto. Keine Aktienverkäufe, wenn die Diagnose „kein
-                            Handlungsbedarf“ meldet.</li>
-                        <li><strong>Überschüsse parken:</strong> Bleibt Cash übrig, schieben Sie ihn zurück auf den
-                            Geldmarkt oder tilgen Sie Kreditlinien; das Panel nennt Prioritäten.</li>
+                        <li><strong>Plan prüfen:</strong> Handlung, Betrag, Quell-/Zielkonto und eventuelle
+                            Guardrail- oder Steuerhinweise gegen die tatsächlichen Konten prüfen. „Kein
+                            Handlungsbedarf“ ist ebenfalls ein mögliches Ergebnis.</li>
+                        <li><strong>Bank/Broker ausführen:</strong> Nur die bewusst übernommene Aktion außerhalb der
+                            Suite ausführen. Abweichende Kurse, Gebühren und Steuerabrechnung dokumentieren.</li>
+                        <li><strong>Tranchen abgleichen:</strong> Nach einem realen Depotverkauf im
+                            Profil-Assets-Manager Vorschau und bestätigten Reconcile ausführen. Eine bloße Empfehlung
+                            verändert keine Lots.</li>
+                        <li><strong>Cash nachführen:</strong> Den tatsächlich angekommenen Nettoerlös im geführten
+                            Cashstand erfassen und den offenen Cashnachweis separat bestätigen. Der Reconcile nimmt
+                            diese Buchung nicht automatisch vor.</li>
+                        <li><strong>Ergebnis kontrollieren:</strong> Balance mit den neuen Ist-Ständen erneut öffnen
+                            und prüfen, ob Handlungsschritte und Runway-Anzeige zum realen Stand passen.</li>
                     </ol>
                     <figure style="margin-top: 1rem;">
                         <img src="assets/images/kapitalfluss_mock.svg" alt="Mockup der Kapitalfluss-Schritte"
@@ -1606,8 +1661,9 @@
                             Gehaltsänderung) aktualisieren und Benchmarks dokumentieren.</li>
                         <li><strong>Jahres-Update fest einplanen:</strong> Termin im Kalender blocken, um Inflation,
                             Marktwerte und Bedarfe zu aktualisieren.</li>
-                        <li><strong>Risiko-Governance:</strong> Rebalancing-Schwellen, Notfall-Runway und CAPE-Grenzen
-                            in einer kurzen Policy-Notiz festhalten.</li>
+                        <li><strong>Risiko-Governance:</strong> Rebalancing-Schwellen, Netto-Runway-Ziel,
+                            getrennten Brutto-Notfallpuffer und CAPE-Grenzen in einer kurzen Policy-Notiz
+                            festhalten.</li>
                         <li><strong>Backup & Versionierung:</strong> Exporte versionieren (z.B. YYYY-MM) und mindestens
                             zweifach sichern, um Datenverlust zu vermeiden.</li>
                     </ul>
@@ -1619,23 +1675,27 @@
                 <div class="detail-block" style="margin-top: 1rem;">
                     <h3>Keine Internetverbindung für EZB-Daten</h3>
                     <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                        <li><strong>Symptom:</strong> Jahres-Update bleibt bei „Inflationsdaten laden“ hängen.</li>
-                        <li><strong>Sofortmaßnahme:</strong> Internetverbindung prüfen, VPN/Firewall temporär
-                            deaktivieren, Seite neu laden.</li>
-                        <li><strong>Fallback:</strong> Inflationsrate manuell eintragen (Feld „Inflation manuell“ im
-                            Jahres-Update), danach Speichern drücken.</li>
-                        <li><strong>Prävention:</strong> Vor geplantem Update Offline-Sperren (Flugmodus/Firewall)
-                            prüfen und Datenquelle in <code>balance-config.js</code> nicht ändern.</li>
+                        <li><strong>Vor dem Abschluss:</strong> Verbindung und im Browserbetrieb den lokalen Proxy
+                            prüfen. Ein vorab gepflegter manueller Wert oder CSV-Import ersetzt den erforderlichen
+                            Datenlauf des periodengebundenen Abschlusses nicht.</li>
+                        <li><strong>Während des Abschlusses:</strong> Meldet die App nach dem Recovery-Snapshot einen
+                            unvollständigen Jahresprozess, keine Werte nachträglich überschreiben und nicht einfach
+                            offline neu starten.</li>
+                        <li><strong>Recovery:</strong> Den in der Fehlermeldung benannten Jahresabschluss-Snapshot
+                            wiederherstellen, danach Ursache beheben und den Abschluss erneut von vorn starten.</li>
+                        <li><strong>Nur Marktdaten nachrücken:</strong> „🗓️ Nachr.“ ist ein separater Vorgang und
+                            ersetzt weder Recovery noch periodengebundenen Jahresabschluss.</li>
                     </ul>
                 </div>
                 <div class="detail-block" style="margin-top: 1rem;">
                     <h3>Ungültige Eingaben</h3>
                     <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
                         <li><strong>Symptom:</strong> Felder werden rot markiert oder Buttons bleiben deaktiviert.</li>
-                        <li><strong>Checkliste:</strong> Nur Zahlen ohne Sonderzeichen verwenden, Dezimaltrenner als
-                            Punkt/Komma akzeptiert; Pflichtfelder (Vermögen, Bedarf, Sparrate) ausfüllen.</li>
-                        <li><strong>Fehlerbehebung:</strong> Seite aktualisieren, Eingaben schrittweise wiederherstellen
-                            und auf Plausibilität (keine negativen Werte, realistische Quoten) prüfen.</li>
+                        <li><strong>Checkliste:</strong> Pflichtfelder, Einheiten und Wertebereiche prüfen. Insbesondere
+                            muss Mindest-Flex nichtnegativ und höchstens so groß wie der Flex-Bedarf sein.</li>
+                        <li><strong>Fehlerbehebung:</strong> Den konkret markierten Wert korrigieren und erneut
+                            validieren. Eine Persistenz- oder Quarantänewarnung verlangt eine ausdrückliche
+                            Recovery- oder Reset-Entscheidung; Neuladen ersetzt korrupte Daten nicht still.</li>
                         <li><strong>Dauerhafte Lösung:</strong> Eigene Default-Vorlagen mit validierten Werten als JSON
                             speichern und beim Start laden.</li>
                     </ul>
@@ -1659,16 +1719,19 @@
             <div class="info-card" id="jahrespflege" style="margin-top: 2rem;">
                 <h2>Best Practices für die jährliche Pflege</h2>
                 <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                    <li><strong>Fixen Termin setzen:</strong> Einmal pro Jahr (idealerweise Januar) alle Eingaben
-                        aktualisieren und Ergebnisse protokollieren.</li>
-                    <li><strong>Datenquellen einfrieren:</strong> Für Vergleiche dasselbe Inflations- und Kursdatum
-                        verwenden; danach Export mit Zeitstempel ablegen.</li>
+                    <li><strong>Abschlussperiode festlegen:</strong> Das abgeschlossene Kalenderjahr im
+                        Ausgaben-Check prüfen und denselben periodengebundenen Ablauf nicht doppelt starten.</li>
+                    <li><strong>Vorher sichern:</strong> Komplettbackup erstellen; den automatisch erzeugten
+                        Jahresabschluss-Snapshot zusätzlich als Recovery-Punkt, nicht als Backupersatz verstehen.</li>
+                    <li><strong>Stichtag und Provenienz prüfen:</strong> Periode, Kursstichtag und Datenquelle im
+                        Update-Protokoll beziehungsweise in der Marktdatenanzeige festhalten.</li>
                     <li><strong>Delta-Review:</strong> Änderungen bei Vermögen, Bedarf, Floor-Deckung, Outcomes und
                         Kürzungs-/Entnahmekennzahlen gegenüber dem Vorjahr notieren; große Abweichungen kommentieren.</li>
-                    <li><strong>Handlungsschritte prüfen:</strong> Rebalancing und Runway-Anpassungen sofort
-                        terminieren, damit der Plan nicht liegen bleibt.</li>
-                    <li><strong>Risiko-Parameter bestätigen:</strong> Ziel-Aktienquote, CAPE-Grenzen und Runway-Minimum
-                        jährlich bestätigen oder schriftlich anpassen.</li>
+                    <li><strong>Handlungsschritte nachführen:</strong> Übernommene Bank-/Brokeraktion, anschließenden
+                        Tranchen-Reconcile und tatsächlichen Cashstand getrennt dokumentieren.</li>
+                    <li><strong>Parameter bewusst prüfen:</strong> Ziel-Aktienquote, CAPE-Grenzen,
+                        Liquiditäts-Runway, Brutto-Cash-Puffer und Mindest-Flex nicht aufgrund einer einzelnen Ampel
+                        ändern.</li>
                 </ul>
             </div>
 
@@ -1757,7 +1820,9 @@
 
                     <dt>Was bedeutet Mindest-Flex p.a.?</dt>
                     <dd>Der Mindest-Flex ist eine optionale Untergrenze für flexible Ausgaben in gekürzten
-                        Safety-/Guardrail-Jahren. Er ist kein Teil des Floors. Wenn ausreichend Gesamtvermögen
+                        Safety-/Guardrail-Jahren. Er ist kein Teil des Floors. Die Eingabe muss nichtnegativ sein und
+                        darf den Flex-Bedarf nicht übersteigen; ungültige Werte werden abgelehnt, nicht still
+                        begrenzt. Wenn ausreichend Gesamtvermögen
                         vorhanden ist, hebt die Engine die Flex-Rate so weit an, dass mindestens dieser Flex-Betrag
                         erreicht wird; fehlende Floor-Deckung, ein aktiver Alarmvertrag oder ein nicht
                         wiederherstellbarer Mindest-Runway können diese Anhebung blockieren. In der besonders
@@ -1815,8 +1880,10 @@
                         Steuerberatung.</dd>
 
                     <dt>Wie oft sollte ich Rebalancing machen?</dt>
-                    <dd>Ein jährlicher Rhythmus (z.B. zum Jahreswechsel) balanciert Aufwand, Steuern und
-                        Transaktionskosten sinnvoll aus.</dd>
+                    <dd>Die Suite gibt keinen pauschalen Rebalancing-Rhythmus vor. Balance beurteilt den aktuellen
+                        Stand anhand Ihrer Zielquote, Toleranzen, Runway- und Marktregeln und erzeugt daraus einen
+                        modellierten Handlungsvorschlag. Prüfen Sie reale Steuern, Kosten und Kontostände vor der
+                        Umsetzung.</dd>
 
                     <dt>Kann ich die Simulation offline nutzen?</dt>
                     <dd>Ja. Kernrechnung, manuelle Eingaben und lokale Speicherung funktionieren ohne Internet.
@@ -1843,20 +1910,24 @@
                         <code>technical_error</code> werden Quote und Wilson-Intervall nicht ausgewiesen.</dd>
 
                     <dt><a class="toc-link" data-tab-target="manual" href="#balance-diagnose">Runway</a></dt>
-                    <dd>Monatspuffer aus Cash/Geldmarkt, der Entnahmen in schwachen Märkten abfedert. Beispiel:
-                        <em>12 Monate Runway</em> = 12 × aktueller Monatsbedarf liegen auf Tagesgeld. Im Diagnose-Panel
-                        (KPIs oben rechts) zeigt die Runway-Anzeige in Monaten, ob der Puffer reicht.
-                    </dd>
+                    <dd>Konfigurierbares Nettoziel für die Reichweite der freien Liquidität. Die kanonische
+                        Balance-Kennzahl misst Cash/Geldmarkt nach der geplanten Transaktion und vor der
+                        Jahresauszahlung gegen die final geplante Netto-Entnahme nach Renten und Spending-Policies.
+                        Das Ziel stammt aus „Liquiditäts-Runway (Jahre)“. Der separate „Min. Cash-Puffer (Monate)“
+                        schützt Bruttobedarf; Pflegebucket und interne harte Runway-Untergrenze sind wiederum eigene
+                        Größen.</dd>
 
                     <dt><a class="toc-link" data-tab-target="manual" href="#balance-handlungsschritte">Skim &amp;
                             Fill</a></dt>
-                    <dd>Kapitalfluss-Logik: Gewinne werden in starken Phasen „abgeschöpft“ (Skim) und füllen den
-                        Runway (Fill), während in Schwächephasen keine Verkäufe erfolgen. Beispiel-Sequenz:
+                    <dd>Kapitalfluss-Logik: In geeigneten Markt- und Guardrail-Situationen können Aktienbeträge
+                        „abgeschöpft“ (Skim) und zur Ziel-Liquidität umgeschichtet werden (Fill). In Bärenphasen kann
+                        eine begrenzte Auffüllung gelten; die konkrete Diagnose ist maßgeblich. Schematische
+                        Plansequenz:
                         <div
                             style="background: var(--card-background); border: 1px solid #e0e6ed; border-radius: 8px; padding: 10px; margin-top: 8px; color: var(--text-light);">
-                            <pre style="margin: 0; white-space: pre-line;">Aktien (über Ziel) → Verkauf 8.000 €
-Geldmarkt +8.000 € → Runway steigt auf 12 Monate
-Ausgabe-Konto erhält Monatsbedarf aus Geldmarkt</pre>
+                            <pre style="margin: 0; white-space: pre-line;">Aktien (über Ziel) → Verkaufsvorschlag
+Brokeraktion ausführen → tatsächlichen Nettoerlös prüfen
+Tranchen abgleichen → Cashstand manuell nachführen</pre>
                         </div>
                         Die Handlungsschritte im Panel verlinken jede Bewegung zwischen Depot, Geldmarkt und Konto.
                     </dd>
@@ -1879,14 +1950,14 @@ Ausgabe-Konto erhält Monatsbedarf aus Geldmarkt</pre>
                     <dt><a class="toc-link" data-tab-target="manual" href="#balance-jahresupdate">Floor/Flex-Bedarf</a>
                     </dt>
                     <dd>Fixer Grundbedarf (<strong>Floor</strong>) plus variable Ausgaben (<strong>Flex</strong>). Beide
-                        Werte werden im
-                        Jahres-Update indexiert und steuern Runway- und Kapitalfluss-Berechnungen. Die Flex-Kürzung
-                        berücksichtigt sowohl die Höhe des jährlichen Flex-Bedarfs als auch das Gesamtvermögen (hohes
-                        Vermögen dämpft die Kürzung). Beispiel: 1.500 € Floor + 700 € Flex = 2.200 € Monatsbedarf → 12
-                        Monate Runway = 26.400 € Cash.</dd>
+                        Werte werden im Jahres-Update indexiert. Der Floor bleibt vom Flex getrennt. Renten und
+                        Spending-Policies bestimmen daraus die geplante Netto-Entnahme, die als Runway-Basis dient;
+                        der Brutto-Notfallpuffer verwendet dagegen den ungekürzten Floor plus Flex.</dd>
 
                     <dt><a class="toc-link" data-tab-target="manual" href="#balance-diagnose">Mindest-Flex p.a.</a></dt>
-                    <dd>Optionale Untergrenze für den ausgezahlten Flex-Anteil in gekürzten Jahren. Beispiel:
+                    <dd>Validierte optionale Untergrenze für den ausgezahlten Flex-Anteil in gekürzten Jahren. Der
+                        Wert muss zwischen 0 und dem Flex-Bedarf liegen; außerhalb dieses Bereichs wird die Eingabe
+                        abgelehnt und nicht still angepasst. Beispiel:
                         12.000 € Flex-Bedarf und 6.000 € Mindest-Flex bedeuten, dass die Flex-Rate mindestens 50%
                         erreichen müsste, sofern keine Notfallblocker greifen. Diagnose und Logs zeigen Status,
                         Blockgrund und effektiven Betrag.</dd>
