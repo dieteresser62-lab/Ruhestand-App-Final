@@ -419,6 +419,10 @@
                         </li>
                         <li><a class="toc-link" data-tab-target="manual" href="#profilverbund-simulator">Simulator</a>
                         </li>
+                        <li><a class="toc-link" data-tab-target="manual"
+                                href="#tranchen-zustaende">Tranchenzustände &amp; Recovery</a></li>
+                        <li><a class="toc-link" data-tab-target="manual"
+                                href="#tranchen-lebenszyklus">Verkauf &amp; Cashabschluss</a></li>
                     </ol>
                 </li>
                 <li><a class="toc-link" data-tab-target="manual" href="#onboarding-playbook">Onboarding-Playbook</a>
@@ -921,7 +925,9 @@
                             einzelne Tranchen pflegen. Ein valider Detailbestand ermöglicht lotbezogene Verkäufe und
                             Steuerabzüge; ein explizit leerer Bestand nutzt die vereinfachte Aggregatsicht. Korrupte
                             oder widersprüchliche Daten blockieren sichtbar. Der Simulator arbeitet auf tiefen Kopien
-                            und verändert den Realbestand nicht.</p>
+                            und verändert den Realbestand nicht. Die Zustände, Recovery-Wege und der reale
+                            Verkaufsabgleich sind im Abschnitt <a href="#tranchen-zustaende">Tranchenzustände und
+                                Recovery</a> beschrieben.</p>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
                             <li><strong>Öffnen:</strong> Profil auf der Startseite wählen und „Profil-Assets Manager“
@@ -1382,37 +1388,17 @@
                         <h3>Depot-Tranchen-Manager</h3>
                         <p>In der Balance-App fließen valide detaillierte Tranchen direkt in die Handlungsschritte ein.
                             Das sorgt für realistische Steuerabschätzungen und eine klare Zuordnung, welche Positionen
-                            verkauft werden sollen. Die Empfehlung selbst bleibt schreibfrei.</p>
+                            verkauft werden sollen. Die Empfehlung selbst bleibt schreibfrei. Führen Sie einen realen
+                            Brokerverkauf ausschließlich über den Ablauf <a href="#tranchen-lebenszyklus">Verkauf,
+                                Reconcile und Cashabschluss</a> nach.</p>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
                             <li><strong>Aktivierung:</strong> Profil auf der Startseite wählen, Tranchen im
                                 Profil-Assets-Manager pflegen und den bestätigten Speicherstatus abwarten.</li>
                             <li><strong>Verkaufsauswahl:</strong> Steueroptimierte Reihenfolge (geringste Steuerlast
                                 zuerst).</li>
-                            <li><strong>Reale Ausführung:</strong> Erst nach dem Brokerverkauf im Manager Vorschau und
-                                separate Bestätigung des Reconcile-Schritts durchführen. Eine identische Action-ID wird
-                                nur einmal angewandt.</li>
-                            <li><strong>Cashstatus beim Verkauf:</strong> Standardmäßig „Nein / noch unklar“ wählen.
-                                Der Verkauf reduziert dann das Lot, bleibt aber als manuell offene Cashbuchung sichtbar.
-                                Nur wenn der Nettoerlös bereits sicher im erfassten Cashstand enthalten ist,
-                                „bereits berücksichtigt“ wählen und den Cashstand eingeben.</li>
-                            <li><strong>Offenen Cashstatus schließen:</strong> Den Nettoerlös selbst in den Rahmendaten
-                                beziehungsweise im tatsächlich geführten Cashbestand nachtragen. Danach beim
-                                Zielverkauf „Cashbuchung manuell bestätigen“ wählen, unveränderten Nettoerlös,
-                                kanonische Nachweis-ID und Cashstand prüfen und explizit bestätigen. Die Suite bucht
-                                nichts automatisch.</li>
-                            <li><strong>Tippfehler korrigieren:</strong> „Bestätigten Cashstand korrigieren“ wählen,
-                                bisherigen und neuen Stand prüfen und einen nichtleeren Grund erfassen. Verkauf,
-                                Abschluss und frühere Korrekturen bleiben unverändert sichtbar; nur die letzte
-                                lückenlose Revision ist der wirksame Cashstand.</li>
-                            <li><strong>Paralleles Fenster:</strong> Hat ein anderes Fenster den Cashstatus seit dem
-                                Öffnen des Dialogs verändert, wird die alte Korrektur vor der Bestätigung blockiert.
-                                Dialog schließen, den aktuellen Stand neu laden und die Korrektur erneut prüfen; die
-                                Suite leitet niemals still eine neue Revision aus dem veralteten Dialog ab.</li>
-                            <li><strong>Altbestand:</strong> Frühere Verkäufe ohne Cashstatus erscheinen als
-                                „Abgeschlossen (Altfall – Cashstatus nicht dokumentiert)“. Sie sind kein offener
-                                Rückstand und keine Cashbestätigung; der Nachweis kann freiwillig ergänzt werden.
-                                Balance und Simulator weisen solche Altverkäufe ebenfalls gesondert aus.</li>
+                            <li><strong>Schreibgrenze:</strong> Balance berechnet und empfiehlt; sie reduziert keine
+                                realen Lots und bucht keinen Verkaufserlös.</li>
                         </ul>
                         <p style="color: var(--text-light); margin-top: 0.5rem;">Ohne gepflegte Tranchen fallen die
                             Steuerwerte auf eine vereinfachte Schätzung zurück.</p>
@@ -1534,8 +1520,9 @@
             <div class="info-card" id="profilverbund"
                 style="margin-top: 2rem; border-left: 5px solid var(--accent-color);">
                 <h2>👥 Profilverbund (Multi-Profil)</h2>
-                <p class="card-intro">Mehrere Profile werden gemeinsam ausgewertet. Die Profilauswahl steuert Balance
-                    und Simulator direkt.</p>
+                <p class="card-intro">Ein Profil besitzt seine eigenen Eingaben und Assets. Ein Profilverbund führt
+                    ausgewählte Profile für eine Haushaltsplanung zusammen, ohne diesen Besitz oder den realen
+                    Tranchenbestand umzuschreiben.</p>
                 <figure style="margin-top: 1rem;">
                     <img src="assets/images/profilverbund_aggregation.svg" alt="Profilverbund Aggregationslogik"
                         style="width:100%; max-width: 1100px; border: 1px solid #e0e6ed; border-radius: 12px; box-shadow: var(--card-shadow);">
@@ -1564,8 +1551,39 @@
                     </ul>
                     <div class="tip-box"
                         style="background: #e8f4f8; padding: 1rem; border-radius: 8px; margin-top: 1rem;">
-                        <strong>💡 Tipp:</strong> Jedes Profil speichert eigene Vermögenswerte, Ausgaben, Renten und
-                        Tranchen. Wechseln Sie das Profil <em>vor</em> Eingaben oder Änderungen.
+                        <strong>💡 Besitzregel:</strong> Tagesgeld, Depot-/Geldmarkt-/Goldwerte, Bedarf, Rente,
+                        Pflegebucket und Tranchen gehören zu dem Profil, dessen Name und ID geladen sind. Wechseln Sie
+                        das Profil <em>vor</em> Eingaben oder Änderungen und kontrollieren Sie den bestätigten
+                        Speicherstatus.
+                    </div>
+                </div>
+
+                <div class="detail-block" id="profilverbund-haushalt" style="margin-top: 1.5rem;">
+                    <h3>Finanzen und Personen getrennt verstehen</h3>
+                    <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li><strong>Finanzielle Aggregation:</strong> Balance kann die Werte mehrerer ausgewählter
+                            Profile summieren. Tagesgeld, Geldmarkt, Depot, Gold, Renten und profilgebundene Tranchen
+                            behalten dabei ihre Herkunft.</li>
+                        <li><strong>Keine zusätzlichen Personen:</strong> Mehr Finanzprofile erzeugen nicht automatisch
+                            mehr individuelle Lebens-, Pflege- oder Hinterbliebenenpfade. Der Simulator unterstützt
+                            höchstens zwei Personen und begrenzt seine Profilauswahl entsprechend.</li>
+                        <li><strong>Hauptprofil:</strong> Im Simulator ist das aktuell geöffnete Profil Hauptprofil,
+                            sofern es ausgewählt ist; andernfalls das erste ausgewählte Profil. Es liefert Person 1 und
+                            die maßgebliche Haushaltskonfiguration, etwa Rentenanpassungsmodus, Stresspreset,
+                            Pflegemodell und Pflegebucket.</li>
+                        <li><strong>Zweites Profil:</strong> Das weitere ausgewählte Profil liefert Person 2 und deren
+                            Alter, Geschlecht und Rente. Renten aller in den kombinierten Eingaben enthaltenen Profile
+                            bleiben finanziell berücksichtigt, auch wenn keine dritte Demografie modelliert wird.</li>
+                        <li><strong>Abweichungen:</strong> Unterscheiden sich maßgebliche Haushaltswerte, zeigt der
+                            Simulator eine Warnung und verwendet den Wert des Hauptprofils; er mischt diese Regeln nicht
+                            still.</li>
+                    </ul>
+                    <div class="warning-box"
+                        style="background: #fff3cd; padding: 1rem; border-radius: 8px; margin-top: 1rem; border-left: 4px solid var(--warning-color);">
+                        <strong>Beispiel:</strong> Drei Finanzprofile können in Balance zu einer Haushaltssicht
+                        beitragen. Im Simulator bleiben es dennoch maximal Person 1 und Person 2; eine Auswahl von mehr
+                        als zwei Profilen wird dort sichtbar auf zwei begrenzt. Prüfen Sie deshalb Hauptprofil,
+                        Profilauswahl und Warnungen vor jedem Lauf.
                     </div>
                 </div>
 
@@ -1576,8 +1594,11 @@
                             aktiv).</li>
                         <li><strong>Aggregation:</strong> Tagesgeld, Geldmarkt, Depot, Gold und Renten werden summiert.
                         </li>
+                        <li><strong>Detailbestand:</strong> Valide Tranchen ersetzen die überlappenden Depot-, Gold-
+                            und Geldmarkt-Aggregate ihres Profils; sie werden nicht zusätzlich aufaddiert.</li>
                         <li><strong>Pflegebucket:</strong> Die Balance-App zeigt den Pflegebucket als gesperrte
-                            Zweckbindung und zieht ihn nicht als automatische Entnahmequelle heran.</li>
+                            Zweckbindung und zieht ihn nicht als automatische Entnahmequelle heran. Maßgeblich ist die
+                            Definition des ersten ausgewählten Profils.</li>
                         <li><strong>Verteilungsmodus:</strong> Steueroptimiert, proportional oder runway-first.</li>
                         <li><strong>Handlungsschritte:</strong> Quellen/Verwendungen werden pro Profil getrennt
                             dargestellt.</li>
@@ -1590,17 +1611,110 @@
                         <li><strong>Profilauswahl:</strong> Im Tab "Rahmendaten" Profile aktivieren.</li>
                         <li><strong>Startdaten:</strong> Startvermögen, Floor/Flex und Renten werden aus den Profilen
                             gefüllt.</li>
-                        <li><strong>Personen & Renten:</strong> Ergeben sich automatisch aus den Profilen (kein
-                            separater Tab).</li>
+                        <li><strong>Personen &amp; Renten:</strong> Das Hauptprofil wird Person 1, das zweite Profil
+                            Person 2. Der Simulator akzeptiert höchstens zwei ausgewählte Profile.</li>
                         <li><strong>Pflegebucket:</strong> Der Simulator übernimmt die Definition des Hauptprofils,
                             gliedert den Bucket erst nach der Haushaltsaggregation aus und warnt bei abweichenden
                             sekundären Profildefinitionen.</li>
                     </ol>
                     <div class="warning-box"
                         style="background: #fff3cd; padding: 1rem; border-radius: 8px; margin-top: 1rem; border-left: 4px solid var(--warning-color);">
-                        <strong>⚠️ Hinweis:</strong> Profile ohne Simulator-Daten werden übersprungen. Füllen Sie die
-                        Rahmendaten einmal pro Profil aus.
+                        <strong>⚠️ Hinweis:</strong> Ungültige oder nicht sicher ladbare Profildaten blockieren den
+                        Lauf. Korrigieren beziehungsweise recovern Sie das genannte Profil; interpretieren Sie es nicht
+                        als still übersprungen.
                     </div>
+                </div>
+
+                <div class="detail-block" id="tranchen-zustaende" style="margin-top: 1.5rem;">
+                    <h3>Tranchen anlegen, laden und wiederherstellen</h3>
+                    <p>Öffnen Sie auf der Startseite zuerst das richtige Profil und dann „Profil-Assets Manager“.
+                        Kontrollieren Sie Profilname und Profil-ID. „Neue Tranche“ erfasst Stückzahl, Kauf- und
+                        aktuellen Preis, passende Kategorie und Typ, Steuerstatus sowie optionale Kennungen. Erst die
+                        erfolgreiche Speicheranzeige bestätigt eine Anlage, Änderung oder Löschung.</p>
+                    <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li><strong>Noch kein Detailbestand:</strong> Es ist kein gespeicherter Tranchenpayload für das
+                            Profil vorhanden. Die vereinfachten Aggregatwerte können verwendet werden; dieser Zustand
+                            ist nicht dasselbe wie ein bewusst gespeichertes leeres Array.</li>
+                        <li><strong>Explizit leer:</strong> „Alle löschen“ wurde bestätigt oder ein valides leeres
+                            Array gespeichert. Das Profil besitzt bewusst keine Detaillots und fällt auf den dafür
+                            vorgesehenen vereinfachten Aggregatpfad zurück.</li>
+                        <li><strong>Valider Detailbestand:</strong> Die Lots sind schema- und klassifikationsgültig.
+                            Sie ersetzen überlappende Aggregate, ermöglichen lotbezogene Planung und behalten im
+                            Profilverbund ihre Herkunft.</li>
+                        <li><strong>Korrupt:</strong> Beschädigtes JSON, doppelte IDs oder widersprüchliche Lots werden
+                            nicht als leer behandelt. Normale Änderungen bleiben gesperrt. Sie können abbrechen, ein
+                            Komplettbackup wiederherstellen, Rohdaten lokal anzeigen/kopieren oder nach ausdrücklicher
+                            Bestätigung genau diesen Profilbestand auf leer setzen.</li>
+                        <li><strong>Nicht verfügbar:</strong> Ein vorübergehender Speicher-/Backendfehler bietet
+                            „Speicher erneut lesen“ beziehungsweise „Speichern erneut versuchen“. Er ist kein
+                            Korruptionsfall und bietet keinen Reset.</li>
+                    </ul>
+                    <p style="color: var(--text-light); margin-top: 0.75rem;">„Kurse aktualisieren“ ist optional.
+                        Gültige EUR-Teilerfolge werden gemeinsam gespeichert; fehlgeschlagene Lots behalten ihren alten
+                        Kurs. Ohne gültigen Quote erfolgt kein Write. Verwenden Sie für Sicherung und Recovery das
+                        zentrale Komplettbackup unter „Profile &gt; Erweitert“; es gibt keinen separaten
+                        Tranchen-Teilimport oder -export.</p>
+                    <div class="warning-box"
+                        style="background: #fff3cd; padding: 1rem; border-radius: 8px; margin-top: 1rem; border-left: 4px solid var(--warning-color);">
+                        <strong>Hybridwarnung im Simulator:</strong> Sobald ein ausgewähltes Profil einen validen oder
+                        explizit leeren Detailbestand besitzt, blockiert ein weiteres Profil mit positiven Depot- oder
+                        Geldmarkt-Aggregaten ohne Detailtranchen. Ergänzen Sie dort einen eindeutigen Detailzustand;
+                        Cost Basis und Teilfreistellung werden nicht erfunden.
+                    </div>
+                </div>
+
+                <div class="detail-block" id="tranchen-lebenszyklus" style="margin-top: 1.5rem;">
+                    <h3>Vom Brokerverkauf bis zum Cashabschluss</h3>
+                    <ol style="margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li><strong>Vorbereiten:</strong> Vor dem ersten produktiven Cashstatus-Vorgang unter „Profile
+                            &gt; Erweitert &gt; Backup exportieren“ ein Komplettbackup erstellen.</li>
+                        <li><strong>Empfehlung prüfen:</strong> Balance, Monte Carlo, Backtest, Sweep und Optimierung
+                            rechnen schreibfrei. Eine Empfehlung ist noch kein Brokerauftrag und ändert kein reales Lot.</li>
+                        <li><strong>Real ausführen:</strong> Den Verkauf beim Broker durchführen und die tatsächlichen
+                            Ausführungsdaten abwarten.</li>
+                        <li><strong>Vorschau:</strong> Im richtigen Profil unter „Tatsächliche Broker-Ausführung
+                            abgleichen“ eine stabile Action-ID, exakte Tranche, Datum, Stückzahl, Bruttoerlös und Kosten
+                            erfassen. Die Vorschau schreibt nichts.</li>
+                        <li><strong>Reconcile bestätigen:</strong> Profil, Lot und resultierenden Bestand prüfen und
+                            „Dauerhafte Bestandsänderung bestätigen“ wählen. Erst dieser Flush reduziert oder entfernt
+                            das reale Lot. Gleiche Action-ID mit gleichen Daten ist ein No-op; abweichende Daten,
+                            Überverkauf, Profilwechsel oder ein seit der Vorschau veränderter Bestand blockieren.</li>
+                        <li><strong>Cashstatus wählen:</strong> Standard ist offen
+                            (<code>pending_manual_posting</code>). Nur wenn der Nettoerlös bereits sicher im erfassten
+                            Cashstand enthalten ist, „bereits berücksichtigt“ wählen und diesen Stand bestätigen.</li>
+                        <li><strong>Offenen Erlös nachführen:</strong> Den tatsächlich angekommenen Nettoerlös selbst
+                            in der freien Liquidität/Rahmendaten erfassen. Der Reconcile bucht ihn niemals automatisch.</li>
+                        <li><strong>Cashabschluss bestätigen:</strong> Beim Zielverkauf „Cashbuchung manuell
+                            bestätigen“ öffnen, unveränderten Nettoerlös und aktuellen Cashstand prüfen und separat
+                            bestätigen. Erst dann ist der offene Cashstatus geschlossen.</li>
+                        <li><strong>Fehler korrigieren:</strong> Einen falschen bestätigten Cashstand nicht
+                            überschreiben. „Bestätigten Cashstand korrigieren“ verwenden, alten und neuen Stand prüfen
+                            und einen Grund angeben. Verkauf, Erstbestätigung und frühere Korrekturen bleiben
+                            unverändert; die letzte lückenlose Revision ist wirksam.</li>
+                    </ol>
+                    <p style="color: var(--text-light); margin-top: 0.75rem;">Hat ein anderes Fenster den Cashstatus
+                        inzwischen geändert, blockiert der veraltete Dialog. Neu laden und erneut prüfen. Frühere
+                        Verkäufe ohne Cashstatus erscheinen als „Abgeschlossen (Altfall – Cashstatus nicht
+                        dokumentiert)“: Sie gelten nicht als offener Rückstand, aber auch nicht als bestätigtes Cash;
+                        ein Nachweis kann freiwillig ergänzt werden.</p>
+                </div>
+
+                <div class="detail-block" id="tranchen-abgleich-checkliste" style="margin-top: 1.5rem; background: #f0f4f8;">
+                    <h3>Checkliste: App, Broker und freie Liquidität</h3>
+                    <ol style="margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li>Stimmen aktiver Profilname und Profil-ID mit dem wirtschaftlichen Eigentümer des
+                            Brokerlots überein?</li>
+                        <li>Stimmen Lot-ID/Instrument, verkaufte Stücke, Ausführungstag, Bruttoerlös und Kosten mit der
+                            Brokerabrechnung überein?</li>
+                        <li>Zeigt die Reconcile-Vorschau den erwarteten Restbestand, ohne bereits zu schreiben?</li>
+                        <li>Wurde der bestätigte Reconcile genau einmal angewandt und der neue Lotbestand gespeichert?</li>
+                        <li>Ist der Nettoerlös tatsächlich im geführten Cashstand enthalten? Falls nein: manuell
+                            nachführen und Cashstatus offen lassen.</li>
+                        <li>Wurde der Cashabschluss erst mit dem realen Cashstand separat bestätigt und eine spätere
+                            Korrektur append-only dokumentiert?</li>
+                        <li>Balance erneut öffnen und Profilquellen, freie Liquidität und Handlungsschritte mit dem
+                            Broker- und Cash-Ist abgleichen.</li>
+                    </ol>
                 </div>
 
                 <div class="detail-block" style="margin-top: 1.5rem; background: #f0f4f8;">
@@ -1849,9 +1963,9 @@
                         nicht: Sie erfassen eine sichtbare append-only Korrektur mit altem/neuem Stand und Grund.</dd>
 
                     <dt>Kann der Simulator mehr als zwei Personen abbilden?</dt>
-                    <dd>Finanzwerte aus mehr als zwei Profilen können aggregiert werden. Individuelle Demografie-,
-                        Mortalitäts-, Pflege- und Rentenpfade werden in Version 1 jedoch auf höchstens zwei Personen
-                        begrenzt; bei mehr Profilen erscheint eine Warnung.</dd>
+                    <dd>Nein. Balance kann Finanzwerte aus mehr als zwei ausgewählten Profilen aggregieren. Der
+                        Simulator begrenzt seine Profilauswahl dagegen sichtbar auf zwei und bildet höchstens Person 1
+                        und Person 2 mit individuellen Demografie-, Mortalitäts-, Pflege- und Rentenpfaden ab.</dd>
 
                     <dt>Ist die Kirchensteuerberechnung eine Steuerberechnung nach aktuellem Recht?</dt>
                     <dd>Nein. Die Suite verwendet eine vereinfachte Planungsformel. Insbesondere die
