@@ -372,6 +372,8 @@
                         <li><a class="toc-link" data-tab-target="manual" href="#simulator-renten">Personen &amp;
                                 Rente</a></li>
                         <li><a class="toc-link" data-tab-target="manual" href="#simulator-parameter">Parameter</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#simulator-stresstest">Stresstests &amp;
+                                Presets</a></li>
                         <li><a class="toc-link" data-tab-target="manual" href="#simulator-backtest">Backtesting</a>
                         </li>
                         <li><a class="toc-link" data-tab-target="manual" href="#simulator-tranchen">Depot-Tranchen</a>
@@ -519,9 +521,9 @@
                         <div class="step-number">2</div>
                         <div class="step-content">
                             <h3>Parameter anpassen (Optional)</h3>
-                            <p>Wählen Sie Ihre Asset-Allokation (Aktienquote) und bestimmen Sie, wie viel Rente Sie
-                                bereits sicher haben (z.B. gesetzliche Rente). Standardwerte sind bereits für Sie
-                                vorausgefüllt.</p>
+                            <p>Prüfen Sie Portfolio, Kosten, Ansparphase, Renten und Samplingannahmen. Aktivieren Sie
+                                Dynamic Flex, Stresspreset oder Tail-Risk nur bewusst; vorausgefüllte Werte sind
+                                Modellannahmen und keine persönliche Empfehlung.</p>
                         </div>
                     </li>
                     <li class="step-item">
@@ -539,9 +541,10 @@
                     <span class="tip-icon">💡</span>
                     <div>
                         <strong>Tipp:</strong> Pflegen Sie Profile und Depot-Tranchen zuerst in
-                        <code>index.html</code>, damit Steuerlogik und Aggregation korrekt arbeiten. Nutzen Sie danach
-                        den Parameter-Sweep, um schnell zu sehen, wie sich eine höhere Sparrate oder ein späterer
-                        Renteneintritt auf Ihre Erfolgchancen auswirkt.
+                        <code>index.html</code>, damit Steuerlogik und Aggregation korrekt arbeiten. Ändern Sie
+                        Sparrate oder Rentenbeginn für getrennte Szenarien in den Rahmendaten. Der Sweep variiert
+                        andere, im <a class="toc-link" data-tab-target="manual" href="#simulator-sweep">Sweep-Abschnitt</a>
+                        aufgeführte Modellparameter.
                     </div>
                 </div>
             </div>
@@ -632,48 +635,43 @@
 
             <div class="info-card" id="ansparer-jung">
                 <h2>Junger Ansparer: Nutzung der Suite</h2>
-                <p>Wenn der Ruhestand noch weit entfernt ist, hilft Ihnen die Suite dabei, den langfristigen
-                    Spar- und Investitionsplan robust aufzusetzen und regelmäßig zu kalibrieren. Konzentrieren Sie
-                    sich im Simulator auf die Wachstumsphase, nutzen Sie Parameter-Sweeps für Szenarien und bauen Sie
-                    Routinen auf, um Ihre Fortschritte jährlich zu messen.</p>
+                <p>Wenn der Ruhestand noch weit entfernt ist, können Sie im Simulator verschiedene Eingaben zur
+                    Anspar- und Entnahmephase als getrennte Szenarien vergleichen. Das ist eine Modellrechnung zur
+                    Orientierung, keine Vorgabe für Sparquote, Asset-Allokation oder Umschichtungsrhythmus.</p>
                 <div class="detail-block" style="margin-top: 1rem;">
                     <h3>Empfohlener Ablauf</h3>
                     <ol style="margin-left: 20px; color: var(--text-light);">
-                        <li><strong>Horizont & Sparrate festlegen:</strong> Tragen Sie aktuelles Vermögen,
-                            geplante Monatsrate und Ziel-Rentenalter ein. Prüfen Sie, ob der monatliche Überschuss
-                            realistisch zur Gesamtplanung passt.</li>
-                        <li><strong>Asset-Allokation wählen:</strong> Starten Sie mit einer Aktienquote passend zu
-                            Ihrem Risikoappetit (z.B. 70-90 % bei langem Horizont). Nutzen Sie die Sensitivität der
-                            Floor-Deckung und der Risikokennzahlen, um die Quote anzupassen.</li>
-                        <li><strong>Parameter-Sweep ausführen:</strong> Variieren Sie Sparrate, Rentenalter und
-                            Aktienquote automatisch, um zu sehen, wie viel Puffer Sie für Marktstress haben.</li>
-                        <li><strong>Zielkorridor definieren:</strong> Speichern Sie zwei bis drei Szenarien
-                            (Basis, optimistisch, konservativ) und vergleichen Sie Floor-Deckung, terminale Outcomes,
-                            Kürzungen sowie Endvermögen.</li>
-                        <li><strong>Jährliches Update:</strong> Wiederholen Sie die Simulation nach Gehaltsänderungen
-                            oder größeren Ausgaben. Dokumentieren Sie die Version (z.B. YYYY-MM) für Ihre
-                            Planungsunterlagen.</li>
+                        <li><strong>Rahmendaten erfassen:</strong> Prüfen Sie Startvermögen, Dauer und monatliche
+                            Sparrate der Ansparphase sowie Personen, Rentenstart und Ruhestandsbedarf.</li>
+                        <li><strong>Vergleichsszenarien anlegen:</strong> Ändern Sie Sparrate, Anspar-Dauer oder
+                            Portfolioannahmen jeweils bewusst in den Rahmendaten und speichern Sie nachvollziehbare
+                            Szenarien.</li>
+                        <li><strong>Läufe vergleichen:</strong> Lesen Sie Floor-Deckung, terminale Outcomes,
+                            Kürzungen, reale Depotentnahme, Drawdown und Endvermögen zusammen. Eine einzelne Quote
+                            ist kein persönlicher Zielwert.</li>
+                        <li><strong>Stress separat prüfen:</strong> Vergleichen Sie Basissimulation, historische
+                            Backtests und ausdrücklich aktivierte Stressannahmen, ohne daraus Zukunftseignung
+                            abzuleiten.</li>
+                        <li><strong>Änderungen dokumentieren:</strong> Aktualisieren Sie Eingaben bei wesentlichen
+                            Änderungen und halten Sie Szenarioname, Datum, Seed und Annahmen fest.</li>
                     </ol>
                 </div>
                 <div class="detail-block" style="margin-top: 1rem;">
                     <h3>Nutzen für Ansparer</h3>
                     <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                        <li><strong>Klarheit über Sparlücke:</strong> Zeigt, ob Sparrate oder Rentenalter angepasst
-                            werden sollten, um den gewählten Zielkorridor robuster zu erreichen.</li>
-                        <li><strong>Stress-Resilienz:</strong> Monte-Carlo-Simulationen machen sichtbar, wie robust
-                            der Plan gegenüber Crashs oder hoher Inflation bleibt.</li>
-                        <li><strong>Messbare Fortschritte:</strong> Durch jährliche Szenarienvergleiche erkennen Sie,
-                            ob Sie im Soll liegen oder nachjustieren müssen.</li>
-                        <li><strong>Frühe Warnsignale:</strong> Verschlechtern sich Floor-Deckung, terminale Outcomes
-                            oder Kürzungs-/Entnahmekennzahlen gegenüber Ihrem Zielkorridor, können Sie Sparraten oder
-                            Konsumziele anpassen, solange noch viel Zeit bleibt.</li>
+                        <li><strong>Sensitivität:</strong> Getrennte Szenarien zeigen, wie Modellresultate auf
+                            veränderte Eingaben reagieren.</li>
+                        <li><strong>Unsicherheit:</strong> Monte Carlo zeigt modellinterne Verteilungen; ein
+                            Backtest ergänzt bekannte historische Pfade.</li>
+                        <li><strong>Nachvollziehbarkeit:</strong> Wiederholte Läufe mit dokumentiertem Seed und
+                            Datenstand lassen Annahmen vergleichbar werden.</li>
                     </ul>
                     <div class="tip-box">
                         <span class="tip-icon">💡</span>
                         <div>
-                            <strong>Praxis-Tipp:</strong> Legen Sie einen festen Termin (z.B. Jahresbeginn) für ein
-                            Kurz-Review fest. Führen Sie einen Parameter-Sweep mit +10 %/-10 % Sparrate durch und
-                            speichern Sie ein Referenzszenario als neue Basis.
+                            <strong>Praxis-Tipp:</strong> Für einen Vergleich mit höherer oder niedrigerer Sparrate
+                            speichern Sie zwei getrennte Rahmendaten-Szenarien. Der Parameter Sweep besitzt keine
+                            Sparraten-Dimension.
                         </div>
                     </div>
                 </div>
@@ -681,113 +679,59 @@
 
             <div class="info-card" id="ansparphase" style="margin-top: 2rem;">
                 <h2>Ansparphase: Ablauf und Pflege</h2>
-                <p class="card-intro">Diese Schritte helfen, die Ansparphase planbar und belastbar aufzusetzen. Fokus:
-                    Simulator nutzen, Annahmen sauber halten, Abweichungen früh erkennen.</p>
+                <p class="card-intro">Die Suite bildet eine Ansparphase über Dauer, monatliche Sparrate und deren
+                    optionale Indexierung ab. Allgemeine Anlageentscheidungen bleiben außerhalb des
+                    Produktvertrags.</p>
                 <div class="manual-grid" style="margin-top: 1.5rem;">
                     <div class="detail-block">
-                        <h3>1) Startwerte und Einzahlungen</h3>
+                        <h3>1) Sichtbare Eingaben</h3>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Startvermögen:</strong> Aktuellen Depotwert inkl. Cash erfassen.</li>
-                            <li><strong>Sparrate:</strong> Monatliche Einzahlungen angeben; optional Sparsteigerung p.a.
-                                eintragen.</li>
-                            <li><strong>Sonderzahlungen:</strong> Bonus, Erbe oder Einmalzahlungen als Extra-Sparjahr
-                                simulieren.</li>
+                            <li><strong>Portfolio:</strong> Gesamtvermögen und dessen Aufteilung auf Depot,
+                                Tagesgeld, Geldmarkt und Gold konsistent halten.</li>
+                            <li><strong>Ansparphase:</strong> Aktivierung, Dauer, monatliche Sparrate und den sichtbaren
+                                Indexierungsmodus prüfen.</li>
+                            <li><strong>Übergang:</strong> Personen-, Renten- und Bedarfsdaten bestimmen gemeinsam,
+                                wann und mit welchen Zahlungsströmen die Entnahmephase modelliert wird.</li>
                         </ul>
                     </div>
                     <div class="detail-block">
-                        <h3>2) Simulator als Hauptwerkzeug</h3>
+                        <h3>2) Varianten vergleichen</h3>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Parameter-Sweep:</strong> Sparrate/Rentenbeginn variieren, um Zielkorridore zu
-                                finden.</li>
-                            <li><strong>Risiko-Sensitivität:</strong> Aktienquote und Fees anpassen, um robuste
-                                Korridore zu testen.</li>
-                            <li><strong>Interpretation:</strong> Nicht nur Median, sondern 10./90. Perzentil betrachten.
-                            </li>
+                            <li><strong>Sparrate oder Dauer:</strong> Als getrennte Szenarien in den Rahmendaten
+                                ändern; diese Werte sind keine interaktiven Sweep-Dimensionen.</li>
+                            <li><strong>Portfolio und Kosten:</strong> Nur tatsächlich sichtbare Eingaben verändern
+                                und jede Variante mit Namen, Seed und Datenstand dokumentieren.</li>
+                            <li><strong>Auswertung:</strong> Verteilung, Outcomes, Entnahmen, Kürzungen und Drawdown
+                                gemeinsam lesen; Missingness nicht als Wert 0 behandeln.</li>
                         </ul>
                     </div>
                     <div class="detail-block">
-                        <h3>3) Jahrespflege in der Ansparphase</h3>
+                        <h3>3) Pflege und Grenzen</h3>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Update-Rhythmus:</strong> Einmal pro Jahr Werte aktualisieren (Vermögen,
-                                Sparrate, Ziele).</li>
-                            <li><strong>Ist vs. Plan:</strong> Abweichungen dokumentieren und Szenario neu rechnen.</li>
-                            <li><strong>Rebalancing:</strong> Wenn nötig manuell; Balance-App ist erst in der
-                                Entnahmephase relevant.</li>
+                            <li><strong>Aktualisierung:</strong> Nach einer tatsächlichen Änderung von Vermögen,
+                                Einzahlung, Renten- oder Bedarfsannahmen die betroffenen Eingaben aktualisieren.</li>
+                            <li><strong>Keine Produktvorgabe:</strong> Die Suite legt weder Sparquote noch ETF-Auswahl,
+                                Zielallokation oder Rebalancing-Frequenz als fachliche Empfehlung fest.</li>
+                            <li><strong>Beratungsgrenze:</strong> Steuern, Kosten, Risiko- und Liquiditätsfähigkeit vor
+                                realen Anlageentscheidungen eigenständig fachlich prüfen.</li>
                         </ul>
                     </div>
                     <div class="detail-block">
                         <h3>4) Übergang zur Entnahmephase</h3>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Timing:</strong> 3-5 Jahre vor Ruhestand erste Balance-Tests durchführen.</li>
-                            <li><strong>Liquidität:</strong> Cash-Buffer aufbauen, um erste Entnahmejahre zu
-                                stabilisieren.</li>
+                            <li><strong>Voraussetzungen:</strong> Floor, Flex, Mindest-Flex, Personen/Renten und
+                                Portfolioverteilung auf Aktualität prüfen.</li>
+                            <li><strong>Liquidität:</strong> Konfigurierbares Netto-Runway-Ziel und getrennten
+                                Brutto-Notfallpuffer nicht miteinander verwechseln.</li>
                             <li><strong>Tranchen:</strong> Depot-Tranchen-Manager pflegen, damit Steuerlogik realistisch
                                 wird.</li>
+                            <li><strong>Ergebnis:</strong> Erst nach Simulator- und Backtestvergleich in den
+                                periodengebundenen Balance-Jahresprozess wechseln.</li>
                         </ul>
-                    </div>
-                    <div class="detail-block">
-                        <h3>5) ETF-Auswahl und Diversifikation</h3>
-                        <ul
-                            style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Breit diversifiziert:</strong> Welt-ETF als Kern; Sektor- oder Themen-ETFs nur
-                                als Satelliten.</li>
-                            <li><strong>Währung:</strong> Keine starre Währungswette; Diversifikation über Regionen
-                                bevorzugen.</li>
-                            <li><strong>Kosten:</strong> TER und Spreads vergleichen; kleine Kostenunterschiede wirken
-                                langfristig stark.</li>
-                        </ul>
-                    </div>
-                    <div class="detail-block">
-                        <h3>6) Rebalancing-Regeln</h3>
-                        <ul
-                            style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Rhythmus:</strong> Jährlich prüfen; bei starken Abweichungen kürzer reagieren.
-                            </li>
-                            <li><strong>Bandbreiten:</strong> Zielquote plus/minus 5-10 Prozentpunkte als Trigger.</li>
-                            <li><strong>Umsetzung:</strong> Rebalancing in der Ansparphase meist durch Sparraten
-                                steuern.</li>
-                        </ul>
-                    </div>
-                    <div class="detail-block">
-                        <h3>7) Sparplan-Steigerungen</h3>
-                        <ul
-                            style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Automatik:</strong> Sparrate jährlich anpassen (z.B. +2-3% oder Inflationsrate).
-                            </li>
-                            <li><strong>Meilensteine:</strong> Gehaltsstufen und Einmalzahlungen als Sonderbeitrag
-                                abbilden.</li>
-                            <li><strong>Realismus:</strong> Sparrate nicht nur am Optimum, sondern am realen Cashflow
-                                ausrichten.</li>
-                        </ul>
-                    </div>
-                    <div class="detail-block">
-                        <h3>Beispiel-Strategien (Ansparphase)</h3>
-                        <ul
-                            style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Konservativ:</strong> 40-60% Aktien, Rest sichere Bausteine; geringere
-                                Schwankung.</li>
-                            <li><strong>Ausgewogen:</strong> 60-75% Aktien, Rest stabilisierend; guter Kompromiss.</li>
-                            <li><strong>Offensiv:</strong> 80-100% Aktien; hohe Schwankungen, lange Anlagehorizonte
-                                vorausgesetzt.</li>
-                        </ul>
-                    </div>
-                    <div class="detail-block">
-                        <h3>Beispielwerte (Orientierung)</h3>
-                        <ul
-                            style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Liquiditätsparameter:</strong> In Balance das Nettoziel „Liquiditäts-Runway
-                                (Jahre)“ und den getrennten Brutto-Notfallpuffer „Min. Cash-Puffer (Monate)“ passend
-                                zur eigenen Planung setzen; die Suite gibt hier keine pauschale Monatszahl vor.</li>
-                            <li><strong>Sparrate:</strong> 10-20% des Nettoeinkommens als Zielkorridor.</li>
-                            <li><strong>Sparsteigerung:</strong> 2-3% pro Jahr oder Inflationsrate als Automatismus.
-                            </li>
-                        </ul>
-                        <p style="color: var(--text-light); margin-top: 0.75rem;">Hinweis: Diese Werte sind nur
-                            Orientierung und ersetzen keine individuelle Planung.</p>
                     </div>
                 </div>
             </div>
@@ -894,19 +838,22 @@
                 <div class="manual-grid" style="margin-top: 1.5rem;">
                     <div class="detail-block" id="simulator-eingaben">
                         <h3>Eingaben</h3>
-                        <p>Tragen Sie Vermögen, monatliche Sparrate sowie gewünschtes Renteneintrittsalter ein. Fügen
-                            Sie Ihre erwarteten Ausgaben im Ruhestand (Grundbedarf und variable Kosten) hinzu.</p>
+                        <p>Arbeiten Sie die sichtbaren Bereiche von oben nach unten ab: Profile, Startportfolio und
+                            Bedarf, Runway/Rebalancing, Personen/Rente, Ansparphase sowie Pflegefall-Absicherung.
+                            Profilwerte werden vor dem Start validiert; widersprüchliche Portfolio- oder Pflichtwerte
+                            blockieren den Lauf.</p>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Zeithorizont:</strong> Die App simuliert standardmäßig bis zum 100. Lebensjahr;
-                                passen
-                                Sie das Zielalter an, falls längere Sicherheitsmargen gewünscht sind.</li>
-                            <li><strong>Inflationsindex:</strong> Geben Sie heutige Euro-Beträge an, die Engine
-                                indexiert sie
-                                automatisch mit Ihren Annahmen.</li>
-                            <li><strong>Partner-Fälle:</strong> Aktivieren Sie die zweite Person, wenn zwei Rentenströme
-                                oder
-                                Pflegekosten berücksichtigt werden müssen.</li>
+                            <li><strong>Portfolio:</strong> Gesamtvermögen und Teilbestände für Depot, Tagesgeld,
+                                Geldmarkt und Gold müssen zusammenpassen.</li>
+                            <li><strong>Bedarf:</strong> Floor, Flex und optionaler Mindest-Flex sind Jahresbeträge.
+                                Mindest-Flex bleibt eine validierte Untergrenze innerhalb des Flex-Bedarfs und wird
+                                bei ungültiger Eingabe nicht still begrenzt.</li>
+                            <li><strong>Ansparphase:</strong> Aktivierung, Dauer, Monatsrate und Indexierungsmodus sind
+                                eigene Eingaben; Sparrate und Rentenbeginn gehören nicht zum Parameter Sweep.</li>
+                            <li><strong>Kosten und Pflege:</strong> Kosten-, Steuer- und Pflegeannahmen sind
+                                Modellinputs. Reale Rechts-, Steuer- und Pflegefälle werden dadurch nicht
+                                abschließend bewertet.</li>
                         </ul>
                     </div>
                     <div class="detail-block" id="simulator-renten">
@@ -928,41 +875,44 @@
                     </div>
                     <div class="detail-block" id="simulator-parameter">
                         <h3>Parameter</h3>
-                        <p>Passen Sie optional die Asset-Allokation (Aktienquote), sichere Rentenbestandteile und
-                            Inflationsannahmen an. Die Standardwerte sind konservativ gewählt und dienen als
-                            Startpunkt.</p>
-                        <p style="color: var(--text-light);">Hintergrund: Die Engine arbeitet mit historischen
-                            Kapitalmarktdaten, resampelt Renditen blockweise (Block-Bootstrap) und fügt einen
-                            Inflations-Overlay hinzu. Pessimistische Schwänze werden per Fat-Tail-Adjustment
-                            verstärkt, damit seltene Crash-Jahre realistisch abgebildet werden.</p>
+                        <p>Prüfen Sie Entnahmestrategie, Dynamic Flex, Portfolio-/Kostenannahmen und Monte-Carlo-
+                            Steuerung als zusammengehörigen Modellvertrag. Vorausgefüllte Werte sind keine
+                            persönliche Empfehlung.</p>
+                        <p style="color: var(--text-light);">Die Simulationsmethode ist wählbar: Regime-Sampling
+                            (Markov oder iid), Block-Bootstrap oder Stationary Bootstrap. Das separate
+                            Fat-Tail-/Crash-Overlay gehört nicht zur Basissimulation und bleibt standardmäßig
+                            deaktiviert.</p>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Datenbasis:</strong> Historische Renditen reichen bis 1925; per Startjahr-Filter
-                                und Recency-Gewichtung können Sie jüngere Perioden stärker betonen.</li>
-                            <li><strong>Renditeannahmen:</strong> Passen Sie Mittelwert/Volatilität im Reiter
-                                „Erweiterte
-                                Parameter“ an, wenn Sie eigene Kapitalmarktsichten nutzen.</li>
-                            <li><strong>Korrelationen:</strong> Für gemischte Portfolios steuert der Korrelationsslider,
-                                wie
-                                stark Aktien und Anleihen gemeinsam schwanken; konservative Nutzer lassen den
-                                Standardwert unverändert.</li>
-                            <li><strong>Gebühren/Puffer:</strong> Hinterlegen Sie prozentuale Kosten, um Spar- oder
-                                Auszahlpläne realistisch abzubilden; der Simulator reduziert Renditen automatisch um
-                                diesen Wert.</li>
+                            <li><strong>Datenbasis:</strong> Historische Jahresrecords reichen bis 1925; Jahre vor 1950
+                                können als geschätzt gekennzeichnet und über die sichtbare Option ausgeschlossen
+                                werden.</li>
+                            <li><strong>Dynamic Flex:</strong> Aktivierung, aktuarische Horizon-Methode,
+                                Survival-Quantil, optionales Go-Go und Langlebigkeits-Puffer beeinflussen nur den
+                                flexiblen Bedarf; der Floor bleibt getrennt.</li>
+                            <li><strong>CAPE-Return-Policy:</strong> <code>legacy_step</code> bleibt der Engine-Default.
+                                <code>cape_continuous</code> ist ein expliziter Config-Modus, kein Schalter der
+                                normalen Simulatoroberfläche und keine Auto-Optimize-Dimension. Diagnose und
+                                Detail-Logs weisen die tatsächlich verwendete Policy aus.</li>
+                            <li><strong>Kosten:</strong> Hinterlegte Kosten reduzieren die modellierten Renditen. Sie
+                                ersetzen keine Prüfung realer Produkt-, Handels- oder Steuerkosten.</li>
                         </ul>
                     </div>
                     <div class="detail-block" id="simulator-stresstest">
                         <h3>Stresstests &amp; Presets</h3>
-                        <p>Im Tab „Stress &amp; Pflege“ können Sie historische Extremphasen oder eigene Stressannahmen
-                            aktivieren, um die Robustheit zu prüfen.</p>
+                        <p>Wählen Sie im Monte-Carlo-Bereich optional ein Stresspreset für die ersten
+                            Simulationsjahre. Das getrennte Tail-Risk-Overlay muss über „Fat-Tail-/Crash-Overlay
+                            aktivieren“ ausdrücklich zugeschaltet werden.</p>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Presets:</strong> Great Depression (1929-1933) und Zweiter Weltkrieg
-                                (1939-1945) simulieren seltene Schockperioden.</li>
-                            <li><strong>Custom-Overlay:</strong> Zusätzliche Drawdowns/Inflationsschocks lassen sich
-                                über eigene Parameter abbilden.</li>
-                            <li><strong>Vergleichbarkeit:</strong> Gleiche Einstellungen liefern deterministische
-                                Vergleichswerte für Vorher/Nachher-Checks.</li>
+                            <li><strong>Stresspreset:</strong> Erzwingt das gewählte Szenario zu Beginn des Laufs und
+                                ist von der normalen historischen Stichprobe zu unterscheiden.</li>
+                            <li><strong>Tail Risk:</strong> Jahreswahrscheinlichkeit, Aktien- und Inflationsschock,
+                                Dauer und Cooldown sind zusätzliche Stressannahmen, keine Prognose. Historische
+                                Krisenjahre erhalten keinen weiteren Return-Schock.</li>
+                            <li><strong>Vergleichbarkeit:</strong> Gleicher Seed, RNG-Modus, Samplingvertrag,
+                                Datenfilter und gleiche Inputs sind Voraussetzung für einen nachvollziehbaren
+                                Vorher-/Nachher-Vergleich.</li>
                         </ul>
                     </div>
                     <div class="detail-block" id="simulator-tranchen">
@@ -1012,18 +962,26 @@
                     </div>
                     <div class="detail-block" id="simulator-start">
                         <h3>Simulation starten</h3>
-                        <p>Klicken Sie auf <strong>"Simulation starten"</strong>. Der Standard sind 10.000
-                            modellierte Pfade. Bis 100.000 Läufe gilt der interaktive Normalbereich; bei 100.001 bis
-                            1.000.000 Läufen zeigt die Oberfläche Run-Jahre und Speicherklasse und verlangt vor jedem
-                            Start eine ausdrückliche Bestätigung.</p>
+                        <p>Prüfen Sie „Anzahl Simulationen“, Dauer, Blockgröße, Seed, Simulationsmethode und RNG-Modus
+                            und klicken Sie auf <strong>„Monte-Carlo-Simulation starten“</strong>. Der Standard sind
+                            10.000 Pfade. 1 bis 100.000 Läufe liegen im empfohlenen interaktiven Bereich; mehr als
+                            100.000 bis höchstens 1.000.000 erfordern nach jeder Parameteränderung eine ausdrückliche
+                            Großlastbestätigung.</p>
                         <ol style="margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Monte-Carlo-Läufe:</strong> Jeder Lauf erzeugt eine eigene Rendite- und
-                                Inflationssequenz, wendet Sparraten und Entnahmen an und trackt Liquidität sowie
-                                Depotwerte.</li>
-                            <li><strong>Sampling:</strong> Das gewählte Startjahr ist das erste tatsächlich simulierte
-                                Marktjahr. Fixed- und Stationary-Block setzen dort zusammenhängend fort, Markov startet
-                                im Regime dieses Jahres und IID zieht erst ab Jahr 2 unabhängig. CAPE hat Vorrang vor
-                                Filter/Recency; Konflikte und Fallbacks erscheinen in der Sampling-Diagnostik.</li>
+                            <li><strong>Ressourcen:</strong> „Geschätzte Rechenlast“ leitet Run-Jahre und Speicherklasse
+                                aus Runzahl und Dauer ab. „Worker-Anzahl“ erlaubt 0 für automatisch oder 1 bis 32
+                                explizit; „Job-Timebudget (ms)“ erlaubt 50 bis 5.000 und steuert das automatische
+                                Chunking.</li>
+                            <li><strong>Reproduzierbarkeit:</strong> Der Seed liegt zwischen 0 und 4.294.967.295.
+                                „Per-Run Seed“ ist der deterministische Normalmodus; „Legacy Stream“ dient dem
+                                Vergleich mit alten Ergebnissen.</li>
+                            <li><strong>Sampling:</strong> Uniform, harter Startjahr-Filter oder Recency-Half-Life
+                                bestimmen die Auswahl. Das pro Lauf ausgewählte Startjahr ist das erste simulierte
+                                Marktjahr: Block- und Stationary-Sampling setzen von dort blockweise fort, Markov
+                                startet im zugehörigen Regime und iid zieht ab dem Folgejahr unabhängig.</li>
+                            <li><strong>Vorrang:</strong> Aktiviertes CAPE-Sampling bevorzugt ähnliche CAPE-Jahre und
+                                hat Vorrang vor Filter/Recency. Konflikte, effektive Auswahl und Fallbacks gehören zur
+                                Sampling-Diagnostik.</li>
                             <li><strong>Ruin oder Aktien/Gold ≤ 100 €:</strong> Diese Quote markiert Läufe mit
                                 <code>isRuin</code> oder einem Aktien-plus-Gold-Endbestand von höchstens 100 €.
                                 Freie Liquidität und ein verbleibender Pflegebucket zählen nicht zu dieser
@@ -1038,9 +996,9 @@
                                 0 gesetzt. Dieser Ausnahme-Nullwert bremst die Flex-Erholung nach Ende der Notlage
                                 nicht als neuer Glättungsanker. Ein lokaler Extrembär allein reicht nicht; der separate
                                 Floor bleibt unverändert.</li>
-                            <li><strong>Fehlerabfang:</strong> Eingaben werden validiert (keine negativen Sparraten,
-                                Ausgaben &lt;= erreichbare Einnahmen). Fehlende Pflichtfelder werden direkt im UI
-                                hervorgehoben.</li>
+                            <li><strong>Fortschritt und Fehler:</strong> Status und Fortschrittsbalken zeigen den
+                                aktiven Batch. Validierungs- oder Workerfehler erscheinen gesondert; ein technisch
+                                unvollständiger Batch ist kein erfolgreicher Finanzlauf.</li>
                             <li><strong>Abbruch:</strong> „Monte-Carlo-Lauf abbrechen“ beendet die aktive
                                 Worker-Generation. Ein Nutzerabbruch startet keinen seriellen Ersatzlauf; ein neuer
                                 Worker-Pool entsteht erst beim nächsten ausdrücklichen Start.</li>
@@ -1068,9 +1026,12 @@
                                 konservativen Horizont aktivieren, zeigen Diagnose und Detail-Logs den rohen und den
                                 effektiven Horizont sowie Hinweise auf Quantil-, Max-Horizon- oder
                                 Übergangsglättung.</li>
-                            <li><strong>Interpretation:</strong> Ein guter Backtest ersetzt keine
-                                Wahrscheinlichkeiten, zeigt aber, ob die Strategie plausible Vergangenheitsszenarien
-                                übersteht.</li>
+                            <li><strong>Export:</strong> „Raw-JSON herunterladen“ beziehungsweise der CSV-Export
+                                dokumentiert diesen historischen Lauf und ist weder das vollständige
+                                Monte-Carlo-Ergebnis noch der Export eines ausgewählten Szenario-Logs.</li>
+                            <li><strong>Interpretation:</strong> Ein Backtest zeigt das Modellverhalten in bekannten,
+                                eingebetteten Daten. Auch ein günstiger Verlauf ist keine Out-of-sample-Validierung,
+                                Zukunftswahrscheinlichkeit oder Garantie.</li>
                         </ul>
                     </div>
                     <div class="detail-block" id="simulator-ergebnisse">
@@ -1094,14 +1055,21 @@
                                 Dekumulationsverpflichtungen bis Tod oder Horizont mit 0 Euro aufgefüllt. Die Kennzahl
                                 ist kein Maß für den gesamten Haushaltskonsum und besitzt kein behauptetes
                                 Quantil-Konfidenzintervall.</li>
-                            <li><strong>Liquiditäts-Puffer:</strong> Zeigt, wie viele Monate der Grundbedarf auch in
-                                Drawdowns gedeckt bleibt. Werte &gt;= 24 Monate gelten als komfortabel.</li>
-                            <li><strong>Stress-Events:</strong> Die Ergebnis-Timeline markiert Kapitalmarktschocks und
-                                zeigt, ob Anpassungen (z.B. Ausgabenreduktion) notwendig gewesen wären.</li>
-                            <li><strong>Median vs. Perzentile:</strong> Lesen Sie Median, 10. und 90. Perzentil
-                                getrennt,
-                                um zu unterscheiden, ob Verbesserungen nur die Mittelwerte betreffen oder wirklich die
-                                Risikoschwänze stabilisieren.</li>
+                            <li><strong>Endvermögen:</strong> Perzentile und Mittelwerte beziehen sich auf die
+                                auswertbaren modellierten Endbestände. Sie sind keine Bandbreite sicher erzielbarer
+                                Vermögen; <code>technical_error</code> darf nicht als Endwert 0 einsortiert werden.</li>
+                            <li><strong>Drawdown:</strong> Drawdown-Kennzahlen messen Rückgänge vom jeweiligen
+                                modellierten Hoch nach der ausgewiesenen Definition. Sie sind nicht mit Verlust,
+                                Ruinquote oder benötigtem Cashpuffer gleichzusetzen.</li>
+                            <li><strong>Steuern:</strong> Steuer-KPIs aggregieren die vereinfachte Modellsteuer über
+                                die ausgewiesenen Läufe und Einheiten. Sie sind keine Steuerberechnung nach aktuellem
+                                Recht und keine Prognose eines Steuerbescheids.</li>
+                            <li><strong>Runway und Kürzungen:</strong> Monatswerte, Zeitanteile und Beträge nur in der
+                                jeweils ausgewiesenen Grundgesamtheit lesen. Ein frei gewählter Komfortgrenzwert ist
+                                keine Produktregel.</li>
+                            <li><strong>Missingness:</strong> Gedankenstrich, <code>null</code>, „nicht anwendbar“ oder
+                                eine kleinere Beobachtungszahl bedeuten fehlende beziehungsweise nicht anwendbare
+                                Daten. Sie dürfen weder als 0 noch als Erfolg umgedeutet werden.</li>
                             <li><strong>Pflege-KPIs:</strong> KPI-Karten je Person zeigen Eintrittsalter, Dauer,
                                 realen modellierten Mehrbedarf zur Preisbasis des Simulationsstarts, simultane
                                 Pflegejahre sowie nicht-kausale Gruppenmedian-Deltas. Ein Gedankenstrich bedeutet
@@ -1136,38 +1104,44 @@
                                 dem Klick und enthält die Finanzannahmen des aktuellen Szenarios.</li>
                             <li><strong>Szenario-Export:</strong> JSON/CSV eines ausgewählten Szenario-Logs bleibt ein
                                 eigener, kleinerer Export und ersetzt den vollständigen Laufvertrag nicht.</li>
+                            <li><strong>Vertraulichkeit:</strong> Alle drei Exportarten können persönliche
+                                Finanzannahmen enthalten. Legen Sie sie geschützt ab; ein Ergebnisexport ersetzt kein
+                                Komplettbackup.</li>
                         </ul>
                     </div>
                     <div class="detail-block" id="simulator-sweep">
                         <h3>Parameter Sweep &amp; Szenarien</h3>
-                        <p>Der Parameter Sweep testet systematisch mehrere Sparraten, Ruhestandsalter oder
-                            Aktienquoten. Die Heatmap zeigt, welche Kombinationen im gewählten Modell und
-                            Stichprobenlauf die Zielkennzahlen erreichen. Quantilrankings sind experimentelle
-                            Punktschätzer, keine extern validierte Rangfolge.</p>
+                        <p>Der Parameter Sweep vergleicht Kombinationen aus sieben sichtbaren Modelldimensionen. Die
+                            Heatmap ist eine Sensitivitätsansicht im gewählten Modell-, Daten- und Stichprobenraum;
+                            ihre Kennzahlen sind keine empirischen Zukunftswahrscheinlichkeiten oder extern
+                            validierte Rangfolge.</p>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Konvergenz:</strong> Der Sweep wiederverwendet die gleichen Zufallssamen, um
-                                Varianten vergleichbar zu halten. Kleine Sprünge sind normal; trendende Muster sind
-                                entscheidend.</li>
-                            <li><strong>Szenario-Speicher:</strong> Speichern Sie interessante Konfigurationen als
-                                benannte Szenarien, um sie später in der Balance-App gegenzuprüfen.</li>
+                            <li><strong>Sieben Sweep-Dimensionen:</strong> Liquiditäts-Runway,
+                                Gold-Rebalancing-Band, maximale Skim-Quote, maximale Bear-Refill-Quote, Goldziel,
+                                VPW-Survival-Quantil und VPW-Go-Go-Multiplikator. Quantil und Go-Go sind nur bei den
+                                passenden aktivierten Dynamic-Flex-Einstellungen anwendbar.</li>
+                            <li><strong>Keine Sweep-Dimension:</strong> Sparrate, Rentenbeginn, Aktienzielquote und
+                                direkter VPW-Horizont lassen sich in der interaktiven Sweep-Oberfläche nicht
+                                variieren. Solche Annahmen vergleichen Sie gegebenenfalls als getrennte
+                                Rahmendaten-Szenarien.</li>
+                            <li><strong>Vergleichsrauschen:</strong> Der Sweep verwendet gemeinsame deterministische
+                                Zufallsgrundlagen für Varianten. Kleine Unterschiede bleiben Stichprobenergebnisse;
+                                prüfen Sie Provenienz und mehrere Kennzahlen statt nur eine farbige Zelle.</li>
                             <li><strong>Optimierer:</strong> Auto-Optimize ist ein experimentelles
                                 Vergleichsverfahren. Es sucht modellinterne Kandidaten unter den gewählten Daten,
                                 Seeds, Parametern und Constraints; der Champion ist kein globales Optimum und keine
                                 Finanzempfehlung.</li>
-                            <li><strong>Auto-Optimize-Details:</strong> Der Optimierer arbeitet in drei Stufen
-                                (Grob/Raffiniert/Verifikation) und gibt eine Champion-Konfiguration als Vorlage aus.
+                            <li><strong>Auto-Optimize-Details:</strong> Der Optimierer arbeitet mehrstufig mit
+                                Kandidatenerzeugung, Quick-Filter, voller Evaluation, lokaler Verfeinerung und
+                                Bestätigung auf getrennten Seeds. Er gibt eine Champion-Konfiguration als Vorlage aus.
                                 Die Ergebnisanzeige nennt Modellversion, Hashes des gesamten Datenuniversums,
                                 die effektive Filterauswahl sowie getrennte technische, interne und externe
                                 Validierungsstatuswerte.</li>
-                            <li><strong>Preset-Setups:</strong> Vordefinierte Sweep-Presets und eine dynamische
-                                Parameter-Auswahl (1-7 Parameter) beschleunigen den Einstieg.</li>
-                            <li><strong>Sweep-Felder mit geprüftem Datenpfad:</strong> Der interaktive Sweep bietet Runway-Minimum
-                                und -Ziel, Aktienzielquote, Rebalancing-Band, maximale Skim-Quote, Goldziel,
-                                maximale Bear-Refill-Quote, Survival-Quantil und Go-Go-Multiplikator. Nur der
-                                direkte Horizont ist keine Browserdimension, weil er den aktuarischen Einstellungen
-                                folgt. Geprüft sind Zuordnung, Consumer und Ergebnisprovenienz; daraus folgt kein
-                                eigenständiger Nachweis der KPI-Wirkung oder fachlichen Modellgüte.</li>
+                            <li><strong>Sechs Auto-Optimize-Dimensionen:</strong> Liquiditäts-Runway, Goldziel,
+                                Gold-Rebalancing-Band, maximale Skim-Quote, VPW-Survival-Quantil und
+                                VPW-Go-Go-Multiplikator. Die maximale Bear-Refill-Quote bleibt im Auto-Optimize
+                                ausgeschlossen; je Lauf werden 1 bis 6 dieser Dimensionen ausgewählt.</li>
                             <li><strong>Schutzmechanismen:</strong> Whitelist + Rente-2-Invarianz verhindern, dass
                                 Partner-Felder versehentlich verändert werden; Verstöße erscheinen als Heatmap-Badges.
                             </li>
@@ -1186,16 +1160,22 @@
                         <h3>Best Practices &amp; typische Fragen</h3>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>„Was passiert bei Crash + Inflation?“</strong> Testen Sie ein pessimistisches
-                                Inflationsband und senken Sie die Aktienquote leicht; prüfen Sie, ob die Liquidität in
-                                den ersten fünf Ruhestandsjahren stabil bleibt.</li>
-                            <li><strong>„Reicht meine Sparrate?“</strong> Nutzen Sie den Sweep mit 50-€-Schritten. Ein
-                                Plateau bei Floor-Deckung und Risikokennzahlen zeigt, dass weitere Erhöhungen im
-                                untersuchten Modellraum wenig zusätzlichen Nutzen bringen.</li>
+                            <li><strong>„Was passiert bei Crash + Inflation?“</strong> Speichern Sie zuerst einen
+                                Basislauf und aktivieren Sie danach bewusst Stresspreset oder Tail-Risk-Overlay.
+                                Vergleichen Sie bei sonst gleichem Seed Outcomes, Kürzungen, Runway und Drawdown.</li>
+                            <li><strong>„Wie wirkt eine andere Sparrate?“</strong> Ändern Sie die Monatsrate in der
+                                Ansparphase und speichern Sie einen getrennten Szenariolauf. Der Sweep kann die
+                                Sparrate nicht variieren.</li>
                             <li><strong>„Wie robust ist mein Entnahmeplan?“</strong> Simulieren Sie reduzierte flexible
                                 Ausgaben und vergleichen Sie Floor-Deckung, Outcomes, Kürzungsanteil und reale
                                 Depotentnahme. Eine geringe Differenz allein ist noch kein externer Robustheitsnachweis.</li>
                         </ul>
+                        <div class="warning-box" style="margin-top: 1rem;">
+                            <strong>Modell- und Beratungsgrenze:</strong> Monte Carlo, Backtest, Sweep und
+                            Auto-Optimize unterstützen den Vergleich dokumentierter Annahmen. Sie ersetzen keine
+                            Anlage-, Steuer-, Rechts- oder Pflegeberatung und liefern weder Garantie noch globales
+                            Optimum.
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1934,9 +1914,11 @@ Tranchen abgleichen → Cashstand manuell nachführen</pre>
 
                     <dt><a class="toc-link" data-tab-target="manual" href="#simulator-ergebnisse">Parameter Sweep</a>
                     </dt>
-                    <dd>Heatmap, die zeigt, wie Kombinationen aus Sparrate und Rentenbeginn die
-                        modellinterne Floor-Deckung und weitere Zielmetriken beeinflussen. Die Felder sind eine
-                        Sensitivitätsansicht im gewählten Modellraum, keine empirischen Wahrscheinlichkeiten.</dd>
+                    <dd>Experimentelle Heatmap für Kombinationen aus Liquiditäts-Runway, Gold-Rebalancing-Band,
+                        maximaler Skim-Quote, maximaler Bear-Refill-Quote, Goldziel, VPW-Survival-Quantil und
+                        VPW-Go-Go-Multiplikator. Sparrate und Rentenbeginn gehören nicht zu diesen sieben Dimensionen.
+                        Auto-Optimize verwendet davon sechs und schließt Bear Refill aus. Beide Verfahren bleiben
+                        Sensitivitäts-/Kandidatensuchen im ausgewiesenen Modellraum, keine Finanzempfehlung.</dd>
 
                     <dt><a class="toc-link" data-tab-target="manual" href="#simulator-backtest">Backtesting</a></dt>
                     <dd>Historische In-sample-Diagnose: Die Strategie wird ab einem gewählten Startjahr durch die
