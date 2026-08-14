@@ -1449,8 +1449,8 @@ console.log('Test: opt-in stress replay capture leaves normal MC financial outpu
     }));
     assertEqual(
         survivingCapture?.terminalStatus,
-        MONTE_CARLO_OUTCOME_CODE.HORIZON_EXHAUSTED,
-        'Surviving fixture must exhaust the configured horizon'
+        'horizon_exhausted',
+        'Surviving fixture must expose the canonical horizon terminal status'
     );
     assertEqual(survivingCapture?.continuation?.active, false, 'Surviving capture must not activate shadow continuation');
     assertEqual(survivingCapture?.years?.length, monteCarloParams.maxDauer, 'Surviving capture must cover the full horizon');
@@ -1481,7 +1481,7 @@ console.log('Test: opt-in stress replay capture leaves normal MC financial outpu
         continuationActive: ruinedCapture?.continuation?.active,
         yearIndices: ruinedYearIndices
     }));
-    assertEqual(ruinedCapture?.terminalStatus, MONTE_CARLO_OUTCOME_CODE.RUIN, 'Ruin fixture must terminate as genuine ruin');
+    assertEqual(ruinedCapture?.terminalStatus, 'ruin', 'Ruin fixture must expose the canonical terminal status');
     assert(
         ruinedCapture?.sourcePrefixLength > 1 && ruinedCapture.sourcePrefixLength < monteCarloParams.maxDauer,
         'Ruin fixture must fail after at least one completed year and before the horizon'
@@ -1492,5 +1492,62 @@ console.log('Test: opt-in stress replay capture leaves normal MC financial outpu
         JSON.stringify(ruinedYearIndices),
         JSON.stringify([...Array(monteCarloParams.maxDauer).keys()]),
         'Ruin capture year indices must be strictly increasing without duplicates'
+    );
+}
+
+console.log('Test: stress replay capture isolates a technical-error run from sibling runs');
+{
+    let engineInvocationCount = 0;
+    const faultingEngine = new Proxy(EngineAPI, {
+        get(target, property, receiver) {
+            if (property !== 'simulateSingleYear') return Reflect.get(target, property, receiver);
+            return (...args) => {
+                engineInvocationCount++;
+                if (engineInvocationCount === 1) {
+                    throw new Error('Injected captured-run engine fault');
+                }
+                return Reflect.apply(target.simulateSingleYear, target, args);
+            };
+        }
+    });
+    const monteCarloParams = {
+        anzahl: 2,
+        maxDauer: 3,
+        blockSize: 3,
+        seed: 81235,
+        methode: 'block',
+        rngMode: 'per-run-seed'
+    };
+    const result = await runMonteCarloChunk({
+        inputs: baseInputs,
+        monteCarloParams,
+        widowOptions,
+        useCapeSampling: false,
+        runRange: { start: 0, count: 2 },
+        logIndices: [0, 1],
+        stressReplayCapture: createStressReplayCaptureRequest([0]),
+        engine: faultingEngine
+    });
+
+    assertEqual(result.batchStatus, 'technical_error', 'Chunk must surface the scoped technical error');
+    assertEqual(result.technicalInventory.technicalError, 1, 'Exactly the injected run must be technical');
+    assertEqual(result.technicalInventory.financiallyEvaluable, 1, 'Sibling run must remain financially evaluable');
+    assertEqual(
+        result.pathSummaries.outcomeCode[0],
+        MONTE_CARLO_OUTCOME_CODE.TECHNICAL_ERROR,
+        'Captured faulting run must be classified as technical error'
+    );
+    assertEqual(
+        result.pathSummaries.outcomeCode[1],
+        MONTE_CARLO_OUTCOME_CODE.HORIZON_EXHAUSTED,
+        'Sibling run must complete through the configured horizon'
+    );
+    assert(
+        result.runMeta.some(meta => meta.index === 1),
+        'Sibling run must still publish its requested run metadata'
+    );
+    assert(
+        result.runMeta.every(meta => !Object.hasOwn(meta, 'stressReplayCapture')),
+        'Technical-error capture must be omitted rather than published as a financial replay path'
     );
 }

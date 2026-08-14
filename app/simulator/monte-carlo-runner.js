@@ -83,6 +83,15 @@ export { buildStartYearCdf, pickStartYearIndex } from './mc-year-sampling.js';
 const MAX_TECHNICAL_ERROR_SAMPLES = 20;
 export const MONTE_CARLO_HOUSEHOLD_LIFE_CONTRACT_VERSION = 'MonteCarloHouseholdLifeContractV2';
 
+function resolveStressReplayTerminalStatus(outcomeCode) {
+    if (outcomeCode === MONTE_CARLO_OUTCOME_CODE.RUIN) return 'ruin';
+    if (outcomeCode === MONTE_CARLO_OUTCOME_CODE.ALL_DEAD) return 'all_dead';
+    if (outcomeCode === MONTE_CARLO_OUTCOME_CODE.HORIZON_EXHAUSTED) return 'horizon_exhausted';
+    const error = new Error('Stress replay capture received an unsupported terminal outcome.');
+    error.code = 'STRESS_REPLAY_TERMINAL_STATUS_INVALID';
+    throw error;
+}
+
 function cloneReplayValue(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
 }
@@ -1275,7 +1284,7 @@ export async function runMonteCarloChunk({
         }
 
         if (replayCapture) {
-            replayCapture.terminalStatus = terminalResolution.outcomeCode;
+            replayCapture.terminalStatus = resolveStressReplayTerminalStatus(terminalResolution.outcomeCode);
             replayCapturesByIndex.set(runIdx, replayCapture);
         }
 

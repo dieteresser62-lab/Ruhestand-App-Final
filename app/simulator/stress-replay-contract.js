@@ -46,6 +46,7 @@ const THREE_BUCKET_MODE = '3_bucket_jilge';
 const STANDARD_MODE = 'standard';
 const HORIZON_METHODS = new Set(['mean', 'survival_quantile']);
 const TERMINAL_STATUSES = new Set(['horizon_exhausted', 'all_dead', 'ruin']);
+const RESULT_TERMINAL_STATUSES = new Set([...TERMINAL_STATUSES, 'technical_error']);
 const RECORD_TYPES = new Set(['financial_year', 'terminal_ruin', 'terminal_death']);
 const SOURCE_TIE_BREAK = 'smallest_absolute_run_index';
 const FINGERPRINT_EXCLUDED_KEYS = new Set([
@@ -466,3 +467,48 @@ export function validateStressReplayPathV1(path) {
 }
 
 export const assertStressReplayPathV1 = validateStressReplayPathV1;
+
+export function createStressReplayPathFingerprint(path) {
+    requirePlainObject(path, 'path');
+    const { pathFingerprint: _pathFingerprint, ...fingerprintBasis } = path;
+    return createStressReplayFingerprint(fingerprintBasis);
+}
+
+export function validateStressReplayVariantResultV1(result) {
+    requirePlainObject(result, 'result');
+    if (result.schemaVersion !== STRESS_REPLAY_SCHEMA_VERSIONS.variantResult) {
+        fail('STRESS_REPLAY_VERSION_UNSUPPORTED', 'Unsupported stress replay variant result contract', {
+            schemaVersion: result.schemaVersion
+        });
+    }
+    for (const key of [
+        'pathFingerprint',
+        'baselineScenarioFingerprint',
+        'variantFingerprint',
+        'resultFingerprint'
+    ]) validateFingerprint(result[key], `result.${key}`);
+    if (!RESULT_TERMINAL_STATUSES.has(result.terminalStatus)) {
+        fail('STRESS_REPLAY_CONTRACT_INVALID', 'result.terminalStatus is unsupported', {
+            terminalStatus: result.terminalStatus
+        });
+    }
+    if (!Array.isArray(result.yearResults) || !Array.isArray(result.transactions)
+        || !Array.isArray(result.missingness) || !Array.isArray(result.warnings)) {
+        fail('STRESS_REPLAY_CONTRACT_INVALID', 'Stress replay result collections are invalid');
+    }
+    if (result.terminalStatus === 'technical_error') {
+        requirePlainObject(result.technicalError, 'result.technicalError');
+        if (result.summary !== null || result.reconciliation?.matched === true) {
+            fail('STRESS_REPLAY_CONTRACT_INVALID', 'Technical errors must not expose reconciled financial summaries');
+        }
+    } else {
+        requirePlainObject(result.summary, 'result.summary');
+        if (result.technicalError !== null) {
+            fail('STRESS_REPLAY_CONTRACT_INVALID', 'Financial results must not contain a technical error');
+        }
+    }
+    assertStressReplayFinite(result, 'result');
+    return deepFreeze(cloneValue(result));
+}
+
+export const assertStressReplayVariantResultV1 = validateStressReplayVariantResultV1;

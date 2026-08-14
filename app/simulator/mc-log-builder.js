@@ -166,3 +166,106 @@ export function buildMonteCarloDeathLogRow({
         vpw: null
     };
 }
+
+function cloneReplayLogValue(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+}
+
+/**
+ * Rebuilds the exact simulator-facing annual data shape from a materialized
+ * replay record. No sampling or fallback return is allowed here.
+ */
+export function buildStressReplayYearData(record) {
+    if (!record || typeof record !== 'object') {
+        throw new TypeError('A materialized stress replay year is required.');
+    }
+    const financiallyRunnable = record.recordType === 'financial_year'
+        || record.recordType === 'terminal_ruin';
+    if (!financiallyRunnable) {
+        return {
+            jahr: record.historicalYear ?? null,
+            inflation: record.inflationPct ?? null
+        };
+    }
+    return {
+        jahr: record.historicalYear,
+        rendite: record.equityReturnPct / 100,
+        gold_eur_perf: record.goldReturnPct,
+        zinssatz: record.cashReturnPct,
+        inflation: record.inflationPct,
+        lohn: record.wageGrowthPct,
+        capeRatio: record.capeRatio,
+        regime: record.regime
+    };
+}
+
+/** Projects the stored household event into the existing MC log contract. */
+export function buildStressReplayLifeLogContext(record) {
+    const event = Array.isArray(record?.householdEvents)
+        ? record.householdEvents.find(candidate => candidate?.type === 'household_state')
+        : null;
+    if (!event) return null;
+    const hasPartner = event.p2Alive !== null && event.p2Alive !== undefined;
+    return {
+        hasPartner,
+        p1Alive: event.p1Alive === 1 || event.p1Alive === true,
+        p2Alive: hasPartner && (event.p2Alive === 1 || event.p2Alive === true),
+        careMetaP1: cloneReplayLogValue(event.careMetaP1),
+        careMetaP2: cloneReplayLogValue(event.careMetaP2),
+        p1ActiveThisYear: event.p1CareActive === true,
+        p2ActiveThisYear: event.p2CareActive === true
+    };
+}
+
+/**
+ * Builds ScenarioLog-compatible output without consulting an RNG or the DOM.
+ */
+export function buildStressReplayLogRow({
+    record,
+    result = null,
+    inputs,
+    portfolioSnapshot = {},
+    currentRunLogLength = 0
+}) {
+    const yearData = buildStressReplayYearData(record);
+    const lifeLogContext = buildStressReplayLifeLogContext(record);
+    if (!lifeLogContext) {
+        const error = new TypeError('Stress replay household state is missing.');
+        error.code = 'STRESS_REPLAY_HOUSEHOLD_EVENT_MISSING';
+        throw error;
+    }
+    const tailRiskOverlay = Array.isArray(record.tailRiskEvents) && record.tailRiskEvents.length > 0
+        ? cloneReplayLogValue(record.tailRiskEvents.at(-1))
+        : null;
+
+    if (record.recordType === 'terminal_death') {
+        return buildMonteCarloDeathLogRow({
+            deathLogContext: {
+                jahr: record.yearIndex + 1,
+                histJahr: record.historicalYear ?? null,
+                inflation: record.inflationPct ?? null,
+                tailRiskOverlay
+            },
+            currentRunLogLength,
+            portfolioSnapshot,
+            inputs,
+            lifeLogContext
+        });
+    }
+    if (result?.kind === 'ruin' || result?.isRuin === true) {
+        return buildMonteCarloRuinLogRow({
+            simulationsJahr: record.yearIndex,
+            yearData,
+            inputs,
+            lifeLogContext,
+            tailRiskOverlay
+        });
+    }
+    return buildMonteCarloYearLogRow({
+        simulationsJahr: record.yearIndex,
+        yearData,
+        result,
+        lifeLogContext,
+        tailRiskOverlay
+    });
+}
