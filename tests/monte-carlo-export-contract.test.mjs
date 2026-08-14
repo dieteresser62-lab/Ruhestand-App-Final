@@ -220,6 +220,10 @@ const schemaGolden = JSON.parse(fs.readFileSync(
     assert(/^[a-f0-9]{64}$/.test(request.data.fingerprint.value), 'data fingerprint is a SHA-256 hex value');
     assertEqual(request.execution.chunkConfiguration.strategy, 'single-chunk-v1', 'request records the exact serial chunk policy');
     assertEqual(request.snapshotPolicy.currentReference, null, 'request must not advertise a pending snapshot as the current reference');
+    assertEqual(Object.hasOwn(request, 'stressReplayCapture'), false,
+        'Normal MC exports must not persist opt-in replay capture traces');
+    assertEqual(Object.hasOwn(result, 'stressReplayCapture'), false,
+        'Normal MC results must remain independent of replay capture traces');
     assertEqual(
         request.snapshotPolicy.policy,
         'immutable-baseline-with-versioned-pending-candidates',

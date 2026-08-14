@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "StressReplayPerformanceBaselineV1",
+  "measuredAtUtc": "2026-08-15T12:00:00.000Z",
+  "referenceEnvironment": {
+    "operatingSystem": "WSL2 Linux 6.6.87.1-microsoft-standard-WSL2 x86_64",
+    "runtime": "Node.js v22.23.2",
+    "processor": "AMD Ryzen 7 3700X 8-Core Processor (16 logical CPUs)",
+    "powerMode": "not normalized; foreground local run"
+  },
+  "measurement": {
+    "operation": "StressReplayComparisonV1 baseline plus one alternative on one materialized 60-year path",
+    "horizonYears": 60,
+    "warmupRuns": 2,
+    "measuredRuns": 5,
+    "samplesMs": [443.441, 439.359, 427.667, 435.858, 430.102],
+    "medianMs": 435.858,
+    "exportBytes": 88524
+  },
+  "budgets": {
+    "maximumMedianMultiplier": 4,
+    "minimumAbsoluteMedianMs": 250,
+    "maximumExportMultiplier": 1.25,
+    "maximumExportBytes": 2097152
+  },
+  "rationale": "The budget is relative to the checked-in local baseline and retains an absolute noise floor. It protects the deterministic financial contracts before throughput; the obsolete unmeasured p95-below-50-ms-for-240-year-runs target is not used."
+}

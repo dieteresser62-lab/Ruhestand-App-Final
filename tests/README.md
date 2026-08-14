@@ -1469,6 +1469,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `market-analyzer.test.mjs` | ~150 | Markt-Regime-Klassifizierung |
 | `mc-worker-contract.test.mjs` | ~170 | MC-Worker-Entrypoint, Lifecycle und Fehlervertraege |
 | `monte-carlo-export-contract.test.mjs` | ~900 | V1-/V2-Request-, Result- und Exportprovenienz, Heatmap-/Einheitenvertrag, Drawdown-Domaene, ScenarioLog-V2-JSON/CSV, Akkumulations-Missingness, Mindest-Flex-Quelltrennung, Legacy-Warnungen und fail-closed Dispatcher |
+| `stress-replay-e2e.test.mjs` | ~220 | Echter 60-Jahres-Durchstich von MC-Capture und Pfadmaterialisierung ueber deterministisches Baseline-/Varianten-Replay bis Export/Import, Groessenlimit und relatives Performancebudget |
 | `monte-carlo-measurement-contract.test.mjs` | ~1100 | Golden Cases, Snapshot-Linie, Delta-Ledger, Ressourcen-/Worker-Paritaet |
 | `monte-carlo-sampling.test.mjs` | ~200 | Bootstrap, Regime-Transitions |
 | `monte-carlo-startyear.test.mjs` | ~100 | Startjahr-Auswahl |
@@ -1523,5 +1524,18 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `transaction-tax.test.mjs` | ~340 | Steuerberechnung, Roh-Aggregate |
 | `utils.test.mjs` | ~100 | Hilfsfunktionen |
 | `vpw-dynamic-flex.test.mjs` | ~230 | VPW-Formel, Smoothing, Safety und Go-Go |
-| `worker-parity.test.mjs` | ~750 | Worker-Chunk-Parity |
+| `worker-parity.test.mjs` | ~800 | Worker-Chunk-Parity einschliesslich absolut indexierter Stress-Replay-Capture-Identitaet ueber Chunkgrenzen |
+
+### Stress-Replay-Performancebaseline
+
+`fixtures/stress-replay-performance-baseline-v1.json` ist eine versionierte,
+synthetische Messfixture ohne personenbezogene Finanzdaten. Gemessen wird ein
+vollstaendiger Vergleich aus Baseline plus einer Alternative auf einem
+materialisierten 60-Jahres-Pfad. Referenz: WSL2 Linux, Node.js v22.23.2, AMD
+Ryzen 7 3700X; zwei Warmups und fuenf Messungen ergaben am 2026-08-15 einen
+Median von 435,858 ms bei 88.524 Byte JSON-Export. Das Testbudget ist der
+groessere Wert aus vierfacher Baseline und 250 ms. Damit faengt es deutliche
+Regressionen ab, ohne Scheduler-/Energiesparrauschen als Fachfehler zu werten.
+Die veraltete, nicht gemessene Forderung `p95 < 50 ms fuer 240 Jahreslaeufe`
+wird nicht verwendet.
 | `worker-pool.test.mjs` | ~670 | Worker-Pool-Lifecycle |

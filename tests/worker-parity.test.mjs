@@ -1551,3 +1551,40 @@ console.log('Test: stress replay capture isolates a technical-error run from sib
         'Technical-error capture must be omitted rather than published as a financial replay path'
     );
 }
+
+console.log('Test: stress replay capture identity is invariant across worker-like chunk boundaries');
+{
+    const monteCarloParams = {
+        anzahl: 12,
+        maxDauer: 8,
+        blockSize: 3,
+        seed: 71236,
+        methode: 'block',
+        rngMode: 'per-run-seed'
+    };
+    const common = {
+        inputs: baseInputs,
+        monteCarloParams,
+        widowOptions,
+        useCapeSampling: false,
+        logIndices: [7],
+        stressReplayCapture: createStressReplayCaptureRequest([7]),
+        engine: EngineAPI
+    };
+    const full = await runMonteCarloChunk({
+        ...common,
+        runRange: { start: 0, count: 12 }
+    });
+    const split = await runMonteCarloChunk({
+        ...common,
+        runRange: { start: 6, count: 6 }
+    });
+    const fullMeta = full.runMeta.find(meta => meta.index === 7);
+    const splitMeta = split.runMeta.find(meta => meta.index === 7);
+    assert(fullMeta?.stressReplayCapture && splitMeta?.stressReplayCapture,
+        'Both chunk layouts must capture the selected absolute run index');
+    assertEqual(JSON.stringify(splitMeta.logDataRows), JSON.stringify(fullMeta.logDataRows),
+        'Scenario log rows must be chunk-boundary invariant');
+    assertEqual(JSON.stringify(splitMeta.stressReplayCapture), JSON.stringify(fullMeta.stressReplayCapture),
+        'Materialized replay inputs and source identity must be chunk-boundary invariant');
+}

@@ -977,6 +977,12 @@ async function runSimulatorSmoke(browser, baseUrl) {
     'Forbidden asset and minimum-flex fields are absent from the variant editor');
     assert(await page.locator('#stressReplayVariantEditor [data-active-when="decumulation:3_bucket_jilge"]').first().isHidden(),
         'Three-bucket-only controls start hidden when their strategy mode is inactive');
+    assert((await page.locator('#stressReplayWorkspace').textContent()).includes('Auf diesem fixierten Stresspfad'),
+        'The browser workflow must explain the paired fixed-path interpretation');
+    assert(!(await page.locator('#stressReplayWorkspace').textContent()).toLowerCase().includes('optimale strategie'),
+        'The browser workflow must not present replay variants as a general optimum');
+    assertEqual(await readIndexedDb(page, 'kv', 'sim.stressReplay.active.v1'), null,
+        'Opening the Simulator with replay inactive must not create a persisted replay workspace');
     const replayScrollStyle = await page.evaluate(() => {
         const probe = document.createElement('div');
         probe.className = 'stress-replay-table-scroll';

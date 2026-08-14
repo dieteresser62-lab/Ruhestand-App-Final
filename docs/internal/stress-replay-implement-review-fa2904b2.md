@@ -193,6 +193,22 @@ Noch kein strukturiertes Reviewereignis.
 - Validierungsbindung: `validation-7e5f1f3e312d`
 - Testdateien: `tests/browser-smoke.test.mjs`, `tests/stress-replay-renderer.test.mjs`
 - Eigene Findings: `C-02`
+
+#### Work Unit 11 – Slice 10
+
+- Auftrag: End-to-End, Performance und Dokumentationssync
+- Scope: `README.md`, `docs/internal/slice-stress-pfad-replay-arbeitsplan-10-end-to-end-performance-und-dokumentationssync.md`, `docs/internal/slice-stress-replay-implement-10-end-to-end-performance-und-dokumentationssync.md`, `docs/internal/stress-replay-implement-review-fa2904b2.md`, `docs/reference/SIMULATOR_MODULES_README.md`, `docs/reference/TECHNICAL.md`, `tests/README.md`, `tests/browser-smoke.test.mjs`, `tests/fixtures/stress-replay-performance-baseline-v1.json`, `tests/monte-carlo-export-contract.test.mjs`, `tests/stress-replay-e2e.test.mjs`, `tests/worker-parity.test.mjs`
+
+### Ereignis 2: Runde 1
+
+- Reviewer: `claude`
+- Freigabe: `YES`
+- Validierungsbindung: `validation-03b55dc8dc48`
+- Testdateien: `tests/README.md`, `tests/browser-smoke.test.mjs`, `tests/fixtures/stress-replay-performance-baseline-v1.json`, `tests/monte-carlo-export-contract.test.mjs`, `tests/stress-replay-e2e.test.mjs`, `tests/worker-parity.test.mjs`
+- Prüfdimensionen: scope/allowlist conformance, e2e wiring correctness (capture→materialize→compare→export/import), determinism/idempotency of comparisonFingerprint across repeated runs, chunk-boundary parity for absolute-indexed capture, export-schema non-leakage, browser-level persistence/idempotency and financial-advice-boundary copy checks, performance-budget design
+- Größtes Restrisiko: Largest residual risk: the relative+floor performance budget (4×/250ms) in stress-replay-e2e.test.mjs could still intermittently fail on heavily contended/throttled CI/dev hardware, and the worker-parity addition only exercises a second-half split (not a first-half split), leaving a narrow gap in offset-independence coverage
+- Realistische Bruchbedingung: Break condition: a shared/throttled CI runner pushes the 5-sample median for baseline+one-alternative on the 60-year path above &#96;max(4×435.858ms, 250ms)&#96; purely from scheduling noise, or a future chunk-splitting change breaks first-half offset correctness in a way the current split-only-from-6 test cannot detect.
+- Eigene Findings: keine
 <!-- audit:claude-review:end -->
 
 ### Review-Feedback von Antigravity
@@ -348,6 +364,22 @@ Noch kein strukturiertes Reviewereignis.
 - Größtes Restrisiko: Largest residual risk is that rapid user interaction with the variant editor form controls while a calculation is in flight or while invalid DOM form inputs are present could trigger unhandled validation rejections if client-side validation states are circumvented prior to checkValidity() calls
 - Realistische Bruchbedingung: Break condition: A user inputs unexpected non-standard floating point notation or extreme numeric values into number fields that pass HTML5 form validity but exceed safe calculation boundaries during simulation execution on high-iteration models
 - Eigene Findings: keine
+
+#### Work Unit 11 – Slice 10
+
+- Auftrag: End-to-End, Performance und Dokumentationssync
+- Scope: `README.md`, `docs/internal/slice-stress-pfad-replay-arbeitsplan-10-end-to-end-performance-und-dokumentationssync.md`, `docs/internal/slice-stress-replay-implement-10-end-to-end-performance-und-dokumentationssync.md`, `docs/internal/stress-replay-implement-review-fa2904b2.md`, `docs/reference/SIMULATOR_MODULES_README.md`, `docs/reference/TECHNICAL.md`, `tests/README.md`, `tests/browser-smoke.test.mjs`, `tests/fixtures/stress-replay-performance-baseline-v1.json`, `tests/monte-carlo-export-contract.test.mjs`, `tests/stress-replay-e2e.test.mjs`, `tests/worker-parity.test.mjs`
+
+### Ereignis 3: Runde 1
+
+- Reviewer: `antigravity`
+- Freigabe: `YES`
+- Validierungsbindung: `validation-03b55dc8dc48`
+- Testdateien: `tests/README.md`, `tests/browser-smoke.test.mjs`, `tests/fixtures/stress-replay-performance-baseline-v1.json`, `tests/monte-carlo-export-contract.test.mjs`, `tests/stress-replay-e2e.test.mjs`, `tests/worker-parity.test.mjs`
+- Prüfdimensionen: scope and allowlist compliance, end-to-end integration wiring (Monte Carlo opt-in capture -&gt; path materialization -&gt; single-path replay comparison -&gt; workspace creation -&gt; versioned JSON export/import round-trip), contract non-leakage (asserting no replay capture traces in standard MonteCarloExportV2), worker chunk boundary invariance for absolute run indices, browser smoke disclaimer and persistence hygiene verification, 60-year performance baseline budgeting (4x relative multiplier with 250ms absolute noise floor), and complete cross-documentation synchronization
+- Größtes Restrisiko: Largest residual risk is that execution duration measurements in stress-replay-e2e.test.mjs could encounter transient OS-level CPU throttling or heavy background scheduler contention on severely constrained shared CI nodes, causing duration spikes during the 5 measured iterations
+- Realistische Bruchbedingung: Break condition: A shared virtualized CI runner experiencing severe CPU starvation pushes the 5-iteration median duration on the 60-year path above max(250ms, 4 * 435.858ms = 1743.432ms) due solely to host scheduling jitter rather than an algorithmic regression
+- Eigene Findings: keine
 <!-- audit:antigravity-review:end -->
 
 ### Review-Antworten von Codex
@@ -422,6 +454,13 @@ Noch keine strukturierten Codex-Antworten.
 
 - Auftrag: Varianteneditor und Vergleichsansicht
 - Scope: `Simulator.html`, `app/simulator/simulator-results.js`, `app/simulator/stress-replay-renderer.js`, `app/simulator/stress-replay-ui.js`, `docs/internal/slice-stress-pfad-replay-arbeitsplan-09-varianteneditor-und-vergleichsansicht.md`, `docs/internal/slice-stress-replay-implement-09-varianteneditor-und-vergleichsansicht.md`, `docs/internal/stress-replay-implement-review-fa2904b2.md`, `simulator.css`, `tests/browser-smoke.test.mjs`, `tests/stress-replay-renderer.test.mjs`
+
+Noch keine strukturierten Codex-Antworten.
+
+#### Work Unit 11 – Slice 10
+
+- Auftrag: End-to-End, Performance und Dokumentationssync
+- Scope: `README.md`, `docs/internal/slice-stress-pfad-replay-arbeitsplan-10-end-to-end-performance-und-dokumentationssync.md`, `docs/internal/slice-stress-replay-implement-10-end-to-end-performance-und-dokumentationssync.md`, `docs/internal/stress-replay-implement-review-fa2904b2.md`, `docs/reference/SIMULATOR_MODULES_README.md`, `docs/reference/TECHNICAL.md`, `tests/README.md`, `tests/browser-smoke.test.mjs`, `tests/fixtures/stress-replay-performance-baseline-v1.json`, `tests/monte-carlo-export-contract.test.mjs`, `tests/stress-replay-e2e.test.mjs`, `tests/worker-parity.test.mjs`
 
 Noch keine strukturierten Codex-Antworten.
 <!-- audit:codex-responses:end -->
@@ -648,6 +687,23 @@ Noch keine strukturierte Validierungsattestierung.
 | Matrixbefehl | Status | Exitcode | Kompaktausgabe |
 |---|---|---:|---|
 | shell: npm test | PASS | 0 | &gt; ruhestand-app-final@1.0.0 test<br>&gt; node tests/run-tests.mjs<br><br>🚀 Starting Test Runner...<br>Found 179 test files.<br><br>📂 Running 3bucket-config.test.mjs in process...<br>--- 3-Bucket Config Tests ---<br>✅ 3-Bucket config tests passed<br>✅ 3bucket-config.test.mjs completed.<br>📊 FILE RESULT: 3bucket-config.test.mjs &#124; mode=in-process &#124; assertions=17 &#124; passed=17 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running 3bucket-refill.test.mjs in process...<br>--- 3-Bucket Refill Tests ---<br>✅ 3-Bucket refill tests passed<br>✅ 3bucket-refill.test.mjs completed.<br>📊 FILE RESULT: 3bucket-refill.test.mjs &#124; mode=in-process &#124; assertions=32 &#124; passed=32 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running architecture-evidence.test.mjs in process...<br>--- Architecture Evidence Contract Tests ---<br>✅ Architecture evidence contract tests passed<br>✅ architecture-evidence.test.mjs completed.<br>📊 FILE RESULT: architecture-evidence.test.mjs &#124; mode=in-process &#124; assertions=24 &#124; passed=24 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running auto-optimize-fidelity<br>...[181906 characters omitted]...<br>ete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-storage.js:537:28)<br>    at initProfileSubpageLifecycle (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-navigation.js:157:5)<br>    at initProfileBridge (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-bridge.js:8:5)<br>    at async Promise.all (index 0)<br>    at async MockDocument.dispatch (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:80:9)<br>    at async runProfileUiContractTests (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:244:9)<br>    at async file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:257:9<br>[VALIDATION ERROR] Invalid input fields: [<br>  {<br>    fieldId: 'goGoMultiplier',<br>    message: 'goGoMultiplier muss zwischen 1.0 und 1.5 liegen.'<br>  }<br>] |
+
+#### Work Unit 11 – Slice 10
+
+- Auftrag: End-to-End, Performance und Dokumentationssync
+- Scope: `README.md`, `docs/internal/slice-stress-pfad-replay-arbeitsplan-10-end-to-end-performance-und-dokumentationssync.md`, `docs/internal/slice-stress-replay-implement-10-end-to-end-performance-und-dokumentationssync.md`, `docs/internal/stress-replay-implement-review-fa2904b2.md`, `docs/reference/SIMULATOR_MODULES_README.md`, `docs/reference/TECHNICAL.md`, `tests/README.md`, `tests/browser-smoke.test.mjs`, `tests/fixtures/stress-replay-performance-baseline-v1.json`, `tests/monte-carlo-export-contract.test.mjs`, `tests/stress-replay-e2e.test.mjs`, `tests/worker-parity.test.mjs`
+
+### Ereignis 1: `validation-03b55dc8dc48`
+
+- Diff-Fingerprint: `03b55dc8dc48f588a0f24d7606b08fdf8e8e84fc14e1ab5c9f4eb15ea3996416`
+- Status: `PASS`
+- Vollständig: `YES`
+- Kurzresultat: 1 passed; 0 failed; 0 unavailable; 1 required
+- Ausgabedigest: `022e1bfb10b59c0d624f6edf004714dce4501dda7ccd2636c50e547159bc1d12`
+
+| Matrixbefehl | Status | Exitcode | Kompaktausgabe |
+|---|---|---:|---|
+| shell: npm test | PASS | 0 | &gt; ruhestand-app-final@1.0.0 test<br>&gt; node tests/run-tests.mjs<br><br>🚀 Starting Test Runner...<br>Found 180 test files.<br><br>📂 Running 3bucket-config.test.mjs in process...<br>--- 3-Bucket Config Tests ---<br>✅ 3-Bucket config tests passed<br>✅ 3bucket-config.test.mjs completed.<br>📊 FILE RESULT: 3bucket-config.test.mjs &#124; mode=in-process &#124; assertions=17 &#124; passed=17 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running 3bucket-refill.test.mjs in process...<br>--- 3-Bucket Refill Tests ---<br>✅ 3-Bucket refill tests passed<br>✅ 3bucket-refill.test.mjs completed.<br>📊 FILE RESULT: 3bucket-refill.test.mjs &#124; mode=in-process &#124; assertions=32 &#124; passed=32 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running architecture-evidence.test.mjs in process...<br>--- Architecture Evidence Contract Tests ---<br>✅ Architecture evidence contract tests passed<br>✅ architecture-evidence.test.mjs completed.<br>📊 FILE RESULT: architecture-evidence.test.mjs &#124; mode=in-process &#124; assertions=24 &#124; passed=24 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running auto-optimize-fidelity<br>...[182494 characters omitted]...<br>ete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-storage.js:537:28)<br>    at initProfileSubpageLifecycle (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-navigation.js:157:5)<br>    at initProfileBridge (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-bridge.js:8:5)<br>    at async Promise.all (index 0)<br>    at async MockDocument.dispatch (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:80:9)<br>    at async runProfileUiContractTests (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:244:9)<br>    at async file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:257:9<br>[VALIDATION ERROR] Invalid input fields: [<br>  {<br>    fieldId: 'goGoMultiplier',<br>    message: 'goGoMultiplier muss zwischen 1.0 und 1.5 liegen.'<br>  }<br>] |
 <!-- audit:validation-attestation:end -->
 
 ### Testfreigabe und Pre-Mortem
@@ -754,6 +810,16 @@ Noch keine strukturierte Validierungsattestierung.
 - Pre-Mortems:
   - Ereignis 2: In three months, the most likely failure is a support report of a stress-replay workspace whose comparison view claims a clean/reconciled baseline after the browser was reloaded or the workspace was re-imported, even though the persisted &#96;path.years&#96; had silently diverged from the true original Monte-Carlo run (e.g. due to a storage-layer bug, manual JSON edit, or a regression in an earlier slice's materializer) — because the reload-path reconciliation in &#96;defaultRunComparison&#96; is self-referential (C-02) and therefore structurally unable to surface that drift.
   - Ereignis 3: In three months, the most likely failure cause is a support issue where an atypical browser autofill or script submits incomplete numeric values into the variant editor without triggering standard input events, resulting in an unvalidated patch payload being passed directly to createVariant and surfacing as a visible UI validation error instead of being caught in live preview.
+
+#### Work Unit 11 – Slice 10
+
+- Auftrag: End-to-End, Performance und Dokumentationssync
+- Scope: `README.md`, `docs/internal/slice-stress-pfad-replay-arbeitsplan-10-end-to-end-performance-und-dokumentationssync.md`, `docs/internal/slice-stress-replay-implement-10-end-to-end-performance-und-dokumentationssync.md`, `docs/internal/stress-replay-implement-review-fa2904b2.md`, `docs/reference/SIMULATOR_MODULES_README.md`, `docs/reference/TECHNICAL.md`, `tests/README.md`, `tests/browser-smoke.test.mjs`, `tests/fixtures/stress-replay-performance-baseline-v1.json`, `tests/monte-carlo-export-contract.test.mjs`, `tests/stress-replay-e2e.test.mjs`, `tests/worker-parity.test.mjs`
+
+- Teständerungsfreigabe: nicht erfasst.
+- Pre-Mortems:
+  - Ereignis 2: In three months the most likely failure is an intermittent CI red on &#96;stress-replay-e2e.test.mjs&#96;'s performance assertion under a busier/slower runner than the Ryzen 7 3700X reference, prompting the budget or fixture to be loosened ad hoc without re-measuring, which would silently erode the regression-detection value of the gate rather than fixing an actual throughput regression.
+  - Ereignis 3: In three months, the most likely failure cause is that a future modification to the underlying engine transaction loops subtly shifts microsecond execution characteristics on long simulation horizons (e.g., 80–100 years), tempting developers to loosen or bypass the performance baseline budget ad hoc rather than re-measuring against a documented reference hardware profile.
 <!-- audit:test-approval-premortem:end -->
 
 ### Findings-Lebenszyklus
@@ -914,6 +980,13 @@ Noch keine strukturierten Findings.
 - Finding: After browser reload (&#96;initialize()&#96;) or &#96;importSerialized()&#96;, &#96;sourceScenarioLog&#96; is reset to &#96;null&#96;, causing &#96;defaultRunComparison&#96; to derive the baseline "source" identity rows from &#96;workspace.path&#96; itself instead of an independently persisted original scenario log; the baseline reconciliation check therefore becomes tautological on every reload/import and cannot detect drift between the persisted fixed path and its true originating Monte-Carlo run across sessions.
 - Akzeptanztest: Add a &#96;stress-replay-ui.test.mjs&#96;/&#96;stress-replay-renderer.test.mjs&#96; case that stubs &#96;runComparison&#96;/&#96;runStressReplayPathV1&#96; to record the &#96;sourceScenarioLog&#96; argument passed for the baseline variant across (a) a fresh &#96;fixSelectedScenario()&#96; call and (b) a subsequent &#96;initialize()&#96; reload of the same persisted workspace; assert the two invocations receive an identical, independently-sourced scenario log (e.g. because it is itself persisted in the workspace) rather than (b) deriving it from &#96;workspace.path.years&#96;. VALIDATE: ["node","tests/run-single.mjs","tests/stress-replay-ui.test.mjs"]
 - Statusbegründung: –
+
+#### Work Unit 11 – Slice 10
+
+- Auftrag: End-to-End, Performance und Dokumentationssync
+- Scope: `README.md`, `docs/internal/slice-stress-pfad-replay-arbeitsplan-10-end-to-end-performance-und-dokumentationssync.md`, `docs/internal/slice-stress-replay-implement-10-end-to-end-performance-und-dokumentationssync.md`, `docs/internal/stress-replay-implement-review-fa2904b2.md`, `docs/reference/SIMULATOR_MODULES_README.md`, `docs/reference/TECHNICAL.md`, `tests/README.md`, `tests/browser-smoke.test.mjs`, `tests/fixtures/stress-replay-performance-baseline-v1.json`, `tests/monte-carlo-export-contract.test.mjs`, `tests/stress-replay-e2e.test.mjs`, `tests/worker-parity.test.mjs`
+
+Noch keine strukturierten Findings.
 <!-- audit:findings:end -->
 
 ### Entscheidungstabelle
@@ -1012,6 +1085,15 @@ Noch keine strukturierten Findings.
 | ID | Quelle | Finding | Klasse | Entscheidung | Umsetzung |
 |---|---|---|---|---|---|
 | C-02 | claude | After browser reload (&#96;initialize()&#96;) or &#96;importSerialized()&#96;, &#96;sourceScenarioLog&#96; is reset to &#96;null&#96;, causing &#96;defaultRunComparison&#96; to derive the baseline "source" identity rows from &#96;workspace.path&#96; itself instead of an independently persisted original scenario log; the baseline reconciliation check therefore becomes tautological on every reload/import and cannot detect drift between the persisted fixed path and its true originating Monte-Carlo run across sessions. | OBSERVATION | offen | offen |
+
+#### Work Unit 11 – Slice 10
+
+- Auftrag: End-to-End, Performance und Dokumentationssync
+- Scope: `README.md`, `docs/internal/slice-stress-pfad-replay-arbeitsplan-10-end-to-end-performance-und-dokumentationssync.md`, `docs/internal/slice-stress-replay-implement-10-end-to-end-performance-und-dokumentationssync.md`, `docs/internal/stress-replay-implement-review-fa2904b2.md`, `docs/reference/SIMULATOR_MODULES_README.md`, `docs/reference/TECHNICAL.md`, `tests/README.md`, `tests/browser-smoke.test.mjs`, `tests/fixtures/stress-replay-performance-baseline-v1.json`, `tests/monte-carlo-export-contract.test.mjs`, `tests/stress-replay-e2e.test.mjs`, `tests/worker-parity.test.mjs`
+
+| ID | Quelle | Finding | Klasse | Entscheidung | Umsetzung |
+|---|---|---|---|---|---|
+| – | – | Noch keine Findings | – | – | – |
 <!-- audit:decision-table:end -->
 
 ### Freigabestatus
@@ -1129,6 +1211,18 @@ Noch keine strukturierten Findings.
 
 - Auftrag: Varianteneditor und Vergleichsansicht
 - Scope: `Simulator.html`, `app/simulator/simulator-results.js`, `app/simulator/stress-replay-renderer.js`, `app/simulator/stress-replay-ui.js`, `docs/internal/slice-stress-pfad-replay-arbeitsplan-09-varianteneditor-und-vergleichsansicht.md`, `docs/internal/slice-stress-replay-implement-09-varianteneditor-und-vergleichsansicht.md`, `docs/internal/stress-replay-implement-review-fa2904b2.md`, `simulator.css`, `tests/browser-smoke.test.mjs`, `tests/stress-replay-renderer.test.mjs`
+
+- Implementierung bereit: `YES`
+- Validierung: `PASS`
+- Claude-Freigabe: `YES`
+- Antigravity-Freigabe: `YES`
+- Red-State-Folgeslice: `NONE`
+- Commit autorisiert: `YES`
+
+#### Work Unit 11 – Slice 10
+
+- Auftrag: End-to-End, Performance und Dokumentationssync
+- Scope: `README.md`, `docs/internal/slice-stress-pfad-replay-arbeitsplan-10-end-to-end-performance-und-dokumentationssync.md`, `docs/internal/slice-stress-replay-implement-10-end-to-end-performance-und-dokumentationssync.md`, `docs/internal/stress-replay-implement-review-fa2904b2.md`, `docs/reference/SIMULATOR_MODULES_README.md`, `docs/reference/TECHNICAL.md`, `tests/README.md`, `tests/browser-smoke.test.mjs`, `tests/fixtures/stress-replay-performance-baseline-v1.json`, `tests/monte-carlo-export-contract.test.mjs`, `tests/stress-replay-e2e.test.mjs`, `tests/worker-parity.test.mjs`
 
 - Implementierung bereit: `YES`
 - Validierung: `PASS`

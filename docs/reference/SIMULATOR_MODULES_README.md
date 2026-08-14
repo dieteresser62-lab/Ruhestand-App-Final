@@ -247,6 +247,47 @@ Sammelt und sortiert Szenarien (Worst, Perzentile, Pflege, Zufalls-Samples) wäh
 
 **Einbindung:** Von `simulator-monte-carlo.js` instanziiert und als Callback an den Runner übergeben.
 
+## 5a. Stress-Pfad-Replay
+
+Das Stress-Pfad-Replay fixiert den exogenen Verlauf eines ausgewaehlten
+`per-run-seed`-Monte-Carlo-Runs. Der normale Batch bleibt unveraendert; nur der
+explizite serielle Nachlauf fordert fuer den absoluten Run-Index einen
+`StressReplayCaptureV1` an. Direkter und workerartig gesplitteter Chunk liefern
+fuer denselben absoluten Index identische Log- und Capture-Daten.
+
+**DOM-freie Module:**
+
+- `stress-replay-contract.js` – Schemas, kanonische SHA-256-Fingerprints,
+  Whitelist, Varianten-/Workspace-/Vergleichsvalidierung und Groessenlimits.
+- `stress-replay-path-materializer.js` – Quellidentitaet, ScenarioLog-Abgleich,
+  vollstaendiger Markt-/Household-Pfad und unabhaengiger Post-Ruin-Shadow-Seed.
+- `stress-replay-runner.js` – RNG-freier Single-Path-Lauf mit unveraenderter
+  Baseline oder validiertem Strategiepatch; Ruin, Tod, Horizont und technischer
+  Fehler bleiben getrennte Statuswerte.
+- `stress-replay-variant.js` – Baseline und maximal drei Alternativen. Erlaubt
+  sind nur bestehende Strategieparameter; Asset-, Profil-, Tranchen- und
+  Mindest-Flex-Werte bleiben fixiert.
+- `stress-replay-transactions.js` und `stress-replay-comparison.js` – additive
+  Transaktionsklassen, KPI-Deltas und erste Delta-Marker. Mehr-Faktor-Varianten
+  werden sichtbar benannt; ein allgemeines Finanzranking ist ausgeschlossen.
+- `stress-replay-persistence.js` und `stress-replay-export.js` – genau ein
+  lokaler Workspace, bestaetigtes Ersetzen/Verwerfen, versionierter JSON-
+  Roundtrip und Nur-Lesen-Modus bei Kompatibilitaetsabweichung. Der aktive Key
+  `sim.stressReplay.active.v1` wird nicht in allgemeine Snapshots aufgenommen.
+
+**UI-Module:** `stress-replay-ui.js` steuert Sitzung, Fixieren, Varianten und
+Import/Export; `stress-replay-renderer.js` rendert Patchvorschau, KPIs,
+Delta-Timeline und Jahrestabelle. Statuscopy, Fokus und Live-Regionen machen
+deutlich, dass alle Aussagen nur fuer den fixierten Pfad gelten.
+
+**Performancevertrag:** Der End-to-End-Test misst Baseline plus eine
+Alternative auf einem materialisierten 60-Jahres-Pfad. Die eingecheckte
+Referenzmessung unter WSL2/Node 22 auf einem Ryzen 7 3700X betraegt 435,858 ms
+Median bei fuenf Messungen nach zwei Warmups; der JSON-Export umfasst 88.524
+Byte. Das Regressionsbudget ist relativ (Faktor 4, mindestens 250 ms) und
+priorisiert deterministische fachliche Paritaet vor einer unbelegten absoluten
+Durchsatzforderung.
+
 ---
 
 ## 6. `simulator-sweep.js` (~360 Zeilen)
@@ -1402,4 +1443,4 @@ Nach jeder Monte-Carlo-Simulation werden bis zu 31 Szenarien gespeichert:
 
 ---
 
-**Last Updated:** 2026-08-07
+**Last Updated:** 2026-08-15
