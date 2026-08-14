@@ -419,6 +419,45 @@ const profileInputs = [
 }
 
 {
+    console.log('\n📋 Test 6b: Cent-identical detail assets do not trigger a rounding warning');
+    const equity = 45807.51;
+    const moneyMarket = 89944.01;
+    const cash = 91000;
+    const trancheOrderTotal = equity + 0 + moneyMarket + cash;
+    const componentOrderTotal = equity + cash + moneyMarket;
+    assert(trancheOrderTotal < componentOrderTotal,
+        'Fixture should reproduce the former IEEE-754 ordering difference');
+    assertEqual(Math.round(trancheOrderTotal * 100), Math.round(componentOrderTotal * 100),
+        'Fixture totals should represent the same whole-cent amount');
+
+    const result = combineSimulatorProfiles([{
+        profileId: 'karin',
+        name: 'Karin',
+        inputs: {
+            ...profileInputs[0].inputs,
+            startVermoegen: 226751.52,
+            depotwertAlt: equity,
+            tagesgeld: cash,
+            geldmarktEtf: moneyMarket,
+            detailledTranches: [
+                {
+                    trancheId: 'aktien', marketValue: equity, costBasis: equity,
+                    type: 'aktien_alt'
+                },
+                {
+                    trancheId: 'geldmarkt', marketValue: moneyMarket, costBasis: moneyMarket,
+                    type: 'geldmarkt', category: 'money_market'
+                }
+            ]
+        }
+    }], 'karin');
+
+    assert(!result.warnings.includes(
+        'Startvermoegen ist kleiner als die Summe aus Depot + Liquiditaet. Bitte Profile pruefen.'
+    ), 'Cent-identical assets should not trigger the consistency warning');
+}
+
+{
     console.log('\n📋 Test 7: Explicit empty and corrupt profile inputs fail closed');
     const parsedEmpty = buildSimulatorInputsFromProfileData({
         depot_tranchen: '[]',

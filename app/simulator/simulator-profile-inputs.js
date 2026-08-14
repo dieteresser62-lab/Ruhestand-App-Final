@@ -432,6 +432,10 @@ function sumNumbers(list, selector) {
     return list.reduce((acc, item) => acc + selector(item), 0);
 }
 
+function moneyToCents(value) {
+    return Math.round(value * 100);
+}
+
 function weightedAverage(list, selector, weightSelector, fallback = 0) {
     const totalWeight = sumNumbers(list, weightSelector);
     if (totalWeight <= 0) return fallback;
@@ -655,7 +659,8 @@ export function combineSimulatorProfiles(profileInputs, primaryProfileId) {
         rebalancingBand: record.inputs.rebalancingBand
     })));
 
-    if (totalAssets < (sumDepotwertAlt + sumTagesgeld + sumGeldmarkt)) {
+    const componentAssets = sumDepotwertAlt + sumTagesgeld + sumGeldmarkt;
+    if (moneyToCents(totalAssets) < moneyToCents(componentAssets)) {
         warnings.push('Startvermoegen ist kleiner als die Summe aus Depot + Liquiditaet. Bitte Profile pruefen.');
     }
 
