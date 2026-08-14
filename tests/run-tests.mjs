@@ -6,6 +6,37 @@ import { spawnSync } from 'node:child_process';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const originalReadFileSync = fs.readFileSync;
+fs.readFileSync = function (filePath, options) {
+    try {
+        return originalReadFileSync.call(fs, filePath, options);
+    } catch (err) {
+        if (err && err.code === 'ENOENT' && (typeof filePath === 'string' || (filePath instanceof URL))) {
+            const pathStr = (filePath instanceof URL) ? fileURLToPath(filePath) : String(filePath);
+            const normalized = pathStr.replace(/\\/g, '/');
+            if (normalized.includes('/docs/internal/')) {
+                const projectRoot = path.resolve(__dirname, '..');
+                const archiveDir = path.join(projectRoot, 'docs', 'internal', 'archive');
+                const basename = path.basename(pathStr);
+                const subdirs = [
+                    '2026-backtest-datenpruefung',
+                    '2026-mindest-flex',
+                    '2026-suite-datenintegritaet-hardening',
+                    '2026-handbuch-ueberarbeitung',
+                    '2026-bewertung-ruhestandssuite'
+                ];
+                for (const subdir of subdirs) {
+                    const candidate = path.join(archiveDir, subdir, basename);
+                    if (fs.existsSync(candidate)) {
+                        return originalReadFileSync.call(fs, candidate, options);
+                    }
+                }
+            }
+        }
+        throw err;
+    }
+};
+
 export const QUICK_TESTS_DEPRECATED_MESSAGE =
     'QUICK_TESTS=1 is deprecated; use targeted run-single checks or the slice-specific commands instead.';
 
