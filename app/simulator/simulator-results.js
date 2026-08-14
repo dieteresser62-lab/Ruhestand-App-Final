@@ -91,6 +91,10 @@ export function persistDetailLevel(storageKey, level) {
  */
 export function displayMonteCarloResults(results, anzahl, failCount, worstRun, resultsMitPflege, resultsOhnePflege, pflegefallEingetretenCount, inputs, worstRunCare, scenarioLogs = null) {
 
+    // A newly rendered result set invalidates any selection from the previous
+    // batch before a new characteristic scenario is chosen.
+    selectStressReplayScenario(null);
+
     const viewModel = prepareMonteCarloViewModel({ results, totalRuns: anzahl, failCount, inputs });
 
     renderSummary(document.getElementById('monteCarloSummary'), viewModel.summaryCards);

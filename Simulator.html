@@ -1156,6 +1156,80 @@
                             </dl>
                             <p id="stressReplayCompatibilityReasons" hidden></p>
                         </aside>
+                        <section id="stressReplayVariantWorkspace" aria-labelledby="stressReplayVariantHeading">
+                            <h5 id="stressReplayVariantHeading">Strategievarianten auf dem fixierten Pfad</h5>
+                            <p>Die angezeigte Baseline ist der eingefrorene Wert aus dem Ursprungslauf. Leere
+                                Felder übernehmen ihn; Änderungen schreiben weder Profil- noch Tranchenwerte.</p>
+                            <form id="stressReplayVariantEditor">
+                                <fieldset id="stressReplayVariantFields" disabled>
+                                    <legend>Strategie-Patch erstellen</legend>
+                                    <div class="stress-replay-editor-grid">
+                                        <label>Variantenname
+                                            <input id="stressReplayVariantLabel" type="text" maxlength="60" required
+                                                autocomplete="off" placeholder="z. B. längere Liquiditätsreichweite">
+                                        </label>
+                                        <label>Liquiditätsreichweite in Jahren <small>Baseline: <output data-stress-replay-baseline="liquidityRunwayYears">—</output></small>
+                                            <input type="number" min="1" max="10" step="0.5" data-value-type="number" data-stress-replay-path="strategy.liquidityRunwayYears" placeholder="Baseline übernehmen">
+                                        </label>
+                                        <label>Maximale Gewinnmitnahme in % <small>Baseline: <output data-stress-replay-baseline="maxSkimPctOfEq">—</output></small>
+                                            <input type="number" min="0" max="50" step="0.1" data-value-type="number" data-stress-replay-path="strategy.maxSkimPctOfEq" placeholder="Baseline übernehmen">
+                                        </label>
+                                        <label>Nachfüllgrenze Bärenmarkt in % <small>Baseline: <output data-stress-replay-baseline="maxBearRefillPctOfEq">—</output></small>
+                                            <input type="number" min="0" max="70" step="0.1" data-value-type="number" data-stress-replay-path="strategy.maxBearRefillPctOfEq" placeholder="Baseline übernehmen">
+                                        </label>
+                                        <label>Entnahmemodus <small>Baseline: <output data-stress-replay-baseline="decumulation.mode">—</output></small>
+                                            <select data-stress-replay-path="strategy.decumulation.mode"><option value="">Baseline übernehmen</option><option value="standard">Standard</option><option value="3_bucket_jilge">Drei-Bucket-Strategie</option></select>
+                                        </label>
+                                        <label data-active-when="decumulation:3_bucket_jilge" hidden>Bucket-Zielfaktor <small>Baseline: <output data-stress-replay-baseline="decumulation.bondTargetFactor">—</output></small>
+                                            <input type="number" min="0" step="0.1" data-value-type="number" data-stress-replay-path="strategy.decumulation.bondTargetFactor" placeholder="Baseline übernehmen">
+                                        </label>
+                                        <label data-active-when="decumulation:3_bucket_jilge" hidden>Drawdown-Auslöser <small>Baseline: <output data-stress-replay-baseline="decumulation.drawdownTrigger">—</output></small>
+                                            <input type="number" min="0" step="0.1" data-value-type="number" data-stress-replay-path="strategy.decumulation.drawdownTrigger" placeholder="Baseline übernehmen">
+                                        </label>
+                                        <label data-active-when="decumulation:3_bucket_jilge" hidden>Bucket-Nachfüllschwelle <small>Baseline: <output data-stress-replay-baseline="decumulation.bondRefillThreshold">—</output></small>
+                                            <input type="number" min="0" step="0.1" data-value-type="number" data-stress-replay-path="strategy.decumulation.bondRefillThreshold" placeholder="Baseline übernehmen">
+                                        </label>
+                                        <label>Dynamische Flexausgaben <small>Baseline: <output data-stress-replay-baseline="dynamicFlex">—</output></small>
+                                            <select data-value-type="boolean" data-stress-replay-path="strategy.dynamicFlex"><option value="">Baseline übernehmen</option><option value="true">Aktiv</option><option value="false">Inaktiv</option></select>
+                                        </label>
+                                        <label>Horizontmethode <small>Baseline: <output data-stress-replay-baseline="horizonMethod">—</output></small>
+                                            <select data-stress-replay-path="strategy.horizonMethod"><option value="">Baseline übernehmen</option><option value="mean">Mittelwert</option><option value="survival_quantile">Überlebensquantil</option></select>
+                                        </label>
+                                        <label>Planungshorizont in Jahren <small>Baseline: <output data-stress-replay-baseline="horizonYears">—</output></small>
+                                            <input type="number" min="1" max="60" step="1" data-value-type="number" data-stress-replay-path="strategy.horizonYears" placeholder="Baseline übernehmen">
+                                        </label>
+                                        <label>Überlebensquantil <small>Baseline: <output data-stress-replay-baseline="survivalQuantile">—</output></small>
+                                            <input type="number" min="0.5" max="0.99" step="0.01" data-value-type="number" data-stress-replay-path="strategy.survivalQuantile" placeholder="Baseline übernehmen">
+                                        </label>
+                                        <label>Go-Go-Phase <small>Baseline: <output data-stress-replay-baseline="goGoActive">—</output></small>
+                                            <select data-value-type="boolean" data-stress-replay-path="strategy.goGoActive"><option value="">Baseline übernehmen</option><option value="true">Aktiv</option><option value="false">Inaktiv</option></select>
+                                        </label>
+                                        <label>Go-Go-Multiplikator <small>Baseline: <output data-stress-replay-baseline="goGoMultiplier">—</output></small>
+                                            <input type="number" min="1" max="1.5" step="0.05" data-value-type="number" data-stress-replay-path="strategy.goGoMultiplier" placeholder="Baseline übernehmen">
+                                        </label>
+                                        <label>Langlebigkeitsmodus <small>Baseline: <output data-stress-replay-baseline="longevityMode">—</output></small>
+                                            <select data-stress-replay-path="strategy.longevityMode"><option value="">Baseline übernehmen</option><option value="none">Keine Anpassung</option><option value="quantile_shift">Quantil verschieben</option><option value="relative_horizon_buffer">Relativer Horizontpuffer</option><option value="buffer_years">Feste Pufferjahre</option></select>
+                                        </label>
+                                        <label data-active-when="longevity:quantile_shift" hidden>Quantilverschiebung <small>Baseline: <output data-stress-replay-baseline="longevityQuantileShift">—</output></small>
+                                            <input type="number" min="0" max="0.1" step="0.01" data-value-type="number" data-stress-replay-path="strategy.longevityQuantileShift" placeholder="Baseline übernehmen">
+                                        </label>
+                                        <label data-active-when="longevity:relative_horizon_buffer" hidden>Relativer Puffer als Anteil <small>Baseline: <output data-stress-replay-baseline="longevityRelativePct">—</output></small>
+                                            <input type="number" min="0" max="0.2" step="0.01" data-value-type="number" data-stress-replay-path="strategy.longevityRelativePct" placeholder="Baseline übernehmen">
+                                        </label>
+                                        <label data-active-when="longevity:buffer_years" hidden>Pufferjahre <small>Baseline: <output data-stress-replay-baseline="longevityBufferYears">—</output></small>
+                                            <input type="number" min="0" max="10" step="1" data-value-type="number" data-stress-replay-path="strategy.longevityBufferYears" placeholder="Baseline übernehmen">
+                                        </label>
+                                    </div>
+                                    <div id="stressReplayPatchPreview" class="stress-replay-patch-preview" aria-live="polite"></div>
+                                    <button type="button" id="stressReplayAddVariantButton">Als Variante berechnen</button>
+                                </fieldset>
+                            </form>
+                            <section aria-labelledby="stressReplayVariantListHeading">
+                                <h5 id="stressReplayVariantListHeading">Variantenliste</h5>
+                                <div id="stressReplayVariantList"></div>
+                            </section>
+                            <section id="stressReplayComparison" tabindex="-1" aria-label="Stresspfad-Variantenvergleich"></section>
+                        </section>
                     </section>
                     <div id="print-footer" class="print-footer"></div>
                     <div id="monteCarloResults" tabindex="-1" aria-label="Ergebnisse der Monte-Carlo-Analyse"

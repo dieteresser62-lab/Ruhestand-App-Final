@@ -966,6 +966,27 @@ async function runSimulatorSmoke(browser, baseUrl) {
         'Stress replay banner must be programmatically focusable');
     assert(await page.locator('#stressReplayImportFile').getAttribute('accept') === 'application/json,.json',
         'Stress replay import must be constrained to JSON files');
+    assert(await page.locator('#stressReplayVariantFields').isDisabled(),
+        'Variant editor stays disabled until an executable fixed path exists');
+    assert(await page.locator('#stressReplayVariantLabel').getAttribute('maxlength') === '60',
+        'Variant labels have a bounded keyboard-editable control');
+    assert(await page.locator('#stressReplayAddVariantButton').count() === 1,
+        'Variant calculation uses one native button');
+    assert(await page.locator('#stressReplayVariantEditor [data-stress-replay-path="strategy.goldAktiv"]').count() === 0
+        && await page.locator('#stressReplayVariantEditor [data-stress-replay-path="strategy.minimumFlexAnnual"]').count() === 0,
+    'Forbidden asset and minimum-flex fields are absent from the variant editor');
+    assert(await page.locator('#stressReplayVariantEditor [data-active-when="decumulation:3_bucket_jilge"]').first().isHidden(),
+        'Three-bucket-only controls start hidden when their strategy mode is inactive');
+    const replayScrollStyle = await page.evaluate(() => {
+        const probe = document.createElement('div');
+        probe.className = 'stress-replay-table-scroll';
+        document.body.appendChild(probe);
+        const overflowX = getComputedStyle(probe).overflowX;
+        probe.remove();
+        return overflowX;
+    });
+    assert(replayScrollStyle === 'auto',
+        'Stress replay comparison tables contain horizontal overflow locally');
 
     await mcRuns.fill('100001');
     await mcRuns.dispatchEvent('input');
