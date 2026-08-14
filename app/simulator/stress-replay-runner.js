@@ -21,6 +21,7 @@ import {
     buildStressReplayYearData
 } from './mc-log-builder.js';
 import { projectScenarioLogV2 } from './monte-carlo-export.js';
+import { applyStressReplayVariantV1 } from './stress-replay-variant.js';
 
 export const STRESS_REPLAY_RUNNER_VERSION = 'StressReplayRunnerV1';
 export const STRESS_REPLAY_BASELINE_VARIANT_ID = 'baseline';
@@ -162,12 +163,21 @@ function finalizeResult(result) {
     return validateStressReplayVariantResultV1(withFingerprint);
 }
 
-function technicalResult({ pathFingerprint, baselineScenarioFingerprint, variantFingerprint, error, yearIndex }) {
+function technicalResult({
+    pathFingerprint,
+    baselineScenarioFingerprint,
+    variantFingerprint,
+    variantId,
+    role,
+    warnings,
+    error,
+    yearIndex
+}) {
     return finalizeResult({
         schemaVersion: STRESS_REPLAY_SCHEMA_VERSIONS.variantResult,
         runnerVersion: STRESS_REPLAY_RUNNER_VERSION,
-        variantId: STRESS_REPLAY_BASELINE_VARIANT_ID,
-        role: 'baseline',
+        variantId,
+        role,
         pathFingerprint,
         baselineScenarioFingerprint,
         variantFingerprint,
@@ -177,7 +187,7 @@ function technicalResult({ pathFingerprint, baselineScenarioFingerprint, variant
         scenarioLog: null,
         transactions: [],
         missingness: [{ code: 'technical_error', yearIndex }],
-        warnings: [],
+        warnings,
         technicalError: normalizeTechnicalError(error, yearIndex),
         reconciliation: { matched: false, reason: 'technical_error' }
     });
@@ -191,18 +201,26 @@ export function runStressReplayPathV1({
     path,
     baselineInputs,
     sourceScenarioLog,
+    variant = null,
     engine = null,
     dependencies = {}
 }) {
     const validatedPath = validateStressReplayPathV1(path);
-    const sourceRows = normalizeSourceRows(sourceScenarioLog);
     const frozenInputFingerprint = createStressReplayFingerprint(baselineInputs);
-    const inputs = cloneValue(baselineInputs);
+    const role = variant?.role || 'baseline';
+    const variantId = variant?.id || STRESS_REPLAY_BASELINE_VARIANT_ID;
+    const warnings = cloneValue(variant?.warnings || []);
+    const variantFingerprint = variant?.variantFingerprint
+        || createStressReplayFingerprint({ role: 'baseline', patch: {} });
+    const inputs = variant
+        ? cloneValue(applyStressReplayVariantV1({ baselineInputs, variant }))
+        : cloneValue(baselineInputs);
+    const normalizedInputFingerprint = createStressReplayFingerprint(inputs);
+    const sourceRows = role === 'baseline' ? normalizeSourceRows(sourceScenarioLog) : null;
     const pathFingerprint = createStressReplayPathFingerprint(validatedPath);
     if (validatedPath.pathFingerprint && validatedPath.pathFingerprint.value !== pathFingerprint.value) {
         fail('STRESS_REPLAY_PATH_FINGERPRINT_MISMATCH', 'The stress replay path fingerprint does not match its contents.');
     }
-    const variantFingerprint = createStressReplayFingerprint({ role: 'baseline', patch: {} });
     const initialize = dependencies.initMcRunState || initMcRunState;
     const runYear = dependencies.simulateOneYear || simulateOneYear;
     let state;
@@ -210,7 +228,16 @@ export function runStressReplayPathV1({
         state = initialize(inputs, validatedPath.source.startYearIndex);
         state.marketDataHist = cloneValue(validatedPath.initialMarketDataHist[0]);
     } catch (error) {
-        return technicalResult({ pathFingerprint, baselineScenarioFingerprint: frozenInputFingerprint, variantFingerprint, error, yearIndex: 0 });
+        return technicalResult({
+            pathFingerprint,
+            baselineScenarioFingerprint: frozenInputFingerprint,
+            variantFingerprint,
+            variantId,
+            role,
+            warnings,
+            error,
+            yearIndex: 0
+        });
     }
 
     const initialValue = portfolioTotal(state.portfolio);
@@ -305,7 +332,16 @@ export function runStressReplayPathV1({
                 engine
             );
         } catch (error) {
-            return technicalResult({ pathFingerprint, baselineScenarioFingerprint: frozenInputFingerprint, variantFingerprint, error, yearIndex: record.yearIndex });
+            return technicalResult({
+                pathFingerprint,
+                baselineScenarioFingerprint: frozenInputFingerprint,
+                variantFingerprint,
+                variantId,
+                role,
+                warnings,
+                error,
+                yearIndex: record.yearIndex
+            });
         }
         const flagsConflict = (result?.kind === 'success' && result?.isRuin === true)
             || (result?.kind === 'ruin' && result?.isRuin === false);
@@ -313,7 +349,16 @@ export function runStressReplayPathV1({
             const error = flagsConflict
                 ? { code: 'MC_TERMINAL_FLAGS_CONFLICT', message: 'The year adapter returned conflicting terminal flags.' }
                 : result?.error || result;
-            return technicalResult({ pathFingerprint, baselineScenarioFingerprint: frozenInputFingerprint, variantFingerprint, error, yearIndex: record.yearIndex });
+            return technicalResult({
+                pathFingerprint,
+                baselineScenarioFingerprint: frozenInputFingerprint,
+                variantFingerprint,
+                variantId,
+                role,
+                warnings,
+                error,
+                yearIndex: record.yearIndex
+            });
         }
         if (result?.kind === 'ruin' || result?.isRuin === true) {
             logRows.push(buildStressReplayLogRow({ record, result, inputs }));
@@ -334,6 +379,9 @@ export function runStressReplayPathV1({
                 pathFingerprint,
                 baselineScenarioFingerprint: frozenInputFingerprint,
                 variantFingerprint,
+                variantId,
+                role,
+                warnings,
                 error: { code: 'SIMULATOR_RESULT_SHAPE_INVALID', message: 'The year adapter returned an invalid result shape.' },
                 yearIndex: record.yearIndex
             });
@@ -362,16 +410,22 @@ export function runStressReplayPathV1({
     }
 
     terminalStatus ??= 'horizon_exhausted';
-    if (terminalStatus !== validatedPath.terminalStatus) {
+    if (role === 'baseline' && terminalStatus !== validatedPath.terminalStatus) {
         fail('STRESS_REPLAY_BASELINE_RECONCILIATION_FAILED', 'Baseline terminal status differs from the source path.', {
             expected: validatedPath.terminalStatus,
             actual: terminalStatus
         });
     }
-    const reconciliation = reconcileRows(logRows, sourceRows, validatedPath);
+    const reconciliation = role === 'baseline'
+        ? reconcileRows(logRows, sourceRows, validatedPath)
+        : { matched: false, reason: 'alternative_not_source_reconciled' };
     const inputFingerprintAfter = createStressReplayFingerprint(baselineInputs);
     if (inputFingerprintAfter.value !== frozenInputFingerprint.value) {
         fail('STRESS_REPLAY_BASELINE_INPUT_MUTATED', 'Baseline inputs changed during replay.');
+    }
+    const normalizedInputFingerprintAfter = createStressReplayFingerprint(inputs);
+    if (normalizedInputFingerprintAfter.value !== normalizedInputFingerprint.value) {
+        fail('STRESS_REPLAY_VARIANT_INPUT_MUTATED', 'Normalized variant inputs changed during replay.');
     }
     const finalValueNominalEur = terminalStatus === 'ruin' ? 0 : portfolioTotal(state.portfolio);
     const finalValueRealEur = terminalStatus === 'ruin'
@@ -380,8 +434,8 @@ export function runStressReplayPathV1({
     return finalizeResult({
         schemaVersion: STRESS_REPLAY_SCHEMA_VERSIONS.variantResult,
         runnerVersion: STRESS_REPLAY_RUNNER_VERSION,
-        variantId: STRESS_REPLAY_BASELINE_VARIANT_ID,
-        role: 'baseline',
+        variantId,
+        role,
         pathFingerprint,
         baselineScenarioFingerprint: frozenInputFingerprint,
         variantFingerprint,
@@ -400,13 +454,20 @@ export function runStressReplayPathV1({
         scenarioLog: projectScenarioLogV2(logRows),
         transactions: [],
         missingness: [],
-        warnings: [],
+        warnings,
         technicalError: null,
         reconciliation
     });
 }
 
 export const runStressReplayBaselineV1 = runStressReplayPathV1;
+
+export function runStressReplayVariantV1(options) {
+    if (!options?.variant || options.variant.role !== 'alternative') {
+        fail('STRESS_REPLAY_VARIANT_REQUIRED', 'runStressReplayVariantV1 requires an alternative variant');
+    }
+    return runStressReplayPathV1(options);
+}
 
 export function isStressReplayContractFailure(error) {
     return error instanceof StressReplayContractError || error instanceof StressReplayRunnerError;

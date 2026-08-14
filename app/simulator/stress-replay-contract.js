@@ -23,6 +23,21 @@ export const STRESS_REPLAY_SCHEMA_VERSIONS = Object.freeze({
 });
 
 export const STRESS_REPLAY_CONTRACT_VERSION = 'stress-replay-contract-v1';
+export const STRESS_REPLAY_VARIANT_WHITELIST_VERSION = 'StressReplayVariantWhitelistV1';
+export const STRESS_REPLAY_VARIANT_CONTRACT_KEYS_V1 = Object.freeze([
+    'schemaVersion',
+    'contractVersion',
+    'whitelistVersion',
+    'id',
+    'role',
+    'label',
+    'baselineScenarioFingerprint',
+    'patch',
+    'normalizedInputFingerprint',
+    'materialChangeGroups',
+    'warnings',
+    'variantFingerprint'
+]);
 export const STRESS_REPLAY_FINGERPRINT_ALGORITHM = 'sha256-canonical-json-v1';
 export const STRESS_REPLAY_SCOPE = 'single-materialized-monte-carlo-path';
 export const STRESS_REPLAY_LIMITS = Object.freeze({
@@ -473,6 +488,108 @@ export function createStressReplayPathFingerprint(path) {
     const { pathFingerprint: _pathFingerprint, ...fingerprintBasis } = path;
     return createStressReplayFingerprint(fingerprintBasis);
 }
+
+export function createStressReplayVariantFingerprint(variant) {
+    requirePlainObject(variant, 'variant');
+    const fingerprintBasis = Object.fromEntries(
+        STRESS_REPLAY_VARIANT_CONTRACT_KEYS_V1
+            .filter(key => key !== 'label' && key !== 'variantFingerprint')
+            .filter(key => Object.hasOwn(variant, key))
+            .map(key => [key, variant[key]])
+    );
+    return createStressReplayFingerprint(fingerprintBasis);
+}
+
+export function validateStressReplayVariantV1(variant) {
+    requirePlainObject(variant, 'variant');
+    const allowedKeys = new Set(STRESS_REPLAY_VARIANT_CONTRACT_KEYS_V1);
+    const unknownKeys = Object.keys(variant).filter(key => !allowedKeys.has(key)).sort();
+    if (unknownKeys.length > 0) {
+        fail('STRESS_REPLAY_CONTRACT_INVALID', 'Variant contains unknown contract fields', {
+            fields: unknownKeys
+        });
+    }
+    if (variant.schemaVersion !== STRESS_REPLAY_SCHEMA_VERSIONS.variant
+        || variant.contractVersion !== STRESS_REPLAY_CONTRACT_VERSION
+        || variant.whitelistVersion !== STRESS_REPLAY_VARIANT_WHITELIST_VERSION) {
+        fail('STRESS_REPLAY_VERSION_UNSUPPORTED', 'Unsupported stress replay variant contract', {
+            schemaVersion: variant.schemaVersion,
+            contractVersion: variant.contractVersion,
+            whitelistVersion: variant.whitelistVersion
+        });
+    }
+    requireString(variant.id, 'variant.id');
+    requireString(variant.label, 'variant.label');
+    if (variant.role !== 'baseline' && variant.role !== 'alternative') {
+        fail('STRESS_REPLAY_CONTRACT_INVALID', 'variant.role must be baseline or alternative', {
+            path: 'variant.role',
+            role: variant.role
+        });
+    }
+    if ((variant.role === 'baseline' && variant.id !== 'baseline')
+        || (variant.role === 'alternative' && variant.id === 'baseline')) {
+        fail('STRESS_REPLAY_CONTRACT_INVALID', 'The baseline id is reserved for the baseline variant', {
+            path: 'variant.id'
+        });
+    }
+    validateFingerprint(variant.baselineScenarioFingerprint, 'variant.baselineScenarioFingerprint');
+    validateFingerprint(variant.normalizedInputFingerprint, 'variant.normalizedInputFingerprint');
+    validateFingerprint(variant.variantFingerprint, 'variant.variantFingerprint');
+    const expectedVariantFingerprint = createStressReplayVariantFingerprint(variant);
+    if (expectedVariantFingerprint.value !== variant.variantFingerprint.value) {
+        fail('STRESS_REPLAY_VARIANT_FINGERPRINT_MISMATCH', 'Variant fingerprint does not match its contents');
+    }
+    const normalizedPatch = normalizeStressReplayVariantPatch(variant.patch);
+    if (canonicalizeHistoricalContractValue(normalizedPatch)
+        !== canonicalizeHistoricalContractValue(variant.patch)) {
+        fail('STRESS_REPLAY_CONTRACT_INVALID', 'Variant patch must already be canonically normalized', {
+            path: 'variant.patch'
+        });
+    }
+    const patchLeaves = flattenLeaves(normalizedPatch);
+    if (variant.role === 'baseline' && patchLeaves.length !== 0) {
+        fail('STRESS_REPLAY_CONTRACT_INVALID', 'The baseline variant must have an empty patch', {
+            path: 'variant.patch'
+        });
+    }
+    if (variant.role === 'alternative' && patchLeaves.length === 0) {
+        fail('STRESS_REPLAY_VARIANT_NO_OP', 'An alternative variant must contain a material change');
+    }
+    if (!Array.isArray(variant.materialChangeGroups) || !Array.isArray(variant.warnings)) {
+        fail('STRESS_REPLAY_CONTRACT_INVALID', 'Variant diagnostics must be arrays');
+    }
+    const expectedGroups = [...new Set(patchLeaves.map(([path]) => {
+        if (path.startsWith('strategy.decumulation.')) return 'decumulation';
+        if (path === 'strategy.longevityMode' || path.startsWith('strategy.longevity')) return 'longevity';
+        return path.replace(/^strategy\./, '');
+    }))].sort();
+    if (canonicalizeHistoricalContractValue(variant.materialChangeGroups)
+        !== canonicalizeHistoricalContractValue(expectedGroups)) {
+        fail('STRESS_REPLAY_CONTRACT_INVALID', 'Variant material-change groups do not match its patch');
+    }
+    const expectedWarnings = expectedGroups.length > 1
+        ? [{
+            code: 'STRESS_REPLAY_MULTI_FACTOR_VARIANT',
+            factorCount: expectedGroups.length,
+            factorGroups: expectedGroups
+        }]
+        : [];
+    if (canonicalizeHistoricalContractValue(variant.warnings)
+        !== canonicalizeHistoricalContractValue(expectedWarnings)) {
+        fail('STRESS_REPLAY_CONTRACT_INVALID', 'Variant warnings do not match its material changes');
+    }
+    if (variant.role === 'baseline' && variant.materialChangeGroups.length !== 0) {
+        fail('STRESS_REPLAY_CONTRACT_INVALID', 'The baseline variant must not report material changes');
+    }
+    if (variant.role === 'baseline'
+        && variant.normalizedInputFingerprint.value !== variant.baselineScenarioFingerprint.value) {
+        fail('STRESS_REPLAY_CONTRACT_INVALID', 'Baseline normalized inputs must match the baseline scenario');
+    }
+    assertStressReplayFinite(variant, 'variant');
+    return deepFreeze(cloneValue({ ...variant, patch: normalizedPatch }));
+}
+
+export const assertStressReplayVariantV1 = validateStressReplayVariantV1;
 
 export function validateStressReplayVariantResultV1(result) {
     requirePlainObject(result, 'result');
