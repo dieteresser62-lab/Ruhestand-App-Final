@@ -99,6 +99,44 @@ export function createMonteCarloLifeState(inputs, rand, widowOptions = null) {
     };
 }
 
+function cloneCareMeta(value) {
+    return value == null ? null : JSON.parse(JSON.stringify(value));
+}
+
+/**
+ * Rehydrates the exogenous household state after source ruin. Random streams
+ * are derived from the separately seeded shadow generator, not forked from the
+ * already consumed source-run generator.
+ */
+export function createMonteCarloPostRuinLifeState(inputs, shadowRand, {
+    widowOptions = null,
+    p1Alive = true,
+    p2Alive = inputs?.partner?.aktiv === true,
+    careMetaP1 = null,
+    careMetaP2 = null,
+    p1CareYears = 0,
+    p2CareYears = 0,
+    bothCareYears = 0,
+    triggeredAgeP2 = null,
+    widowBenefitActiveForP1 = false,
+    widowBenefitActiveForP2 = false
+} = {}) {
+    const state = createMonteCarloLifeState(inputs, shadowRand, widowOptions);
+    state.careMetaP1 = cloneCareMeta(careMetaP1) ?? state.careMetaP1;
+    state.careMetaP2 = cloneCareMeta(careMetaP2) ?? state.careMetaP2;
+    state.p1Alive = p1Alive === true;
+    state.p2Alive = state.hasPartner && p2Alive === true;
+    state.p1CareYears = Number(p1CareYears) || 0;
+    state.p2CareYears = Number(p2CareYears) || 0;
+    state.bothCareYears = Number(bothCareYears) || 0;
+    state.triggeredAgeP2 = Number.isFinite(triggeredAgeP2) ? triggeredAgeP2 : null;
+    state.widowBenefitActiveForP1 = widowBenefitActiveForP1 === true;
+    state.widowBenefitActiveForP2 = widowBenefitActiveForP2 === true;
+    state.householdContext.p1Alive = state.p1Alive;
+    state.householdContext.p2Alive = state.p2Alive;
+    return state;
+}
+
 export function updateMonteCarloLifeEventsForYear(
     lifeState,
     inputs,

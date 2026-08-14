@@ -21,8 +21,10 @@ import { createMonteCarloRunContext } from './mc-run-context.js';
 import { normalizeMonteCarloParametersV1 } from './monte-carlo-parameters.js';
 import {
     assertSimulatorHorizonAgeContract,
+    createMonteCarloPostRuinLifeState,
     createMonteCarloLifeState,
-    resolveSimulatorMortalityProbability
+    resolveSimulatorMortalityProbability,
+    updateMonteCarloLifeEventsForYear
 } from './mc-life-events.js';
 import { applyTailRiskOverlay, createTailRiskSchedule } from './tail-risk-overlay.js';
 import {
@@ -67,12 +69,119 @@ import {
     resolveMonteCarloTerminalOutcomeV1
 } from './monte-carlo-chunk-result.js';
 import { GERMAN_DEMOGRAPHY_CARE_SURVIVOR_CONTRACT } from './german-demography-care-survivor-contract.js';
+import {
+    STRESS_REPLAY_CAPTURE_VERSION,
+    STRESS_REPLAY_POST_RUIN_POLICY_VERSION,
+    STRESS_REPLAY_SHADOW_DOMAIN,
+    deriveStressReplayShadowSeed
+} from './stress-replay-path-materializer.js';
+import { buildNextMarketDataHist } from './simulator-year-portfolio.js';
 
 export { MC_HEATMAP_BINS, pickWorstRun, createMonteCarloBuffers, buildMonteCarloAggregates };
 export { buildStartYearCdf, pickStartYearIndex } from './mc-year-sampling.js';
 
 const MAX_TECHNICAL_ERROR_SAMPLES = 20;
 export const MONTE_CARLO_HOUSEHOLD_LIFE_CONTRACT_VERSION = 'MonteCarloHouseholdLifeContractV2';
+
+function cloneReplayValue(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+}
+
+function throwIfMonteCarloAborted(signal) {
+    if (!signal?.aborted) return;
+    if (signal.reason instanceof Error) throw signal.reason;
+    const error = new Error('Monte Carlo run was cancelled.');
+    error.code = 'MC_RUN_CANCELLED';
+    throw error;
+}
+
+function createReplayHouseholdEvent({
+    p1Alive,
+    p2Alive,
+    hasPartner,
+    careMetaP1,
+    careMetaP2,
+    p1ActiveThisYear,
+    p2ActiveThisYear,
+    effectiveFlexFactor,
+    totalCareFloor,
+    widowBenefitActiveForP1,
+    widowBenefitActiveForP2,
+    effectiveTransitionYear
+}) {
+    return {
+        type: 'household_state',
+        p1Alive: p1Alive ? 1 : 0,
+        p2Alive: hasPartner ? (p2Alive ? 1 : 0) : null,
+        p1CareActive: p1ActiveThisYear === true,
+        p2CareActive: p2ActiveThisYear === true,
+        careMetaP1: cloneReplayValue(careMetaP1),
+        careMetaP2: cloneReplayValue(careMetaP2),
+        effectiveFlexFactor: Number(effectiveFlexFactor) || 0,
+        totalCareFloorEur: Number(totalCareFloor) || 0,
+        widowBenefitActiveForP1: widowBenefitActiveForP1 === true,
+        widowBenefitActiveForP2: widowBenefitActiveForP2 === true,
+        effectiveTransitionYear
+    };
+}
+
+function createReplayStressEvents(beforeStress, afterStress, stressCtx, stressPreset) {
+    const changed = beforeStress?.rendite !== afterStress?.rendite
+        || beforeStress?.inflation !== afterStress?.inflation
+        || beforeStress?.gold_eur_perf !== afterStress?.gold_eur_perf;
+    if (!changed) return [];
+    return [{
+        type: 'stress_override',
+        preset: String(stressPreset || 'NONE'),
+        equityReturnBeforePct: Number(beforeStress.rendite) * 100,
+        equityReturnAfterPct: Number(afterStress.rendite) * 100,
+        inflationBeforePct: Number(beforeStress.inflation),
+        inflationAfterPct: Number(afterStress.inflation),
+        goldReturnBeforePct: Number(beforeStress.gold_eur_perf),
+        goldReturnAfterPct: Number(afterStress.gold_eur_perf),
+        remainingYearsAfter: Number(stressCtx?.remainingYears) || 0
+    }];
+}
+
+function createReplayAnnualRecord({
+    yearIndex,
+    yearData,
+    recordType,
+    stressEvents,
+    tailRiskOverlay,
+    householdEvent,
+    continuation = false
+}) {
+    const financiallyEvaluable = recordType === 'financial_year';
+    const record = {
+        yearIndex,
+        recordType,
+        financiallyEvaluable,
+        historicalYear: Number.isFinite(Number(yearData?.jahr)) ? Number(yearData.jahr) : null,
+        stressEvents: cloneReplayValue(stressEvents || []),
+        tailRiskEvents: tailRiskOverlay?.tailRiskActive === true ? [cloneReplayValue(tailRiskOverlay)] : [],
+        householdEvents: householdEvent ? [cloneReplayValue(householdEvent)] : [],
+        continuation
+    };
+    // A terminal ruin row does not expose returns in ScenarioLogExportV2 and
+    // therefore does not reconcile them. The opt-in runner capture observed
+    // the effective data directly, however, and must retain it so a variant
+    // that survives the same started financial year can be evaluated.
+    if (financiallyEvaluable || recordType === 'terminal_ruin') {
+        Object.assign(record, {
+            equityReturnPct: Number(yearData.rendite) * 100,
+            goldReturnPct: Number(yearData.gold_eur_perf),
+            cashReturnPct: Number(yearData.zinssatz),
+            inflationPct: Number(yearData.inflation),
+            wageGrowthPct: Number(yearData.lohn),
+            capeRatio: Number(yearData.capeRatio),
+            regime: String(yearData.regime || 'UNKNOWN')
+        });
+    } else if (Number.isFinite(Number(yearData?.inflation))) {
+        record.inflationPct = Number(yearData.inflation);
+    }
+    return record;
+}
 
 function createMonteCarloHouseholdLifeContractV2() {
     return {
@@ -327,8 +436,11 @@ export async function runMonteCarloChunk({
     runRange = null,
     onProgress = () => { },
     logIndices = null,
+    stressReplayCapture = null,
+    signal = null,
     engine = null
 }) {
+    throwIfMonteCarloAborted(signal);
     onProgress(0);
 
     const normalizedParameters = normalizeMonteCarloParametersV1(monteCarloParams, {
@@ -357,6 +469,7 @@ export async function runMonteCarloChunk({
         excludeEstimatedHistory,
         runStart,
         runCount,
+        resolvedRngMode,
         legacyRand,
         stressCtxMaster,
         buffers,
@@ -425,9 +538,26 @@ export async function runMonteCarloChunk({
         horizon_exhausted: 0
     };
     const heatmap = Array(10).fill(0).map(() => new Uint32Array(MC_HEATMAP_BINS.length - 1));
+    if (stressReplayCapture !== null
+        && (stressReplayCapture?.schemaVersion !== STRESS_REPLAY_CAPTURE_VERSION
+            || !Array.isArray(stressReplayCapture.runIndices))) {
+        const error = new Error('Stress replay capture request is invalid.');
+        error.code = 'STRESS_REPLAY_CAPTURE_REQUEST_INVALID';
+        throw error;
+    }
+    const replayCaptureIndexSet = stressReplayCapture === null
+        ? null
+        : new Set(stressReplayCapture.runIndices);
+    if (replayCaptureIndexSet && resolvedRngMode !== 'per-run-seed') {
+        const error = new Error('Stress replay capture requires per-run-seed RNG mode.');
+        error.code = 'STRESS_REPLAY_SOURCE_UNSUPPORTED';
+        throw error;
+    }
+    const replayCapturesByIndex = new Map();
     let lastProgressPct = -1;
 
     for (let i = 0; i < runCount; i++) {
+        throwIfMonteCarloAborted(signal);
         if (i % progressUpdateInterval === 0) {
             const pct = Math.floor((i / runCount) * 90);
             if (pct > lastProgressPct) {
@@ -437,6 +567,7 @@ export async function runMonteCarloChunk({
             }
         }
         const runIdx = runStart + i;
+        const shouldCaptureReplay = replayCaptureIndexSet?.has(runIdx) === true;
         let failed = false, totalTaxesThisRun = 0, totalTaxSavedByLossCarryThisRun = 0, kpiJahreMitKuerzungDieserLauf = 0, kpiMaxKuerzungDieserLauf = 0;
         let cutYearsNumeratorThisRun = 0;
         let cutDecisionYearsThisRun = 0;
@@ -475,6 +606,28 @@ export async function runMonteCarloChunk({
             samplingResolution,
             annualData
         });
+        const replayCapture = shouldCaptureReplay ? {
+            schemaVersion: STRESS_REPLAY_CAPTURE_VERSION,
+            seed: seed >>> 0,
+            runSeed,
+            rngMode: resolvedRngMode,
+            absoluteRunIndex: runIdx,
+            horizonYears: maxDauer,
+            startYearIndex,
+            breakOnRuin: BREAK_ON_RUIN,
+            initialMarketDataHist: cloneReplayValue(simState.marketDataHist),
+            years: [],
+            sourcePrefixLength: 0,
+            terminalStatus: null,
+            continuation: {
+                schemaVersion: STRESS_REPLAY_POST_RUIN_POLICY_VERSION,
+                active: false,
+                domain: STRESS_REPLAY_SHADOW_DOMAIN,
+                shadowSeed: null,
+                startsAtYearIndex: null,
+                careInflationPolicy: 'captured-effective-year-data-v1'
+            }
+        } : null;
 
         const initialPortfolioTotal = portfolioTotal(simState.portfolio);
         const depotWertHistorie = [initialPortfolioTotal];
@@ -525,6 +678,7 @@ export async function runMonteCarloChunk({
         let healthBucketInterestThisRun = 0;
 
         for (let simulationsJahr = 0; simulationsJahr < maxDauer; simulationsJahr++) {
+            throwIfMonteCarloAborted(signal);
             lebensdauer = simulationsJahr + 1;
 
             const conditionalStressActive = shouldUseStressBootstrap(stressCtx);
@@ -545,7 +699,11 @@ export async function runMonteCarloChunk({
                 source: samplingStep.source,
                 stationaryRestartReason: samplingStep.stationaryRestartReason
             });
+            const yearDataBeforeStress = cloneReplayValue(yearData);
             yearData = applyStressOverride(yearData, stressCtx, rand);
+            const replayStressEvents = replayCapture
+                ? createReplayStressEvents(yearDataBeforeStress, yearData, stressCtx, inputs?.stressPreset)
+                : null;
             const tailRiskOverlay = applyTailRiskOverlay(yearData, tailRiskSchedule[simulationsJahr] ?? null, {
                 runIdx,
                 simulationsJahr,
@@ -657,7 +815,35 @@ export async function runMonteCarloChunk({
                 p2: careMetaP2
             };
 
-            if (runEndedBecauseAllDied) break;
+            const replayHouseholdEvent = replayCapture ? createReplayHouseholdEvent({
+                p1Alive,
+                p2Alive,
+                hasPartner,
+                careMetaP1,
+                careMetaP2,
+                p1ActiveThisYear,
+                p2ActiveThisYear,
+                effectiveFlexFactor,
+                totalCareFloor,
+                widowBenefitActiveForP1,
+                widowBenefitActiveForP2,
+                effectiveTransitionYear
+            }) : null;
+
+            if (runEndedBecauseAllDied) {
+                if (replayCapture) {
+                    replayCapture.years.push(createReplayAnnualRecord({
+                        yearIndex: simulationsJahr,
+                        yearData,
+                        recordType: 'terminal_death',
+                        stressEvents: replayStressEvents,
+                        tailRiskOverlay,
+                        householdEvent: replayHouseholdEvent
+                    }));
+                    replayCapture.sourcePrefixLength = replayCapture.years.length;
+                }
+                break;
+            }
 
             // Measure the exact modelled care addition passed to the engine.
             // It is a need, not an attributable depot cash flow. Real values use
@@ -768,6 +954,17 @@ export async function runMonteCarloChunk({
                     lifeLogContext,
                     tailRiskOverlay
                 }));
+                if (replayCapture) {
+                    replayCapture.years.push(createReplayAnnualRecord({
+                        yearIndex: simulationsJahr,
+                        yearData,
+                        recordType: 'terminal_ruin',
+                        stressEvents: replayStressEvents,
+                        tailRiskOverlay,
+                        householdEvent: replayHouseholdEvent
+                    }));
+                    replayCapture.sourcePrefixLength = replayCapture.years.length;
+                }
                 if (BREAK_ON_RUIN) break;
             } else if ((result?.kind === undefined || result.kind === 'success')
                 && result?.newState?.portfolio
@@ -867,13 +1064,31 @@ export async function runMonteCarloChunk({
                     lifeLogContext,
                     tailRiskOverlay
                 }));
+                if (replayCapture) {
+                    replayCapture.years.push(createReplayAnnualRecord({
+                        yearIndex: simulationsJahr,
+                        yearData,
+                        recordType: 'financial_year',
+                        stressEvents: replayStressEvents,
+                        tailRiskOverlay,
+                        householdEvent: replayHouseholdEvent
+                    }));
+                    replayCapture.sourcePrefixLength = replayCapture.years.length;
+                }
             } else {
                 technicalPathError = normalizeTechnicalPathError(result, runIdx, simulationsJahr);
                 break;
             }
         }
 
-        if (failed && BREAK_ON_RUIN && !technicalPathError) {
+        const endedEarlyBecauseOfRuin = failed && BREAK_ON_RUIN && !technicalPathError;
+        const shouldCapturePostRuinContinuation = Boolean(
+            replayCapture
+            && endedEarlyBecauseOfRuin
+            && replayCapture.years.length < maxDauer
+        );
+
+        if (endedEarlyBecauseOfRuin) {
             appendPostRuinZeroWithdrawals({
                 inputs,
                 startSimulationYear: lebensdauer,
@@ -889,6 +1104,127 @@ export async function runMonteCarloChunk({
                 realWithdrawals: realWithdrawalsThisRun,
                 stressTracker
             });
+        }
+
+        if (shouldCapturePostRuinContinuation) {
+            const shadowSeed = deriveStressReplayShadowSeed({
+                seed: seed >>> 0,
+                absoluteRunIndex: runIdx
+            });
+            const shadowRand = rng(shadowSeed);
+            const shadowTailRiskSchedule = createTailRiskSchedule(shadowSeed, inputs, maxDauer).schedule;
+            const shadowLifeState = createMonteCarloPostRuinLifeState(inputs, shadowRand, {
+                widowOptions,
+                p1Alive,
+                p2Alive,
+                careMetaP1,
+                careMetaP2,
+                p1CareYears,
+                p2CareYears,
+                bothCareYears,
+                triggeredAgeP2,
+                widowBenefitActiveForP1,
+                widowBenefitActiveForP2
+            });
+            const shadowStressCtx = cloneStressContext(stressCtx);
+            let shadowTriggeredAge = triggeredAge;
+            let shadowCareEverActive = careEverActive;
+            let shadowEffectiveTransitionYear = effectiveTransitionYear;
+            replayCapture.continuation = {
+                ...replayCapture.continuation,
+                active: true,
+                shadowSeed,
+                startsAtYearIndex: replayCapture.years.length
+            };
+
+            for (let shadowYearIndex = replayCapture.years.length; shadowYearIndex < maxDauer; shadowYearIndex++) {
+                throwIfMonteCarloAborted(signal);
+                const conditionalStressActive = shouldUseStressBootstrap(shadowStressCtx);
+                const samplingStep = sampleMonteCarloYearV1({
+                    state: simState,
+                    method: methode,
+                    blockSize,
+                    rand: shadowRand,
+                    stressContext: shadowStressCtx,
+                    conditionalStressActive,
+                    samplingResolution,
+                    annualData,
+                    sampleNextYearData
+                });
+                const beforeStress = cloneReplayValue(samplingStep.yearData);
+                let shadowYearData = applyStressOverride(samplingStep.yearData, shadowStressCtx, shadowRand);
+                const shadowStressEvents = createReplayStressEvents(
+                    beforeStress,
+                    shadowYearData,
+                    shadowStressCtx,
+                    inputs?.stressPreset
+                );
+                const shadowTailRiskOverlay = applyTailRiskOverlay(
+                    shadowYearData,
+                    shadowTailRiskSchedule[shadowYearIndex] ?? null,
+                    {
+                        runIdx,
+                        simulationsJahr: shadowYearIndex,
+                        methode,
+                        stressPreset: inputs?.stressPreset
+                    }
+                );
+                shadowYearData = shadowTailRiskOverlay.yearData;
+                const resolvedCapeRatio = resolveMonteCarloCape(
+                    shadowYearData,
+                    inputs,
+                    simState.marketDataHist
+                );
+                shadowYearData.capeRatio = resolvedCapeRatio;
+
+                const shadowLifeYear = updateMonteCarloLifeEventsForYear(
+                    shadowLifeState,
+                    inputs,
+                    widowOptions,
+                    shadowYearIndex,
+                    shadowYearData,
+                    shadowEffectiveTransitionYear,
+                    shadowTriggeredAge,
+                    shadowCareEverActive,
+                    shadowRand
+                );
+                shadowEffectiveTransitionYear = shadowLifeYear.effectiveTransitionYear;
+                shadowTriggeredAge = shadowLifeYear.triggeredAge;
+                shadowCareEverActive = shadowLifeYear.careEverActive;
+                const shadowHouseholdEvent = createReplayHouseholdEvent({
+                    p1Alive: shadowLifeState.p1Alive,
+                    p2Alive: shadowLifeState.p2Alive,
+                    hasPartner: shadowLifeState.hasPartner,
+                    careMetaP1: shadowLifeState.careMetaP1,
+                    careMetaP2: shadowLifeState.careMetaP2,
+                    p1ActiveThisYear: shadowLifeState.p1ActiveThisYear,
+                    p2ActiveThisYear: shadowLifeState.p2ActiveThisYear,
+                    effectiveFlexFactor: shadowLifeYear.effectiveFlexFactor,
+                    totalCareFloor: shadowLifeYear.totalCareFloor,
+                    widowBenefitActiveForP1: shadowLifeState.widowBenefitActiveForP1,
+                    widowBenefitActiveForP2: shadowLifeState.widowBenefitActiveForP2,
+                    effectiveTransitionYear: shadowEffectiveTransitionYear
+                });
+                const recordType = shadowLifeState.runEndedBecauseAllDied
+                    ? 'terminal_death'
+                    : 'financial_year';
+                replayCapture.years.push(createReplayAnnualRecord({
+                    yearIndex: shadowYearIndex,
+                    yearData: shadowYearData,
+                    recordType,
+                    stressEvents: shadowStressEvents,
+                    tailRiskOverlay: shadowTailRiskOverlay,
+                    householdEvent: shadowHouseholdEvent,
+                    continuation: true
+                }));
+                if (shadowLifeState.runEndedBecauseAllDied) break;
+                simState.marketDataHist = buildNextMarketDataHist({
+                    marketDataHist: simState.marketDataHist,
+                    yearData: shadowYearData,
+                    rA: Number(shadowYearData.rendite),
+                    resolvedCapeRatio
+                });
+            }
         }
 
         if (technicalPathError) {
@@ -936,6 +1272,11 @@ export async function runMonteCarloChunk({
                 technicalError: true
             });
             continue;
+        }
+
+        if (replayCapture) {
+            replayCapture.terminalStatus = terminalResolution.outcomeCode;
+            replayCapturesByIndex.set(runIdx, replayCapture);
         }
 
         technicalInventory.financiallyEvaluable++;
@@ -1074,6 +1415,11 @@ export async function runMonteCarloChunk({
     }
 
     const finalizedMetrics = finalizeMonteCarloRunMetrics(runMetrics);
+    for (const meta of finalizedMetrics.runMeta) {
+        if (replayCapturesByIndex.has(meta.index)) {
+            meta.stressReplayCapture = replayCapturesByIndex.get(meta.index);
+        }
+    }
     finalizedMetrics.totals.outcomeRuinCount = outcomeCounts.ruin;
     finalizedMetrics.totals.outcomeAllDeadCount = outcomeCounts.all_dead;
     finalizedMetrics.totals.outcomeHorizonExhaustedCount = outcomeCounts.horizon_exhausted;

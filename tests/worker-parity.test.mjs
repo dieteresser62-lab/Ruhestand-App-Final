@@ -3,7 +3,9 @@ import { CONFIG } from '../engine/config.mjs';
 import { compileScenario, prepareHistoricalDataOnce } from '../app/simulator/simulator-engine-helpers.js';
 import { annualData } from '../app/simulator/simulator-data.js';
 import { createMonteCarloBuffers, MC_HEATMAP_BINS, pickWorstRun, runMonteCarloChunk, buildMonteCarloAggregates } from '../app/simulator/monte-carlo-runner.js';
+import { MONTE_CARLO_OUTCOME_CODE } from '../app/simulator/monte-carlo-chunk-result.js';
 import { runSweepChunk } from '../app/simulator/sweep-runner.js';
+import { createStressReplayCaptureRequest } from '../app/simulator/stress-replay-path-materializer.js';
 
 // Engine API is expected to live on window in browser-mode code.
 if (typeof global.window === 'undefined') {
@@ -1399,3 +1401,96 @@ try {
 }
 
 console.log('--- Worker Parity Tests Completed ---');
+
+console.log('Test: opt-in stress replay capture leaves normal MC financial outputs unchanged');
+{
+    const monteCarloParams = {
+        anzahl: 1,
+        maxDauer: 6,
+        blockSize: 3,
+        seed: 91234,
+        methode: 'block',
+        rngMode: 'per-run-seed'
+    };
+    const common = {
+        inputs: baseInputs,
+        monteCarloParams,
+        widowOptions,
+        useCapeSampling: false,
+        runRange: { start: 0, count: 1 },
+        logIndices: [0],
+        engine: EngineAPI
+    };
+    const normal = await runMonteCarloChunk(common);
+    const captured = await runMonteCarloChunk({
+        ...common,
+        stressReplayCapture: createStressReplayCaptureRequest([0])
+    });
+    assertEqual(
+        JSON.stringify(captured.buffers.finalOutcomes),
+        JSON.stringify(normal.buffers.finalOutcomes),
+        'Capture must not change terminal wealth'
+    );
+    assertEqual(
+        JSON.stringify(captured.pathSummaries),
+        JSON.stringify(normal.pathSummaries),
+        'Capture must not change path summary metrics'
+    );
+    assertEqual(
+        JSON.stringify(captured.runMeta[0].logDataRows),
+        JSON.stringify(normal.runMeta[0].logDataRows),
+        'Capture must not change source log rows'
+    );
+    const survivingCapture = captured.runMeta[0].stressReplayCapture;
+    const survivingYearIndices = survivingCapture?.years?.map(year => year.yearIndex) || [];
+    console.log('Stress replay surviving capture trace:', JSON.stringify({
+        continuationActive: survivingCapture?.continuation?.active,
+        yearIndices: survivingYearIndices
+    }));
+    assertEqual(
+        survivingCapture?.terminalStatus,
+        MONTE_CARLO_OUTCOME_CODE.HORIZON_EXHAUSTED,
+        'Surviving fixture must exhaust the configured horizon'
+    );
+    assertEqual(survivingCapture?.continuation?.active, false, 'Surviving capture must not activate shadow continuation');
+    assertEqual(survivingCapture?.years?.length, monteCarloParams.maxDauer, 'Surviving capture must cover the full horizon');
+    assertEqual(
+        JSON.stringify(survivingYearIndices),
+        JSON.stringify([...Array(monteCarloParams.maxDauer).keys()]),
+        'Surviving capture year indices must be strictly increasing without duplicates'
+    );
+    assert(!Object.hasOwn(normal.runMeta[0], 'stressReplayCapture'), 'Normal run must not allocate replay capture output');
+
+    const ruinInputs = {
+        ...baseInputs,
+        startVermoegen: 150000,
+        depotwertAlt: 150000,
+        einstandAlt: 150000,
+        zielLiquiditaet: 0,
+        startFloorBedarf: 60000,
+        startFlexBedarf: 0
+    };
+    const ruined = await runMonteCarloChunk({
+        ...common,
+        inputs: ruinInputs,
+        stressReplayCapture: createStressReplayCaptureRequest([0])
+    });
+    const ruinedCapture = ruined.runMeta[0].stressReplayCapture;
+    const ruinedYearIndices = ruinedCapture?.years?.map(year => year.yearIndex) || [];
+    console.log('Stress replay ruin capture trace:', JSON.stringify({
+        continuationActive: ruinedCapture?.continuation?.active,
+        yearIndices: ruinedYearIndices
+    }));
+    assertEqual(ruinedCapture?.terminalStatus, MONTE_CARLO_OUTCOME_CODE.RUIN, 'Ruin fixture must terminate as genuine ruin');
+    assert(
+        ruinedCapture?.sourcePrefixLength > 1 && ruinedCapture.sourcePrefixLength < monteCarloParams.maxDauer,
+        'Ruin fixture must fail after at least one completed year and before the horizon'
+    );
+    assertEqual(ruinedCapture?.continuation?.active, true, 'Mid-horizon ruin must activate shadow continuation');
+    assertEqual(ruinedCapture?.years?.length, monteCarloParams.maxDauer, 'Ruin capture must continue through the full horizon');
+    assertEqual(
+        JSON.stringify(ruinedYearIndices),
+        JSON.stringify([...Array(monteCarloParams.maxDauer).keys()]),
+        'Ruin capture year indices must be strictly increasing without duplicates'
+    );
+}

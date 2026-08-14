@@ -37,6 +37,7 @@ import {
 import { resolveMonteCarloWorkerCountV1 } from './monte-carlo-parameters.js';
 import { resolveMonteCarloSamplingContractV1 } from './mc-year-sampling.js';
 import { annualData } from './simulator-data.js';
+import { createStressReplayCaptureRequest } from './stress-replay-path-materializer.js';
 
 const formatMs = (value, digits = 0) => `${Number(value).toFixed(digits)} ms`;
 const formatSpeedup = (value, digits = 2) => `${Number(value).toFixed(digits)}x`;
@@ -53,17 +54,20 @@ function mergeHeatmap(target, source) {
     }
 }
 
-async function runMonteCarloLogsForIndices({
+async function runMonteCarloSerialRerunForIndices({
     inputs,
     widowOptions,
     monteCarloParams,
     useCapeSampling,
     runIndices,
     generationId,
-    signal = null
+    signal = null,
+    captureStressReplay = false
 }) {
     const logsByIndex = new Map();
-    if (!Array.isArray(runIndices) || runIndices.length === 0) return logsByIndex;
+    const capturesByIndex = new Map();
+    if (!Array.isArray(runIndices) || runIndices.length === 0) return { logsByIndex, capturesByIndex };
+    const captureRequest = captureStressReplay ? createStressReplayCaptureRequest(runIndices) : null;
     for (const runIdx of runIndices) {
         throwIfRunCancelled(signal, generationId);
         // Re-run a single index with logging enabled to get full log rows.
@@ -73,14 +77,27 @@ async function runMonteCarloLogsForIndices({
             monteCarloParams,
             useCapeSampling,
             runRange: { start: runIdx, count: 1 },
-            logIndices: [runIdx]
+            logIndices: [runIdx],
+            stressReplayCapture: captureRequest,
+            signal
         });
+        throwIfRunCancelled(signal, generationId);
         const meta = chunk.runMeta?.[0];
         if (meta && meta.logDataRows && meta.logDataRows.length) {
             logsByIndex.set(meta.index, meta.logDataRows);
         }
+        if (meta?.stressReplayCapture) capturesByIndex.set(meta.index, meta.stressReplayCapture);
     }
+    return { logsByIndex, capturesByIndex };
+}
+
+export async function runMonteCarloLogsForIndices(options) {
+    const { logsByIndex } = await runMonteCarloSerialRerunForIndices(options);
     return logsByIndex;
+}
+
+export async function runMonteCarloReplayCaptureForIndices(options) {
+    return runMonteCarloSerialRerunForIndices({ ...options, captureStressReplay: true });
 }
 
 function appendArray(target, source) {

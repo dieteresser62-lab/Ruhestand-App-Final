@@ -17,9 +17,45 @@ function finiteCareEntryAge(meta, person) {
 function earliestCareScenario(scenarios, person) {
     const observed = scenarios.filter(scenario => finiteCareEntryAge(scenario, person) !== null);
     if (observed.length === 0) return null;
-    return observed.reduce((left, right) => (
-        finiteCareEntryAge(left, person) <= finiteCareEntryAge(right, person) ? left : right
-    ));
+    return observed.reduce((left, right) => {
+        const leftAge = finiteCareEntryAge(left, person);
+        const rightAge = finiteCareEntryAge(right, person);
+        if (leftAge !== rightAge) return leftAge < rightAge ? left : right;
+        return left.index <= right.index ? left : right;
+    });
+}
+
+const byAscendingWealthThenIndex = (left, right) => (
+    left.endVermoegen - right.endVermoegen || left.index - right.index
+);
+
+function selectExtreme(scenarios, field, direction = 'maximum') {
+    return scenarios.reduce((left, right) => {
+        const delta = Number(left[field]) - Number(right[field]);
+        if (delta === 0) return left.index <= right.index ? left : right;
+        return direction === 'minimum'
+            ? (delta < 0 ? left : right)
+            : (delta > 0 ? left : right);
+    });
+}
+
+function buildScenarioSourceIdentity(scenario, selectionMetric) {
+    return {
+        absoluteRunIndex: scenario.index,
+        displayRunNumber: scenario.index + 1,
+        selectionMetric,
+        tieBreak: 'smallest_absolute_run_index'
+    };
+}
+
+function resolveSelectionMetric(key) {
+    if (key === 'longestCare') return 'total_care_years';
+    if (key === 'highestCareNeed') return 'total_care_additional_need_real_eur';
+    if (key === 'earliestCareP1') return 'p1_care_entry_age_years';
+    if (key === 'earliestCareP2') return 'p2_care_entry_age_years';
+    if (key === 'longestLife') return 'simulated_lifetime_years';
+    if (key === 'maxCut') return 'maximum_spending_cut_pct';
+    return 'nominal_terminal_wealth_eur';
 }
 
 /**
@@ -74,7 +110,7 @@ export class ScenarioAnalyzer {
     getCharacteristicIndices() {
         if (!this.meta.length) return [];
         // Hauptsortierung: Endvermögen (schlechteste bis beste Runs).
-        const sortedByWealth = [...this.meta].sort((a, b) => a.endVermoegen - b.endVermoegen);
+        const sortedByWealth = [...this.meta].sort(byAscendingWealthThenIndex);
         const percentileIndex = (arr, p) => Math.min(Math.floor(arr.length * p), arr.length - 1);
 
         const indices = new Set();
@@ -98,11 +134,9 @@ export class ScenarioAnalyzer {
         // Pflege-Szenarien separat betrachten, da sie eine eigene Risiko-Dimension abbilden.
         const careScenarios = this.meta.filter(s => s.careEverActive);
         if (careScenarios.length > 0) {
-            const worstWithCare = careScenarios.reduce((a, b) => a.endVermoegen < b.endVermoegen ? a : b);
-            const longestCare = careScenarios.reduce((a, b) => a.totalCareYears > b.totalCareYears ? a : b);
-            const highestCareNeed = careScenarios.reduce((a, b) => (
-                a.totalCareAdditionalNeedRealEur > b.totalCareAdditionalNeedRealEur ? a : b
-            ));
+            const worstWithCare = selectExtreme(careScenarios, 'endVermoegen', 'minimum');
+            const longestCare = selectExtreme(careScenarios, 'totalCareYears');
+            const highestCareNeed = selectExtreme(careScenarios, 'totalCareAdditionalNeedRealEur');
             const earliestCareP1 = earliestCareScenario(careScenarios, 'p1');
             const earliestCareP2 = earliestCareScenario(careScenarios, 'p2');
             indices.add(worstWithCare.index);
@@ -113,8 +147,8 @@ export class ScenarioAnalyzer {
         }
 
         // Extremfälle als "Stress-Szenarien".
-        const longestLife = this.meta.reduce((a, b) => a.lebensdauer > b.lebensdauer ? a : b);
-        const maxCut = this.meta.reduce((a, b) => a.maxKuerzung > b.maxKuerzung ? a : b);
+        const longestLife = selectExtreme(this.meta, 'lebensdauer');
+        const maxCut = selectExtreme(this.meta, 'maxKuerzung');
         if (longestLife) indices.add(longestLife.index);
         if (maxCut) indices.add(maxCut.index);
 
@@ -151,7 +185,7 @@ export class ScenarioAnalyzer {
             return { characteristic: [], random: [] };
         }
 
-        const sortedByWealth = [...this.meta].sort((a, b) => a.endVermoegen - b.endVermoegen);
+        const sortedByWealth = [...this.meta].sort(byAscendingWealthThenIndex);
         const percentileIndex = (arr, p) => Math.min(Math.floor(arr.length * p), arr.length - 1);
 
         const wealthPercentiles = [
@@ -169,15 +203,13 @@ export class ScenarioAnalyzer {
         const careScenarios = this.meta.filter(s => s.careEverActive);
         const careSpecific = [];
         if (careScenarios.length > 0) {
-            const worstWithCare = careScenarios.reduce((a, b) => a.endVermoegen < b.endVermoegen ? a : b);
+            const worstWithCare = selectExtreme(careScenarios, 'endVermoegen', 'minimum');
             careSpecific.push({ key: 'worstCare', label: 'Worst MIT Pflege', scenario: worstWithCare });
 
-            const longestCare = careScenarios.reduce((a, b) => a.totalCareYears > b.totalCareYears ? a : b);
+            const longestCare = selectExtreme(careScenarios, 'totalCareYears');
             careSpecific.push({ key: 'longestCare', label: 'Längste Pflegedauer', scenario: longestCare });
 
-            const highestCareNeed = careScenarios.reduce((a, b) => (
-                a.totalCareAdditionalNeedRealEur > b.totalCareAdditionalNeedRealEur ? a : b
-            ));
+            const highestCareNeed = selectExtreme(careScenarios, 'totalCareAdditionalNeedRealEur');
             careSpecific.push({ key: 'highestCareNeed', label: 'Höchster realer Pflege-Mehrbedarf', scenario: highestCareNeed });
 
             const earliestCareP1 = earliestCareScenario(careScenarios, 'p1');
@@ -190,8 +222,8 @@ export class ScenarioAnalyzer {
             }
         }
 
-        const longestLife = this.meta.reduce((a, b) => a.lebensdauer > b.lebensdauer ? a : b);
-        const maxCut = this.meta.reduce((a, b) => a.maxKuerzung > b.maxKuerzung ? a : b);
+        const longestLife = selectExtreme(this.meta, 'lebensdauer');
+        const maxCut = selectExtreme(this.meta, 'maxKuerzung');
         const riskScenarios = [
             { key: 'longestLife', label: 'Längste Lebensdauer', scenario: longestLife },
             { key: 'maxCut', label: 'Maximale Kürzung', scenario: maxCut }
@@ -211,6 +243,7 @@ export class ScenarioAnalyzer {
             characteristic: characteristicScenarios.map(s => ({
                 key: s.key,
                 label: s.label,
+                sourceIdentity: buildScenarioSourceIdentity(s.scenario, resolveSelectionMetric(s.key)),
                 endVermoegen: s.scenario.endVermoegen,
                 failed: s.scenario.failed,
                 lebensdauer: s.scenario.lebensdauer,
@@ -224,6 +257,7 @@ export class ScenarioAnalyzer {
             random: randomScenarios.map(s => ({
                 key: s.key,
                 label: s.label,
+                sourceIdentity: buildScenarioSourceIdentity(s.scenario, 'deterministic_sample_index'),
                 endVermoegen: s.scenario.endVermoegen,
                 failed: s.scenario.failed,
                 lebensdauer: s.scenario.lebensdauer,
