@@ -1,0 +1,192 @@
+{
+  "schemaVersion": "MinimumFlexSevereAffordabilityMeasurementV1",
+  "snapshotId": "post-minimum-flex-severe-affordability-v1",
+  "sourceSnapshotId": "post-abschlusshaertung-03-v1",
+  "sourceFixtureSha256": "0fee747dd7b946c18d58f95eb7dc76cdd4f55c8b15ed128cde36cc2fbbb5bd97",
+  "targetResultDocument": "docs/internal/MINDEST_FLEX_NOTFALLGATE_TRAGFAEHIGKEIT.md",
+  "reviewStatus": "pending_external_review",
+  "personalReplayDataIncluded": false,
+  "backtest": {
+    "cause": "protected_withdrawal_capacity_preserves_affordable_minimum_flex_without_weakening_floor_protection",
+    "crossSliceRuntimeBinding": {
+      "sourceCrossSliceOracleProjectionSha256": "069c2bb52c1f67b75dd3734ae8b94390547d5b8ebf823b91479a8f5a1f91db69",
+      "sourceSlice09To10DeltaLedgerSha256": "6888e2bee8ebe3393315926e8b6cb9a24a3cc468a881f23413012b94a576f208",
+      "targetCrossSliceOracleProjectionSha256": "15813110bf8964fd7004eb80e1cba1d5d54b676a3edb7ea9ec0cbcee4f80675c",
+      "targetSlice09To10DeltaLedgerSha256": "b8fe2ae75b023d7bcb3f7d6973f82aea145d996432d5418b4c23e7c893025647"
+    },
+    "integratedReference": {
+      "delta": {
+        "observedRowCount": 0,
+        "outcomeChanged": false,
+        "summaryEndWealth": 111704.33,
+        "totalTax": -6248.9,
+        "totalWithdrawal": -38238.36
+      },
+      "source": {
+        "canonicalRowsHash": "ba523fc94bea9f1d0dbe7db4fb96d783a9c76bde0c6f7857d0f1001b754a626c",
+        "observedRowCount": 26,
+        "outcome": "completed",
+        "summaryEndWealth": 5779092.67,
+        "totalTax": 115826.73,
+        "totalWithdrawal": 841788.67
+      },
+      "target": {
+        "canonicalRowsHash": "e31e83440f2724bc99e3ac3080a368d706cfc837efbf876853ce6e54125a97f6",
+        "maxAbsolutePortfolioFlowDelta": 0,
+        "observedRowCount": 26,
+        "outcome": "completed",
+        "summaryEndWealth": 5890797,
+        "totalTax": 109577.83,
+        "totalWithdrawal": 803550.31
+      }
+    },
+    "policyEvidence": {
+      "bindingYears": [],
+      "completedYearCount": 26,
+      "floorViolationCount": 0,
+      "normalSafetyCapAppliedYearCount": 0,
+      "normalSafetyCapDeferredYearCount": 0,
+      "normalSafetyCapMinimumFlexViolationCount": 0,
+      "safetyCapActiveYearCount": 5,
+      "safetyCapAppliedYearCount": 0,
+      "severeEmergencyFloorMismatchCount": 0,
+      "severeFlexEmergencyYearCount": 0,
+      "syntheticWitnesses": {
+        "firstRecoveredYearWithPositiveMinimumFlex": {
+          "deferredByRateLimit": false,
+          "effectiveCapRatePct": 0,
+          "finalFlexRatePct": 75,
+          "floorNominalEur": 24000,
+          "minimumFlexAnnualNominalEur": 30000,
+          "minimumFlexFulfilled": true,
+          "minimumFlexStatus": "not_needed",
+          "policyTargetRatePct": 0,
+          "safetyCapApplied": false,
+          "severeFlexEmergencyActive": false,
+          "smoothingReferencePct": 75,
+          "withdrawalNominalEur": 69000
+        },
+        "normalRateLimitedCapWithPositiveMinimumFlex": {
+          "deferredByRateLimit": true,
+          "effectiveCapRatePct": 90,
+          "finalFlexRatePct": 90,
+          "floorNominalEur": 24000,
+          "minimumFlexAnnualNominalEur": 30000,
+          "minimumFlexFulfilled": true,
+          "minimumFlexStatus": "applied",
+          "policyTargetRatePct": 50,
+          "safetyCapApplied": false,
+          "severeFlexEmergencyActive": false,
+          "smoothingReferencePct": 90,
+          "withdrawalNominalEur": 78000
+        },
+        "severeOverrideWithPositiveMinimumFlex": {
+          "deferredByRateLimit": false,
+          "effectiveCapRatePct": 0,
+          "finalFlexRatePct": 0,
+          "floorNominalEur": 24000,
+          "minimumFlexAnnualNominalEur": 30000,
+          "minimumFlexFulfilled": false,
+          "minimumFlexStatus": "overridden_by_severe_flex_emergency",
+          "policyTargetRatePct": 0,
+          "safetyCapApplied": true,
+          "severeFlexEmergencyActive": true,
+          "smoothingReferencePct": 90,
+          "withdrawalNominalEur": 24000
+        }
+      }
+    },
+    "resultProjection": {
+      "caseCount": 12,
+      "negativeCaseCount": 5,
+      "ruinCaseCount": 1,
+      "sourceActualSha256": "5de98e83c26923967246056221977c89894ec32ca78e07fcf75309814f404f48",
+      "targetActualSha256": "aed5b9a6a8a39273c331d64e1c77618adc8e26b16be696709d793f2ec5c9cf6d"
+    },
+    "reviewStatus": "pending_external_review",
+    "schemaVersion": "MinimumFlexSevereAffordabilityBacktestMeasurementV1",
+    "sourceFixtureSha256": "0fee747dd7b946c18d58f95eb7dc76cdd4f55c8b15ed128cde36cc2fbbb5bd97",
+    "sourceReference": "post-abschlusshaertung-03-v1",
+    "targetResultDocument": "docs/internal/MINDEST_FLEX_NOTFALLGATE_TRAGFAEHIGKEIT.md"
+  },
+  "monteCarlo": {
+    "schemaVersion": "MinimumFlexSevereAffordabilityMonteCarloMeasurementV1",
+    "sourceReference": "post-abschlusshaertung-03-v1",
+    "sourceFixtureSha256": "0fee747dd7b946c18d58f95eb7dc76cdd4f55c8b15ed128cde36cc2fbbb5bd97",
+    "targetResultDocument": "docs/internal/MINDEST_FLEX_NOTFALLGATE_TRAGFAEHIGKEIT.md",
+    "reviewStatus": "pending_external_review",
+    "sourceProjectionHashes": {
+      "carResultSha256": "9021e165213f1f2bd08442708ae77fee356428715f5305d4f13ca3d676feee40",
+      "autoOptimizeResultSha256": "3db5ace7731b003911ba533875ea8594d170f8ba7de21fe032c7f3edce308955",
+      "finalResultSha256": "6ecf663ab4551b399ea9823652250dbae6f52cfc956c380d286091567e317707"
+    },
+    "targetProjectionHashes": {
+      "carResultSha256": "232281d02913cd742b86147243b3e9e74979024e571c2fb261ac8ac0fce8823a",
+      "autoOptimizeResultSha256": "c9ca031dab02b8496e2a31d008a30534318ab0b8c37663aad7c4a81ce1d4a813",
+      "finalResultSha256": "43df6c2aba738c0851591e6baf53196a14459df9746c3d71b92626d1d563f5e4"
+    },
+    "changedProjectionCount": 3,
+    "measuredProjectionCount": 3,
+    "technicalErrorCount": 0,
+    "requestedRuns": 8,
+    "financiallyEvaluableRuns": 8,
+    "cause": "protected_withdrawal_capacity_changes_financial_paths_without_changing_sampling_or_worker_contracts"
+  },
+  "demography": {
+    "schemaVersion": "MinimumFlexSevereAffordabilityDemographyMeasurementV1",
+    "sourceReference": "post-abschlusshaertung-03-v1",
+    "sourceFixtureSha256": "0fee747dd7b946c18d58f95eb7dc76cdd4f55c8b15ed128cde36cc2fbbb5bd97",
+    "targetResultDocument": "docs/internal/MINDEST_FLEX_NOTFALLGATE_TRAGFAEHIGKEIT.md",
+    "reviewStatus": "pending_external_review",
+    "sourceMeasurementSha256": "80eba72b118cd4dd8c41adcd360479e1b2c49be3af3222a749ae73fd9f19d42f",
+    "targetMeasurementSha256": "8201af7591a4df383fdf7ca5251cabd6da484465b4f30afc12c4d4c4cf70ed4f",
+    "targetSummary": {
+      "outcomeCounts": {
+        "ruin": 2,
+        "allDead": 2045,
+        "horizonExhausted": 1,
+        "technicalError": 0
+      },
+      "lifespanYears": {
+        "p10": 16,
+        "p50": 26,
+        "p90": 32
+      },
+      "finalWealthNominalEur": {
+        "p10": 1400634.732407,
+        "p50": 3923227.947045,
+        "p90": 11481172.487412
+      },
+      "care": {
+        "anyCareRunCount": 1725,
+        "p1EntryRunCount": 1159,
+        "p2EntryRunCount": 1315,
+        "additionalNeedNominalEur": {
+          "p10": 0,
+          "p50": 84193.536697,
+          "p90": 306424.653501
+        }
+      },
+      "pathEvidenceHash": "caed2aec3f35d39c4c22fa6cc08c252625c605f9955767cca92eb5a59b6723d9",
+      "sweep": [
+        {
+          "comboIdx": 0,
+          "successProbFloor": 99.902344,
+          "p10EndWealth": 1400634.732407,
+          "medianEndWealth": 3923227.947045,
+          "worst5Drawdown": 59.228115,
+          "evidenceHash": "739d197782ff06457bf7dcd594aaf5637cc7c3a118197b7e82c8267f50a8f605"
+        },
+        {
+          "comboIdx": 1,
+          "successProbFloor": 99.902344,
+          "p10EndWealth": 1320798.530974,
+          "medianEndWealth": 3263875.384716,
+          "worst5Drawdown": 54.978586,
+          "evidenceHash": "e133e3660265fb1ca792c3389aadd291b7f7c642c2ca278fef0417b788b16962"
+        }
+      ]
+    },
+    "cause": "protected_withdrawal_capacity_prevents_zero_flex_when_minimum_spending_remains_affordable"
+  }
+}

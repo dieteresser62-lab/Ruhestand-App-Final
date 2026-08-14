@@ -5,9 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Benutzerhandbuch | Ruhestand-Apps Suite</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --primary-color: #1a2530;
@@ -30,7 +27,7 @@
         }
 
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             background-color: var(--background-color);
             color: var(--text-color);
             min-height: 100vh;
@@ -292,6 +289,28 @@
             line-height: 1.5;
         }
 
+        img {
+            height: auto;
+        }
+
+        code,
+        pre,
+        td,
+        th {
+            overflow-wrap: anywhere;
+        }
+
+        table {
+            display: block;
+            max-width: 100%;
+            overflow-x: auto;
+        }
+
+        [tabindex="-1"]:focus {
+            outline: 3px solid var(--accent-color);
+            outline-offset: 4px;
+        }
+
         .tip-box {
             background-color: rgba(197, 160, 89, 0.1);
             border: 1px solid rgba(197, 160, 89, 0.3);
@@ -320,8 +339,35 @@
         }
 
         @media (max-width: 768px) {
+            .navbar {
+                gap: 0.75rem;
+                padding: 0.75rem 1rem;
+            }
+
+            .nav-brand,
+            .back-link {
+                font-size: 0.85rem;
+            }
+
+            .container {
+                padding: 0 12px;
+            }
+
             .page-header h1 {
                 font-size: 2rem;
+            }
+
+            .info-card {
+                padding: 1.25rem;
+            }
+
+            .manual-grid {
+                grid-template-columns: minmax(0, 1fr);
+            }
+
+            .step-item,
+            .tip-box {
+                gap: 0.75rem;
             }
 
             .tabs-container {
@@ -359,17 +405,39 @@
             <h2>Inhaltsverzeichnis</h2>
             <ol class="toc-list">
                 <li><a class="toc-link" data-tab-target="manual" href="#ueberblick">Überblick</a></li>
-                <li><a class="toc-link" data-tab-target="manual" href="#ansparer-jung">Ansparer (lange Laufzeit)</a>
-                </li>
-                <li><a class="toc-link" data-tab-target="manual" href="#ansparphase">Ansparphase</a></li>
                 <li><a class="toc-link" data-tab-target="manual" href="#installation-start">Installation &amp; Start</a>
+                </li>
+                <li><a class="toc-link" data-tab-target="manual" href="#datensicherheit">Datensicherheit &amp;
+                        Wiederherstellung</a></li>
+                <li><a class="toc-link" data-tab-target="manual" href="#profilverbund">Profile &amp; Depot-Tranchen</a>
+                    <ol class="toc-sublist">
+                        <li><a class="toc-link" data-tab-target="manual"
+                                href="#profilverbund-profilverwaltung">Profilverwaltung</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#profilverbund-haushalt">Finanzen &amp;
+                                Personen</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#profilverbund-balance">Balance-App</a>
+                        </li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#profilverbund-simulator">Simulator</a>
+                        </li>
+                        <li><a class="toc-link" data-tab-target="manual"
+                                href="#tranchen-zustaende">Tranchenzustände &amp; Recovery</a></li>
+                        <li><a class="toc-link" data-tab-target="manual"
+                                href="#tranchen-lebenszyklus">Verkauf &amp; Cashabschluss</a></li>
+                        <li><a class="toc-link" data-tab-target="manual"
+                                href="#tranchen-abgleich-checkliste">Abgleich-Checkliste</a></li>
+                    </ol>
                 </li>
                 <li><a class="toc-link" data-tab-target="manual" href="#simulator">Simulator</a>
                     <ol class="toc-sublist">
+                        <li><a class="toc-link" data-tab-target="manual" href="#ansparer-jung">Einstieg für Ansparer</a>
+                        </li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#ansparphase">Ansparphase</a></li>
                         <li><a class="toc-link" data-tab-target="manual" href="#simulator-eingaben">Eingaben</a></li>
                         <li><a class="toc-link" data-tab-target="manual" href="#simulator-renten">Personen &amp;
                                 Rente</a></li>
                         <li><a class="toc-link" data-tab-target="manual" href="#simulator-parameter">Parameter</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#simulator-stresstest">Stresstests &amp;
+                                Presets</a></li>
                         <li><a class="toc-link" data-tab-target="manual" href="#simulator-backtest">Backtesting</a>
                         </li>
                         <li><a class="toc-link" data-tab-target="manual" href="#simulator-tranchen">Depot-Tranchen</a>
@@ -390,6 +458,10 @@
                     <ol class="toc-sublist">
                         <li><a class="toc-link" data-tab-target="manual" href="#balance-jahresupdate">Jahres-Update</a>
                         </li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#balance-marktdaten-csv">Marktdaten</a>
+                        </li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#balance-snapshots">Snapshots &amp;
+                                Recovery</a></li>
                         <li><a class="toc-link" data-tab-target="manual" href="#balance-diagnose">Diagnose</a></li>
                         <li><a class="toc-link" data-tab-target="manual" href="#balance-pflegebucket">Pflegebucket</a>
                         </li>
@@ -403,16 +475,6 @@
                         </li>
                     </ol>
                 </li>
-                <li><a class="toc-link" data-tab-target="manual" href="#profilverbund">Profilverbund (Multi-Profil)</a>
-                    <ol class="toc-sublist">
-                        <li><a class="toc-link" data-tab-target="manual"
-                                href="#profilverbund-profilverwaltung">Profilverwaltung</a></li>
-                        <li><a class="toc-link" data-tab-target="manual" href="#profilverbund-balance">Balance-App</a>
-                        </li>
-                        <li><a class="toc-link" data-tab-target="manual" href="#profilverbund-simulator">Simulator</a>
-                        </li>
-                    </ol>
-                </li>
                 <li><a class="toc-link" data-tab-target="manual" href="#onboarding-playbook">Onboarding-Playbook</a>
                     <ol class="toc-sublist">
                         <li><a class="toc-link" data-tab-target="manual" href="#onboarding-woche">Erste Woche</a></li>
@@ -420,7 +482,7 @@
                     </ol>
                 </li>
                 <li><a class="toc-link" data-tab-target="manual" href="#haeufige-probleme">Häufige Probleme</a></li>
-                <li><a class="toc-link" data-tab-target="manual" href="#jahrespflege">Best Practices Jahrespflege</a>
+                <li><a class="toc-link" data-tab-target="manual" href="#jahrespflege">Jährliche Pflege</a>
                 </li>
                 <li><a class="toc-link" data-tab-target="manual" href="#anhang">Anhang</a>
                     <ol class="toc-sublist">
@@ -430,8 +492,8 @@
                         </li>
                         <li><a class="toc-link" data-tab-target="manual" href="#anhang-dokumente">Weiterführende
                                 Dokumente</a></li>
-                        <li><a class="toc-link" data-tab-target="manual" href="#anhang-support">Kontakt &amp;
-                                Support</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#anhang-support">Hilfe &amp;
+                                Fehlerbericht</a></li>
                     </ol>
                 </li>
                 <li><a class="toc-link" data-tab-target="manual" href="#faq">FAQ</a></li>
@@ -439,11 +501,13 @@
             </ol>
         </div>
 
-        <div class="tabs-container">
-            <button class="tab-btn" data-tab-id="quickstart" onclick="switchTab('quickstart')">
+        <div class="tabs-container" role="tablist" aria-label="Handbuchansicht">
+            <button class="tab-btn" type="button" role="tab" data-tab-id="quickstart" aria-controls="quickstart"
+                aria-selected="false" onclick="switchTab('quickstart')">
                 🚀 Schnellstart
             </button>
-            <button class="tab-btn active" data-tab-id="manual" onclick="switchTab('manual')">
+            <button class="tab-btn active" type="button" role="tab" data-tab-id="manual" aria-controls="manual"
+                aria-selected="true" onclick="switchTab('manual')">
                 📖 Detailliertes Handbuch
             </button>
         </div>
@@ -451,7 +515,7 @@
         <!-- ============================================= -->
         <!-- TAB 1: SCHNELLSTART                           -->
         <!-- ============================================= -->
-        <div id="quickstart" class="content-section">
+        <div id="quickstart" class="content-section" role="tabpanel" aria-hidden="true">
             <div class="info-card">
                 <h2>⚡ Start in 2 Minuten</h2>
                 <p class="card-intro">Kurzfassung analog zum <code>QUICKSTART.md</code>.</p>
@@ -460,25 +524,29 @@
                         <div class="step-number">1</div>
                         <div class="step-content">
                             <h3>Startart wählen</h3>
-                            <p><strong>Option A:</strong> <code>RuhestandSuite.exe</code> starten. <strong>Option B:</strong>
-                                Repository entpacken und <code>start_suite.cmd</code> ausführen.</p>
+                            <p><strong>Desktop:</strong> <code>RuhestandSuite.exe</code> starten.
+                                <strong>Browser:</strong> Repository entpacken und <code>start_suite.cmd</code> oder
+                                <code>start_suite.ps1</code> ausführen; die Startseite öffnet sich über den lokalen
+                                HTTP-Server.</p>
                         </div>
                     </li>
                     <li class="step-item">
                         <div class="step-number">2</div>
                         <div class="step-content">
                             <h3>Profile vorbereiten</h3>
-                            <p>In <code>index.html</code> Profil(e) anlegen und Stammdaten pflegen. Für Paare je Partner ein
-                                eigenes Profil verwenden.</p>
+                            <p>Auf der Startseite das aktive Profil prüfen, Profil(e) anlegen und Stammdaten pflegen.
+                                Vor dem Wechsel speichert die Suite den aktuellen Stand und lädt danach das Zielprofil.
+                                Öffnen Sie Balance, Simulator oder den Profil-Assets-Manager nur über die Links der
+                                Startseite, damit der Profilkontext übergeben wird.</p>
                         </div>
                     </li>
                     <li class="step-item">
                         <div class="step-number">3</div>
                         <div class="step-content">
-                            <h3>Tranchen erfassen</h3>
-                            <p>Im gewählten Profil Depot-Tranchen im Profil-Assets-Manager pflegen und die sichtbare
-                                Profil-ID prüfen. Diese Daten sind die Basis für Teilfreistellung und steueroptimierte
-                                Verkäufe. Empfehlungen verändern den Realbestand nicht.</p>
+                            <h3>Daten sichern, dann Tranchen erfassen</h3>
+                            <p>Unter „Profile &gt; Erweitert &gt; Backup exportieren“ ein Komplettbackup anlegen.
+                                Danach im gewählten Profil Depot-Tranchen im Profil-Assets-Manager pflegen und die
+                                sichtbare Profil-ID prüfen. Empfehlungen verändern den Realbestand nicht.</p>
                         </div>
                     </li>
                 </ol>
@@ -509,9 +577,9 @@
                         <div class="step-number">2</div>
                         <div class="step-content">
                             <h3>Parameter anpassen (Optional)</h3>
-                            <p>Wählen Sie Ihre Asset-Allokation (Aktienquote) und bestimmen Sie, wie viel Rente Sie
-                                bereits sicher haben (z.B. gesetzliche Rente). Standardwerte sind bereits für Sie
-                                vorausgefüllt.</p>
+                            <p>Prüfen Sie Portfolio, Kosten, Ansparphase, Renten und Samplingannahmen. Aktivieren Sie
+                                Dynamic Flex, Stresspreset oder Tail-Risk nur bewusst; vorausgefüllte Werte sind
+                                Modellannahmen und keine persönliche Empfehlung.</p>
                         </div>
                     </li>
                     <li class="step-item">
@@ -529,60 +597,66 @@
                     <span class="tip-icon">💡</span>
                     <div>
                         <strong>Tipp:</strong> Pflegen Sie Profile und Depot-Tranchen zuerst in
-                        <code>index.html</code>, damit Steuerlogik und Aggregation korrekt arbeiten. Nutzen Sie danach
-                        den Parameter-Sweep, um schnell zu sehen, wie sich eine höhere Sparrate oder ein späterer
-                        Renteneintritt auf Ihre Erfolgchancen auswirkt.
+                        <code>index.html</code>, damit Steuerlogik und Aggregation korrekt arbeiten. Ändern Sie
+                        Sparrate oder Rentenbeginn für getrennte Szenarien in den Rahmendaten. Der Sweep variiert
+                        andere, im <a class="toc-link" data-tab-target="manual" href="#simulator-sweep">Sweep-Abschnitt</a>
+                        aufgeführte Modellparameter.
                     </div>
                 </div>
             </div>
 
             <!-- Balance App Quick Start -->
             <div class="info-card">
-                <h2>⚖️ Balance App Schnellstart</h2>
-                <p class="card-intro">Das jährliche Ritual für Ihr Portfolio (Prime Harvesting).</p>
+                <h2>⚖️ Balance-App: Schnellstart</h2>
+                <p class="card-intro">Der sichere Jahresablauf von der Vorprüfung bis zur realen Umsetzung.</p>
 
                 <ol class="steps-list">
                     <li class="step-item">
                         <div class="step-number">1</div>
                         <div class="step-content">
-                            <h3>Jahres-Update starten</h3>
-                            <p>Klicken Sie oben auf den Button <strong>"🌐 Jahres-Update"</strong>. Die App ruft
-                                automatisch die aktuelle Inflation (EZB/World Bank/OECD) und ETF-Kurse ab,
-                                aktualisiert Ihr Alter und rückt die Marktdaten (Shiller-CAPE Basis) um ein Jahr
-                                weiter.</p>
+                            <h3>Profil, Ausgabenjahr und Backup prüfen</h3>
+                            <p>Öffnen Sie Balance aus dem richtigen aktiven Profil. Prüfen Sie, ob der
+                                Ausgaben-Check auf dem abzuschließenden Vorjahr steht, und erstellen Sie vor dem
+                                Jahresprozess ein aktuelles Komplettbackup.</p>
                         </div>
                     </li>
                     <li class="step-item">
                         <div class="step-number">2</div>
                         <div class="step-content">
-                            <h3>Aktuelle Werte prüfen</h3>
-                            <p>Kontrollieren Sie die aktualisierten Felder. Tragen Sie den <strong>heutigen
-                                    Marktwert</strong> Ihrer Depots und Cash-Konten ein. Die neuen Bedarfswerte
-                                (Floor/Flex) wurden bereits automatisch um die Inflation erhöht.</p>
+                            <h3>Jahresabschluss starten</h3>
+                            <p>Klicken Sie auf <strong>„🌐 Jahres-Update“</strong> oder
+                                <strong>„⭐ Jahresabschluss“</strong>. Beide starten denselben periodengebundenen
+                                Abschluss. Nach der Vorprüfung legt die App vor dem ersten Schreibvorgang einen
+                                geprüften Recovery-Snapshot an.</p>
                         </div>
                     </li>
                     <li class="step-item">
                         <div class="step-number">3</div>
                         <div class="step-content">
-                            <h3>Diagnose & Handlung</h3>
-                            <p>Schauen Sie auf das Panel "Ergebnisse & Handlungsschritte". Folgen Sie genau der
-                                Anweisung (z.B. "Kein Handlungsbedarf" oder "Rebalancing durchführen").</p>
+                            <h3>Datenlauf und Abschluss prüfen</h3>
+                            <p>Warten Sie Inflation, periodengebundene Marktdaten, Fortschreibung und
+                                Post-Write-Validierung vollständig ab. Bei einem Fehler nach Prozessbeginn stellen
+                                Sie zuerst den benannten Recovery-Snapshot wieder her; starten Sie nicht einfach
+                                offline erneut.</p>
                         </div>
                     </li>
                     <li class="step-item">
                         <div class="step-number">4</div>
                         <div class="step-content">
-                            <h3>Ausgaben-Check</h3>
-                            <p>Im Tab "Ausgaben-Check" pro Monat CSV importieren, Monatsampel prüfen und
-                                Soll/Ist auf Basis importierter Monate bewerten.</p>
+                            <h3>Ist-Werte und Ausgaben kontrollieren</h3>
+                            <p>Pflegen Sie Depot- und Cashstände im Profil-Assets-Manager und kehren Sie zu Balance
+                                zurück. Prüfen Sie im „Ausgaben-Check“ das neue Jahr sowie die erhaltene Historie;
+                                Monats-CSV-Importe dienen der laufenden Soll/Ist-Kontrolle.</p>
                         </div>
                     </li>
                     <li class="step-item">
                         <div class="step-number">5</div>
                         <div class="step-content">
-                            <h3>Kapitalfluss umsetzen</h3>
-                            <p>Führen Sie die angezeigten Transaktionen bei Ihrer Bank durch (z.B. Verkauf von XX € um
-                                Cash aufzufüllen).</p>
+                            <h3>Diagnose lesen und real umsetzen</h3>
+                            <p>Prüfen Sie im Panel „Ergebnisse &amp; Handlungsschritte“ Messphase, Zielwerte und
+                                Blockiergründe. Die Anzeige ist ein Plan: Führen Sie Bank- oder Brokeraktionen selbst
+                                aus, gleichen Sie bestätigte Tranchenverkäufe im Manager ab und führen Sie den
+                                tatsächlichen Cashstand anschließend manuell nach.</p>
                         </div>
                     </li>
                 </ol>
@@ -599,14 +673,15 @@
         <!-- ============================================= -->
         <!-- TAB 2: DETAILLIERTES HANDBUCH                 -->
         <!-- ============================================= -->
-        <div id="manual" class="content-section active">
+        <div id="manual" class="content-section active" role="tabpanel" aria-hidden="false">
 
             <div class="info-card" id="ueberblick">
                 <h2>Überblick</h2>
-                <p>Die Ruhestand-Apps Suite bündelt zwei Kernwerkzeuge: den <strong>Simulator</strong> für langfristige
-                    Prognosen und die <strong>Balance-App</strong> für laufende Entscheidungen in der Entnahmephase. Das
-                    Handbuch ist nach den typischen Schritten gegliedert und bietet schnelle Sprungmarken über das
-                    Inhaltsverzeichnis.</p>
+                <p>Die Suite verbindet fünf Oberflächen: Die Startseite verwaltet Profile und Komplettbackups, der
+                    Profil-Assets-Manager pflegt Depot-Tranchen, der Simulator untersucht langfristige Szenarien und
+                    Balance unterstützt Jahresabschluss und operative Entnahmeplanung. Dieses Handbuch ist die fünfte
+                    Oberfläche. Folgen Sie für einen neuen Datenbestand der Nutzerreise im Inhaltsverzeichnis: Start
+                    und Datensicherheit, Profile und Tranchen, Simulator, Balance sowie Fehlerhilfe und Begriffe.</p>
                 <figure style="margin-top: 1rem;">
                     <img src="assets/images/system_overview.svg" alt="Systemübersicht: Balance-App, Simulator und Engine"
                         style="width:100%; max-width: 1100px; border: 1px solid #e0e6ed; border-radius: 12px; box-shadow: var(--card-shadow);">
@@ -617,48 +692,43 @@
 
             <div class="info-card" id="ansparer-jung">
                 <h2>Junger Ansparer: Nutzung der Suite</h2>
-                <p>Wenn der Ruhestand noch weit entfernt ist, hilft Ihnen die Suite dabei, den langfristigen
-                    Spar- und Investitionsplan robust aufzusetzen und regelmäßig zu kalibrieren. Konzentrieren Sie
-                    sich im Simulator auf die Wachstumsphase, nutzen Sie Parameter-Sweeps für Szenarien und bauen Sie
-                    Routinen auf, um Ihre Fortschritte jährlich zu messen.</p>
+                <p>Wenn der Ruhestand noch weit entfernt ist, können Sie im Simulator verschiedene Eingaben zur
+                    Anspar- und Entnahmephase als getrennte Szenarien vergleichen. Das ist eine Modellrechnung zur
+                    Orientierung, keine Vorgabe für Sparquote, Asset-Allokation oder Umschichtungsrhythmus.</p>
                 <div class="detail-block" style="margin-top: 1rem;">
                     <h3>Empfohlener Ablauf</h3>
                     <ol style="margin-left: 20px; color: var(--text-light);">
-                        <li><strong>Horizont & Sparrate festlegen:</strong> Tragen Sie aktuelles Vermögen,
-                            geplante Monatsrate und Ziel-Rentenalter ein. Prüfen Sie, ob der monatliche Überschuss
-                            realistisch zur Gesamtplanung passt.</li>
-                        <li><strong>Asset-Allokation wählen:</strong> Starten Sie mit einer Aktienquote passend zu
-                            Ihrem Risikoappetit (z.B. 70-90 % bei langem Horizont). Nutzen Sie die Sensitivität der
-                            Floor-Deckung und der Risikokennzahlen, um die Quote anzupassen.</li>
-                        <li><strong>Parameter-Sweep ausführen:</strong> Variieren Sie Sparrate, Rentenalter und
-                            Aktienquote automatisch, um zu sehen, wie viel Puffer Sie für Marktstress haben.</li>
-                        <li><strong>Zielkorridor definieren:</strong> Speichern Sie zwei bis drei Szenarien
-                            (Basis, optimistisch, konservativ) und vergleichen Sie Floor-Deckung, terminale Outcomes,
-                            Kürzungen sowie Endvermögen.</li>
-                        <li><strong>Jährliches Update:</strong> Wiederholen Sie die Simulation nach Gehaltsänderungen
-                            oder größeren Ausgaben. Dokumentieren Sie die Version (z.B. YYYY-MM) für Ihre
-                            Planungsunterlagen.</li>
+                        <li><strong>Rahmendaten erfassen:</strong> Prüfen Sie Startvermögen, Dauer und monatliche
+                            Sparrate der Ansparphase sowie Personen, Rentenstart und Ruhestandsbedarf.</li>
+                        <li><strong>Vergleichsszenarien anlegen:</strong> Ändern Sie Sparrate, Anspar-Dauer oder
+                            Portfolioannahmen jeweils bewusst in den Rahmendaten und speichern Sie nachvollziehbare
+                            Szenarien.</li>
+                        <li><strong>Läufe vergleichen:</strong> Lesen Sie Floor-Deckung, terminale Outcomes,
+                            Kürzungen, reale Depotentnahme, Drawdown und Endvermögen zusammen. Eine einzelne Quote
+                            ist kein persönlicher Zielwert.</li>
+                        <li><strong>Stress separat prüfen:</strong> Vergleichen Sie Basissimulation, historische
+                            Backtests und ausdrücklich aktivierte Stressannahmen, ohne daraus Zukunftseignung
+                            abzuleiten.</li>
+                        <li><strong>Änderungen dokumentieren:</strong> Aktualisieren Sie Eingaben bei wesentlichen
+                            Änderungen und halten Sie Szenarioname, Datum, Seed und Annahmen fest.</li>
                     </ol>
                 </div>
                 <div class="detail-block" style="margin-top: 1rem;">
                     <h3>Nutzen für Ansparer</h3>
                     <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                        <li><strong>Klarheit über Sparlücke:</strong> Zeigt, ob Sparrate oder Rentenalter angepasst
-                            werden sollten, um den gewählten Zielkorridor robuster zu erreichen.</li>
-                        <li><strong>Stress-Resilienz:</strong> Monte-Carlo-Simulationen machen sichtbar, wie robust
-                            der Plan gegenüber Crashs oder hoher Inflation bleibt.</li>
-                        <li><strong>Messbare Fortschritte:</strong> Durch jährliche Szenarienvergleiche erkennen Sie,
-                            ob Sie im Soll liegen oder nachjustieren müssen.</li>
-                        <li><strong>Frühe Warnsignale:</strong> Verschlechtern sich Floor-Deckung, terminale Outcomes
-                            oder Kürzungs-/Entnahmekennzahlen gegenüber Ihrem Zielkorridor, können Sie Sparraten oder
-                            Konsumziele anpassen, solange noch viel Zeit bleibt.</li>
+                        <li><strong>Sensitivität:</strong> Getrennte Szenarien zeigen, wie Modellresultate auf
+                            veränderte Eingaben reagieren.</li>
+                        <li><strong>Unsicherheit:</strong> Monte Carlo zeigt modellinterne Verteilungen; ein
+                            Backtest ergänzt bekannte historische Pfade.</li>
+                        <li><strong>Nachvollziehbarkeit:</strong> Wiederholte Läufe mit dokumentiertem Seed und
+                            Datenstand lassen Annahmen vergleichbar werden.</li>
                     </ul>
                     <div class="tip-box">
                         <span class="tip-icon">💡</span>
                         <div>
-                            <strong>Praxis-Tipp:</strong> Legen Sie einen festen Termin (z.B. Jahresbeginn) für ein
-                            Kurz-Review fest. Führen Sie einen Parameter-Sweep mit +10 %/-10 % Sparrate durch und
-                            speichern Sie ein Referenzszenario als neue Basis.
+                            <strong>Praxis-Tipp:</strong> Für einen Vergleich mit höherer oder niedrigerer Sparrate
+                            speichern Sie zwei getrennte Rahmendaten-Szenarien. Der Parameter Sweep besitzt keine
+                            Sparraten-Dimension.
                         </div>
                     </div>
                 </div>
@@ -666,138 +736,149 @@
 
             <div class="info-card" id="ansparphase" style="margin-top: 2rem;">
                 <h2>Ansparphase: Ablauf und Pflege</h2>
-                <p class="card-intro">Diese Schritte helfen, die Ansparphase planbar und belastbar aufzusetzen. Fokus:
-                    Simulator nutzen, Annahmen sauber halten, Abweichungen früh erkennen.</p>
+                <p class="card-intro">Die Suite bildet eine Ansparphase über Dauer, monatliche Sparrate und deren
+                    optionale Indexierung ab. Allgemeine Anlageentscheidungen bleiben außerhalb des
+                    Produktvertrags.</p>
                 <div class="manual-grid" style="margin-top: 1.5rem;">
                     <div class="detail-block">
-                        <h3>1) Startwerte und Einzahlungen</h3>
+                        <h3>1) Sichtbare Eingaben</h3>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Startvermögen:</strong> Aktuellen Depotwert inkl. Cash erfassen.</li>
-                            <li><strong>Sparrate:</strong> Monatliche Einzahlungen angeben; optional Sparsteigerung p.a.
-                                eintragen.</li>
-                            <li><strong>Sonderzahlungen:</strong> Bonus, Erbe oder Einmalzahlungen als Extra-Sparjahr
-                                simulieren.</li>
+                            <li><strong>Portfolio:</strong> Gesamtvermögen und dessen Aufteilung auf Depot,
+                                Tagesgeld, Geldmarkt und Gold konsistent halten.</li>
+                            <li><strong>Ansparphase:</strong> Aktivierung, Dauer, monatliche Sparrate und den sichtbaren
+                                Indexierungsmodus prüfen.</li>
+                            <li><strong>Übergang:</strong> Personen-, Renten- und Bedarfsdaten bestimmen gemeinsam,
+                                wann und mit welchen Zahlungsströmen die Entnahmephase modelliert wird.</li>
                         </ul>
                     </div>
                     <div class="detail-block">
-                        <h3>2) Simulator als Hauptwerkzeug</h3>
+                        <h3>2) Varianten vergleichen</h3>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Parameter-Sweep:</strong> Sparrate/Rentenbeginn variieren, um Zielkorridore zu
-                                finden.</li>
-                            <li><strong>Risiko-Sensitivität:</strong> Aktienquote und Fees anpassen, um robuste
-                                Korridore zu testen.</li>
-                            <li><strong>Interpretation:</strong> Nicht nur Median, sondern 10./90. Perzentil betrachten.
-                            </li>
+                            <li><strong>Sparrate oder Dauer:</strong> Als getrennte Szenarien in den Rahmendaten
+                                ändern; diese Werte sind keine interaktiven Sweep-Dimensionen.</li>
+                            <li><strong>Portfolio und Kosten:</strong> Nur tatsächlich sichtbare Eingaben verändern
+                                und jede Variante mit Namen, Seed und Datenstand dokumentieren.</li>
+                            <li><strong>Auswertung:</strong> Verteilung, Outcomes, Entnahmen, Kürzungen und Drawdown
+                                gemeinsam lesen; Missingness nicht als Wert 0 behandeln.</li>
                         </ul>
                     </div>
                     <div class="detail-block">
-                        <h3>3) Jahrespflege in der Ansparphase</h3>
+                        <h3>3) Pflege und Grenzen</h3>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Update-Rhythmus:</strong> Einmal pro Jahr Werte aktualisieren (Vermögen,
-                                Sparrate, Ziele).</li>
-                            <li><strong>Ist vs. Plan:</strong> Abweichungen dokumentieren und Szenario neu rechnen.</li>
-                            <li><strong>Rebalancing:</strong> Wenn nötig manuell; Balance-App ist erst in der
-                                Entnahmephase relevant.</li>
+                            <li><strong>Aktualisierung:</strong> Nach einer tatsächlichen Änderung von Vermögen,
+                                Einzahlung, Renten- oder Bedarfsannahmen die betroffenen Eingaben aktualisieren.</li>
+                            <li><strong>Keine Produktvorgabe:</strong> Die Suite legt weder Sparquote noch ETF-Auswahl,
+                                Zielallokation oder Rebalancing-Frequenz als fachliche Empfehlung fest.</li>
+                            <li><strong>Beratungsgrenze:</strong> Steuern, Kosten, Risiko- und Liquiditätsfähigkeit vor
+                                realen Anlageentscheidungen eigenständig fachlich prüfen.</li>
                         </ul>
                     </div>
                     <div class="detail-block">
                         <h3>4) Übergang zur Entnahmephase</h3>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Timing:</strong> 3-5 Jahre vor Ruhestand erste Balance-Tests durchführen.</li>
-                            <li><strong>Liquidität:</strong> Cash-Buffer aufbauen, um erste Entnahmejahre zu
-                                stabilisieren.</li>
+                            <li><strong>Voraussetzungen:</strong> Floor, Flex, Mindest-Flex, Personen/Renten und
+                                Portfolioverteilung auf Aktualität prüfen.</li>
+                            <li><strong>Liquidität:</strong> Konfigurierbares Netto-Runway-Ziel und getrennten
+                                Brutto-Notfallpuffer nicht miteinander verwechseln.</li>
                             <li><strong>Tranchen:</strong> Depot-Tranchen-Manager pflegen, damit Steuerlogik realistisch
                                 wird.</li>
+                            <li><strong>Ergebnis:</strong> Erst nach Simulator- und Backtestvergleich in den
+                                periodengebundenen Balance-Jahresprozess wechseln.</li>
                         </ul>
-                    </div>
-                    <div class="detail-block">
-                        <h3>5) ETF-Auswahl und Diversifikation</h3>
-                        <ul
-                            style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Breit diversifiziert:</strong> Welt-ETF als Kern; Sektor- oder Themen-ETFs nur
-                                als Satelliten.</li>
-                            <li><strong>Währung:</strong> Keine starre Währungswette; Diversifikation über Regionen
-                                bevorzugen.</li>
-                            <li><strong>Kosten:</strong> TER und Spreads vergleichen; kleine Kostenunterschiede wirken
-                                langfristig stark.</li>
-                        </ul>
-                    </div>
-                    <div class="detail-block">
-                        <h3>6) Rebalancing-Regeln</h3>
-                        <ul
-                            style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Rhythmus:</strong> Jährlich prüfen; bei starken Abweichungen kürzer reagieren.
-                            </li>
-                            <li><strong>Bandbreiten:</strong> Zielquote plus/minus 5-10 Prozentpunkte als Trigger.</li>
-                            <li><strong>Umsetzung:</strong> Rebalancing in der Ansparphase meist durch Sparraten
-                                steuern.</li>
-                        </ul>
-                    </div>
-                    <div class="detail-block">
-                        <h3>7) Sparplan-Steigerungen</h3>
-                        <ul
-                            style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Automatik:</strong> Sparrate jährlich anpassen (z.B. +2-3% oder Inflationsrate).
-                            </li>
-                            <li><strong>Meilensteine:</strong> Gehaltsstufen und Einmalzahlungen als Sonderbeitrag
-                                abbilden.</li>
-                            <li><strong>Realismus:</strong> Sparrate nicht nur am Optimum, sondern am realen Cashflow
-                                ausrichten.</li>
-                        </ul>
-                    </div>
-                    <div class="detail-block">
-                        <h3>Beispiel-Strategien (Ansparphase)</h3>
-                        <ul
-                            style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Konservativ:</strong> 40-60% Aktien, Rest sichere Bausteine; geringere
-                                Schwankung.</li>
-                            <li><strong>Ausgewogen:</strong> 60-75% Aktien, Rest stabilisierend; guter Kompromiss.</li>
-                            <li><strong>Offensiv:</strong> 80-100% Aktien; hohe Schwankungen, lange Anlagehorizonte
-                                vorausgesetzt.</li>
-                        </ul>
-                    </div>
-                    <div class="detail-block">
-                        <h3>Beispielwerte (Orientierung)</h3>
-                        <ul
-                            style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Cash-Puffer:</strong> 3-6 Monatsausgaben als Reserve neben dem Depot.</li>
-                            <li><strong>Sparrate:</strong> 10-20% des Nettoeinkommens als Zielkorridor.</li>
-                            <li><strong>Sparsteigerung:</strong> 2-3% pro Jahr oder Inflationsrate als Automatismus.
-                            </li>
-                        </ul>
-                        <p style="color: var(--text-light); margin-top: 0.75rem;">Hinweis: Diese Werte sind nur
-                            Orientierung und ersetzen keine individuelle Planung.</p>
                     </div>
                 </div>
             </div>
 
             <div class="info-card" id="installation-start">
                 <h2>Installation &amp; Start</h2>
-                <p>Zum Start genügt ein moderner Browser (Chrome, Edge oder Firefox). Laden Sie das Repository lokal
-                    und öffnen Sie <code>index.html</code>. Alternativ nutzen Sie den Windows-Starter
-                    <code>start_suite.cmd</code> (oder <code>start_suite.ps1</code>), um die Suite als lokalen Webserver
-                    inklusive Yahoo-Proxy für Online-Kurse zu starten. Für einen komplett browserfreien Aufruf steht die
-                    portable <code>RuhestandSuite.exe</code> bereit; sie benötigt keine zusätzlichen Abhängigkeiten und
-                    lässt sich direkt per Doppelklick starten. Legen Sie die EXE in einen beliebigen Ordner und kopieren
-                    Sie sie bei Bedarf zusammen mit dem Konfigurationsordner als Backup.
-                </p>
+                <p>Wählen Sie eine der beiden Laufzeitvarianten. Die Daten werden jeweils lokal gespeichert, aber in
+                    getrennten Backends. Ein automatischer Cloud-Sync findet nicht statt.</p>
+                <div class="manual-grid" style="margin-top: 1.25rem;">
+                    <div class="detail-block">
+                        <h3>Desktop-App (Tauri)</h3>
+                        <p>Starten Sie <code>RuhestandSuite.exe</code> per Doppelklick. Die Desktop-App benötigt für
+                            lokale Eingaben und Berechnungen keinen separat gestarteten Browser und kein Node.js. Sie
+                            speichert ihre Daten in einer lokalen Datei im App-Datenverzeichnis.</p>
+                    </div>
+                    <div class="detail-block">
+                        <h3>Browser über lokalen HTTP-Server</h3>
+                        <p>Entpacken Sie das Repository und starten Sie <code>start_suite.cmd</code> oder
+                            <code>start_suite.ps1</code>. Der Starter öffnet die Startseite über
+                            <code>http://localhost:…</code>. Ein direktes Öffnen der HTML-Dateien über
+                            <code>file://</code> ist wegen ES-Modulen und Workern kein regulärer Startweg.</p>
+                    </div>
+                </div>
                 <div class="detail-block" style="margin-top: 1.25rem;">
-                    <h3>Praktische Hinweise</h3>
+                    <h3>Netzwerk und optionale Live-Daten</h3>
                     <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                        <li>Sichern Sie Lese- und Schreibrechte, damit lokale Daten (z.B. Szenarien) gespeichert werden
-                            können.</li>
-                        <li>Für Live-Daten (Inflation, Kurse) ist eine Internetverbindung notwendig; die Simulation
-                            funktioniert auch offline.</li>
+                        <li>Kernrechnung, manuelle Eingaben und lokale Persistenz funktionieren ohne Internet.
+                            Google Fonts sowie Live-Kurse und Inflations-/CAPE-Abrufe sind optionale externe
+                            Netzwerkpfade.</li>
                         <li>Online-ETF-Kurse benötigen in der Browser-Variante Node.js, da der lokale Yahoo-Proxy über
-                            <code>start_suite.cmd</code> gestartet wird; die Tauri-EXE bringt diesen Proxy selbst mit.
-                            Ohne Node.js läuft die Browser-Suite weiter, nur der Kurs-Download ist dort deaktiviert.</li>
+                            den Starter gestartet wird; die Tauri-EXE bringt ihren Loopback-Proxy selbst mit. Ohne
+                            Node.js läuft die Browser-Suite weiter, Online-Kursabrufe stehen dort jedoch nicht zur
+                            Verfügung. Kurse können weiterhin manuell gepflegt werden.</li>
                         <li>Beenden Sie die lokalen Dienste mit <code>stop_suite.cmd</code>, wenn der Browser
                             geschlossen wird.</li>
                     </ul>
+                </div>
+            </div>
+
+            <div class="info-card" id="datensicherheit">
+                <h2>Datensicherheit &amp; Wiederherstellung</h2>
+                <p class="card-intro">Ihre Finanzdaten bleiben lokal. Browser und Desktop verwenden jedoch getrennte
+                    Speicherorte; es gibt weder automatischen Cloud-Sync noch eine automatische Übertragung zwischen
+                    beiden Varianten.</p>
+                <div class="detail-block">
+                    <h3>Speicher und Profilkontext</h3>
+                    <ol style="margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li><strong>Browser:</strong> IndexedDB ist die lokale Source of Truth. Private Fenster,
+                            Browserbereinigung oder ein anderes Browserprofil können den Zugriff auf diese Daten
+                            verhindern.</li>
+                        <li><strong>Desktop:</strong> Tauri speichert lokal im App-Datenverzeichnis. Die EXE-Datei
+                            selbst ist kein Backup Ihrer Nutzerdaten.</li>
+                        <li><strong>Vor einer Eingabe:</strong> Auf der Startseite „Aktiv: …“ und „Profil waehlen“
+                            kontrollieren. Beim Profilwechsel wird zuerst der aktuelle Stand gespeichert und dann das
+                            Zielprofil geladen. Schlägt Speichern oder Laden fehl, nicht im vermeintlichen Zielprofil
+                            weiterarbeiten; den angezeigten Recovery-Hinweis befolgen.</li>
+                        <li><strong>Beim Wechsel in eine Teil-App:</strong> Balance, Simulator und Profil-Assets-Manager
+                            über die Startseite öffnen und den dort übergebenen Profilkontext abwarten.</li>
+                    </ol>
+                </div>
+                <div class="detail-block" style="margin-top: 1.25rem;">
+                    <h3>Drei Sicherungsarten mit unterschiedlichem Zweck</h3>
+                    <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li><strong>Komplettbackup:</strong> Unter „Profile &gt; Erweitert &gt; Backup exportieren“ werden
+                            die zulässigen Persistenzdaten einschließlich Profilregistry in eine JSON-Datei
+                            geschrieben. „Backup importieren“ stellt diesen Datenbestand wieder her. Nutzen Sie das
+                            Komplettbackup vor größeren Änderungen und zur Übertragung zwischen Browser und Desktop.</li>
+                        <li><strong>Jahresabschluss-Snapshot:</strong> Die Balance-App erzeugt vor fachlichen
+                            Jahresabschluss-Writes einen internen Recovery-Punkt. Er dient der Wiederherstellung dieses
+                            Prozesses und ersetzt kein extern aufbewahrtes Komplettbackup.</li>
+                        <li><strong>Ergebnisexport:</strong> Balance-, Monte-Carlo-, Backtest- und Szenarioexporte
+                            dokumentieren einen bestimmten Stand oder Lauf. Sie sind nicht automatisch ein vollständiges
+                            Backup aller Profile und Einstellungen.</li>
+                    </ul>
+                </div>
+                <div class="tip-box" style="margin-top: 1.25rem;">
+                    <span class="tip-icon">🔒</span>
+                    <div><strong>Vertraulich behandeln:</strong> Backups und Ergebnisexporte können persönliche
+                        Finanzwerte, Annahmen und Verlaufsdaten enthalten. Bewahren Sie die Dateien geschützt und
+                        versioniert auf; ein Speicherort bei einem Cloud-Anbieter ist eine eigene Entscheidung und kein
+                        Sync-Dienst der Suite.</div>
+                </div>
+                <div class="detail-block" style="margin-top: 1.25rem;">
+                    <h3>Offlinegrenze bei einem begonnenen Jahresabschluss</h3>
+                    <p>Ein normaler lokaler Rechenlauf kann offline fortgesetzt werden. Anders ist ein bereits
+                        gestarteter, periodengebundener Jahresabschluss: Scheitert danach ein erforderlicher
+                        Datenabruf, kann der verifizierte Recovery-Snapshot zusammen mit einem sichtbaren
+                        unvollständigen Periodenstatus bestehen bleiben. Deuten Sie das nicht als erfolgreichen
+                        Offlineabschluss. Folgen Sie dem Recovery-Hinweis und schließen Sie den Prozess erst nach dem
+                        erfolgreichen erforderlichen Datenschritt ab.</p>
                 </div>
             </div>
 
@@ -814,19 +895,22 @@
                 <div class="manual-grid" style="margin-top: 1.5rem;">
                     <div class="detail-block" id="simulator-eingaben">
                         <h3>Eingaben</h3>
-                        <p>Tragen Sie Vermögen, monatliche Sparrate sowie gewünschtes Renteneintrittsalter ein. Fügen
-                            Sie Ihre erwarteten Ausgaben im Ruhestand (Grundbedarf und variable Kosten) hinzu.</p>
+                        <p>Arbeiten Sie die sichtbaren Bereiche von oben nach unten ab: Profile, Startportfolio und
+                            Bedarf, Runway/Rebalancing, Personen/Rente, Ansparphase sowie Pflegefall-Absicherung.
+                            Profilwerte werden vor dem Start validiert; widersprüchliche Portfolio- oder Pflichtwerte
+                            blockieren den Lauf.</p>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Zeithorizont:</strong> Die App simuliert standardmäßig bis zum 100. Lebensjahr;
-                                passen
-                                Sie das Zielalter an, falls längere Sicherheitsmargen gewünscht sind.</li>
-                            <li><strong>Inflationsindex:</strong> Geben Sie heutige Euro-Beträge an, die Engine
-                                indexiert sie
-                                automatisch mit Ihren Annahmen.</li>
-                            <li><strong>Partner-Fälle:</strong> Aktivieren Sie die zweite Person, wenn zwei Rentenströme
-                                oder
-                                Pflegekosten berücksichtigt werden müssen.</li>
+                            <li><strong>Portfolio:</strong> Gesamtvermögen und Teilbestände für Depot, Tagesgeld,
+                                Geldmarkt und Gold müssen zusammenpassen.</li>
+                            <li><strong>Bedarf:</strong> Floor, Flex und optionaler Mindest-Flex sind Jahresbeträge.
+                                Mindest-Flex bleibt eine validierte Untergrenze innerhalb des Flex-Bedarfs und wird
+                                bei ungültiger Eingabe nicht still begrenzt.</li>
+                            <li><strong>Ansparphase:</strong> Aktivierung, Dauer, Monatsrate und Indexierungsmodus sind
+                                eigene Eingaben; Sparrate und Rentenbeginn gehören nicht zum Parameter Sweep.</li>
+                            <li><strong>Kosten und Pflege:</strong> Kosten-, Steuer- und Pflegeannahmen sind
+                                Modellinputs. Reale Rechts-, Steuer- und Pflegefälle werden dadurch nicht
+                                abschließend bewertet.</li>
                         </ul>
                     </div>
                     <div class="detail-block" id="simulator-renten">
@@ -848,41 +932,44 @@
                     </div>
                     <div class="detail-block" id="simulator-parameter">
                         <h3>Parameter</h3>
-                        <p>Passen Sie optional die Asset-Allokation (Aktienquote), sichere Rentenbestandteile und
-                            Inflationsannahmen an. Die Standardwerte sind konservativ gewählt und dienen als
-                            Startpunkt.</p>
-                        <p style="color: var(--text-light);">Hintergrund: Die Engine arbeitet mit historischen
-                            Kapitalmarktdaten, resampelt Renditen blockweise (Block-Bootstrap) und fügt einen
-                            Inflations-Overlay hinzu. Pessimistische Schwänze werden per Fat-Tail-Adjustment
-                            verstärkt, damit seltene Crash-Jahre realistisch abgebildet werden.</p>
+                        <p>Prüfen Sie Entnahmestrategie, Dynamic Flex, Portfolio-/Kostenannahmen und Monte-Carlo-
+                            Steuerung als zusammengehörigen Modellvertrag. Vorausgefüllte Werte sind keine
+                            persönliche Empfehlung.</p>
+                        <p style="color: var(--text-light);">Die Simulationsmethode ist wählbar: Regime-Sampling
+                            (Markov oder iid), Block-Bootstrap oder Stationary Bootstrap. Das separate
+                            Fat-Tail-/Crash-Overlay gehört nicht zur Basissimulation und bleibt standardmäßig
+                            deaktiviert.</p>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Datenbasis:</strong> Historische Renditen reichen bis 1925; per Startjahr-Filter
-                                und Recency-Gewichtung können Sie jüngere Perioden stärker betonen.</li>
-                            <li><strong>Renditeannahmen:</strong> Passen Sie Mittelwert/Volatilität im Reiter
-                                „Erweiterte
-                                Parameter“ an, wenn Sie eigene Kapitalmarktsichten nutzen.</li>
-                            <li><strong>Korrelationen:</strong> Für gemischte Portfolios steuert der Korrelationsslider,
-                                wie
-                                stark Aktien und Anleihen gemeinsam schwanken; konservative Nutzer lassen den
-                                Standardwert unverändert.</li>
-                            <li><strong>Gebühren/Puffer:</strong> Hinterlegen Sie prozentuale Kosten, um Spar- oder
-                                Auszahlpläne realistisch abzubilden; der Simulator reduziert Renditen automatisch um
-                                diesen Wert.</li>
+                            <li><strong>Datenbasis:</strong> Historische Jahresrecords reichen bis 1925; Jahre vor 1950
+                                können als geschätzt gekennzeichnet und über die sichtbare Option ausgeschlossen
+                                werden.</li>
+                            <li><strong>Dynamic Flex:</strong> Aktivierung, aktuarische Horizon-Methode,
+                                Survival-Quantil, optionales Go-Go und Langlebigkeits-Puffer beeinflussen nur den
+                                flexiblen Bedarf; der Floor bleibt getrennt.</li>
+                            <li><strong>CAPE-Return-Policy:</strong> <code>legacy_step</code> bleibt der Engine-Default.
+                                <code>cape_continuous</code> ist ein expliziter Config-Modus, kein Schalter der
+                                normalen Simulatoroberfläche und keine Auto-Optimize-Dimension. Diagnose und
+                                Detail-Logs weisen die tatsächlich verwendete Policy aus.</li>
+                            <li><strong>Kosten:</strong> Hinterlegte Kosten reduzieren die modellierten Renditen. Sie
+                                ersetzen keine Prüfung realer Produkt-, Handels- oder Steuerkosten.</li>
                         </ul>
                     </div>
                     <div class="detail-block" id="simulator-stresstest">
                         <h3>Stresstests &amp; Presets</h3>
-                        <p>Im Tab „Stress &amp; Pflege“ können Sie historische Extremphasen oder eigene Stressannahmen
-                            aktivieren, um die Robustheit zu prüfen.</p>
+                        <p>Wählen Sie im Monte-Carlo-Bereich optional ein Stresspreset für die ersten
+                            Simulationsjahre. Das getrennte Tail-Risk-Overlay muss über „Fat-Tail-/Crash-Overlay
+                            aktivieren“ ausdrücklich zugeschaltet werden.</p>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Presets:</strong> Great Depression (1929-1933) und Zweiter Weltkrieg
-                                (1939-1945) simulieren seltene Schockperioden.</li>
-                            <li><strong>Custom-Overlay:</strong> Zusätzliche Drawdowns/Inflationsschocks lassen sich
-                                über eigene Parameter abbilden.</li>
-                            <li><strong>Vergleichbarkeit:</strong> Gleiche Einstellungen liefern deterministische
-                                Vergleichswerte für Vorher/Nachher-Checks.</li>
+                            <li><strong>Stresspreset:</strong> Erzwingt das gewählte Szenario zu Beginn des Laufs und
+                                ist von der normalen historischen Stichprobe zu unterscheiden.</li>
+                            <li><strong>Tail Risk:</strong> Jahreswahrscheinlichkeit, Aktien- und Inflationsschock,
+                                Dauer und Cooldown sind zusätzliche Stressannahmen, keine Prognose. Historische
+                                Krisenjahre erhalten keinen weiteren Return-Schock.</li>
+                            <li><strong>Vergleichbarkeit:</strong> Gleicher Seed, RNG-Modus, Samplingvertrag,
+                                Datenfilter und gleiche Inputs sind Voraussetzung für einen nachvollziehbaren
+                                Vorher-/Nachher-Vergleich.</li>
                         </ul>
                     </div>
                     <div class="detail-block" id="simulator-tranchen">
@@ -891,7 +978,9 @@
                             einzelne Tranchen pflegen. Ein valider Detailbestand ermöglicht lotbezogene Verkäufe und
                             Steuerabzüge; ein explizit leerer Bestand nutzt die vereinfachte Aggregatsicht. Korrupte
                             oder widersprüchliche Daten blockieren sichtbar. Der Simulator arbeitet auf tiefen Kopien
-                            und verändert den Realbestand nicht.</p>
+                            und verändert den Realbestand nicht. Die Zustände, Recovery-Wege und der reale
+                            Verkaufsabgleich sind im Abschnitt <a href="#tranchen-zustaende">Tranchenzustände und
+                                Recovery</a> beschrieben.</p>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
                             <li><strong>Öffnen:</strong> Profil auf der Startseite wählen und „Profil-Assets Manager“
@@ -932,18 +1021,26 @@
                     </div>
                     <div class="detail-block" id="simulator-start">
                         <h3>Simulation starten</h3>
-                        <p>Klicken Sie auf <strong>"Simulation starten"</strong>. Der Standard sind 10.000
-                            modellierte Pfade. Bis 100.000 Läufe gilt der interaktive Normalbereich; bei 100.001 bis
-                            1.000.000 Läufen zeigt die Oberfläche Run-Jahre und Speicherklasse und verlangt vor jedem
-                            Start eine ausdrückliche Bestätigung.</p>
+                        <p>Prüfen Sie „Anzahl Simulationen“, Dauer, Blockgröße, Seed, Simulationsmethode und RNG-Modus
+                            und klicken Sie auf <strong>„Monte-Carlo-Simulation starten“</strong>. Der Standard sind
+                            10.000 Pfade. 1 bis 100.000 Läufe liegen im empfohlenen interaktiven Bereich; mehr als
+                            100.000 bis höchstens 1.000.000 erfordern nach jeder Parameteränderung eine ausdrückliche
+                            Großlastbestätigung.</p>
                         <ol style="margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Monte-Carlo-Läufe:</strong> Jeder Lauf erzeugt eine eigene Rendite- und
-                                Inflationssequenz, wendet Sparraten und Entnahmen an und trackt Liquidität sowie
-                                Depotwerte.</li>
-                            <li><strong>Sampling:</strong> Das gewählte Startjahr ist das erste tatsächlich simulierte
-                                Marktjahr. Fixed- und Stationary-Block setzen dort zusammenhängend fort, Markov startet
-                                im Regime dieses Jahres und IID zieht erst ab Jahr 2 unabhängig. CAPE hat Vorrang vor
-                                Filter/Recency; Konflikte und Fallbacks erscheinen in der Sampling-Diagnostik.</li>
+                            <li><strong>Ressourcen:</strong> „Geschätzte Rechenlast“ leitet Run-Jahre und Speicherklasse
+                                aus Runzahl und Dauer ab. „Worker-Anzahl“ erlaubt 0 für automatisch oder 1 bis 32
+                                explizit; „Job-Timebudget (ms)“ erlaubt 50 bis 5.000 und steuert das automatische
+                                Chunking.</li>
+                            <li><strong>Reproduzierbarkeit:</strong> Der Seed liegt zwischen 0 und 4.294.967.295.
+                                „Per-Run Seed“ ist der deterministische Normalmodus; „Legacy Stream“ dient dem
+                                Vergleich mit alten Ergebnissen.</li>
+                            <li><strong>Sampling:</strong> Uniform, harter Startjahr-Filter oder Recency-Half-Life
+                                bestimmen die Auswahl. Das pro Lauf ausgewählte Startjahr ist das erste simulierte
+                                Marktjahr: Block- und Stationary-Sampling setzen von dort blockweise fort, Markov
+                                startet im zugehörigen Regime und iid zieht ab dem Folgejahr unabhängig.</li>
+                            <li><strong>Vorrang:</strong> Aktiviertes CAPE-Sampling bevorzugt ähnliche CAPE-Jahre und
+                                hat Vorrang vor Filter/Recency. Konflikte, effektive Auswahl und Fallbacks gehören zur
+                                Sampling-Diagnostik.</li>
                             <li><strong>Ruin oder Aktien/Gold ≤ 100 €:</strong> Diese Quote markiert Läufe mit
                                 <code>isRuin</code> oder einem Aktien-plus-Gold-Endbestand von höchstens 100 €.
                                 Freie Liquidität und ein verbleibender Pflegebucket zählen nicht zu dieser
@@ -958,9 +1055,9 @@
                                 0 gesetzt. Dieser Ausnahme-Nullwert bremst die Flex-Erholung nach Ende der Notlage
                                 nicht als neuer Glättungsanker. Ein lokaler Extrembär allein reicht nicht; der separate
                                 Floor bleibt unverändert.</li>
-                            <li><strong>Fehlerabfang:</strong> Eingaben werden validiert (keine negativen Sparraten,
-                                Ausgaben &lt;= erreichbare Einnahmen). Fehlende Pflichtfelder werden direkt im UI
-                                hervorgehoben.</li>
+                            <li><strong>Fortschritt und Fehler:</strong> Status und Fortschrittsbalken zeigen den
+                                aktiven Batch. Validierungs- oder Workerfehler erscheinen gesondert; ein technisch
+                                unvollständiger Batch ist kein erfolgreicher Finanzlauf.</li>
                             <li><strong>Abbruch:</strong> „Monte-Carlo-Lauf abbrechen“ beendet die aktive
                                 Worker-Generation. Ein Nutzerabbruch startet keinen seriellen Ersatzlauf; ein neuer
                                 Worker-Pool entsteht erst beim nächsten ausdrücklichen Start.</li>
@@ -988,9 +1085,12 @@
                                 konservativen Horizont aktivieren, zeigen Diagnose und Detail-Logs den rohen und den
                                 effektiven Horizont sowie Hinweise auf Quantil-, Max-Horizon- oder
                                 Übergangsglättung.</li>
-                            <li><strong>Interpretation:</strong> Ein guter Backtest ersetzt keine
-                                Wahrscheinlichkeiten, zeigt aber, ob die Strategie plausible Vergangenheitsszenarien
-                                übersteht.</li>
+                            <li><strong>Export:</strong> „Raw-JSON herunterladen“ beziehungsweise der CSV-Export
+                                dokumentiert diesen historischen Lauf und ist weder das vollständige
+                                Monte-Carlo-Ergebnis noch der Export eines ausgewählten Szenario-Logs.</li>
+                            <li><strong>Interpretation:</strong> Ein Backtest zeigt das Modellverhalten in bekannten,
+                                eingebetteten Daten. Auch ein günstiger Verlauf ist keine Out-of-sample-Validierung,
+                                Zukunftswahrscheinlichkeit oder Garantie.</li>
                         </ul>
                     </div>
                     <div class="detail-block" id="simulator-ergebnisse">
@@ -1014,14 +1114,21 @@
                                 Dekumulationsverpflichtungen bis Tod oder Horizont mit 0 Euro aufgefüllt. Die Kennzahl
                                 ist kein Maß für den gesamten Haushaltskonsum und besitzt kein behauptetes
                                 Quantil-Konfidenzintervall.</li>
-                            <li><strong>Liquiditäts-Puffer:</strong> Zeigt, wie viele Monate der Grundbedarf auch in
-                                Drawdowns gedeckt bleibt. Werte &gt;= 24 Monate gelten als komfortabel.</li>
-                            <li><strong>Stress-Events:</strong> Die Ergebnis-Timeline markiert Kapitalmarktschocks und
-                                zeigt, ob Anpassungen (z.B. Ausgabenreduktion) notwendig gewesen wären.</li>
-                            <li><strong>Median vs. Perzentile:</strong> Lesen Sie Median, 10. und 90. Perzentil
-                                getrennt,
-                                um zu unterscheiden, ob Verbesserungen nur die Mittelwerte betreffen oder wirklich die
-                                Risikoschwänze stabilisieren.</li>
+                            <li><strong>Endvermögen:</strong> Perzentile und Mittelwerte beziehen sich auf die
+                                auswertbaren modellierten Endbestände. Sie sind keine Bandbreite sicher erzielbarer
+                                Vermögen; <code>technical_error</code> darf nicht als Endwert 0 einsortiert werden.</li>
+                            <li><strong>Drawdown:</strong> Drawdown-Kennzahlen messen Rückgänge vom jeweiligen
+                                modellierten Hoch nach der ausgewiesenen Definition. Sie sind nicht mit Verlust,
+                                Ruinquote oder benötigtem Cashpuffer gleichzusetzen.</li>
+                            <li><strong>Steuern:</strong> Steuer-KPIs aggregieren die vereinfachte Modellsteuer über
+                                die ausgewiesenen Läufe und Einheiten. Sie sind keine Steuerberechnung nach aktuellem
+                                Recht und keine Prognose eines Steuerbescheids.</li>
+                            <li><strong>Runway und Kürzungen:</strong> Monatswerte, Zeitanteile und Beträge nur in der
+                                jeweils ausgewiesenen Grundgesamtheit lesen. Ein frei gewählter Komfortgrenzwert ist
+                                keine Produktregel.</li>
+                            <li><strong>Missingness:</strong> Gedankenstrich, <code>null</code>, „nicht anwendbar“ oder
+                                eine kleinere Beobachtungszahl bedeuten fehlende beziehungsweise nicht anwendbare
+                                Daten. Sie dürfen weder als 0 noch als Erfolg umgedeutet werden.</li>
                             <li><strong>Pflege-KPIs:</strong> KPI-Karten je Person zeigen Eintrittsalter, Dauer,
                                 realen modellierten Mehrbedarf zur Preisbasis des Simulationsstarts, simultane
                                 Pflegejahre sowie nicht-kausale Gruppenmedian-Deltas. Ein Gedankenstrich bedeutet
@@ -1056,38 +1163,44 @@
                                 dem Klick und enthält die Finanzannahmen des aktuellen Szenarios.</li>
                             <li><strong>Szenario-Export:</strong> JSON/CSV eines ausgewählten Szenario-Logs bleibt ein
                                 eigener, kleinerer Export und ersetzt den vollständigen Laufvertrag nicht.</li>
+                            <li><strong>Vertraulichkeit:</strong> Alle drei Exportarten können persönliche
+                                Finanzannahmen enthalten. Legen Sie sie geschützt ab; ein Ergebnisexport ersetzt kein
+                                Komplettbackup.</li>
                         </ul>
                     </div>
                     <div class="detail-block" id="simulator-sweep">
                         <h3>Parameter Sweep &amp; Szenarien</h3>
-                        <p>Der Parameter Sweep testet systematisch mehrere Sparraten, Ruhestandsalter oder
-                            Aktienquoten. Die Heatmap zeigt, welche Kombinationen im gewählten Modell und
-                            Stichprobenlauf die Zielkennzahlen erreichen. Quantilrankings sind experimentelle
-                            Punktschätzer, keine extern validierte Rangfolge.</p>
+                        <p>Der Parameter Sweep vergleicht Kombinationen aus sieben sichtbaren Modelldimensionen. Die
+                            Heatmap ist eine Sensitivitätsansicht im gewählten Modell-, Daten- und Stichprobenraum;
+                            ihre Kennzahlen sind keine empirischen Zukunftswahrscheinlichkeiten oder extern
+                            validierte Rangfolge.</p>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Konvergenz:</strong> Der Sweep wiederverwendet die gleichen Zufallssamen, um
-                                Varianten vergleichbar zu halten. Kleine Sprünge sind normal; trendende Muster sind
-                                entscheidend.</li>
-                            <li><strong>Szenario-Speicher:</strong> Speichern Sie interessante Konfigurationen als
-                                benannte Szenarien, um sie später in der Balance-App gegenzuprüfen.</li>
+                            <li><strong>Sieben Sweep-Dimensionen:</strong> Liquiditäts-Runway,
+                                Gold-Rebalancing-Band, maximale Skim-Quote, maximale Bear-Refill-Quote, Goldziel,
+                                VPW-Survival-Quantil und VPW-Go-Go-Multiplikator. Quantil und Go-Go sind nur bei den
+                                passenden aktivierten Dynamic-Flex-Einstellungen anwendbar.</li>
+                            <li><strong>Keine Sweep-Dimension:</strong> Sparrate, Rentenbeginn, Aktienzielquote und
+                                direkter VPW-Horizont lassen sich in der interaktiven Sweep-Oberfläche nicht
+                                variieren. Solche Annahmen vergleichen Sie gegebenenfalls als getrennte
+                                Rahmendaten-Szenarien.</li>
+                            <li><strong>Vergleichsrauschen:</strong> Der Sweep verwendet gemeinsame deterministische
+                                Zufallsgrundlagen für Varianten. Kleine Unterschiede bleiben Stichprobenergebnisse;
+                                prüfen Sie Provenienz und mehrere Kennzahlen statt nur eine farbige Zelle.</li>
                             <li><strong>Optimierer:</strong> Auto-Optimize ist ein experimentelles
                                 Vergleichsverfahren. Es sucht modellinterne Kandidaten unter den gewählten Daten,
                                 Seeds, Parametern und Constraints; der Champion ist kein globales Optimum und keine
                                 Finanzempfehlung.</li>
-                            <li><strong>Auto-Optimize-Details:</strong> Der Optimierer arbeitet in drei Stufen
-                                (Grob/Raffiniert/Verifikation) und gibt eine Champion-Konfiguration als Vorlage aus.
+                            <li><strong>Auto-Optimize-Details:</strong> Der Optimierer arbeitet mehrstufig mit
+                                Kandidatenerzeugung, Quick-Filter, voller Evaluation, lokaler Verfeinerung und
+                                Bestätigung auf getrennten Seeds. Er gibt eine Champion-Konfiguration als Vorlage aus.
                                 Die Ergebnisanzeige nennt Modellversion, Hashes des gesamten Datenuniversums,
                                 die effektive Filterauswahl sowie getrennte technische, interne und externe
                                 Validierungsstatuswerte.</li>
-                            <li><strong>Preset-Setups:</strong> Vordefinierte Sweep-Presets und eine dynamische
-                                Parameter-Auswahl (1-7 Parameter) beschleunigen den Einstieg.</li>
-                            <li><strong>Sweep-Felder mit geprüftem Datenpfad:</strong> Der interaktive Sweep bietet Runway-Minimum
-                                und -Ziel, Aktienzielquote, Rebalancing-Band, maximale Skim-Quote, Goldziel,
-                                maximale Bear-Refill-Quote, Survival-Quantil und Go-Go-Multiplikator. Nur der
-                                direkte Horizont ist keine Browserdimension, weil er den aktuarischen Einstellungen
-                                folgt. Geprüft sind Zuordnung, Consumer und Ergebnisprovenienz; daraus folgt kein
-                                eigenständiger Nachweis der KPI-Wirkung oder fachlichen Modellgüte.</li>
+                            <li><strong>Sechs Auto-Optimize-Dimensionen:</strong> Liquiditäts-Runway, Goldziel,
+                                Gold-Rebalancing-Band, maximale Skim-Quote, VPW-Survival-Quantil und
+                                VPW-Go-Go-Multiplikator. Die maximale Bear-Refill-Quote bleibt im Auto-Optimize
+                                ausgeschlossen; je Lauf werden 1 bis 6 dieser Dimensionen ausgewählt.</li>
                             <li><strong>Schutzmechanismen:</strong> Whitelist + Rente-2-Invarianz verhindern, dass
                                 Partner-Felder versehentlich verändert werden; Verstöße erscheinen als Heatmap-Badges.
                             </li>
@@ -1106,16 +1219,22 @@
                         <h3>Best Practices &amp; typische Fragen</h3>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>„Was passiert bei Crash + Inflation?“</strong> Testen Sie ein pessimistisches
-                                Inflationsband und senken Sie die Aktienquote leicht; prüfen Sie, ob die Liquidität in
-                                den ersten fünf Ruhestandsjahren stabil bleibt.</li>
-                            <li><strong>„Reicht meine Sparrate?“</strong> Nutzen Sie den Sweep mit 50-€-Schritten. Ein
-                                Plateau bei Floor-Deckung und Risikokennzahlen zeigt, dass weitere Erhöhungen im
-                                untersuchten Modellraum wenig zusätzlichen Nutzen bringen.</li>
+                            <li><strong>„Was passiert bei Crash + Inflation?“</strong> Speichern Sie zuerst einen
+                                Basislauf und aktivieren Sie danach bewusst Stresspreset oder Tail-Risk-Overlay.
+                                Vergleichen Sie bei sonst gleichem Seed Outcomes, Kürzungen, Runway und Drawdown.</li>
+                            <li><strong>„Wie wirkt eine andere Sparrate?“</strong> Ändern Sie die Monatsrate in der
+                                Ansparphase und speichern Sie einen getrennten Szenariolauf. Der Sweep kann die
+                                Sparrate nicht variieren.</li>
                             <li><strong>„Wie robust ist mein Entnahmeplan?“</strong> Simulieren Sie reduzierte flexible
                                 Ausgaben und vergleichen Sie Floor-Deckung, Outcomes, Kürzungsanteil und reale
                                 Depotentnahme. Eine geringe Differenz allein ist noch kein externer Robustheitsnachweis.</li>
                         </ul>
+                        <div class="warning-box" style="margin-top: 1rem;">
+                            <strong>Modell- und Beratungsgrenze:</strong> Monte Carlo, Backtest, Sweep und
+                            Auto-Optimize unterstützen den Vergleich dokumentierter Annahmen. Sie ersetzen keine
+                            Anlage-, Steuer-, Rechts- oder Pflegeberatung und liefern weder Garantie noch globales
+                            Optimum.
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1128,19 +1247,34 @@
                 <div class="manual-grid" style="margin-top: 1.5rem;">
                     <div class="detail-block" id="balance-jahresupdate">
                         <h3>Jahres-Update</h3>
-                        <p>Starten Sie das Jahres-Update, um alle automatischen Schritte gebündelt auszulösen und
-                            danach nur noch die geprüften Werte zu ergänzen.</p>
+                        <p>„🌐 Jahres-Update“ und „⭐ Jahresabschluss“ führen in denselben fail-safe,
+                            periodengebundenen Abschluss. Der Prozess darf für ein Kalenderjahr nur einmal
+                            erfolgreich abgeschlossen werden.</p>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Automatisch aktualisiert:</strong> Inflation (ECB/World Bank/OECD),
-                                daraus abgeleitete Floor-, Flex- und Mindest-Flex-Bedarfe, Altersfelder beider Personen sowie
-                                Markt-Kontext (CAPE-Rotation, ATH-Status, Shiller-Daten nachgerückt).</li>
-                            <li><strong>Manuell zu prüfen:</strong> aktuelle Depotwerte (Aktien, Anleihen,
-                                ETFs), Cash- und Tagesgeldstände. Korrigieren Sie Tippfehler sofort, damit Guardrails
-                                korrekt greifen.</li>
-                            <li><strong>Prozesskette:</strong> Daten abrufen → Inflation anwenden → Guardrails
-                                neu berechnen → Diagnose aktualisieren → Kapitalfluss-Vorschläge anzeigen.</li>
+                            <li><strong>Vorprüfung:</strong> Das aktive Profil muss stimmen, der Ausgaben-Check muss
+                                auf dem abzuschließenden Kalenderjahr stehen, Alter und Eingaben müssen gültig sein.
+                                Bei Altdaten fragt die App einmalig, ob die Periode noch offen oder bereits
+                                abgeschlossen ist.</li>
+                            <li><strong>Recovery vor Writes:</strong> Die App speichert und bestätigt zuerst einen
+                                Jahresabschluss-Snapshot. Erst danach markiert sie die Periode als laufend und beginnt
+                                mit Änderungen.</li>
+                            <li><strong>Automatische Fortschreibung:</strong> Alter, Inflation, daraus abgeleitete
+                                Floor-, Flex- und Mindest-Flex-Bedarfe, periodengebundene ETF-/CAPE-Daten und das
+                                Ausgabenjahr werden fortgeschrieben.</li>
+                            <li><strong>Abschlussprüfung:</strong> Die App validiert unter anderem das erwartete Alter
+                                und das neue Ausgabenjahr und persistiert anschließend den periodengebundenen Stand.
+                                Erst die Erfolgsmeldung kennzeichnet den Abschluss als vollständig.</li>
+                            <li><strong>Manuell danach:</strong> Depot-, Geldmarkt- und Cash-Iststände werden im
+                                Profil-Assets-Manager gepflegt. Öffnen Sie Balance danach erneut und prüfen Sie
+                                Diagnose und Handlungsschritte.</li>
                         </ul>
+                        <div class="warning-box" style="margin-top: 1rem;">
+                            <strong>Fehler nach dem Snapshot:</strong> Ein fehlgeschlagener erforderlicher Online- oder
+                            Schreibschritt hinterlässt bewusst einen unvollständigen Jahresprozess. Stellen Sie den in
+                            der Fehlermeldung genannten Recovery-Snapshot wieder her, bevor Sie erneut beginnen. Ein
+                            manueller Wert oder Offlinebetrieb ist in diesem Zustand kein stiller Fallback.
+                        </div>
                     </div>
                     <div class="detail-block" id="balance-marktdaten-csv">
                         <h3>Marktdaten per CSV importieren</h3>
@@ -1173,6 +1307,12 @@
                                 Formularwerten moeglich und fuehrt die konkrete Abweichung als
                                 <code>validationWarnings</code> auf.</li>
                         </ul>
+                        <p style="color: var(--text-light); margin-top: 0.5rem;"><strong>Drei getrennte Wege:</strong>
+                            Der periodengebundene Jahresabschluss ruft die benötigten Jahresdaten als Teil seiner
+                            Commit-Kette ab. „🗓️ Nachr.“ verschiebt Marktdaten separat und ist kein Jahresabschluss.
+                            Der CSV-Import ist ein kontrollierter manueller Datenweg mit eigener Periode,
+                            Stichtagsprüfung, Vorschau, Provenienz und Recovery-Snapshot; er schließt keine
+                            Jahresperiode.</p>
                     </div>
                     <div class="detail-block" id="balance-snapshots">
                         <h3>Jahresabschluss-Snapshots</h3>
@@ -1205,6 +1345,13 @@
                             nicht genutzten Rahmen. Ein gesetzter Mindest-Flex wird dort ebenfalls mit Betrag, Status,
                             erforderlicher Rate, Blockiergrund und Effekt vor/nach dem Policy-Schritt angezeigt. Die
                             Hauptansicht bleibt bewusst kompakt.</p>
+                        <p style="color: var(--text-light);"><strong>Runway-Messung:</strong> Das konfigurierbare
+                            Runway-Ziel von 1 bis 10 Jahren bezieht sich auf die final geplante Netto-Entnahme nach
+                            Renten und Spending-Policies. Die kanonische Anzeige misst freie Liquidität nach der
+                            geplanten Transaktion und vor der Jahresauszahlung. Davon getrennt schützt „Min.
+                            Cash-Puffer (Monate)“ einen Bruttobetrag aus ungekürztem Floor plus Flex; die
+                            Ziel-Liquidität ist der höhere, auf volle 100 Euro aufgerundete Wert. Eine interne harte
+                            Runway-Untergrenze ist ebenfalls nicht dieser Brutto-Notfallpuffer.</p>
                     </div>
                     <div class="detail-block" id="balance-pflegebucket">
                         <h3>Pflegebucket</h3>
@@ -1217,6 +1364,10 @@
                                 Liquidität, Zieldeckung und Ziellücke erscheinen in Übersicht und Diagnose.</li>
                             <li><strong>Keine automatische Freigabe:</strong> Balance kennt derzeit keinen aktuellen
                                 Pflegegrad-Ist-Zustand. Deshalb bleibt die Policy <code>diagnostic_only</code>.</li>
+                            <li><strong>Keine Runway-Gleichsetzung:</strong> Pflegebucket, Brutto-Notfallpuffer,
+                                Runway-Ziel und übrige freie Liquidität sind getrennte Größen. Die
+                                Pflegebucket-Anzeige ist in Balance eine Diagnose und löst keine automatische
+                                Entsperrung oder Transaktion aus.</li>
                             <li><strong>Jahresplanung:</strong> Reale Pflegeausgaben tragen Sie weiterhin über Bedarf
                                 und Jahresplanung ein. Die Zweckbindung zeigt, welcher Liquiditätsanteil nicht normal
                                 verfügbar ist.</li>
@@ -1226,7 +1377,8 @@
                         <h3>Handlungsschritte</h3>
                         <p>Im Panel „Ergebnisse &amp; Handlungsschritte“ sehen Sie klare Aufgaben inklusive Reihenfolge.
                             Jede Aufgabe verweist auf die benötigten Konten (Aktien-Depot, Geldmarkt, Ausgabenkonto)
-                            und nennt Zielbeträge, sodass Sie jede Transaktion 1:1 umsetzen können.</p>
+                            und nennt modellierte Zielbeträge. Prüfen Sie Beträge, Messphase, Steuern und
+                            Kontozuordnung vor jeder realen Ausführung.</p>
                         <p style="color: var(--text-light);">Design-Entscheidung: Die Reihenfolge folgt dem
                             Entscheidungsbaum (erst Liquidität, dann Quote, dann eventuelle CAPE-Bremsen), um
                             unnötige Trades zu vermeiden.</p>
@@ -1234,8 +1386,11 @@
                     <div class="detail-block" id="balance-kapitalfluss">
                         <h3>Kapitalfluss</h3>
                         <p>Die App fasst zusammen, welche Beträge zwischen Aktien, Cash und Entnahmekonten fließen
-                            sollen. Nutzen Sie die Checkliste im Panel, um Verkäufe, Umbuchungen und Auszahlungen in
-                            exakt dieser Reihenfolge abzuwickeln.</p>
+                            sollen. Diese Empfehlung verändert weder Bank- noch Brokerbestand. Führen Sie den realen
+                            Auftrag selbst aus, prüfen Sie die tatsächliche Abrechnung und bestätigen Sie einen
+                            Tranchenverkauf erst danach per Vorschau und Reconcile. Der Reconcile reduziert Lots,
+                            bucht den Erlös aber nicht automatisch in freie Liquidität; den Cashstand führen und
+                            bestätigen Sie separat manuell nach.</p>
                     </div>
 
                     <div class="detail-block" id="balance-ausgaben-check">
@@ -1286,37 +1441,17 @@
                         <h3>Depot-Tranchen-Manager</h3>
                         <p>In der Balance-App fließen valide detaillierte Tranchen direkt in die Handlungsschritte ein.
                             Das sorgt für realistische Steuerabschätzungen und eine klare Zuordnung, welche Positionen
-                            verkauft werden sollen. Die Empfehlung selbst bleibt schreibfrei.</p>
+                            verkauft werden sollen. Die Empfehlung selbst bleibt schreibfrei. Führen Sie einen realen
+                            Brokerverkauf ausschließlich über den Ablauf <a href="#tranchen-lebenszyklus">Verkauf,
+                                Reconcile und Cashabschluss</a> nach.</p>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
                             <li><strong>Aktivierung:</strong> Profil auf der Startseite wählen, Tranchen im
                                 Profil-Assets-Manager pflegen und den bestätigten Speicherstatus abwarten.</li>
                             <li><strong>Verkaufsauswahl:</strong> Steueroptimierte Reihenfolge (geringste Steuerlast
                                 zuerst).</li>
-                            <li><strong>Reale Ausführung:</strong> Erst nach dem Brokerverkauf im Manager Vorschau und
-                                separate Bestätigung des Reconcile-Schritts durchführen. Eine identische Action-ID wird
-                                nur einmal angewandt.</li>
-                            <li><strong>Cashstatus beim Verkauf:</strong> Standardmäßig „Nein / noch unklar“ wählen.
-                                Der Verkauf reduziert dann das Lot, bleibt aber als manuell offene Cashbuchung sichtbar.
-                                Nur wenn der Nettoerlös bereits sicher im erfassten Cashstand enthalten ist,
-                                „bereits berücksichtigt“ wählen und den Cashstand eingeben.</li>
-                            <li><strong>Offenen Cashstatus schließen:</strong> Den Nettoerlös selbst in den Rahmendaten
-                                beziehungsweise im tatsächlich geführten Cashbestand nachtragen. Danach beim
-                                Zielverkauf „Cashbuchung manuell bestätigen“ wählen, unveränderten Nettoerlös,
-                                kanonische Nachweis-ID und Cashstand prüfen und explizit bestätigen. Die Suite bucht
-                                nichts automatisch.</li>
-                            <li><strong>Tippfehler korrigieren:</strong> „Bestätigten Cashstand korrigieren“ wählen,
-                                bisherigen und neuen Stand prüfen und einen nichtleeren Grund erfassen. Verkauf,
-                                Abschluss und frühere Korrekturen bleiben unverändert sichtbar; nur die letzte
-                                lückenlose Revision ist der wirksame Cashstand.</li>
-                            <li><strong>Paralleles Fenster:</strong> Hat ein anderes Fenster den Cashstatus seit dem
-                                Öffnen des Dialogs verändert, wird die alte Korrektur vor der Bestätigung blockiert.
-                                Dialog schließen, den aktuellen Stand neu laden und die Korrektur erneut prüfen; die
-                                Suite leitet niemals still eine neue Revision aus dem veralteten Dialog ab.</li>
-                            <li><strong>Altbestand:</strong> Frühere Verkäufe ohne Cashstatus erscheinen als
-                                „Abgeschlossen (Altfall – Cashstatus nicht dokumentiert)“. Sie sind kein offener
-                                Rückstand und keine Cashbestätigung; der Nachweis kann freiwillig ergänzt werden.
-                                Balance und Simulator weisen solche Altverkäufe ebenfalls gesondert aus.</li>
+                            <li><strong>Schreibgrenze:</strong> Balance berechnet und empfiehlt; sie reduziert keine
+                                realen Lots und bucht keinen Verkaufserlös.</li>
                         </ul>
                         <p style="color: var(--text-light); margin-top: 0.5rem;">Ohne gepflegte Tranchen fallen die
                             Steuerwerte auf eine vereinfachte Schätzung zurück.</p>
@@ -1346,35 +1481,39 @@
             </div>
 
             <div class="info-card" id="balance-jahresupdate-guide" style="margin-top: 1.5rem;">
-                <h2>Jahres-Update-Kette im Detail</h2>
-                <p class="card-intro">Diese Schrittfolge beschreibt, welche Felder automatisch aktualisiert werden und
-                    welche Eingaben Sie nach dem Update prüfen oder ergänzen müssen.</p>
+                <h2>Jahresabschluss von der Vorbereitung bis zur Umsetzung</h2>
+                <p class="card-intro">Halten Sie diese Reihenfolge ein, damit Periode, Recovery-Punkt, Marktdaten und
+                    reale Kontostände nachvollziehbar bleiben.</p>
                 <div class="manual-grid" style="margin-top: 1.5rem;">
                     <div class="detail-block">
-                        <h3>Automatische Fortschreibungen</h3>
-                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light);">
-                            <li><strong>Inflation &amp; Bedarf:</strong> Der neu abgerufene Inflationswert indexiert
-                                Floor
-                                und Flex-Bedarf. Die Vorjahreswerte bleiben zum Vergleich sichtbar.</li>
-                            <li><strong>Alter:</strong> Startalter aller Personen erhöht sich um ein Jahr; abhängige
-                                Renten- und Pflege-Trigger werden neu berechnet.</li>
-                            <li><strong>Marktkontext:</strong> CAPE-Reihe rückt um ein Jahr weiter, das Allzeithoch wird
-                                ggf. aktualisiert, und der Entscheidungsbaum erhält den neuen CAPE-Overlay-Status.</li>
-                        </ul>
+                        <h3>1. Vorbereiten und abschließen</h3>
+                        <ol style="margin-left: 20px; color: var(--text-light);">
+                            <li>Aktives Profil und gespeicherten Stand prüfen; anschließend ein versioniertes
+                                Komplettbackup erstellen.</li>
+                            <li>Im „Ausgaben-Check“ das abzuschließende Vorjahr wählen und fehlende Monatsdaten oder
+                                Sonderausgaben prüfen.</li>
+                            <li>Jahresabschluss starten und Periode bestätigen. Die App führt Preflight und Flush
+                                aus und erstellt danach den Recovery-Snapshot.</li>
+                            <li>Inflations-, ETF- und CAPE-Schritte vollständig abwarten. Stichtag und Quelle im
+                                Update-Protokoll beziehungsweise in der Marktdaten-Provenienz prüfen.</li>
+                            <li>Erfolgsmeldung, neues Alter und neues Ausgabenjahr kontrollieren. Bei Recovery-Hinweis
+                                abbrechen und den genannten Snapshot wiederherstellen.</li>
+                        </ol>
                     </div>
                     <div class="detail-block">
-                        <h3>Manuelle Prüfungen</h3>
-                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light);">
-                            <li><strong>Depotwerte:</strong> Tragen Sie den aktuellen Marktwert je Depot/ETF ein. Nutzen
-                                Sie getrennte Felder für Aktien und Anleihen, damit die Zielquote korrekt berechnet
-                                wird.</li>
-                            <li><strong>Cash &amp; Tagesgeld:</strong> Hinterlegen Sie Ist-Stände (inkl.
-                                Zinsgutschriften),
-                                damit Runway und Liquiditätspuffer stimmen.</li>
-                            <li><strong>Sonstige Zuflüsse:</strong> Prüfen Sie Sonderzahlungen oder Ausgaben, die nicht
-                                im
-                                Standardbedarf liegen, bevor Sie den Kapitalfluss ausführen.</li>
-                        </ul>
+                        <h3>2. Ist-Stände und Diagnose prüfen</h3>
+                        <ol style="margin-left: 20px; color: var(--text-light);">
+                            <li>Aktuelle Depot-, Geldmarkt- und Cashstände im Profil-Assets-Manager nachführen und den
+                                bestätigten Speicherstatus abwarten.</li>
+                            <li>Balance neu öffnen. Prüfen, ob die Marktdaten-Provenienz zur abgeschlossenen Periode
+                                passt und keine Persistenz- oder Quarantänewarnung angezeigt wird.</li>
+                            <li>Floor, Flex und optionalen Mindest-Flex prüfen. Mindest-Flex muss nichtnegativ sein
+                                und darf den Flex-Bedarf nicht übersteigen; ungültige Werte werden abgelehnt und nicht
+                                still begrenzt.</li>
+                            <li>Runway vor/nach Plantransaktion, Brutto-Notfallpuffer, Pflegebucket-Diagnose und freie
+                                Liquidität getrennt lesen.</li>
+                            <li>Erst danach die modellierten Handlungsschritte beurteilen.</li>
+                        </ol>
                     </div>
                 </div>
 
@@ -1407,15 +1546,19 @@
                 <div class="detail-block" style="margin-top: 1rem;" id="balance-kapitalfluss-guide">
                     <h3>Kapitalfluss praktisch umsetzen</h3>
                     <ol style="margin-left: 20px; color: var(--text-light);">
-                        <li><strong>Verkauf/Rebalancing:</strong> Entnehmen Sie die genannten Beträge aus dem
-                            Aktien-Depot, falls die Quote über Ziel liegt oder der Runway unter das Ziel fällt.</li>
-                        <li><strong>Geldmarkt auffüllen:</strong> Überweisen Sie Verkaufserlöse auf Tagesgeld/
-                            Geldmarkt, bis der Runway (z.B. 12 Monate) wieder erreicht ist.</li>
-                        <li><strong>Monatsbedarf auszahlen:</strong> Transferieren Sie den Floor/Flex-Betrag vom
-                            Geldmarkt auf das Ausgabenkonto. Keine Aktienverkäufe, wenn die Diagnose „kein
-                            Handlungsbedarf“ meldet.</li>
-                        <li><strong>Überschüsse parken:</strong> Bleibt Cash übrig, schieben Sie ihn zurück auf den
-                            Geldmarkt oder tilgen Sie Kreditlinien; das Panel nennt Prioritäten.</li>
+                        <li><strong>Plan prüfen:</strong> Handlung, Betrag, Quell-/Zielkonto und eventuelle
+                            Guardrail- oder Steuerhinweise gegen die tatsächlichen Konten prüfen. „Kein
+                            Handlungsbedarf“ ist ebenfalls ein mögliches Ergebnis.</li>
+                        <li><strong>Bank/Broker ausführen:</strong> Nur die bewusst übernommene Aktion außerhalb der
+                            Suite ausführen. Abweichende Kurse, Gebühren und Steuerabrechnung dokumentieren.</li>
+                        <li><strong>Tranchen abgleichen:</strong> Nach einem realen Depotverkauf im
+                            Profil-Assets-Manager Vorschau und bestätigten Reconcile ausführen. Eine bloße Empfehlung
+                            verändert keine Lots.</li>
+                        <li><strong>Cash nachführen:</strong> Den tatsächlich angekommenen Nettoerlös im geführten
+                            Cashstand erfassen und den offenen Cashnachweis separat bestätigen. Der Reconcile nimmt
+                            diese Buchung nicht automatisch vor.</li>
+                        <li><strong>Ergebnis kontrollieren:</strong> Balance mit den neuen Ist-Ständen erneut öffnen
+                            und prüfen, ob Handlungsschritte und Runway-Anzeige zum realen Stand passen.</li>
                     </ol>
                     <figure style="margin-top: 1rem;">
                         <img src="assets/images/kapitalfluss_mock.svg" alt="Mockup der Kapitalfluss-Schritte"
@@ -1430,8 +1573,9 @@
             <div class="info-card" id="profilverbund"
                 style="margin-top: 2rem; border-left: 5px solid var(--accent-color);">
                 <h2>👥 Profilverbund (Multi-Profil)</h2>
-                <p class="card-intro">Mehrere Profile werden gemeinsam ausgewertet. Die Profilauswahl steuert Balance
-                    und Simulator direkt.</p>
+                <p class="card-intro">Ein Profil besitzt seine eigenen Eingaben und Assets. Ein Profilverbund führt
+                    ausgewählte Profile für eine Haushaltsplanung zusammen, ohne diesen Besitz oder den realen
+                    Tranchenbestand umzuschreiben.</p>
                 <figure style="margin-top: 1rem;">
                     <img src="assets/images/profilverbund_aggregation.svg" alt="Profilverbund Aggregationslogik"
                         style="width:100%; max-width: 1100px; border: 1px solid #e0e6ed; border-radius: 12px; box-shadow: var(--card-shadow);">
@@ -1460,8 +1604,39 @@
                     </ul>
                     <div class="tip-box"
                         style="background: #e8f4f8; padding: 1rem; border-radius: 8px; margin-top: 1rem;">
-                        <strong>💡 Tipp:</strong> Jedes Profil speichert eigene Vermögenswerte, Ausgaben, Renten und
-                        Tranchen. Wechseln Sie das Profil <em>vor</em> Eingaben oder Änderungen.
+                        <strong>💡 Besitzregel:</strong> Tagesgeld, Depot-/Geldmarkt-/Goldwerte, Bedarf, Rente,
+                        Pflegebucket und Tranchen gehören zu dem Profil, dessen Name und ID geladen sind. Wechseln Sie
+                        das Profil <em>vor</em> Eingaben oder Änderungen und kontrollieren Sie den bestätigten
+                        Speicherstatus.
+                    </div>
+                </div>
+
+                <div class="detail-block" id="profilverbund-haushalt" style="margin-top: 1.5rem;">
+                    <h3>Finanzen und Personen getrennt verstehen</h3>
+                    <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li><strong>Finanzielle Aggregation:</strong> Balance kann die Werte mehrerer ausgewählter
+                            Profile summieren. Tagesgeld, Geldmarkt, Depot, Gold, Renten und profilgebundene Tranchen
+                            behalten dabei ihre Herkunft.</li>
+                        <li><strong>Keine zusätzlichen Personen:</strong> Mehr Finanzprofile erzeugen nicht automatisch
+                            mehr individuelle Lebens-, Pflege- oder Hinterbliebenenpfade. Der Simulator unterstützt
+                            höchstens zwei Personen und begrenzt seine Profilauswahl entsprechend.</li>
+                        <li><strong>Hauptprofil:</strong> Im Simulator ist das aktuell geöffnete Profil Hauptprofil,
+                            sofern es ausgewählt ist; andernfalls das erste ausgewählte Profil. Es liefert Person 1 und
+                            die maßgebliche Haushaltskonfiguration, etwa Rentenanpassungsmodus, Stresspreset,
+                            Pflegemodell und Pflegebucket.</li>
+                        <li><strong>Zweites Profil:</strong> Das weitere ausgewählte Profil liefert Person 2 und deren
+                            Alter, Geschlecht und Rente. Renten aller in den kombinierten Eingaben enthaltenen Profile
+                            bleiben finanziell berücksichtigt, auch wenn keine dritte Demografie modelliert wird.</li>
+                        <li><strong>Abweichungen:</strong> Unterscheiden sich maßgebliche Haushaltswerte, zeigt der
+                            Simulator eine Warnung und verwendet den Wert des Hauptprofils; er mischt diese Regeln nicht
+                            still.</li>
+                    </ul>
+                    <div class="warning-box"
+                        style="background: #fff3cd; padding: 1rem; border-radius: 8px; margin-top: 1rem; border-left: 4px solid var(--warning-color);">
+                        <strong>Beispiel:</strong> Drei Finanzprofile können in Balance zu einer Haushaltssicht
+                        beitragen. Im Simulator bleiben es dennoch maximal Person 1 und Person 2; eine Auswahl von mehr
+                        als zwei Profilen wird dort sichtbar auf zwei begrenzt. Prüfen Sie deshalb Hauptprofil,
+                        Profilauswahl und Warnungen vor jedem Lauf.
                     </div>
                 </div>
 
@@ -1472,8 +1647,11 @@
                             aktiv).</li>
                         <li><strong>Aggregation:</strong> Tagesgeld, Geldmarkt, Depot, Gold und Renten werden summiert.
                         </li>
+                        <li><strong>Detailbestand:</strong> Valide Tranchen ersetzen die überlappenden Depot-, Gold-
+                            und Geldmarkt-Aggregate ihres Profils; sie werden nicht zusätzlich aufaddiert.</li>
                         <li><strong>Pflegebucket:</strong> Die Balance-App zeigt den Pflegebucket als gesperrte
-                            Zweckbindung und zieht ihn nicht als automatische Entnahmequelle heran.</li>
+                            Zweckbindung und zieht ihn nicht als automatische Entnahmequelle heran. Maßgeblich ist die
+                            Definition des ersten ausgewählten Profils.</li>
                         <li><strong>Verteilungsmodus:</strong> Steueroptimiert, proportional oder runway-first.</li>
                         <li><strong>Handlungsschritte:</strong> Quellen/Verwendungen werden pro Profil getrennt
                             dargestellt.</li>
@@ -1486,17 +1664,110 @@
                         <li><strong>Profilauswahl:</strong> Im Tab "Rahmendaten" Profile aktivieren.</li>
                         <li><strong>Startdaten:</strong> Startvermögen, Floor/Flex und Renten werden aus den Profilen
                             gefüllt.</li>
-                        <li><strong>Personen & Renten:</strong> Ergeben sich automatisch aus den Profilen (kein
-                            separater Tab).</li>
+                        <li><strong>Personen &amp; Renten:</strong> Das Hauptprofil wird Person 1, das zweite Profil
+                            Person 2. Der Simulator akzeptiert höchstens zwei ausgewählte Profile.</li>
                         <li><strong>Pflegebucket:</strong> Der Simulator übernimmt die Definition des Hauptprofils,
                             gliedert den Bucket erst nach der Haushaltsaggregation aus und warnt bei abweichenden
                             sekundären Profildefinitionen.</li>
                     </ol>
                     <div class="warning-box"
                         style="background: #fff3cd; padding: 1rem; border-radius: 8px; margin-top: 1rem; border-left: 4px solid var(--warning-color);">
-                        <strong>⚠️ Hinweis:</strong> Profile ohne Simulator-Daten werden übersprungen. Füllen Sie die
-                        Rahmendaten einmal pro Profil aus.
+                        <strong>⚠️ Hinweis:</strong> Ungültige oder nicht sicher ladbare Profildaten blockieren den
+                        Lauf. Korrigieren beziehungsweise recovern Sie das genannte Profil; interpretieren Sie es nicht
+                        als still übersprungen.
                     </div>
+                </div>
+
+                <div class="detail-block" id="tranchen-zustaende" style="margin-top: 1.5rem;">
+                    <h3>Tranchen anlegen, laden und wiederherstellen</h3>
+                    <p>Öffnen Sie auf der Startseite zuerst das richtige Profil und dann „Profil-Assets Manager“.
+                        Kontrollieren Sie Profilname und Profil-ID. „Neue Tranche“ erfasst Stückzahl, Kauf- und
+                        aktuellen Preis, passende Kategorie und Typ, Steuerstatus sowie optionale Kennungen. Erst die
+                        erfolgreiche Speicheranzeige bestätigt eine Anlage, Änderung oder Löschung.</p>
+                    <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li><strong>Noch kein Detailbestand:</strong> Es ist kein gespeicherter Tranchenpayload für das
+                            Profil vorhanden. Die vereinfachten Aggregatwerte können verwendet werden; dieser Zustand
+                            ist nicht dasselbe wie ein bewusst gespeichertes leeres Array.</li>
+                        <li><strong>Explizit leer:</strong> „Alle löschen“ wurde bestätigt oder ein valides leeres
+                            Array gespeichert. Das Profil besitzt bewusst keine Detaillots und fällt auf den dafür
+                            vorgesehenen vereinfachten Aggregatpfad zurück.</li>
+                        <li><strong>Valider Detailbestand:</strong> Die Lots sind schema- und klassifikationsgültig.
+                            Sie ersetzen überlappende Aggregate, ermöglichen lotbezogene Planung und behalten im
+                            Profilverbund ihre Herkunft.</li>
+                        <li><strong>Korrupt:</strong> Beschädigtes JSON, doppelte IDs oder widersprüchliche Lots werden
+                            nicht als leer behandelt. Normale Änderungen bleiben gesperrt. Sie können abbrechen, ein
+                            Komplettbackup wiederherstellen, Rohdaten lokal anzeigen/kopieren oder nach ausdrücklicher
+                            Bestätigung genau diesen Profilbestand auf leer setzen.</li>
+                        <li><strong>Nicht verfügbar:</strong> Ein vorübergehender Speicher-/Backendfehler bietet
+                            „Speicher erneut lesen“ beziehungsweise „Speichern erneut versuchen“. Er ist kein
+                            Korruptionsfall und bietet keinen Reset.</li>
+                    </ul>
+                    <p style="color: var(--text-light); margin-top: 0.75rem;">„Kurse aktualisieren“ ist optional.
+                        Gültige EUR-Teilerfolge werden gemeinsam gespeichert; fehlgeschlagene Lots behalten ihren alten
+                        Kurs. Ohne gültigen Quote erfolgt kein Write. Verwenden Sie für Sicherung und Recovery das
+                        zentrale Komplettbackup unter „Profile &gt; Erweitert“; es gibt keinen separaten
+                        Tranchen-Teilimport oder -export.</p>
+                    <div class="warning-box"
+                        style="background: #fff3cd; padding: 1rem; border-radius: 8px; margin-top: 1rem; border-left: 4px solid var(--warning-color);">
+                        <strong>Hybridwarnung im Simulator:</strong> Sobald ein ausgewähltes Profil einen validen oder
+                        explizit leeren Detailbestand besitzt, blockiert ein weiteres Profil mit positiven Depot- oder
+                        Geldmarkt-Aggregaten ohne Detailtranchen. Ergänzen Sie dort einen eindeutigen Detailzustand;
+                        Cost Basis und Teilfreistellung werden nicht erfunden.
+                    </div>
+                </div>
+
+                <div class="detail-block" id="tranchen-lebenszyklus" style="margin-top: 1.5rem;">
+                    <h3>Vom Brokerverkauf bis zum Cashabschluss</h3>
+                    <ol style="margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li><strong>Vorbereiten:</strong> Vor dem ersten produktiven Cashstatus-Vorgang unter „Profile
+                            &gt; Erweitert &gt; Backup exportieren“ ein Komplettbackup erstellen.</li>
+                        <li><strong>Empfehlung prüfen:</strong> Balance, Monte Carlo, Backtest, Sweep und Optimierung
+                            rechnen schreibfrei. Eine Empfehlung ist noch kein Brokerauftrag und ändert kein reales Lot.</li>
+                        <li><strong>Real ausführen:</strong> Den Verkauf beim Broker durchführen und die tatsächlichen
+                            Ausführungsdaten abwarten.</li>
+                        <li><strong>Vorschau:</strong> Im richtigen Profil unter „Tatsächliche Broker-Ausführung
+                            abgleichen“ eine stabile Action-ID, exakte Tranche, Datum, Stückzahl, Bruttoerlös und Kosten
+                            erfassen. Die Vorschau schreibt nichts.</li>
+                        <li><strong>Reconcile bestätigen:</strong> Profil, Lot und resultierenden Bestand prüfen und
+                            „Dauerhafte Bestandsänderung bestätigen“ wählen. Erst dieser Flush reduziert oder entfernt
+                            das reale Lot. Gleiche Action-ID mit gleichen Daten ist ein No-op; abweichende Daten,
+                            Überverkauf, Profilwechsel oder ein seit der Vorschau veränderter Bestand blockieren.</li>
+                        <li><strong>Cashstatus wählen:</strong> Standard ist offen
+                            (<code>pending_manual_posting</code>). Nur wenn der Nettoerlös bereits sicher im erfassten
+                            Cashstand enthalten ist, „bereits berücksichtigt“ wählen und diesen Stand bestätigen.</li>
+                        <li><strong>Offenen Erlös nachführen:</strong> Den tatsächlich angekommenen Nettoerlös selbst
+                            in der freien Liquidität/Rahmendaten erfassen. Der Reconcile bucht ihn niemals automatisch.</li>
+                        <li><strong>Cashabschluss bestätigen:</strong> Beim Zielverkauf „Cashbuchung manuell
+                            bestätigen“ öffnen, unveränderten Nettoerlös und aktuellen Cashstand prüfen und separat
+                            bestätigen. Erst dann ist der offene Cashstatus geschlossen.</li>
+                        <li><strong>Fehler korrigieren:</strong> Einen falschen bestätigten Cashstand nicht
+                            überschreiben. „Bestätigten Cashstand korrigieren“ verwenden, alten und neuen Stand prüfen
+                            und einen Grund angeben. Verkauf, Erstbestätigung und frühere Korrekturen bleiben
+                            unverändert; die letzte lückenlose Revision ist wirksam.</li>
+                    </ol>
+                    <p style="color: var(--text-light); margin-top: 0.75rem;">Hat ein anderes Fenster den Cashstatus
+                        inzwischen geändert, blockiert der veraltete Dialog. Neu laden und erneut prüfen. Frühere
+                        Verkäufe ohne Cashstatus erscheinen als „Abgeschlossen (Altfall – Cashstatus nicht
+                        dokumentiert)“: Sie gelten nicht als offener Rückstand, aber auch nicht als bestätigtes Cash;
+                        ein Nachweis kann freiwillig ergänzt werden.</p>
+                </div>
+
+                <div class="detail-block" id="tranchen-abgleich-checkliste" style="margin-top: 1.5rem; background: #f0f4f8;">
+                    <h3>Checkliste: App, Broker und freie Liquidität</h3>
+                    <ol style="margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li>Stimmen aktiver Profilname und Profil-ID mit dem wirtschaftlichen Eigentümer des
+                            Brokerlots überein?</li>
+                        <li>Stimmen Lot-ID/Instrument, verkaufte Stücke, Ausführungstag, Bruttoerlös und Kosten mit der
+                            Brokerabrechnung überein?</li>
+                        <li>Zeigt die Reconcile-Vorschau den erwarteten Restbestand, ohne bereits zu schreiben?</li>
+                        <li>Wurde der bestätigte Reconcile genau einmal angewandt und der neue Lotbestand gespeichert?</li>
+                        <li>Ist der Nettoerlös tatsächlich im geführten Cashstand enthalten? Falls nein: manuell
+                            nachführen und Cashstatus offen lassen.</li>
+                        <li>Wurde der Cashabschluss erst mit dem realen Cashstand separat bestätigt und eine spätere
+                            Korrektur append-only dokumentiert?</li>
+                        <li>Balance erneut öffnen und Profilquellen, freie Liquidität und Handlungsschritte mit dem
+                            Broker- und Cash-Ist abgleichen.</li>
+                    </ol>
                 </div>
 
                 <div class="detail-block" style="margin-top: 1.5rem; background: #f0f4f8;">
@@ -1516,31 +1787,37 @@
 
             <div class="info-card" id="onboarding-playbook" style="margin-top: 2rem;">
                 <h2>Onboarding-Playbook: Erste Woche/Erstes Jahr mit der Suite</h2>
-                <p class="card-intro">Strukturierte Checkliste, damit neue Nutzer schnell produktiv werden.</p>
+                <p class="card-intro">Kurze Orientierung; die verlinkten Detailkapitel bleiben für Eingaben,
+                    Sicherheitsreaktionen und Ergebnisgrenzen maßgeblich.</p>
                 <div class="detail-block" id="onboarding-woche" style="margin-top: 1rem;">
                     <h3>Erste Woche</h3>
                     <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                        <li><strong>Setup & Zugriff:</strong> Repository klonen oder ZIP laden, <code>index.html</code>
-                            öffnen, Tab "Simulator" laden.</li>
-                        <li><strong>Datenbasis füllen:</strong> Startvermögen, Sparrate, Rentenalter und Basis-Ausgaben
-                            im Simulator eingeben und erste Simulation speichern.</li>
-                        <li><strong>Balance-Grundlagen:</strong> In der Balance-App einen Testlauf mit Demo-Werten
-                            durchführen, um Diagnose-Panel und Kapitalfluss zu verstehen.</li>
-                        <li><strong>Datenablage klären:</strong> Speicherort für exportierte Szenarien (z.B.
-                            OneDrive/Nextcloud) definieren und Schreibrechte testen.</li>
+                        <li><strong>Setup & Zugriff:</strong> Desktop-App starten oder den Browser-Starter ausführen,
+                            auf der Startseite das aktive Profil prüfen und anschließend den Simulator öffnen.</li>
+                        <li><strong>Datenbasis füllen:</strong> Die tatsächlich sichtbaren Rahmendaten, Personen,
+                            Renten, Bedarfe und Portfolioannahmen im Simulator prüfen. Den ersten Lauf als
+                            Modellrechnung auswerten, nicht als persönliche Empfehlung.</li>
+                        <li><strong>Abläufe kennenlernen:</strong> Den <a class="toc-link" data-tab-target="manual"
+                                href="#simulator-start">Simulatorablauf</a> und den <a class="toc-link"
+                                data-tab-target="manual" href="#balance-jahresupdate-guide">Balance-Jahresprozess</a>
+                            lesen. Einen echten Jahresabschluss nicht mit erfundenen Ist-Daten starten.</li>
+                        <li><strong>Datenablage klären:</strong> Komplettbackup exportieren und einen geschützten,
+                            versionierten Speicherort festlegen. Ergebnisexporte getrennt davon ablegen.</li>
                     </ul>
                 </div>
                 <div class="detail-block" id="onboarding-jahr" style="margin-top: 1rem;">
                     <h3>Erstes Jahr</h3>
                     <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                        <li><strong>Quartals-Review:</strong> Simulationen bei Lebensereignissen (Bonus, Umzug,
-                            Gehaltsänderung) aktualisieren und Benchmarks dokumentieren.</li>
+                        <li><strong>Bei Änderungen aktualisieren:</strong> Betroffene Eingaben nach tatsächlichen
+                            Änderungen an Vermögen, Einzahlungen, Renten oder Bedarf prüfen. Die Suite schreibt dafür
+                            keinen festen Quartalsrhythmus vor.</li>
                         <li><strong>Jahres-Update fest einplanen:</strong> Termin im Kalender blocken, um Inflation,
                             Marktwerte und Bedarfe zu aktualisieren.</li>
-                        <li><strong>Risiko-Governance:</strong> Rebalancing-Schwellen, Notfall-Runway und CAPE-Grenzen
-                            in einer kurzen Policy-Notiz festhalten.</li>
-                        <li><strong>Backup & Versionierung:</strong> Exporte versionieren (z.B. YYYY-MM) und mindestens
-                            zweifach sichern, um Datenverlust zu vermeiden.</li>
+                        <li><strong>Risiko-Governance:</strong> Rebalancing-Schwellen, Netto-Runway-Ziel,
+                            getrennten Brutto-Notfallpuffer und CAPE-Grenzen in einer kurzen Policy-Notiz
+                            festhalten.</li>
+                        <li><strong>Backup und Exporte trennen:</strong> Ein aktuelles Komplettbackup geschützt und
+                            nachvollziehbar ablegen; Ergebnisexporte sind kein Ersatz dafür.</li>
                     </ul>
                 </div>
             </div>
@@ -1550,56 +1827,65 @@
                 <div class="detail-block" style="margin-top: 1rem;">
                     <h3>Keine Internetverbindung für EZB-Daten</h3>
                     <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                        <li><strong>Symptom:</strong> Jahres-Update bleibt bei „Inflationsdaten laden“ hängen.</li>
-                        <li><strong>Sofortmaßnahme:</strong> Internetverbindung prüfen, VPN/Firewall temporär
-                            deaktivieren, Seite neu laden.</li>
-                        <li><strong>Fallback:</strong> Inflationsrate manuell eintragen (Feld „Inflation manuell“ im
-                            Jahres-Update), danach Speichern drücken.</li>
-                        <li><strong>Prävention:</strong> Vor geplantem Update Offline-Sperren (Flugmodus/Firewall)
-                            prüfen und Datenquelle in <code>balance-config.js</code> nicht ändern.</li>
+                        <li><strong>Vor dem Abschluss:</strong> Verbindung und im Browserbetrieb den lokalen Proxy
+                            prüfen. Ein vorab gepflegter manueller Wert oder CSV-Import ersetzt den erforderlichen
+                            Datenlauf des periodengebundenen Abschlusses nicht.</li>
+                        <li><strong>Während des Abschlusses:</strong> Meldet die App nach dem Recovery-Snapshot einen
+                            unvollständigen Jahresprozess, keine Werte nachträglich überschreiben und nicht einfach
+                            offline neu starten.</li>
+                        <li><strong>Recovery:</strong> Den in der Fehlermeldung benannten Jahresabschluss-Snapshot
+                            wiederherstellen, danach Ursache beheben und den Abschluss erneut von vorn starten.</li>
+                        <li><strong>Nur Marktdaten nachrücken:</strong> „🗓️ Nachr.“ ist ein separater Vorgang und
+                            ersetzt weder Recovery noch periodengebundenen Jahresabschluss.</li>
                     </ul>
                 </div>
                 <div class="detail-block" style="margin-top: 1rem;">
                     <h3>Ungültige Eingaben</h3>
                     <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
                         <li><strong>Symptom:</strong> Felder werden rot markiert oder Buttons bleiben deaktiviert.</li>
-                        <li><strong>Checkliste:</strong> Nur Zahlen ohne Sonderzeichen verwenden, Dezimaltrenner als
-                            Punkt/Komma akzeptiert; Pflichtfelder (Vermögen, Bedarf, Sparrate) ausfüllen.</li>
-                        <li><strong>Fehlerbehebung:</strong> Seite aktualisieren, Eingaben schrittweise wiederherstellen
-                            und auf Plausibilität (keine negativen Werte, realistische Quoten) prüfen.</li>
-                        <li><strong>Dauerhafte Lösung:</strong> Eigene Default-Vorlagen mit validierten Werten als JSON
-                            speichern und beim Start laden.</li>
+                        <li><strong>Checkliste:</strong> Pflichtfelder, Einheiten und Wertebereiche prüfen. Insbesondere
+                            muss Mindest-Flex nichtnegativ und höchstens so groß wie der Flex-Bedarf sein.</li>
+                        <li><strong>Fehlerbehebung:</strong> Den konkret markierten Wert korrigieren und erneut
+                            validieren. Eine Persistenz- oder Quarantänewarnung verlangt eine ausdrückliche
+                            Recovery- oder Reset-Entscheidung; Neuladen ersetzt korrupte Daten nicht still.</li>
+                        <li><strong>Weiteres Vorgehen:</strong> Bleibt die Meldung bestehen, keine Werte durch
+                            wiederholtes Laden oder manuelle Dateibearbeitung erzwingen. Den genauen Feldnamen und die
+                            Meldung für die Fehlersuche notieren.</li>
                     </ul>
                 </div>
                 <div class="detail-block" style="margin-top: 1rem;">
                     <h3>Speichern und Laden</h3>
                     <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                        <li><strong>Speichern schlägt fehl:</strong> Browser-Storage eventuell blockiert.
-                            Drittanbieter-Blocking oder Private Mode deaktivieren, Seite im normalen Modus neu öffnen.
-                        </li>
-                        <li><strong>Datei-Export nicht auffindbar:</strong> Download-Ordner des Browsers prüfen und
-                            einheitlich auf Cloud-Speicher umstellen.</li>
-                        <li><strong>Laden liefert alte Werte:</strong> Cache leeren (Strg+F5) und sicherstellen, dass
-                            die korrekte Datei gewählt wurde; Versionsstempel im Dateinamen verwenden.</li>
-                        <li><strong>Backup-Tipp:</strong> Nach jedem Jahres-Update Export erstellen und in der
-                            Planungs-Dokumentation verlinken.</li>
+                        <li><strong>Speichern schlägt fehl:</strong> Aktives Profil und konkrete Meldung prüfen. Im
+                            Browser kann blockierter lokaler Speicher die Persistenz verhindern; vor weiteren
+                            Änderungen nach Möglichkeit ein Komplettbackup exportieren.</li>
+                        <li><strong>Datei-Export nicht auffindbar:</strong> Download-Ordner des Browsers prüfen. Die
+                            Suite verschiebt Dateien nicht automatisch in einen Cloud-Speicher.</li>
+                        <li><strong>Laden liefert alte Werte:</strong> Aktives Profil, Importdatei und sichtbaren
+                            Zeit-/Versionshinweis prüfen. Ein Browser-Reload wechselt das Profil nicht und repariert
+                            keine korrupten Persistenzdaten.</li>
+                        <li><strong>Backup-Tipp:</strong> Ein Ergebnisexport ersetzt kein Komplettbackup. Erstellen Sie
+                            unter „Profile &gt; Erweitert“ regelmäßig ein versioniertes Komplettbackup.</li>
                     </ul>
                 </div>
             </div>
 
             <div class="info-card" id="jahrespflege" style="margin-top: 2rem;">
-                <h2>Best Practices für die jährliche Pflege</h2>
+                <h2>Jährliche Pflege</h2>
                 <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                    <li><strong>Fixen Termin setzen:</strong> Einmal pro Jahr (idealerweise Januar) alle Eingaben
-                        aktualisieren und Ergebnisse protokollieren.</li>
-                    <li><strong>Datenquellen einfrieren:</strong> Für Vergleiche dasselbe Inflations- und Kursdatum
-                        verwenden; danach Export mit Zeitstempel ablegen.</li>
+                    <li><strong>Abschlussperiode festlegen:</strong> Das abgeschlossene Kalenderjahr im
+                        Ausgaben-Check prüfen und denselben periodengebundenen Ablauf nicht doppelt starten.</li>
+                    <li><strong>Vorher sichern:</strong> Komplettbackup erstellen; den automatisch erzeugten
+                        Jahresabschluss-Snapshot zusätzlich als Recovery-Punkt, nicht als Backupersatz verstehen.</li>
+                    <li><strong>Stichtag und Provenienz prüfen:</strong> Periode, Kursstichtag und Datenquelle im
+                        Update-Protokoll beziehungsweise in der Marktdatenanzeige festhalten.</li>
                     <li><strong>Delta-Review:</strong> Änderungen bei Vermögen, Bedarf, Floor-Deckung, Outcomes und
                         Kürzungs-/Entnahmekennzahlen gegenüber dem Vorjahr notieren; große Abweichungen kommentieren.</li>
-                    <li><strong>Handlungsschritte prüfen:</strong> Rebalancing und Runway-Anpassungen sofort
-                        terminieren, damit der Plan nicht liegen bleibt.</li>
-                    <li><strong>Risiko-Parameter bestätigen:</strong> Ziel-Aktienquote, CAPE-Grenzen und Runway-Minimum
-                        jährlich bestätigen oder schriftlich anpassen.</li>
+                    <li><strong>Handlungsschritte nachführen:</strong> Übernommene Bank-/Brokeraktion, anschließenden
+                        Tranchen-Reconcile und tatsächlichen Cashstand getrennt dokumentieren.</li>
+                    <li><strong>Parameter bewusst prüfen:</strong> Ziel-Aktienquote, CAPE-Grenzen,
+                        Liquiditäts-Runway, Brutto-Cash-Puffer und Mindest-Flex nicht aufgrund einer einzelnen Ampel
+                        ändern.</li>
                 </ul>
             </div>
 
@@ -1622,12 +1908,10 @@
                     <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
                         <li><strong>Release-Stand:</strong> Siehe <code>README.md</code> für die aktuelle Version und
                             Changelog-Notizen.</li>
-                        <li><strong>Changelog:</strong> Detaillierte Änderungen stehen in <code>CHANGELOG.md</code>
-                            (z. B. neue Steuer-Settlement-Logik mit Verlusttopf).</li>
-                        <li><strong>Breaking Changes:</strong> Bei Modellwechseln (z.B. neue CAPE-Logik) alte Exporte
-                            archivieren und neu simulieren.</li>
-                        <li><strong>Validierung:</strong> Nach Updates mindestens einen Smoke-Test (Simulator + Balance)
-                            durchführen und Ergebnisse kurz protokollieren.</li>
+                        <li><strong>Changelog:</strong> Detaillierte Änderungen stehen in <code>CHANGELOG.md</code>.</li>
+                        <li><strong>Nach einem Update:</strong> Versionshinweise auf geänderte Daten- oder
+                            Modellverträge prüfen. Alte Ergebnisexporte behalten ihren damaligen Modellstand und
+                            werden nicht rückwirkend aktualisiert.</li>
                     </ul>
                 </div>
                 <div class="detail-block" id="anhang-dokumente" style="margin-top: 1rem;">
@@ -1646,14 +1930,16 @@
                     </ul>
                 </div>
                 <div class="detail-block" id="anhang-support" style="margin-top: 1rem;">
-                    <h3>Kontakt &amp; Support</h3>
+                    <h3>Hilfe &amp; Fehlerbericht</h3>
                     <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                        <li><strong>Feedback:</strong> Issues im Repository anlegen oder per E-Mail an das
-                            Maintainer-Team senden.</li>
-                        <li><strong>Hilfesuche:</strong> FAQ und Glossar prüfen; bei technischen Problemen Log-Auszug
-                            (Konsole) beilegen.</li>
-                        <li><strong>Response-Zeiten:</strong> Innerhalb von 3 Werktagen für Fehlerberichte, komplexe
-                            Anfragen nach Aufwand.</li>
+                        <li><strong>Hilfesuche:</strong> Zuerst <a class="toc-link" data-tab-target="manual"
+                                href="#haeufige-probleme">Häufige Probleme</a>, FAQ und Glossar prüfen.</li>
+                        <li><strong>Fehler eingrenzen:</strong> Oberfläche, aktives Profil, auslösenden Schritt,
+                            sichtbare Meldung und App-/Browservariante notieren. Nur notwendige Konsolenmeldungen
+                            weitergeben und persönliche Finanzdaten zuvor entfernen.</li>
+                        <li><strong>Kontaktweg:</strong> Dieses Handbuch verspricht keinen bestimmten Supportkanal und
+                            keine Reaktionszeit. Verwenden Sie ausschließlich einen im jeweiligen Repository- oder
+                            Auslieferungskontext ausdrücklich genannten Kontaktweg.</li>
                     </ul>
                 </div>
             </div>
@@ -1661,10 +1947,11 @@
             <div class="info-card" id="faq" style="margin-top: 2rem;">
                 <h2>Häufige Fragen (FAQ)</h2>
                 <dl class="term-list">
-                    <dt>Warum reichen durchschnittliche 7% Rendite nicht?</dt>
-                    <dd>Verluste zu Beginn der Entnahmephase (Sequence of Return Risk) können das Depot so stark
-                        verkleinern, dass es sich trotz späterer Gewinne nicht erholt. Unsere Simulation zeigt daher
-                        Spannbreiten statt nur Mittelwerte.</dd>
+                    <dt>Warum reicht eine Durchschnittsrendite nicht zur Beurteilung?</dt>
+                    <dd>Verluste zu Beginn der Entnahmephase (Reihenfolgerisiko beziehungsweise Sequence-of-Returns-
+                        Risiko) können einen Entnahmepfad stärker belasten als gleich hohe spätere Verluste. Der
+                        Simulator zeigt deshalb modellinterne Verteilungen und historische Pfade statt nur eines
+                        Mittelwerts; auch diese Ergebnisse sind keine Zukunftsgarantie.</dd>
 
                     <dt>Was bringt das Backtesting zusätzlich zur Monte-Carlo-Simulation?</dt>
                     <dd>Backtests untersuchen konkrete, bereits bekannte historische Zeiträume (z.B. ab 2000) und
@@ -1688,7 +1975,9 @@
 
                     <dt>Was bedeutet Mindest-Flex p.a.?</dt>
                     <dd>Der Mindest-Flex ist eine optionale Untergrenze für flexible Ausgaben in gekürzten
-                        Safety-/Guardrail-Jahren. Er ist kein Teil des Floors. Wenn ausreichend Gesamtvermögen
+                        Safety-/Guardrail-Jahren. Er ist kein Teil des Floors. Die Eingabe muss nichtnegativ sein und
+                        darf den Flex-Bedarf nicht übersteigen; ungültige Werte werden abgelehnt, nicht still
+                        begrenzt. Wenn ausreichend Gesamtvermögen
                         vorhanden ist, hebt die Engine die Flex-Rate so weit an, dass mindestens dieser Flex-Betrag
                         erreicht wird; fehlende Floor-Deckung, ein aktiver Alarmvertrag oder ein nicht
                         wiederherstellbarer Mindest-Runway können diese Anhebung blockieren. In der besonders
@@ -1703,11 +1992,10 @@
                         blockieren mit einem Recovery-Hinweis.</dd>
 
                     <dt>Was ist der Verlustverrechnungstopf?</dt>
-                    <dd>Wenn Sie in einem Jahr Kapitalverluste realisieren (z.B. durch Verkauf bei niedrigeren
-                        Kursen), werden diese Verluste automatisch ins nächste Jahr übertragen. Dort werden sie
-                        mit künftigen Gewinnen verrechnet, sodass Sie weniger Steuern zahlen. Die Suite zeigt
-                        die Steuerersparnis in der Handlungsanweisung an. Im Simulator sehen Sie den
-                        durchschnittlichen Effekt als KPI.</dd>
+                    <dd>Die Suite führt den modellierten Verlusttopf im Jahreszustand fort und berücksichtigt ihn in
+                        späteren modellierten Steuer-Settlements. Das ist eine Planungsrechnung, keine Feststellung
+                        Ihres realen steuerlichen Verlustvortrags oder Ihrer tatsächlichen Steuerersparnis. Details
+                        und Grenzen stehen unter <a href="#balance-verlusttopf">Verlustverrechnungstopf</a>.</dd>
 
                     <dt>Warum blockiert der Parameter-Sweep manche Felder?</dt>
                     <dd>Die Sweep-Logik schützt Partner-Felder (Rente 2) und weitere kritische Eingaben über eine
@@ -1735,9 +2023,9 @@
                         nicht: Sie erfassen eine sichtbare append-only Korrektur mit altem/neuem Stand und Grund.</dd>
 
                     <dt>Kann der Simulator mehr als zwei Personen abbilden?</dt>
-                    <dd>Finanzwerte aus mehr als zwei Profilen können aggregiert werden. Individuelle Demografie-,
-                        Mortalitäts-, Pflege- und Rentenpfade werden in Version 1 jedoch auf höchstens zwei Personen
-                        begrenzt; bei mehr Profilen erscheint eine Warnung.</dd>
+                    <dd>Nein. Balance kann Finanzwerte aus mehr als zwei ausgewählten Profilen aggregieren. Der
+                        Simulator begrenzt seine Profilauswahl dagegen sichtbar auf zwei und bildet höchstens Person 1
+                        und Person 2 mit individuellen Demografie-, Mortalitäts-, Pflege- und Rentenpfaden ab.</dd>
 
                     <dt>Ist die Kirchensteuerberechnung eine Steuerberechnung nach aktuellem Recht?</dt>
                     <dd>Nein. Die Suite verwendet eine vereinfachte Planungsformel. Insbesondere die
@@ -1746,12 +2034,18 @@
                         Steuerberatung.</dd>
 
                     <dt>Wie oft sollte ich Rebalancing machen?</dt>
-                    <dd>Ein jährlicher Rhythmus (z.B. zum Jahreswechsel) balanciert Aufwand, Steuern und
-                        Transaktionskosten sinnvoll aus.</dd>
+                    <dd>Die Suite gibt keinen pauschalen Rebalancing-Rhythmus vor. Balance beurteilt den aktuellen
+                        Stand anhand Ihrer Zielquote, Toleranzen, Runway- und Marktregeln und erzeugt daraus einen
+                        modellierten Handlungsvorschlag. Prüfen Sie reale Steuern, Kosten und Kontostände vor der
+                        Umsetzung.</dd>
 
                     <dt>Kann ich die Simulation offline nutzen?</dt>
-                    <dd>Ja. Die Berechnungen laufen lokal im Browser. Nur optionale Echtzeitdaten (Inflation,
-                        Marktpreise) benötigen eine Internetverbindung.</dd>
+                    <dd>Ja. Kernrechnung, manuelle Eingaben und lokale Speicherung funktionieren ohne Internet.
+                        Optionale Live-Abrufe benötigen eine Verbindung. Ein bereits begonnener Jahresabschluss mit
+                        fehlgeschlagenem erforderlichem Datenschritt kann bewusst im Recovery-Zustand bleiben; er ist
+                        dann nicht erfolgreich offline abgeschlossen. Siehe <a class="toc-link"
+                            data-tab-target="manual" href="#datensicherheit">Datensicherheit &amp;
+                            Wiederherstellung</a>.</dd>
 
                     <dt>Wie weit reichen die historischen Daten?</dt>
                     <dd>Die historische Renditebasis reicht bis 1925. Über Startjahr-Filter und Recency-Gewichtung
@@ -1770,29 +2064,35 @@
                         <code>technical_error</code> werden Quote und Wilson-Intervall nicht ausgewiesen.</dd>
 
                     <dt><a class="toc-link" data-tab-target="manual" href="#balance-diagnose">Runway</a></dt>
-                    <dd>Monatspuffer aus Cash/Geldmarkt, der Entnahmen in schwachen Märkten abfedert. Beispiel:
-                        <em>12 Monate Runway</em> = 12 × aktueller Monatsbedarf liegen auf Tagesgeld. Im Diagnose-Panel
-                        (KPIs oben rechts) zeigt die Runway-Anzeige in Monaten, ob der Puffer reicht.
-                    </dd>
+                    <dd>Konfigurierbares Nettoziel für die Reichweite der freien Liquidität. Die kanonische
+                        Balance-Kennzahl misst Cash/Geldmarkt nach der geplanten Transaktion und vor der
+                        Jahresauszahlung gegen die final geplante Netto-Entnahme nach Renten und Spending-Policies.
+                        Das Ziel stammt aus „Liquiditäts-Runway (Jahre)“. Der separate „Min. Cash-Puffer (Monate)“
+                        schützt Bruttobedarf; Pflegebucket und interne harte Runway-Untergrenze sind wiederum eigene
+                        Größen.</dd>
 
                     <dt><a class="toc-link" data-tab-target="manual" href="#balance-handlungsschritte">Skim &amp;
                             Fill</a></dt>
-                    <dd>Kapitalfluss-Logik: Gewinne werden in starken Phasen „abgeschöpft“ (Skim) und füllen den
-                        Runway (Fill), während in Schwächephasen keine Verkäufe erfolgen. Beispiel-Sequenz:
+                    <dd>Kapitalfluss-Logik: In geeigneten Markt- und Guardrail-Situationen können Aktienbeträge
+                        „abgeschöpft“ (Skim) und zur Ziel-Liquidität umgeschichtet werden (Fill). In Bärenphasen kann
+                        eine begrenzte Auffüllung gelten; die konkrete Diagnose ist maßgeblich. Schematische
+                        Plansequenz:
                         <div
                             style="background: var(--card-background); border: 1px solid #e0e6ed; border-radius: 8px; padding: 10px; margin-top: 8px; color: var(--text-light);">
-                            <pre style="margin: 0; white-space: pre-line;">Aktien (über Ziel) → Verkauf 8.000 €
-Geldmarkt +8.000 € → Runway steigt auf 12 Monate
-Ausgabe-Konto erhält Monatsbedarf aus Geldmarkt</pre>
+                            <pre style="margin: 0; white-space: pre-line;">Aktien (über Ziel) → Verkaufsvorschlag
+Brokeraktion ausführen → tatsächlichen Nettoerlös prüfen
+Tranchen abgleichen → Cashstand manuell nachführen</pre>
                         </div>
                         Die Handlungsschritte im Panel verlinken jede Bewegung zwischen Depot, Geldmarkt und Konto.
                     </dd>
 
-                    <dt><a class="toc-link" data-tab-target="manual" href="#simulator-ergebnisse">Parameter Sweep</a>
+                    <dt><a class="toc-link" data-tab-target="manual" href="#simulator-sweep">Parameter Sweep</a>
                     </dt>
-                    <dd>Heatmap, die zeigt, wie Kombinationen aus Sparrate und Rentenbeginn die
-                        modellinterne Floor-Deckung und weitere Zielmetriken beeinflussen. Die Felder sind eine
-                        Sensitivitätsansicht im gewählten Modellraum, keine empirischen Wahrscheinlichkeiten.</dd>
+                    <dd>Experimentelle Heatmap für Kombinationen aus Liquiditäts-Runway, Gold-Rebalancing-Band,
+                        maximaler Skim-Quote, maximaler Bear-Refill-Quote, Goldziel, VPW-Survival-Quantil und
+                        VPW-Go-Go-Multiplikator. Sparrate und Rentenbeginn gehören nicht zu diesen sieben Dimensionen.
+                        Auto-Optimize verwendet davon sechs und schließt Bear Refill aus. Beide Verfahren bleiben
+                        Sensitivitäts-/Kandidatensuchen im ausgewiesenen Modellraum, keine Finanzempfehlung.</dd>
 
                     <dt><a class="toc-link" data-tab-target="manual" href="#simulator-backtest">Backtesting</a></dt>
                     <dd>Historische In-sample-Diagnose: Die Strategie wird ab einem gewählten Startjahr durch die
@@ -1806,14 +2106,14 @@ Ausgabe-Konto erhält Monatsbedarf aus Geldmarkt</pre>
                     <dt><a class="toc-link" data-tab-target="manual" href="#balance-jahresupdate">Floor/Flex-Bedarf</a>
                     </dt>
                     <dd>Fixer Grundbedarf (<strong>Floor</strong>) plus variable Ausgaben (<strong>Flex</strong>). Beide
-                        Werte werden im
-                        Jahres-Update indexiert und steuern Runway- und Kapitalfluss-Berechnungen. Die Flex-Kürzung
-                        berücksichtigt sowohl die Höhe des jährlichen Flex-Bedarfs als auch das Gesamtvermögen (hohes
-                        Vermögen dämpft die Kürzung). Beispiel: 1.500 € Floor + 700 € Flex = 2.200 € Monatsbedarf → 12
-                        Monate Runway = 26.400 € Cash.</dd>
+                        Werte werden im Jahres-Update indexiert. Der Floor bleibt vom Flex getrennt. Renten und
+                        Spending-Policies bestimmen daraus die geplante Netto-Entnahme, die als Runway-Basis dient;
+                        der Brutto-Notfallpuffer verwendet dagegen den ungekürzten Floor plus Flex.</dd>
 
                     <dt><a class="toc-link" data-tab-target="manual" href="#balance-diagnose">Mindest-Flex p.a.</a></dt>
-                    <dd>Optionale Untergrenze für den ausgezahlten Flex-Anteil in gekürzten Jahren. Beispiel:
+                    <dd>Validierte optionale Untergrenze für den ausgezahlten Flex-Anteil in gekürzten Jahren. Der
+                        Wert muss zwischen 0 und dem Flex-Bedarf liegen; außerhalb dieses Bereichs wird die Eingabe
+                        abgelehnt und nicht still angepasst. Beispiel:
                         12.000 € Flex-Bedarf und 6.000 € Mindest-Flex bedeuten, dass die Flex-Rate mindestens 50%
                         erreichen müsste, sofern keine Notfallblocker greifen. Diagnose und Logs zeigen Status,
                         Blockgrund und effektiven Betrag.</dd>
@@ -1854,7 +2154,9 @@ Ausgabe-Konto erhält Monatsbedarf aus Geldmarkt</pre>
 
             // Alle Abschnitte umschalten, damit nur der gewählte Bereich sichtbar ist.
             document.querySelectorAll('.content-section').forEach(section => {
-                section.classList.toggle('active', section.id === normalizedTabId);
+                const isTargetSection = section.id === normalizedTabId;
+                section.classList.toggle('active', isTargetSection);
+                section.setAttribute('aria-hidden', String(!isTargetSection));
             });
 
             const tabButtons = document.querySelectorAll('.tab-btn');
@@ -1864,12 +2166,14 @@ Ausgabe-Konto erhält Monatsbedarf aus Geldmarkt</pre>
                 const buttonTabId = button.dataset.tabId;
                 const isTargetButton = buttonTabId === normalizedTabId;
                 button.classList.toggle('active', isTargetButton);
+                button.setAttribute('aria-selected', String(isTargetButton));
             });
 
             // Fallback: Sollte kein Button matchen, markieren wir den ersten, um den UI-Zustand konsistent zu halten.
             const hasActiveButton = Array.from(tabButtons).some(button => button.classList.contains('active'));
             if (!hasActiveButton && tabButtons.length > 0) {
                 tabButtons[0].classList.add('active');
+                tabButtons[0].setAttribute('aria-selected', 'true');
             }
         }
 
@@ -1904,6 +2208,8 @@ Ausgabe-Konto erhält Monatsbedarf aus Geldmarkt</pre>
                         if (anchorElement) {
                             requestAnimationFrame(() => {
                                 anchorElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                anchorElement.setAttribute('tabindex', '-1');
+                                anchorElement.focus({ preventScroll: true });
                                 // URL-Hash aktualisieren, damit die Navigation teilbar bleibt.
                                 history.replaceState(null, '', anchorId);
                             });

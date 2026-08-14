@@ -65,9 +65,11 @@ function evidence(source, candidateFlexRatePct) {
     };
 }
 
-function runMatrixCell({ sKey, drawdown, wealthFactor, alarmActive }) {
+function runMatrixCell({ sKey, drawdown, wealthFactor, alarmActive, protectedWithdrawalRate = 0.054 }) {
     const state = makeState({ drawdown, wealthFactor });
     const params = makeParams({ sKey });
+    const protectedWithdrawalAnnual = params.inflatedBedarf.floor + params.input.minimumFlexAnnual;
+    params.gesamtwert = protectedWithdrawalAnnual / protectedWithdrawalRate;
     params.lastState = state;
     const structuralEvidence = alarmActive
         ? evidence('alarm', 35)
@@ -85,32 +87,50 @@ function runMatrixCell({ sKey, drawdown, wealthFactor, alarmActive }) {
     );
 }
 
-// NE-03 truth matrix: only current bear_deep plus strictly more than 25% drawdown may set Flex to zero.
+// NE-03 truth matrix: only current bear_deep plus strictly more than 25% drawdown
+// plus a protected portfolio-withdrawal rate of at least 3.5% may set Flex to zero.
 for (const sKey of ['bear_deep', 'side_long']) {
     for (const drawdown of [0.2499, 0.25, 0.2501]) {
-        for (const wealthFactor of [0, 1]) {
-            for (const alarmActive of [false, true]) {
-                const result = runMatrixCell({ sKey, drawdown, wealthFactor, alarmActive });
-                const expectedEmergency = sKey === 'bear_deep' && drawdown > 0.25;
-                assertEqual(
-                    result.severeFlexEmergencyActive,
-                    expectedEmergency,
-                    `NE-03 gate for ${sKey}, drawdown ${drawdown}, wealthFactor ${wealthFactor}, alarm ${alarmActive}`
-                );
-                if (expectedEmergency) {
-                    assertClose(result.flexRate, 0, 1e-9, 'Active NE-03 gate must force exact zero flex');
-                    assertEqual(result.safetyCapSource, 'severe_bear_wealth_emergency', 'Emergency source must be explicit');
-                    assertEqual(result.safetyCapAnchorStage, 'post_total_wealth_drawdown_gate', 'Emergency anchor must match source');
-                    assertEqual(result.minimumFlexOverrideAllowed, true, 'Emergency must explicitly allow overriding minimum flex');
-                } else {
-                    assert(result.flexRate > 0, 'Inactive NE-03 gate must not force zero flex');
+        for (const protectedWithdrawalRate of [0.0349, 0.035, 0.0351]) {
+            for (const wealthFactor of [0, 1]) {
+                for (const alarmActive of [false, true]) {
+                    const result = runMatrixCell({
+                        sKey,
+                        drawdown,
+                        wealthFactor,
+                        alarmActive,
+                        protectedWithdrawalRate
+                    });
+                    const expectedEmergency = sKey === 'bear_deep'
+                        && drawdown > 0.25
+                        && protectedWithdrawalRate >= 0.035;
+                    assertEqual(
+                        result.severeFlexEmergencyActive,
+                        expectedEmergency,
+                        `NE-03 gate for ${sKey}, drawdown ${drawdown}, protected rate ${protectedWithdrawalRate}, wealthFactor ${wealthFactor}, alarm ${alarmActive}`
+                    );
+                    assertClose(
+                        result.protectedPortfolioWithdrawalRate,
+                        protectedWithdrawalRate,
+                        1e-12,
+                        'Protected portfolio-withdrawal rate must be diagnosed'
+                    );
+                    if (expectedEmergency) {
+                        assertClose(result.flexRate, 0, 1e-9, 'Active NE-03 gate must force exact zero flex');
+                        assertEqual(result.safetyCapSource, 'severe_bear_wealth_emergency', 'Emergency source must be explicit');
+                        assertEqual(result.safetyCapAnchorStage, 'post_total_wealth_drawdown_gate', 'Emergency anchor must match source');
+                        assertEqual(result.minimumFlexOverrideAllowed, true, 'Emergency must explicitly allow overriding minimum flex');
+                    } else {
+                        assert(result.flexRate > 0, 'Inactive NE-03 gate must not force zero flex');
+                    }
                 }
             }
         }
     }
 }
 
-// C-14: alarm suppression and withdrawal burden remain diagnostics only.
+// C-14: the historical previous-withdrawal burden remains diagnostic only;
+// the protected current withdrawal burden is the required third gate.
 {
     const result = runMatrixCell({
         sKey: 'bear_deep',
@@ -122,6 +142,35 @@ for (const sKey of ['bear_deep', 'side_long']) {
     assertEqual(result.alarmActive, false, 'Alarm may remain inactive independently');
     assertEqual(result.alarmWealthSufficient, true, 'Suppressed-alarm diagnostic remains visible');
     assertEqual(result.withdrawalBurdenGateRole, 'diagnostic_only', 'Withdrawal burden must not become a hidden third gate');
+    assertEqual(result.protectedPortfolioWithdrawalCapacityCritical, true, 'Protected current withdrawal burden must be critical');
+    assertEqual(result.protectedPortfolioWithdrawalGateRole, 'required', 'Protected current withdrawal burden must be an explicit gate');
+}
+
+// A deep real drawdown with a comfortably affordable protected withdrawal must
+// preserve minimum flex instead of interpreting the market loss as insolvency.
+{
+    const state = makeState({ drawdown: 0.40, wealthFactor: 1, flexRate: 80 });
+    const params = makeParams({ sKey: 'bear_deep' });
+    params.inflatedBedarf = { floor: 0, flex: 58_000 };
+    params.renteJahr = 29_000;
+    params.gesamtwert = 1_750_000;
+    const result = applySpendingPolicyPipeline(
+        state,
+        { active: false, newlyTriggered: false },
+        params,
+        () => {},
+        {
+            geglätteteFlexRate: 20,
+            kuerzungQuelle: 'Tiefer Bär',
+            safetyEvidence: evidence('bear_deep', 20)
+        }
+    );
+    assertClose(result.protectedPortfolioWithdrawalAnnual, 25_000, 1e-9, 'Protected amount is open minimum flex after pension surplus');
+    assertClose(result.protectedPortfolioWithdrawalRate, 25_000 / 1_750_000, 1e-12, 'Protected burden uses current total wealth');
+    assertEqual(result.protectedPortfolioWithdrawalCapacityCritical, false, 'Affordable protected burden must not be critical');
+    assertEqual(result.severeFlexEmergencyActive, false, 'Deep drawdown alone must not override minimum flex');
+    assert(result.flexRate > 0, 'Affordable minimum flex must remain withdrawable');
+    assertEqual(state.keyParams.minimumFlexFulfilled, true, 'Affordable minimum flex must remain fulfilled');
 }
 
 // S3-05: alarm suppression and its diagnostic share one exported threshold.

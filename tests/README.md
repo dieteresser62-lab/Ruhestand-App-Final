@@ -422,6 +422,14 @@ Inventar liegen bewusst in den jeweiligen Fachtests.
   Demografie/Pflege besitzen getrennte Zielhashes; persoenliche Replaydaten
   sind nicht enthalten. `reviewStatus` bleibt bis zur externen Codepruefung
   `pending_external_review`.
+- **Mindest-Flex-Tragfaehigkeitsmessung:**
+  `fixtures/minimum-flex-severe-affordability-measurement-v1.json` ist der
+  versionierte Nachfolger der unveraenderten Slice-03-Fixture. Das schwere
+  Null-Flex-Gate verlangt zusaetzlich eine geschuetzte Portfolioentnahmequote
+  von mindestens 3,5 Prozent. Backtest, Monte Carlo/Sweep und Demografie/Pflege
+  binden ihre neuen Finanzpfade getrennt; Outcome-, Pflege-, technische und
+  FlowDelta-Invarianten bleiben sichtbar. Persoenliche Replaydaten sind nicht
+  enthalten, der Kandidat bleibt `pending_external_review`.
 - **Historische Fixture-Kompatibilitaet:** Vergleichsausnahmen fuer
   unveraenderliche Pending-Fixtures stehen ausschliesslich in
   `snapshot-policy-v1.json`. Der produktive Runtime-Vertrag enthaelt weder

@@ -148,17 +148,23 @@ export function buildKeyParams(params = {}) {
         const drawdown = Number.isFinite(params.realTotalWealthDrawdownRatio)
             ? UIUtils.formatPercentRatio(params.realTotalWealthDrawdownRatio, { fractionDigits: 1, invalid: 'n/a' })
             : 'n/a';
+        const protectedRate = Number.isFinite(params.protectedPortfolioWithdrawalRate)
+            ? UIUtils.formatPercentRatio(params.protectedPortfolioWithdrawalRate, { fractionDigits: 1, invalid: 'n/a' })
+            : 'n/a';
+        const protectedThreshold = Number.isFinite(params.protectedPortfolioWithdrawalRateThreshold)
+            ? UIUtils.formatPercentRatio(params.protectedPortfolioWithdrawalRateThreshold, { fractionDigits: 1, invalid: 'n/a' })
+            : 'n/a';
         pushMetric({
             label: 'Schwere Flex-Notlage',
             value: 'AKTIV · Flex 0%',
-            meta: `Tiefer Bärenmarkt UND realer Drawdown des aktiven Gesamtvermögens ${drawdown} > ${threshold}. Mindest-Flex bewusst überstimmt; Floor bleibt geschützt.`,
+            meta: `Tiefer Bärenmarkt UND realer Drawdown des aktiven Gesamtvermögens ${drawdown} > ${threshold} UND geschützte Portfolioentnahmequote ${protectedRate} ≥ ${protectedThreshold}. Mindest-Flex bewusst überstimmt; Floor bleibt geschützt.`,
             trend: 'down'
         });
         if (params.alarmActiveDiagnostic === false) {
             pushMetric({
                 label: 'Alarm-Diagnose',
                 value: 'Inaktiv (separat)',
-                meta: 'Die Entnahmebelastung ist nur Diagnose und steuert das zweigliedrige Notfallgate nicht.',
+                meta: 'Die historische Entnahmebelastung ist nur Diagnose; die geschützte aktuelle Portfolioentnahmequote steuert das dritte Notfallkriterium.',
                 trend: 'neutral'
             });
         }

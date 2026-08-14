@@ -137,11 +137,17 @@ marktbedingten Safety-Caps bleibt
 Mindest-Flex ausserhalb der schweren Notlage die Untergrenze, sofern kein
 bestehender Alarm-, Solvenz- oder Runway-Blocker greift.
 
-Die schwere Flex-Notlage verlangt gleichzeitig `bear_deep` und mehr als 25
-Prozent realen Drawdown des aktiven Gesamtvermoegens. Exakt 25 Prozent, ein
-lokaler Extrembaer allein, Alarm oder ein Entnahmebelastungsfaktor reichen
-nicht. Bei aktivem Gate wird der Flex einschliesslich Mindest-Flex auf 0
-gesetzt und mit `overridden_by_severe_flex_emergency` diagnostiziert. Die
+Die schwere Flex-Notlage verlangt gleichzeitig `bear_deep`, mehr als 25
+Prozent realen Drawdown des aktiven Gesamtvermoegens und eine geschuetzte
+Portfolioentnahmequote von mindestens 3,5 Prozent. Die Quote verwendet den
+Netto-Floor aus dem Portfolio plus den nach Rentenueberschuss offenen
+Mindest-Flex im Zaehler und das aktive Gesamtvermoegen im Nenner; ihre Schwelle
+stammt aus `WEALTH_ADJUSTED_REDUCTION.FULL_WITHDRAWAL_RATE`. Exakt 25 Prozent
+Drawdown, ein lokaler Extrembaer allein, Alarm, ein historischer
+Entnahmebelastungsfaktor oder ein bei hohem Drawdown komfortabel tragbarer
+Mindest-Flex reichen nicht. Bei aktivem Gate wird der Flex einschliesslich
+Mindest-Flex auf 0 gesetzt und mit `overridden_by_severe_flex_emergency`
+diagnostiziert. Die
 Nullrate wird als Istwert gespeichert, waehrend ein getrennter Vor-Gate-Wert
 als Glaettungsanker fuer das erste Erholungsjahr erhalten bleibt. Der
 separate Floor bleibt unveraendert. Fehlende oder nicht-endliche Gatewerte

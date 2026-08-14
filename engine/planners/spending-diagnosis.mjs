@@ -120,6 +120,17 @@ export function buildSpendingDiagnosis({
                 ? policyDiagnostics.alarmWealthSufficientThreshold
                 : null,
             withdrawalBurdenGateRole: policyDiagnostics.withdrawalBurdenGateRole || null,
+            protectedPortfolioWithdrawalAnnual: Number.isFinite(policyDiagnostics.protectedPortfolioWithdrawalAnnual)
+                ? policyDiagnostics.protectedPortfolioWithdrawalAnnual
+                : null,
+            protectedPortfolioWithdrawalRate: Number.isFinite(policyDiagnostics.protectedPortfolioWithdrawalRate)
+                ? policyDiagnostics.protectedPortfolioWithdrawalRate
+                : null,
+            protectedPortfolioWithdrawalRateThreshold: Number.isFinite(policyDiagnostics.protectedPortfolioWithdrawalRateThreshold)
+                ? policyDiagnostics.protectedPortfolioWithdrawalRateThreshold
+                : null,
+            protectedPortfolioWithdrawalCapacityCritical: policyDiagnostics.protectedPortfolioWithdrawalCapacityCritical === true,
+            protectedPortfolioWithdrawalGateRole: policyDiagnostics.protectedPortfolioWithdrawalGateRole || null,
             finalLimitingPolicy: policyDiagnostics.finalLimitingPolicy || null,
             floorProtectionPolicy: policyDiagnostics.floorProtectionPolicy || null,
             runwayMonate,

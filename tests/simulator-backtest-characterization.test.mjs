@@ -36,6 +36,7 @@ const slice13IntegrationFixturePath = path.join(__dirname, 'fixtures', 'backtest
 const slice17MeasurementFixturePath = path.join(__dirname, 'fixtures', 'liquidity-runway-basis-slice-17-measurement-v1.json');
 const slice19MeasurementFixturePath = path.join(__dirname, 'fixtures', 'runway-kpi-slice-19-measurement-v1.json');
 const safetyPolicySlice03MeasurementFixturePath = path.join(__dirname, 'fixtures', 'safety-policy-slice-03-measurement-v1.json');
+const minimumFlexAffordabilityMeasurementFixturePath = path.join(__dirname, 'fixtures', 'minimum-flex-severe-affordability-measurement-v1.json');
 const backtestSourcePath = path.join(__dirname, '..', 'app', 'simulator', 'simulator-backtest.js');
 const backtestRunnerSourcePath = path.join(__dirname, '..', 'app', 'simulator', 'historical-backtest-runner.js');
 const UPDATE_TARGET = process.env.UPDATE_BACKTEST_TARGET === '1';
@@ -2381,15 +2382,17 @@ try {
         'Slice-19 runway KPI fixture must remain byte-identical'
     );
     const expectedSlice19 = JSON.parse(slice19FixtureBytes.toString('utf8')).backtest;
-    const safetyPolicySlice03BacktestMeasurement = {
-        schemaVersion: 'SafetyPolicySlice03BacktestMeasurementV1',
-        sourceReference: 'post-backtest-data-19-v1',
-        sourceFixtureSha256: createHash('sha256').update(slice19FixtureBytes).digest('hex'),
-        targetResultDocument: 'docs/internal/SLICE_ABSCHLUSSHAERTUNG_03_SAFETY_POLICY_PRIORITAET.md',
+    const safetyPolicySlice03MeasurementBytes = fs.readFileSync(safetyPolicySlice03MeasurementFixturePath);
+    const safetyPolicySlice03Measurement = JSON.parse(safetyPolicySlice03MeasurementBytes.toString('utf8'));
+    const minimumFlexAffordabilityBacktestMeasurement = {
+        schemaVersion: 'MinimumFlexSevereAffordabilityBacktestMeasurementV1',
+        sourceReference: safetyPolicySlice03Measurement.snapshotId,
+        sourceFixtureSha256: createHash('sha256').update(safetyPolicySlice03MeasurementBytes).digest('hex'),
+        targetResultDocument: 'docs/internal/MINDEST_FLEX_NOTFALLGATE_TRAGFAEHIGKEIT.md',
         reviewStatus: 'pending_external_review',
-        cause: 'rate_limited_structural_safety_targets_and_severe_gate_protects_floor_without_poisoning_recovery_anchor',
+        cause: 'protected_withdrawal_capacity_preserves_affordable_minimum_flex_without_weakening_floor_protection',
         resultProjection: {
-            sourceActualSha256: expectedSlice19.resultProjection.targetActualSha256,
+            sourceActualSha256: safetyPolicySlice03Measurement.backtest.resultProjection.targetActualSha256,
             targetActualSha256: slice17BacktestMeasurement.targetActualSha256,
             caseCount: slice17BacktestMeasurement.caseCount,
             negativeCaseCount: slice17BacktestMeasurement.negativeCaseCount,
@@ -2397,12 +2400,12 @@ try {
         },
         integratedReference: {
             source: {
-                outcome: expectedSlice17.integratedReferenceDelta.target.outcome,
-                observedRowCount: expectedSlice17.integratedReferenceDelta.target.observedRowCount,
-                summaryEndWealth: expectedSlice17.integratedReferenceDelta.target.summaryEndWealth,
-                totalWithdrawal: expectedSlice17.integratedReferenceDelta.target.totalWithdrawal,
-                totalTax: expectedSlice17.integratedReferenceDelta.target.totalTax,
-                canonicalRowsHash: expectedSlice19.integratedReference.targetCanonicalRowsHash
+                outcome: safetyPolicySlice03Measurement.backtest.integratedReference.target.outcome,
+                observedRowCount: safetyPolicySlice03Measurement.backtest.integratedReference.target.observedRowCount,
+                summaryEndWealth: safetyPolicySlice03Measurement.backtest.integratedReference.target.summaryEndWealth,
+                totalWithdrawal: safetyPolicySlice03Measurement.backtest.integratedReference.target.totalWithdrawal,
+                totalTax: safetyPolicySlice03Measurement.backtest.integratedReference.target.totalTax,
+                canonicalRowsHash: safetyPolicySlice03Measurement.backtest.integratedReference.target.canonicalRowsHash
             },
             target: {
                 outcome: slice17BacktestMeasurement.integratedReferenceDelta.target.outcome,
@@ -2414,44 +2417,44 @@ try {
                 maxAbsolutePortfolioFlowDelta: slice17BacktestMeasurement.integratedReferenceDelta.target.maxAbsolutePortfolioFlowDelta
             },
             delta: {
-                outcomeChanged: expectedSlice17.integratedReferenceDelta.target.outcome
+                outcomeChanged: safetyPolicySlice03Measurement.backtest.integratedReference.target.outcome
                     !== slice17BacktestMeasurement.integratedReferenceDelta.target.outcome,
                 observedRowCount: slice17BacktestMeasurement.integratedReferenceDelta.target.observedRowCount
-                    - expectedSlice17.integratedReferenceDelta.target.observedRowCount,
+                    - safetyPolicySlice03Measurement.backtest.integratedReference.target.observedRowCount,
                 summaryEndWealth: round(
                     slice17BacktestMeasurement.integratedReferenceDelta.target.summaryEndWealth
-                    - expectedSlice17.integratedReferenceDelta.target.summaryEndWealth
+                    - safetyPolicySlice03Measurement.backtest.integratedReference.target.summaryEndWealth
                 ),
                 totalWithdrawal: round(
                     slice17BacktestMeasurement.integratedReferenceDelta.target.totalWithdrawal
-                    - expectedSlice17.integratedReferenceDelta.target.totalWithdrawal
+                    - safetyPolicySlice03Measurement.backtest.integratedReference.target.totalWithdrawal
                 ),
                 totalTax: round(
                     slice17BacktestMeasurement.integratedReferenceDelta.target.totalTax
-                    - expectedSlice17.integratedReferenceDelta.target.totalTax
+                    - safetyPolicySlice03Measurement.backtest.integratedReference.target.totalTax
                 )
             }
         },
         policyEvidence: safetyPolicyEvidence,
         crossSliceRuntimeBinding: {
-            sourceCrossSliceOracleProjectionSha256: expectedSlice19.crossSliceRuntimeBinding.targetCrossSliceOracleProjectionSha256,
+            sourceCrossSliceOracleProjectionSha256: safetyPolicySlice03Measurement.backtest.crossSliceRuntimeBinding.targetCrossSliceOracleProjectionSha256,
             targetCrossSliceOracleProjectionSha256: slice17BacktestMeasurement.preservedCrossSliceRuntimeBinding.crossSliceOracleProjectionSha256,
-            sourceSlice09To10DeltaLedgerSha256: expectedSlice19.crossSliceRuntimeBinding.targetSlice09To10DeltaLedgerSha256,
+            sourceSlice09To10DeltaLedgerSha256: safetyPolicySlice03Measurement.backtest.crossSliceRuntimeBinding.targetSlice09To10DeltaLedgerSha256,
             targetSlice09To10DeltaLedgerSha256: slice17BacktestMeasurement.preservedCrossSliceRuntimeBinding.slice09To10DeltaLedgerSha256
         }
     };
-    if (process.env.PRINT_SAFETY_POLICY_SLICE_03 === '1') {
-        console.log('__SAFETY_POLICY_SLICE_03_BACKTEST_START__');
-        console.log(stableStringify(safetyPolicySlice03BacktestMeasurement, 2));
-        console.log('__SAFETY_POLICY_SLICE_03_BACKTEST_END__');
+    if (process.env.PRINT_MINIMUM_FLEX_AFFORDABILITY === '1') {
+        console.log('__MINIMUM_FLEX_AFFORDABILITY_BACKTEST_START__');
+        console.log(stableStringify(minimumFlexAffordabilityBacktestMeasurement, 2));
+        console.log('__MINIMUM_FLEX_AFFORDABILITY_BACKTEST_END__');
     } else {
-        const expectedSafetyPolicySlice03 = JSON.parse(
-            fs.readFileSync(safetyPolicySlice03MeasurementFixturePath, 'utf8')
+        const expectedMinimumFlexAffordability = JSON.parse(
+            fs.readFileSync(minimumFlexAffordabilityMeasurementFixturePath, 'utf8')
         ).backtest;
-        const safetyPolicyDiffs = collectDiffs(expectedSafetyPolicySlice03, safetyPolicySlice03BacktestMeasurement);
-        if (safetyPolicyDiffs.length > 0) console.error(stableStringify(safetyPolicyDiffs.slice(0, 20), 2));
-        assertEqual(safetyPolicyDiffs.length, 0,
-            'Slice-03 Safety-Policy backtest delta and Floor invariants must reproduce exactly');
+        const affordabilityDiffs = collectDiffs(expectedMinimumFlexAffordability, minimumFlexAffordabilityBacktestMeasurement);
+        if (affordabilityDiffs.length > 0) console.error(stableStringify(affordabilityDiffs.slice(0, 20), 2));
+        assertEqual(affordabilityDiffs.length, 0,
+            'Minimum-Flex affordability backtest delta and Floor invariants must reproduce exactly');
     }
     if (process.env.PRINT_BACKTEST_DATA_10 === '1') {
         console.log('__BACKTEST_DATA_10_MEASUREMENT_START__');

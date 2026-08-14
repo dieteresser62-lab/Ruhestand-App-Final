@@ -68,7 +68,39 @@ function selectStrongestSafetyCandidate(candidates) {
     }, null);
 }
 
-function evaluateSevereFlexEmergency(state, market, alarmStatus) {
+function evaluateProtectedPortfolioWithdrawal(params, minimumFlexResult) {
+    const floorAnnual = Number(params?.inflatedBedarf?.floor);
+    const minimumFlexDepotAnnual = Number(minimumFlexResult?.minimumFlexDepotAnnual);
+    const totalWealth = Number(params?.gesamtwert);
+    const criticalRate = Number(CONFIG.SPENDING_MODEL?.WEALTH_ADJUSTED_REDUCTION?.FULL_WITHDRAWAL_RATE);
+
+    if (!Number.isFinite(floorAnnual) || floorAnnual < 0) {
+        throw new RangeError('Netto-Floor muss fuer das Safety-Gate als nicht-negative endliche Zahl vorliegen.');
+    }
+    if (!Number.isFinite(minimumFlexDepotAnnual) || minimumFlexDepotAnnual < 0) {
+        throw new RangeError('Offener Mindest-Flex muss fuer das Safety-Gate als nicht-negative endliche Zahl vorliegen.');
+    }
+    if (!Number.isFinite(totalWealth) || totalWealth < 0) {
+        throw new RangeError('Aktives Gesamtvermoegen muss fuer das Safety-Gate als nicht-negative endliche Zahl vorliegen.');
+    }
+    if (!Number.isFinite(criticalRate) || criticalRate <= 0 || criticalRate > 1) {
+        throw new RangeError('Kritische geschuetzte Entnahmequote fuer das Safety-Gate ist ungueltig.');
+    }
+
+    const annual = floorAnnual + minimumFlexDepotAnnual;
+    const rate = annual <= 0
+        ? 0
+        : (totalWealth > 0 ? annual / totalWealth : 1);
+
+    return {
+        annual,
+        rate,
+        criticalRate,
+        capacityCritical: rate >= criticalRate
+    };
+}
+
+function evaluateSevereFlexEmergency(state, market, alarmStatus, protectedWithdrawal) {
     const rawDrawdownRatio = state?.keyParams?.realerDepotDrawdown;
     const thresholdRatio = CONFIG.THRESHOLDS?.ALARM?.realDrawdown;
     if (!Number.isFinite(rawDrawdownRatio)) {
@@ -82,7 +114,10 @@ function evaluateSevereFlexEmergency(state, market, alarmStatus) {
     // produce a negative raw ratio. Semantically this is a 0% drawdown.
     const drawdownRatio = Math.max(0, rawDrawdownRatio);
     const marketExtremeBear = market?.sKey === 'bear_deep';
-    const active = marketExtremeBear && drawdownRatio > thresholdRatio;
+    const protectedWithdrawalCapacityCritical = protectedWithdrawal?.capacityCritical === true;
+    const active = marketExtremeBear
+        && drawdownRatio > thresholdRatio
+        && protectedWithdrawalCapacityCritical;
     const withdrawalBurdenFactor = Number.isFinite(state?.keyParams?.withdrawalBurdenFactor)
         ? Math.max(0, Math.min(1, state.keyParams.withdrawalBurdenFactor))
         : (Number.isFinite(state?.keyParams?.wealthReductionFactor)
@@ -101,7 +136,12 @@ function evaluateSevereFlexEmergency(state, market, alarmStatus) {
             ? null
             : withdrawalBurdenFactor < ALARM_WEALTH_SUFFICIENT_FACTOR_THRESHOLD,
         alarmWealthSufficientThreshold: ALARM_WEALTH_SUFFICIENT_FACTOR_THRESHOLD,
-        withdrawalBurdenGateRole: 'diagnostic_only'
+        withdrawalBurdenGateRole: 'diagnostic_only',
+        protectedPortfolioWithdrawalAnnual: protectedWithdrawal.annual,
+        protectedPortfolioWithdrawalRate: protectedWithdrawal.rate,
+        protectedPortfolioWithdrawalRateThreshold: protectedWithdrawal.criticalRate,
+        protectedPortfolioWithdrawalCapacityCritical: protectedWithdrawalCapacityCritical,
+        protectedPortfolioWithdrawalGateRole: 'required'
     };
 }
 
@@ -125,7 +165,6 @@ export function applySpendingPolicyPipeline(state, alarmStatus, params, addDecis
     const safetyCandidates = [];
     const initialSafetyCandidate = normalizeSafetyCandidate(initialPolicyResult.safetyEvidence);
     if (initialSafetyCandidate) safetyCandidates.push(initialSafetyCandidate);
-    const severeFlexEmergency = evaluateSevereFlexEmergency(state, market, alarmStatus);
     const executedSteps = ['alarm'];
     let finalLimitingPolicy = initialSafetyCandidate?.source === 'alarm'
         ? 'alarm'
@@ -172,14 +211,6 @@ export function applySpendingPolicyPipeline(state, alarmStatus, params, addDecis
     };
 
     const normalSafetyCandidate = selectStrongestSafetyCandidate(safetyCandidates);
-    const selectedSafetyCandidate = severeFlexEmergency.active
-        ? {
-            source: 'severe_bear_wealth_emergency',
-            candidateFlexRatePct: 0,
-            anchorStage: 'post_total_wealth_drawdown_gate',
-            evidence: severeFlexEmergency
-        }
-        : normalSafetyCandidate;
 
     executedSteps.push('minimum_flex');
     const minimumFlexResult = applyMinimumFlexFloor(
@@ -190,6 +221,21 @@ export function applySpendingPolicyPipeline(state, alarmStatus, params, addDecis
     flexRate = minimumFlexResult.rate;
     let minimumFlexStatus = minimumFlexResult.status;
     const minimumFlexStatusBeforeSafetyOverride = minimumFlexStatus;
+    const protectedWithdrawal = evaluateProtectedPortfolioWithdrawal(params, minimumFlexResult);
+    const severeFlexEmergency = evaluateSevereFlexEmergency(
+        state,
+        market,
+        alarmStatus,
+        protectedWithdrawal
+    );
+    const selectedSafetyCandidate = severeFlexEmergency.active
+        ? {
+            source: 'severe_bear_wealth_emergency',
+            candidateFlexRatePct: 0,
+            anchorStage: 'post_total_wealth_drawdown_gate',
+            evidence: severeFlexEmergency
+        }
+        : normalSafetyCandidate;
     let minimumFlexCanBeLimited = minimumFlexResult.minimumFlexAnnual > 0
         && minimumFlexResult.flexAnnual > 0
         && minimumFlexResult.status !== 'blocked_emergency';
@@ -307,7 +353,7 @@ export function applySpendingPolicyPipeline(state, alarmStatus, params, addDecis
         kuerzungQuelle = 'Safety-Cap (schwere Flex-Notlage)';
         addDecision(
             'Schwere Flex-Notlage',
-            `Tiefer Bärenmarkt und realer Drawdown des aktiven Gesamtvermögens über ${(severeFlexEmergency.realTotalWealthDrawdownThresholdRatio * 100).toFixed(1)}%: Flex einschließlich Mindest-Flex auf 0% begrenzt; Floor bleibt unverändert.`,
+            `Tiefer Bärenmarkt, realer Drawdown des aktiven Gesamtvermögens über ${(severeFlexEmergency.realTotalWealthDrawdownThresholdRatio * 100).toFixed(1)}% und geschützte Portfolioentnahmequote ab ${(severeFlexEmergency.protectedPortfolioWithdrawalRateThreshold * 100).toFixed(1)}%: Flex einschließlich Mindest-Flex auf 0% begrenzt; Floor bleibt unverändert.`,
             'active',
             'alarm'
         );
@@ -383,6 +429,11 @@ export function applySpendingPolicyPipeline(state, alarmStatus, params, addDecis
         alarmWealthSufficient: severeFlexEmergency.alarmWealthSufficient,
         alarmWealthSufficientThreshold: severeFlexEmergency.alarmWealthSufficientThreshold,
         withdrawalBurdenGateRole: severeFlexEmergency.withdrawalBurdenGateRole,
+        protectedPortfolioWithdrawalAnnual: severeFlexEmergency.protectedPortfolioWithdrawalAnnual,
+        protectedPortfolioWithdrawalRate: severeFlexEmergency.protectedPortfolioWithdrawalRate,
+        protectedPortfolioWithdrawalRateThreshold: severeFlexEmergency.protectedPortfolioWithdrawalRateThreshold,
+        protectedPortfolioWithdrawalCapacityCritical: severeFlexEmergency.protectedPortfolioWithdrawalCapacityCritical,
+        protectedPortfolioWithdrawalGateRole: severeFlexEmergency.protectedPortfolioWithdrawalGateRole,
         finalLimitingPolicy,
         floorProtectionPolicy: 'planned_floor_unchanged',
         nextFlexRateSmoothingReferencePct
@@ -412,6 +463,11 @@ export function applySpendingPolicyPipeline(state, alarmStatus, params, addDecis
         alarmWealthSufficient: severeFlexEmergency.alarmWealthSufficient,
         alarmWealthSufficientThreshold: severeFlexEmergency.alarmWealthSufficientThreshold,
         withdrawalBurdenGateRole: severeFlexEmergency.withdrawalBurdenGateRole,
+        protectedPortfolioWithdrawalAnnual: severeFlexEmergency.protectedPortfolioWithdrawalAnnual,
+        protectedPortfolioWithdrawalRate: severeFlexEmergency.protectedPortfolioWithdrawalRate,
+        protectedPortfolioWithdrawalRateThreshold: severeFlexEmergency.protectedPortfolioWithdrawalRateThreshold,
+        protectedPortfolioWithdrawalCapacityCritical: severeFlexEmergency.protectedPortfolioWithdrawalCapacityCritical,
+        protectedPortfolioWithdrawalGateRole: severeFlexEmergency.protectedPortfolioWithdrawalGateRole,
         finalLimitingPolicy,
         floorProtectionPolicy: 'planned_floor_unchanged',
         nextFlexRateSmoothingReferencePct,
