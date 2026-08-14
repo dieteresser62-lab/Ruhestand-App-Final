@@ -418,6 +418,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     let forcedTaxReserved = 0;
     const threeBucketInput = getThreeBucketInputs(inputs);
     const is3Bucket = threeBucketInput.is3Bucket;
+    const stressReplayTransactionCapture = inputs?.stressReplayTransactionCapture === true;
 
     let bondSaleAmount = 0;
     let bondRefillGross = 0;
@@ -798,6 +799,28 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         combinedTaxRawAggregate = buildTaxRawAggregate();
         addTaxRawAggregate(combinedTaxRawAggregate, actionResult?.taxRawAggregate, regularSaleScale);
     }
+    const regularSaleDiagnostic = stressReplayTransactionCapture && hasSales && regularSaleScale > 0
+        ? {
+            class: 'policy_rebalancing_sale',
+            phase: 'after_action_sales',
+            oracle: 'engine_action_sources_with_execution_scale_v1',
+            requestedNetEur: Number(actionResult.nettoErlös) || 0,
+            grossEur: plannedSaleBrutto * regularSaleScale,
+            netEur: (Number(actionResult.nettoErlös) || 0) * regularSaleScale,
+            taxEur: (Number(actionResult.steuer) || 0) * regularSaleScale,
+            breakdown: saleQuellen.map(source => ({
+                assetClass: source?.category || source?.kind || 'unknown',
+                grossEur: (Number(source?.brutto) || 0) * regularSaleScale,
+                netEur: Number.isFinite(Number(source?.netto))
+                    ? Number(source.netto) * regularSaleScale
+                    : null,
+                taxEur: Number.isFinite(Number(source?.steuer))
+                    ? Number(source.steuer) * regularSaleScale
+                    : null
+            })),
+            missingness: []
+        }
+        : null;
 
     // Aktualisiere Liquidität nach Transaktionen
     if (hasSales && actionResult.nettoErlös > 0) {
@@ -862,7 +885,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         depotTranchesGold,
         equityBeforeForced,
         goldBeforeForced,
-        combinedTaxRawAggregate
+        combinedTaxRawAggregate,
+        captureTransactions: stressReplayTransactionCapture
     });
     liquiditaet += forcedCoverage.liquiditaetDelta;
     bondSaleAmount += forcedCoverage.bondSaleAmountDelta;
@@ -938,7 +962,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         isBadYear,
         depotTranchesAktien,
         depotTranchesGold,
-        formatRuinNumber: formatInteger
+        formatRuinNumber: formatInteger,
+        captureTransactions: stressReplayTransactionCapture
     });
     if (payoutFallback.isRuin) {
         return buildRuinOutcome({
@@ -958,6 +983,13 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     liquiditaet = payoutFallback.liquiditaet;
     bondSaleAmount += payoutFallback.bondSaleAmountDelta;
     unmetLiquidity += payoutFallback.unmetLiquidityDelta;
+    if (stressReplayTransactionCapture && payoutFallback.transactionDiagnostic) {
+        snapshotBalance('after_payout_fallback', {
+            grossSale: euros(payoutFallback.transactionDiagnostic.grossEur),
+            netProceeds: euros(payoutFallback.transactionDiagnostic.netEur),
+            taxMissing: payoutFallback.transactionDiagnostic.taxEur === null
+        });
+    }
 
     const bondRefill = applyBondRefillPostprocessing({
         is3Bucket,
@@ -969,7 +1001,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         depotTranchesAktien,
         engineInput: { ...engineInput, sparerPauschbetrag: 0 },
         market,
-        combinedTaxRawAggregate
+        combinedTaxRawAggregate,
+        captureTransactions: stressReplayTransactionCapture
     });
     bondRefillGross += bondRefill.bondRefillGrossDelta;
     bondRefillNet += bondRefill.bondRefillNetDelta;
@@ -1133,7 +1166,15 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         healthBucketCoverage,
         healthBucketInterest,
         healthBucketDiagnostics,
-            balanceTrace
+        stressReplayTransactionDiagnostics: stressReplayTransactionCapture
+            ? [
+                regularSaleDiagnostic,
+                forcedCoverage.transactionDiagnostic,
+                payoutFallback.transactionDiagnostic,
+                bondRefill.transactionDiagnostic
+            ].filter(Boolean)
+            : null,
+        balanceTrace
         })
     };
 }

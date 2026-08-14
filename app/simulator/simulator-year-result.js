@@ -81,6 +81,7 @@ export function buildSimulatorYearResult({
     healthBucketCoverage = null,
     healthBucketInterest = null,
     healthBucketDiagnostics = null,
+    stressReplayTransactionDiagnostics = null,
     balanceTrace = []
 }) {
     const kaufAktTotal = buyEqAmount + kaufAkt;
@@ -383,6 +384,19 @@ export function buildSimulatorYearResult({
             tax_cash_adjustment: taxCashAdjustment,
             cash_interest_taxable_signed: signedEuros(actionResult?.taxSettlement?.cashInterestIncomeSigned),
             cash_interest_tax_delta: signedEuros(actionResult?.taxSettlement?.cashInterestTaxDelta),
+            ...(Array.isArray(stressReplayTransactionDiagnostics)
+                ? {
+                    stressReplayTransactionDiagnostics: stressReplayTransactionDiagnostics.map(diagnostic => ({
+                        ...diagnostic,
+                        breakdown: Array.isArray(diagnostic?.breakdown)
+                            ? diagnostic.breakdown.map(entry => ({ ...entry }))
+                            : [],
+                        missingness: Array.isArray(diagnostic?.missingness)
+                            ? diagnostic.missingness.map(entry => ({ ...entry }))
+                            : []
+                    }))
+                }
+                : {}),
             balance_trace: normalizedBalanceTrace,
             health_bucket_enabled: !!healthBucketDiagnostics?.enabled,
             health_bucket_start: euros(healthBucketCoverage?.startAmount ?? healthBucketInterest?.startAmount),

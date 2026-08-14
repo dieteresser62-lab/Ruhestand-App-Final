@@ -62,14 +62,16 @@ export function applyBondRefillPostprocessing({
     depotTranchesAktien,
     engineInput,
     market,
-    combinedTaxRawAggregate
+    combinedTaxRawAggregate,
+    captureTransactions = false
 }) {
     if (!(is3Bucket && !isBadYear && threeBucketInput.bondTargetFactor > 0)) {
         return {
             bondRefillGrossDelta: 0,
             bondRefillNetDelta: 0,
             bondRefillTaxDelta: 0,
-            didForcedSale: false
+            didForcedSale: false,
+            ...(captureTransactions ? { transactionDiagnostic: null } : {})
         };
     }
 
@@ -84,7 +86,8 @@ export function applyBondRefillPostprocessing({
             bondRefillGrossDelta: 0,
             bondRefillNetDelta: 0,
             bondRefillTaxDelta: 0,
-            didForcedSale: false
+            didForcedSale: false,
+            ...(captureTransactions ? { transactionDiagnostic: null } : {})
         };
     }
 
@@ -100,7 +103,8 @@ export function applyBondRefillPostprocessing({
             bondRefillGrossDelta: 0,
             bondRefillNetDelta: 0,
             bondRefillTaxDelta: 0,
-            didForcedSale: false
+            didForcedSale: false,
+            ...(captureTransactions ? { transactionDiagnostic: null } : {})
         };
     }
 
@@ -112,7 +116,8 @@ export function applyBondRefillPostprocessing({
             bondRefillGrossDelta: 0,
             bondRefillNetDelta: 0,
             bondRefillTaxDelta: 0,
-            didForcedSale: false
+            didForcedSale: false,
+            ...(captureTransactions ? { transactionDiagnostic: null } : {})
         };
     }
 
@@ -129,7 +134,8 @@ export function applyBondRefillPostprocessing({
             bondRefillGrossDelta: 0,
             bondRefillNetDelta: 0,
             bondRefillTaxDelta: 0,
-            didForcedSale: false
+            didForcedSale: false,
+            ...(captureTransactions ? { transactionDiagnostic: null } : {})
         };
     }
 
@@ -160,6 +166,22 @@ export function applyBondRefillPostprocessing({
         bondRefillTaxDelta: Number(refillSale.steuerGesamt) || 0,
         didForcedSale: true,
         debugVersion: BOND_REFILL_PATCH_VERSION,
-        saleShortfallGross
+        saleShortfallGross,
+        ...(captureTransactions ? { transactionDiagnostic: {
+            class: 'bond_refill_sale',
+            phase: 'after_bond_refill',
+            oracle: 'bond_refill_sale_result_v1',
+            requestedNetEur: requestedNet,
+            grossEur: Number(refillSale.bruttoVerkaufGesamt) || 0,
+            netEur: refillNet,
+            taxEur: Number(refillSale.steuerGesamt) || 0,
+            breakdown: refillBreakdown.map(item => ({
+                assetClass: item?.category || item?.kind || 'equity',
+                grossEur: Number(item?.brutto) || 0,
+                netEur: Number.isFinite(Number(item?.netto)) ? Number(item.netto) : null,
+                taxEur: Number.isFinite(Number(item?.steuer)) ? Number(item.steuer) : null
+            })),
+            missingness: []
+        } } : {})
     };
 }

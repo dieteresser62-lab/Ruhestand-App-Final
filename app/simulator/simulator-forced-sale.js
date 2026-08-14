@@ -59,7 +59,8 @@ export function applyForcedSaleLiquidityCoverage({
     depotTranchesGold,
     equityBeforeForced,
     goldBeforeForced,
-    combinedTaxRawAggregate
+    combinedTaxRawAggregate,
+    captureTransactions = false
 }) {
     if (!(forcedShortfall > 0)) {
         return {
@@ -68,7 +69,8 @@ export function applyForcedSaleLiquidityCoverage({
             unmetLiquidityDelta: 0,
             didForcedSale: false,
             forcedSaleScaleApplied: null,
-            forcedTaxReservedDelta: 0
+            forcedTaxReservedDelta: 0,
+            ...(captureTransactions ? { transactionDiagnostic: null } : {})
         };
     }
 
@@ -174,13 +176,43 @@ export function applyForcedSaleLiquidityCoverage({
         }
     }
 
+    const forcedGrossObserved = Math.max(0, forcedExecutedTotal);
+    const forcedNetObserved = Math.max(0, liquiditaetDelta);
+    const forcedTaxObserved = Math.max(0, forcedTaxReservedDelta);
+
     return {
         liquiditaetDelta,
         bondSaleAmountDelta,
         unmetLiquidityDelta,
         didForcedSale,
         forcedSaleScaleApplied,
-        forcedTaxReservedDelta
+        forcedTaxReservedDelta,
+        ...(captureTransactions ? { transactionDiagnostic: forcedGrossObserved > 0
+            ? {
+                class: 'liquidity_shortfall_forced_sale',
+                phase: 'after_forced_sales',
+                oracle: 'forced_sale_portfolio_delta_v1',
+                requestedNetEur: forcedShortfall,
+                grossEur: forcedGrossObserved,
+                netEur: forcedNetObserved,
+                taxEur: forcedTaxObserved,
+                breakdown: [
+                    ...(forcedExecutedEq > 0 ? [{
+                        assetClass: (is3Bucket && isBadYear) ? 'bonds' : 'equity',
+                        grossEur: forcedExecutedEq,
+                        netEur: null,
+                        taxEur: null
+                    }] : []),
+                    ...(forcedExecutedGld > 0 ? [{
+                        assetClass: 'gold',
+                        grossEur: forcedExecutedGld,
+                        netEur: null,
+                        taxEur: null
+                    }] : [])
+                ],
+                missingness: []
+            }
+            : null } : {})
     };
 }
 
@@ -196,14 +228,16 @@ export function applyPayoutFallbackSale({
     isBadYear,
     depotTranchesAktien,
     depotTranchesGold,
-    formatRuinNumber = value => Number(value) || 0
+    formatRuinNumber = value => Number(value) || 0,
+    captureTransactions = false
 }) {
     if (!(jahresEntnahmeEffektiv + 1e-6 < netFloorYear)) {
         return {
             isRuin: false,
             liquiditaet,
             bondSaleAmountDelta: 0,
-            unmetLiquidityDelta: 0
+            unmetLiquidityDelta: 0,
+            ...(captureTransactions ? { transactionDiagnostic: null } : {})
         };
     }
 
@@ -217,7 +251,8 @@ export function applyPayoutFallbackSale({
             reason: `Entnahme (${formatRuinNumber(jahresEntnahmeEffektiv)}) < Floor (${formatRuinNumber(netFloorYear)}) und nicht genug Assets`,
             liquiditaet,
             bondSaleAmountDelta: 0,
-            unmetLiquidityDelta: 0
+            unmetLiquidityDelta: 0,
+            ...(captureTransactions ? { transactionDiagnostic: null } : {})
         };
     }
 
@@ -244,6 +279,27 @@ export function applyPayoutFallbackSale({
         isRuin: false,
         liquiditaet: nextLiquiditaet,
         bondSaleAmountDelta,
-        unmetLiquidityDelta
+        unmetLiquidityDelta,
+        ...(captureTransactions ? { transactionDiagnostic: totalReduced > 0
+            ? {
+                class: 'payout_floor_fallback_sale',
+                phase: 'after_payout_fallback',
+                oracle: 'payout_fallback_tranche_reduction_v1',
+                requestedNetEur: additionalNeeded,
+                grossEur: totalReduced,
+                netEur: totalReduced,
+                taxEur: null,
+                breakdown: [{
+                    assetClass: (is3Bucket && isBadYear) ? 'bonds' : 'mixed_equity_gold',
+                    grossEur: totalReduced,
+                    netEur: totalReduced,
+                    taxEur: null
+                }],
+                missingness: [{
+                    field: 'taxEur',
+                    reason: 'payout_fallback_tax_not_calculated'
+                }]
+            }
+            : null } : {})
     };
 }
