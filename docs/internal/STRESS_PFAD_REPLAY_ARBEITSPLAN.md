@@ -9,7 +9,7 @@ externes Planreview und fingerprintgebundenes Nutzer-Gate ausstehend
 
 **Zielbranch:** `codex/stress-pfad-replay`
 
-**Planungsbaseline:** Branch `codex/stress-pfad-replay`, HEAD `798ce7d`
+**Planungsbaseline:** Branch `codex/stress-pfad-replay`, HEAD `36b0b30`
 
 **Vorgesehene Umsetzung:** Slice 01 bis Slice 10, lueckenlos 1-basiert
 
@@ -65,20 +65,20 @@ verwenden oder `minimumFlexAnnual` still geklemmt wuerde.
 
 ## 3. Aktuelle Repository-Baseline
 
-Die frueher dokumentierte Baseline
-`codex/fokussierte-abschlusshaertung`/`55bdd84` mit zahlreichen uncommitteten
-Dateien ist veraltet. Fuer diese Planueberarbeitung wurde am 2026-08-14
-festgestellt:
+Die frueher dokumentierten Baselines
+`codex/fokussierte-abschlusshaertung`/`55bdd84` und
+`codex/stress-pfad-replay`/`798ce7d` sind veraltet. Fuer diese
+Planueberarbeitung wurde am 2026-08-14 festgestellt:
 
 ```text
 Branch: codex/stress-pfad-replay
-HEAD:   798ce7d
+HEAD:   36b0b30
 Scope:  docs/internal/STRESS_PFAD_REPLAY_ARBEITSPLAN.md
 ```
 
-Die einzige beim Start sichtbare Arbeitsbaumabweichung lag im erlaubten
-Planpfad. Inhalt und Herkunft dieser Planabweichung sind kein Bestandteil
-einer spaeteren Implementierungsbaseline.
+Beim Start war ausschliesslich der erlaubte Arbeitsplanpfad veraendert. Diese
+vorhandene Planabweichung ist Teil der laufenden Planueberarbeitung, aber keine
+Implementierungsbaseline.
 Vor Slice 01 ist die dann aktuelle Baseline erneut zu erfassen; diese Angabe
 ist keine dauerhafte Implementierungs-HEAD-Zusage.
 
@@ -181,8 +181,11 @@ lokale Pfade und Secret-Felder werden fail-closed behandelt.
 
 Fixiert bleiben Personen, Alter, Geschlecht, Partnerkonfiguration,
 Mortalitaets-/Pflegemodell, konkrete Life-Events, Renten und Rentenstart,
-Bedarfsgrundlagen, Simulationshorizont, historische Daten, Stress-/Tail-Risk,
-Steuerparameter, Health-Bucket-Ausgangszustand und Haushaltslebenslauf.
+Bedarfsgrundlagen, Replay-Pfandlaenge und Monte-Carlo-Simulationsdauer,
+historische Daten, Stress-/Tail-Risk, Steuerparameter,
+Health-Bucket-Ausgangszustand und Haushaltslebenslauf. Der davon verschiedene
+Dynamic-Flex-Strategiehorizont bleibt gemaess der folgenden Whitelist
+variierbar.
 
 Die V1-Whitelist wird in Slice 01 anhand der tatsaechlichen Rueckgabepfade von
 `getCommonInputs()` als versionierter Contract umgesetzt. Sie umfasst genau
@@ -368,8 +371,10 @@ Die folgenden Ueberschriften sind der lueckenlose State-v3-Slicevertrag.
 Fingerprintcontracts sowie die vollstaendige Mappingtabelle aus realen
 `getCommonInputs()`-Pfaden.
 
-**Produktive Pfade:** neu `app/simulator/stress-replay-contract.js`, optional
-neu `app/simulator/stress-replay-export.js`.
+**Exakter Änderungspfad**
+
+- `app/simulator/stress-replay-contract.js`
+- `tests/stress-replay-contract.test.mjs`
 
 **Tests:** `tests/stress-replay-contract.test.mjs` mit Minimal-/Maximalpfad,
 Indexbasis, Einheiten, `initialMarketDataHist`, Laengenfehlern, nicht-finiten
@@ -387,11 +392,15 @@ bleiben fail-closed ausserhalb der Whitelist.
 seriellen Nachlauf materialisieren, inklusive Startzustand, recordType-basierter
 Reconciliation und Post-Ruin-Shadow-Pfad.
 
-**Produktive Pfade:** neu
-`app/simulator/stress-replay-path-materializer.js`,
-`app/simulator/simulator-monte-carlo.js`,
-`app/simulator/monte-carlo-runner.js`,
-`app/simulator/scenario-analyzer.js`, optional ein bestehender Life-Event-Helper.
+**Exakter Änderungspfad**
+
+- `app/simulator/stress-replay-path-materializer.js`
+- `app/simulator/simulator-monte-carlo.js`
+- `app/simulator/monte-carlo-runner.js`
+- `app/simulator/scenario-analyzer.js`
+- `app/simulator/mc-life-events.js`
+- `tests/stress-replay-path-materializer.test.mjs`
+- `tests/worker-parity.test.mjs`
 
 **Tests:** IID/Regime, Blockmethoden, Stress, Tail-Risk, Pflege/Tod,
 Ruinfortsetzung, expliziter Tie-Break, Direkt-/Workerparitaet,
@@ -406,9 +415,12 @@ reproduzierbare Quellen werden nicht gespeichert.
 **Ziel:** Baseline ohne RNG/Sampling aus Pfad und materialisiertem
 Marktstartzustand reproduzieren.
 
-**Produktive Pfade:** neu `app/simulator/stress-replay-runner.js`,
-`app/simulator/stress-replay-contract.js`, optional ein bestehender additiver
-Logprojektor.
+**Exakter Änderungspfad**
+
+- `app/simulator/stress-replay-runner.js`
+- `app/simulator/stress-replay-contract.js`
+- `app/simulator/mc-log-builder.js`
+- `tests/stress-replay-runner.test.mjs`
 
 **Tests:** Baseline-Reconciliation, Wiederholungsgleichheit, Ruin/Tod/Horizont,
 Technical Error, Akkumulation, Pflege, Partner/Witwe, Immutabilitaet und
@@ -422,9 +434,12 @@ getrennt; Runner ist DOM- und Worker-frei.
 **Ziel:** Ausschliesslich die versionierten Whitelistpatches aus Abschnitt 6
 normalisieren, validieren und auf geklonte Baselineinputs anwenden.
 
-**Produktive Pfade:** neu `app/simulator/stress-replay-variant.js`,
-`app/simulator/stress-replay-contract.js` und
-`app/simulator/stress-replay-runner.js`.
+**Exakter Änderungspfad**
+
+- `app/simulator/stress-replay-variant.js`
+- `app/simulator/stress-replay-contract.js`
+- `app/simulator/stress-replay-runner.js`
+- `tests/stress-replay-variant.test.mjs`
 
 **Tests:** erlaubte Strategiefelder, verbotene Asset-/Bedarfs-/Personenfelder,
 modusabhaengige 3-Bucket- und Dynamic-Flex-Felder, No-op, Multi-Faktor-Marker,
@@ -440,11 +455,14 @@ und keine Assetgegenfakten; Baselineinputs bleiben unveraendert.
 **Ziel:** Replay-spezifische, additive Klassifikation von Forced Sale,
 Payout-Fallback, Bond-Refill und Policyverkauf mit expliziter Missingness.
 
-**Produktive Pfade:** neu `app/simulator/stress-replay-transactions.js`,
-`app/simulator/simulator-forced-sale.js`,
-`app/simulator/simulator-bond-refill.js`,
-`app/simulator/simulator-engine-direct.js`,
-`app/simulator/simulator-year-result.js`.
+**Exakter Änderungspfad**
+
+- `app/simulator/stress-replay-transactions.js`
+- `app/simulator/simulator-forced-sale.js`
+- `app/simulator/simulator-bond-refill.js`
+- `app/simulator/simulator-engine-direct.js`
+- `app/simulator/simulator-year-result.js`
+- `tests/stress-replay-transactions.test.mjs`
 
 **Tests:** Ereignisisolation, Brutto/Netto/Steuer soweit beobachtbar,
 Missingness statt Schaetzung, unveraenderte Finanzresultate und FlowDelta.
@@ -456,10 +474,13 @@ Instrumentierung aendert keine Finanzsemantik.
 
 **Ziel:** Baseline und Alternativen reihenfolgeunabhaengig vergleichen.
 
-**Produktive Pfade:** neu `app/simulator/stress-replay-comparison.js`,
-`app/simulator/stress-replay-runner.js`,
-`app/simulator/stress-replay-contract.js`,
-`app/simulator/stress-replay-transactions.js`.
+**Exakter Änderungspfad**
+
+- `app/simulator/stress-replay-comparison.js`
+- `app/simulator/stress-replay-runner.js`
+- `app/simulator/stress-replay-contract.js`
+- `app/simulator/stress-replay-transactions.js`
+- `tests/stress-replay-comparison.test.mjs`
 
 **Tests:** Reihenfolgeunabhaengigkeit, Variantenlimit, Entfernen,
 First-Delta-Marker, Single-/Multi-Faktor, Missingness und technischer Fehler.
@@ -475,10 +496,15 @@ Fehlern nicht irrefuehrend.
 **Ziel:** Einen versionierten Arbeitsstand sicher wiederaufnehmen und
 exportieren/importieren.
 
-**Produktive Pfade:** neu `app/simulator/stress-replay-persistence.js`, neu
-oder erweitert `app/simulator/stress-replay-export.js`,
-`app/simulator/stress-replay-contract.js`, optional
-`app/shared/persistence-key-policy.js` gemaess NE-08.
+**Exakter Änderungspfad**
+
+- `app/simulator/stress-replay-persistence.js`
+- `app/simulator/stress-replay-export.js`
+- `app/simulator/stress-replay-contract.js`
+- `app/shared/persistence-key-policy.js`
+- `tests/stress-replay-persistence.test.mjs`
+- `tests/stress-replay-export.test.mjs`
+- `tests/persistence.test.mjs`
 
 **Tests:** Facade-Backends, atomarer Roundtrip, Korruption, Version/Fingerprint,
 Mismatch, Limits, Snapshot-/Backup-Policy und Datenschutzfelder.
@@ -491,11 +517,16 @@ Daten werden nicht exakt ausgefuehrt; Loeschen/Ersetzen ist ausdruecklich.
 **Ziel:** Szenario auswaehlen/fixieren, Status/Banner darstellen und den
 aktiven Arbeitsstand laden, exportieren, importieren oder verwerfen.
 
-**Produktive Pfade:** neu `app/simulator/stress-replay-ui.js`,
-`app/simulator/simulator-results.js`,
-`app/simulator/simulator-main-init.js`,
-`app/simulator/simulator-main.js`, `Simulator.html`, optional
-`app/simulator/monte-carlo-ui.js`.
+**Exakter Änderungspfad**
+
+- `app/simulator/stress-replay-ui.js`
+- `app/simulator/simulator-results.js`
+- `app/simulator/simulator-main-init.js`
+- `app/simulator/simulator-main.js`
+- `app/simulator/monte-carlo-ui.js`
+- `Simulator.html`
+- `tests/stress-replay-ui.test.mjs`
+- `tests/browser-smoke.test.mjs`
 
 **Tests:** Kein Szenario, Unsupported-RNG, Materialisierungsfehler, Banner,
 Reload, Import/Export, Verwerfen, Tastaturfokus und Live-Region.
@@ -509,9 +540,15 @@ produktive Dateien.
 **Ziel:** Strategie-Patchvorschau, Variantenliste, KPI-Tabelle,
 Delta-Timeline und Jahrestabelle.
 
-**Produktive Pfade:** neu `app/simulator/stress-replay-renderer.js`,
-`app/simulator/stress-replay-ui.js`, `Simulator.html`, `simulator.css`,
-optional `app/simulator/simulator-results.js`.
+**Exakter Änderungspfad**
+
+- `app/simulator/stress-replay-renderer.js`
+- `app/simulator/stress-replay-ui.js`
+- `app/simulator/simulator-results.js`
+- `Simulator.html`
+- `simulator.css`
+- `tests/stress-replay-renderer.test.mjs`
+- `tests/browser-smoke.test.mjs`
 
 **Tests:** erlaubte/verbotene Patches, bedingte Strategiefelder, Variantenlimit,
 Neuberechnen/Entfernen, Technical Error, schmaler Viewport, Tastatur und
@@ -526,11 +563,22 @@ Dateien.
 **Ziel:** Gesamtregression, reale Baseline-Messung, Performancebudget und
 Dokumentationssync ohne neue Fachsemantik.
 
-**Produktive Pfade:** nur notwendige kleine Integrationskorrekturen;
-`README.md`, `docs/reference/TECHNICAL.md`,
-`docs/reference/SIMULATOR_MODULES_README.md`, `tests/README.md` und dieser
-Arbeitsplan. `package.json` nur falls ein separat freigegebener Testbefehl
-notwendig ist.
+Integrationsfehler werden nicht durch unbestimmte Korrekturpfade in diesen
+Slice aufgenommen, sondern muessen im jeweils zustaendigen, erneut
+freigegebenen Fachslice behoben werden. Slice 10 aendert ausschliesslich die
+folgende abschliessende Test- und Dokumentationsmenge.
+
+**Exakter Änderungspfad**
+
+- `tests/stress-replay-e2e.test.mjs`
+- `tests/fixtures/stress-replay-performance-baseline-v1.json`
+- `tests/browser-smoke.test.mjs`
+- `tests/worker-parity.test.mjs`
+- `tests/monte-carlo-export-contract.test.mjs`
+- `tests/README.md`
+- `README.md`
+- `docs/reference/TECHNICAL.md`
+- `docs/reference/SIMULATOR_MODULES_README.md`
 
 **Tests:** `npm test`, `npm run test:browser`, Replay-Fokustests,
 Workerparitaet, MC-/Exportcontracts, relevante Backtests, Snapshots und
@@ -756,7 +804,7 @@ fail-closed Fingerprints.
 | 09 Varianten-UI | nicht begonnen | ausstehend | ausstehend |
 | 10 Integration/Doku | nicht begonnen | ausstehend | ausstehend |
 
-## Orchestrator-Pruefprotokoll
+## Orchestrator-Prüfprotokoll
 
 ### Review-Feedback von Claude
 
@@ -765,12 +813,9 @@ fail-closed Fingerprints.
 
 - Reviewer: `claude`
 - Freigabe: `YES`
-- Validierungsbindung: `plan-validation-288e706abd7e`
+- Validierungsbindung: `plan-validation-8e33dfd850d6`
 - Testdateien: keine
-- Prüfdimensionen: Checked (1) Mechanical slice-heading contract: "### Slice 01"–"### Slice 10" sequential, 1-based, no numeric prefixes; matches attestation (future_slices=10, planned_paths=1, changed_paths=1) for sole path docs/internal/STRESS_PFAD_REPLAY_ARBEITSPLAN.md. (2) Scope discipline: diff touches only the declared work-plan file, no code/tests/config changed, consistent with PLAN_ONLY/TASK_SCOPE. (3) Closure of the 2026-08-07 historical blockers cross-checked line-by-line: baseline refreshed to current branch/HEAD (closes G-P-01/C-P-16); NE-01 C removes the entire asset-counterfactual sub-feature, making C-P-01, C-P-04/C-P-05, C-P-10, C-P-15 and G-P-03 moot by scope removal rather than patched (material simplification); C-P-02 fixed via materialized initialMarketDataHist plus BREAK_ON_RUIN in the path contract/fingerprint; C-P-03 fixed via a getCommonInputs()-path mapping table (hedged as "re-verify at implementation time"); C-P-06 addressed via NE-09 B additive trace instrumentation in simulator-engine-direct.js/forced-sale helpers, gated on tests proving unchanged financial semantics; C-P-07 addressed via an explicit absolute-run-index/tie-break contract with direct/worker parity tests in Slice 02; C-P-08 addressed via a named, position-independent shadow sub-seed (seed/run-index/contract-version/domain) entering the path fingerprint; C-P-09 addressed via NE-08 A snapshot capture/restore exclusion of sim.stressReplay.active.v1; C-P-11 addressed by reusing/extending runMonteCarloLogsForIndices() instead of a duplicate path; C-P-12 addressed via per-recordType reconciliation scoping; C-P-13 addressed by replacing the unbelegte "p95&lt;50ms" target with a measure-then-calibrate requirement in Slice 10; C-P-14/G-P-06 addressed by splitting former Slice 05/07 into Slices 05/06/08/09 with explicit per-slice file caps (&lt;=5/&lt;=6), safely under the ten-file stop rule. (4) Dependencies explicit: Slice 05 gates on NE-09, Slice 07 gates on NE-04/NE-07/NE-08. (5) Validation: attestation plan-validation-288e706abd7e is fingerprint-bound to this exact diff/commit (SLICE START COMMIT 798ce7d) and PASS with future_slices=10, matching the document.
-- Größtes Restrisiko: Largest residual risk: Section 16 closes NE-01 through NE-09 as "Nutzerentscheidung (2026-08-14)" within the same turn that rewrites the plan, and the supplied evidence contains no independently attributable trace (no prior CONTRACT-UNCLEAR stop/resume record, no quoted user turn) proving these came from the user rather than from Codex itself, which the assignment explicitly forbids ("Offene Produktentscheidungen duerfen nicht eigenmaechtig getroffen werden ... muss der Lauf ... anhalten"). NE-01 C in particular deletes the feature's original headline use case (paired Gold/Aktienfonds counterfactual from section 1 of the prior draft) rather than fixing it, the single highest-leverage scope decision in the document. Partially mitigated because Section 2 still requires a separate fingerprint-bound user gate before Slice 01, and the Definition of Done explicitly keeps "Plan fingerprintgebunden extern reviewt und vom Nutzer freigegeben" open, but this reviewer cannot independently confirm authorship of NE-01..NE-09 from the packet alone. Secondary smaller risk: NE-09 B permits "additive" trace instrumentation inside simulator-engine-direct.js/simulator-forced-sale.js, which C-P-06 already showed likely requires inserting a new balance_trace phase (payout-fallback currently jumps after_payout to after_bond_refill with no snapshotBalance step); genuinely additive-only behavior is not self-evidently guaranteed by a plan-level promise.
-- Realistische Bruchbedingung: Break condition: the downstream fingerprint-bound user gate is granted without an explicit, quotable user statement authorizing NE-01 through NE-09 (especially NE-01 C's removal of asset counterfactuals), so Slices 01-10 would implement a materially narrower feature than originally commissioned without traceable authorization; or Slice 05's "additive" diagnostic instrumentation changes balance_trace phase ordering/count in a way its own FlowDelta/financial-semantics tests fail to catch because those tests were written by the same slice that introduced the change.
-- Eigene Findings: keine
+- Eigene Findings: `C-01`
 <!-- audit:claude-review:end -->
 
 ### Review-Feedback von Antigravity
@@ -780,11 +825,11 @@ fail-closed Fingerprints.
 
 - Reviewer: `antigravity`
 - Freigabe: `YES`
-- Validierungsbindung: `plan-validation-288e706abd7e`
+- Validierungsbindung: `plan-validation-8e33dfd850d6`
 - Testdateien: keine
-- Prüfdimensionen: Checked (1) State-v3 slice contract structure: exactly 10 sequential, 1-based headings (### Slice 01 to ### Slice 10) matching the orchestrator work-plan attestation without numeric prefixes; (2) Scope discipline: strictly confined to docs/internal/STRESS_PFAD_REPLAY_ARBEITSPLAN.md with zero out-of-scope code/test mutations; (3) Adversarial resolution of all 2026-08-07 historical findings (G-P-01..06 and C-P-01..16): baseline refreshed to branch codex/stress-pfad-replay at HEAD 798ce7d, asset counterfactual distortions cleanly eliminated via scope removal under NE-01 C, path contract augmented with initialMarketDataHist and BREAK_ON_RUIN (C-P-02), getCommonInputs mapping table formalized (C-P-03), position-independent shadow sub-seed specified for post-ruin continuation (C-P-08/G-P-04), recordType-scoped reconciliation defined (C-P-12), snapshot persistence exclusion formalized under NE-08 A (C-P-09), runMonteCarloLogsForIndices reused as single serial pass (C-P-11), empirical benchmark calibration replacing arbitrary latency goals (C-P-13), and former bulky slices decomposed into Slices 05/06/08/09 with per-slice caps &lt;=6 files safely respecting the 10-file stop rule (C-P-14/G-P-06); (4) Gating dependencies explicit (Slice 05 on NE-09, Slice 07 on NE-04/NE-07/NE-08, and all implementation slices on fingerprint-bound user gate); (5) Orchestrator validation attestation plan-validation-288e706abd7e is fingerprint-bound to diff 288e706abd7e and PASS.
-- Größtes Restrisiko: Largest residual risk: Section 16 formalizes NE-01 C removing the initial Gold/Aktienfonds asset-toggle counterfactual from V1 to protect engine invariants, focusing V1 strictly on strategy and decumulation parameters; downstream implementation requires user awareness of this scope reduction at the fingerprint-bound gate. Secondary risk: Slice 05 additive trace instrumentation inside simulator-engine-direct.js/simulator-forced-sale.js could subtly affect balance_trace phase sequencing if not strictly checked against FlowDelta and snapshot invariants.
-- Realistische Bruchbedingung: Break condition: The user grants the downstream gate expecting Gold/Aktienfonds allocation counterfactuals to be in V1 when they are explicitly excluded by NE-01 C, or Slice 05 diagnostic instrumentation in simulator-engine-direct.js alters trace phase indexing for existing simulation consumers.
+- Prüfdimensionen: Checked (1) State-v3 plan structure and slice contract: sequential 1-based headings (### Slice 01 to ### Slice 10) with exact **Exakter Änderungspfad** sections using discrete backtick file paths with zero globs, options, or directories; (2) Scope discipline: PLAN_ONLY strictly limited to docs/internal/STRESS_PFAD_REPLAY_ARBEITSPLAN.md with no out-of-scope code/test edits; (3) File count budget: all 10 implementation slices touch between 2 and 9 files, safely complying with the 10-file machine stop rule; (4) Dependency and execution ordering: logical progression from schema contract (Slice 01) through path materialization (Slice 02), deterministic runner (Slice 03), variant gating (Slice 04), additive transactions (Slice 05, gated on NE-09), comparison engine (Slice 06), persistence (Slice 07, gated on NE-04/NE-07/NE-08), UI/renderer (Slices 08-09), to integration and documentation (Slice 10); (5) Deterministic orchestrator validation attestation plan-validation-8e33dfd850d6 passed with matching fingerprint 8e33dfd850d6b494aed7d2d91777b3efd57ec6f0474968f049992e61f081899d; (6) Open observation C-01 from Claude appropriately captures the user-gate governance requirement for NE-01..NE-09 decisions prior to Slice 01 execution.
+- Größtes Restrisiko: Largest residual risk: NE-01 C eliminates initial Gold/Aktienfonds asset-allocation counterfactuals in favor of strategy/decumulation parameters, meaning stakeholders must be fully aligned at the upcoming fingerprint-bound user gate regarding this deliberate V1 scope boundary. Secondary risk: Slice 05 additive transaction instrumentation in simulator-engine-direct.js must maintain strict zero-regression invariance on balance snapshots and trace phase ordering.
+- Realistische Bruchbedingung: Break condition: Downstream user grants the fingerprint-bound gate assuming asset-allocation counterfactuals are included in V1 when they are excluded by NE-01 C, or Slice 05 diagnostic instrumentation in simulator-engine-direct.js modifies balance_trace phase indexing or execution order unnoticed by isolated unit tests.
 - Eigene Findings: keine
 <!-- audit:antigravity-review:end -->
 
@@ -797,9 +842,9 @@ Noch keine strukturierten Codex-Antworten.
 ### Validierungsattestierung
 
 <!-- audit:validation-attestation:begin -->
-### Ereignis 1: `plan-validation-288e706abd7e`
+### Ereignis 1: `plan-validation-8e33dfd850d6`
 
-- Diff-Fingerprint: `288e706abd7e659d8cea0b1e1a8925e51035ae0821b29bc30e2d75debae7cba7`
+- Diff-Fingerprint: `8e33dfd850d6b494aed7d2d91777b3efd57ec6f0474968f049992e61f081899d`
 - Status: `PASS`
 - Vollständig: `YES`
 - Kurzresultat: internal plan contract passed
@@ -815,14 +860,20 @@ Noch keine strukturierten Codex-Antworten.
 <!-- audit:test-approval-premortem:begin -->
 - Teständerungsfreigabe: nicht erfasst.
 - Pre-Mortems:
-  - Ereignis 2: In three months, the most likely failure is governance, not code: Slices 01-10 are implemented exactly as specified and all tests are green, yet at final user acceptance it emerges the user never actually agreed to drop the Gold/Aktienfonds counterfactual (NE-01 C), the feature's original motivating question, because that closure was authored inside this same planning turn without a separately verifiable user record. The second most likely cause is that NE-09 B's trace instrumentation in simulator-engine-direct.js/simulator-forced-sale.js quietly restructures balance_trace phase sequencing to obtain payout-fallback gross/tax data (as C-P-06 already flagged as structurally necessary), and a downstream consumer that pattern-matches trace phases regresses despite the plan's "unchanged financial semantics" promise.
-  - Ereignis 3: In three months, the most likely issue is that a stakeholder expects the original paired Gold/Aktienfonds allocation counterfactual in V1 and discovers it was deliberately excised under NE-01 C in favor of existing decumulation strategy parameters; the second most likely issue is that Slice 05's additive trace instrumentation in simulator-engine-direct.js alters balance_trace phase numbering or ordering in a manner that slips past unit tests but regresses an external trace consumer.
+  - Ereignis 2: In three months, the most likely failure is governance rather than a mechanical plan defect: Slices 01-10 get implemented exactly as this revised plan specifies and all its own tests pass, yet at final acceptance a stakeholder discovers the Gold/Aktienfonds asset-counterfactual — the plan's original motivating question — was permanently excised under NE-01 C without a traceable, separately verifiable user authorization, because C-01 was accepted at plan-approval time as an observation rather than enforced as a hard gate precondition.
+  - Ereignis 3: In three months, the most likely issue would be stakeholder discovery at final acceptance that asset allocation counterfactuals (e.g. Gold/Aktienfonds) were excised under NE-01 C in favor of decumulation strategy parameters, arising if the fingerprint-bound user gate was approved without explicitly confirming this V1 scope trade-off; secondarily, Slice 05 additive diagnostic hooks in simulator-engine-direct.js could introduce subtle trace phase ordering differences affecting external simulation listeners.
 <!-- audit:test-approval-premortem:end -->
 
 ### Findings-Lebenszyklus
 
 <!-- audit:findings:begin -->
-Noch keine strukturierten Findings.
+### `C-01` — `OPEN`
+
+- Quelle: `claude`; Runde 1
+- Klasse: `OBSERVATION`
+- Finding: Section 16 (unchanged by this diff) still attributes the NE-01..NE-09 product-decision closures — most consequentially NE-01 C, which deletes the plan's original Gold/Aktienfonds asset-allocation counterfactual use case rather than fixing it — to "Nutzerentscheidung (2026-08-14)" inside the same planning turn that authored the revision. The supplied evidence contains no quotable prior user statement, no CONTRACT-UNCLEAR stop/resume trail, and no other independently attributable trace proving these came from the user rather than from Codex itself, which the assignment explicitly forbids ("Offene Produktentscheidungen dürfen nicht eigenmächtig getroffen werden ... muss der Lauf ... anhalten"). This round's diff neither introduces nor resolves this; it is carried forward unchanged from both round-1 reviews, where it was likewise noted as the largest residual risk but not raised as a blocking finding, because Section 2 still requires a separate fingerprint-bound user gate before Slice 01 begins, which is the actual authorization checkpoint.
+- Akzeptanztest: Acceptance test: before the downstream fingerprint-bound user gate for this fingerprint is granted and Slice 01 is allowed to start, the orchestrator/user record must contain an explicit, quotable user statement (or a documented CONTRACT-UNCLEAR stop/resume trail) authorizing NE-01 through NE-09, in particular NE-01 C's removal of asset-allocation counterfactuals from V1 scope; absent that record, the gate must not be granted.
+- Statusbegründung: –
 <!-- audit:findings:end -->
 
 ### Entscheidungstabelle
@@ -830,7 +881,7 @@ Noch keine strukturierten Findings.
 <!-- audit:decision-table:begin -->
 | ID | Quelle | Finding | Klasse | Entscheidung | Umsetzung |
 |---|---|---|---|---|---|
-| – | – | Noch keine Findings | – | – | – |
+| C-01 | claude | Section 16 (unchanged by this diff) still attributes the NE-01..NE-09 product-decision closures — most consequentially NE-01 C, which deletes the plan's original Gold/Aktienfonds asset-allocation counterfactual use case rather than fixing it — to "Nutzerentscheidung (2026-08-14)" inside the same planning turn that authored the revision. The supplied evidence contains no quotable prior user statement, no CONTRACT-UNCLEAR stop/resume trail, and no other independently attributable trace proving these came from the user rather than from Codex itself, which the assignment explicitly forbids ("Offene Produktentscheidungen dürfen nicht eigenmächtig getroffen werden ... muss der Lauf ... anhalten"). This round's diff neither introduces nor resolves this; it is carried forward unchanged from both round-1 reviews, where it was likewise noted as the largest residual risk but not raised as a blocking finding, because Section 2 still requires a separate fingerprint-bound user gate before Slice 01 begins, which is the actual authorization checkpoint. | OBSERVATION | offen | offen |
 <!-- audit:decision-table:end -->
 
 ### Freigabestatus
