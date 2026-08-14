@@ -37,6 +37,8 @@ export const LEGACY_MIGRATION_MARKER_KEYS = Object.freeze({
     checksum: 'ruhestandsapp_migration_checksum'
 });
 
+export const STRESS_REPLAY_ACTIVE_STORAGE_KEY = 'sim.stressReplay.active.v1';
+
 const EXACT_KEYS = new Set([
     CONFIG.STORAGE.LS_KEY,
     CONFIG.STORAGE.MIGRATION_FLAG,
@@ -147,6 +149,7 @@ export function isSnapshotTechnicalKey(key) {
 export function isSnapshotGlobalDomainKey(key) {
     if (!key) return false;
     const normalized = String(key);
+    if (normalized === STRESS_REPLAY_ACTIVE_STORAGE_KEY) return false;
     if (isLegacySnapshotKey(normalized) || isSnapshotProfileScopedKey(normalized) || isSnapshotTechnicalKey(normalized)) {
         return false;
     }
@@ -157,6 +160,7 @@ export function isSnapshotGlobalDomainKey(key) {
 export function isAllowedSnapshotCaptureKey(key) {
     if (!key) return false;
     const normalized = String(key);
+    if (normalized === STRESS_REPLAY_ACTIVE_STORAGE_KEY) return false;
     if (isLegacySnapshotKey(normalized) || isSnapshotTechnicalKey(normalized)) return false;
     if (SNAPSHOT_CAPTURE_EXACT_KEYS.has(normalized)) return true;
     return SNAPSHOT_DOMAIN_PREFIXES.some(prefix => normalized.startsWith(prefix));

@@ -151,6 +151,19 @@ Noch kein strukturiertes Reviewereignis.
 - Größtes Restrisiko: Largest residual risk: always-on transaction capture in the deterministic runner is unverified against a real forced-sale/payout-fallback year at the integration (runner/comparison) level, only at the isolated engine level from Slice 05
 - Realistische Bruchbedingung: Break condition: a future real bear-market replay produces a payout-floor fallback sale whose additive &#96;after_payout_fallback&#96; balance-trace entry leaks into a downstream reconciliation/hash comparison that assumed capture-off shape, silently flipping &#96;reconciliation.matched&#96; or corrupting a persisted/exported diff in exactly the stressed year this feature exists to diagnose.
 - Eigene Findings: `C-01`
+
+#### Work Unit 08 – Slice 07
+
+- Auftrag: Persistenz sowie Export und Import
+- Scope: `app/shared/persistence-key-policy.js`, `app/simulator/stress-replay-contract.js`, `app/simulator/stress-replay-export.js`, `app/simulator/stress-replay-persistence.js`, `docs/internal/slice-stress-pfad-replay-arbeitsplan-07-persistenz-sowie-export-und-import.md`, `docs/internal/slice-stress-replay-implement-07-persistenz-sowie-export-und-import.md`, `docs/internal/stress-replay-implement-review-fa2904b2.md`, `tests/persistence.test.mjs`, `tests/stress-replay-export.test.mjs`, `tests/stress-replay-persistence.test.mjs`
+
+### Ereignis 2: Runde 1
+
+- Reviewer: `claude`
+- Freigabe: `YES`
+- Validierungsbindung: `validation-c6a5eb7a405e`
+- Testdateien: `tests/persistence.test.mjs`, `tests/stress-replay-export.test.mjs`, `tests/stress-replay-persistence.test.mjs`
+- Eigene Findings: `C-02`
 <!-- audit:claude-review:end -->
 
 ### Review-Feedback von Antigravity
@@ -258,6 +271,22 @@ Noch kein strukturiertes Reviewereignis.
 - Größtes Restrisiko: Downstream persistence (Slice 07) or UI comparison renderer (Slice 09) assuming all paired KPI deltas are numeric and failing to handle null values with structured missingness reasons or not_applicable ruin states
 - Realistische Bruchbedingung: A non-ruined or partially unobserved stress path replay produces null deltas for health bucket usage or ruin year that a downstream exporter or UI table attempts to format as percentages or currency, resulting in NaN displays or serialization exceptions &#124;
 - Eigene Findings: keine
+
+#### Work Unit 08 – Slice 07
+
+- Auftrag: Persistenz sowie Export und Import
+- Scope: `app/shared/persistence-key-policy.js`, `app/simulator/stress-replay-contract.js`, `app/simulator/stress-replay-export.js`, `app/simulator/stress-replay-persistence.js`, `docs/internal/slice-stress-pfad-replay-arbeitsplan-07-persistenz-sowie-export-und-import.md`, `docs/internal/slice-stress-replay-implement-07-persistenz-sowie-export-und-import.md`, `docs/internal/stress-replay-implement-review-fa2904b2.md`, `tests/persistence.test.mjs`, `tests/stress-replay-export.test.mjs`, `tests/stress-replay-persistence.test.mjs`
+
+### Ereignis 3: Runde 1
+
+- Reviewer: `antigravity`
+- Freigabe: `YES`
+- Validierungsbindung: `validation-c6a5eb7a405e`
+- Testdateien: `tests/persistence.test.mjs`, `tests/stress-replay-export.test.mjs`, `tests/stress-replay-persistence.test.mjs`
+- Prüfdimensionen: correctness (StressReplayWorkspaceV1 contract, schema versions, UTC timestamps, path &amp; baseline fingerprint validation, variant order and role verification, StressReplayComparisonExportV1 export/import serialization), security &amp; privacy boundaries (regex screening for credentials/tokens/secrets and absolute/UNC/drive filesystem paths, circular reference defense, deepFreeze immutability, snapshot exclusion policy in persistence-key-policy), failure paths &amp; corruption (fail-closed read-only status on missing or mismatched engine/data fingerprints, non-destructive graceful handling of corrupt storage items, confirmation barriers for replace and discard operations), idempotency (fingerprint-checked no-op writes on unchanged workspace saves, transactional rollback handling)
+- Größtes Restrisiko: Residual risk is that downstream UI lifecycle integration in Slice 08 fails to pass the live runtime engine and data fingerprints during workspace load or comparison execution, causing valid persisted replays to be permanently classified as read_only or causing unexpected modal confirmations if replace actions are triggered without user-visible confirmation prompts
+- Realistische Bruchbedingung: In Slice 08, a user modifies a variant parameter in the UI and clicks save/re-evaluate without passing updated runtime data/engine fingerprints to loadStressReplayWorkspaceV1 / inspectStressReplayWorkspaceV1, which triggers a mismatchReason 'current_data_fingerprint_unavailable' and renders the entire workspace in read_only mode, preventing the user from running the comparison until the page is fully reloaded.
+- Eigene Findings: keine
 <!-- audit:antigravity-review:end -->
 
 ### Review-Antworten von Codex
@@ -311,6 +340,13 @@ Noch keine strukturierten Codex-Antworten.
 
 - Auftrag: Variantenvergleich und Delta-Ledger
 - Scope: `app/simulator/stress-replay-comparison.js`, `app/simulator/stress-replay-contract.js`, `app/simulator/stress-replay-runner.js`, `app/simulator/stress-replay-transactions.js`, `docs/internal/slice-stress-pfad-replay-arbeitsplan-06-variantenvergleich-und-delta-ledger.md`, `docs/internal/slice-stress-replay-implement-06-variantenvergleich-und-delta-ledger.md`, `docs/internal/stress-replay-implement-review-fa2904b2.md`, `tests/stress-replay-comparison.test.mjs`
+
+Noch keine strukturierten Codex-Antworten.
+
+#### Work Unit 08 – Slice 07
+
+- Auftrag: Persistenz sowie Export und Import
+- Scope: `app/shared/persistence-key-policy.js`, `app/simulator/stress-replay-contract.js`, `app/simulator/stress-replay-export.js`, `app/simulator/stress-replay-persistence.js`, `docs/internal/slice-stress-pfad-replay-arbeitsplan-07-persistenz-sowie-export-und-import.md`, `docs/internal/slice-stress-replay-implement-07-persistenz-sowie-export-und-import.md`, `docs/internal/stress-replay-implement-review-fa2904b2.md`, `tests/persistence.test.mjs`, `tests/stress-replay-export.test.mjs`, `tests/stress-replay-persistence.test.mjs`
 
 Noch keine strukturierten Codex-Antworten.
 <!-- audit:codex-responses:end -->
@@ -486,6 +522,23 @@ Noch keine strukturierte Validierungsattestierung.
 | Matrixbefehl | Status | Exitcode | Kompaktausgabe |
 |---|---|---:|---|
 | shell: npm test | PASS | 0 | &gt; ruhestand-app-final@1.0.0 test<br>&gt; node tests/run-tests.mjs<br><br>🚀 Starting Test Runner...<br>Found 175 test files.<br><br>📂 Running 3bucket-config.test.mjs in process...<br>--- 3-Bucket Config Tests ---<br>✅ 3-Bucket config tests passed<br>✅ 3bucket-config.test.mjs completed.<br>📊 FILE RESULT: 3bucket-config.test.mjs &#124; mode=in-process &#124; assertions=17 &#124; passed=17 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running 3bucket-refill.test.mjs in process...<br>--- 3-Bucket Refill Tests ---<br>✅ 3-Bucket refill tests passed<br>✅ 3bucket-refill.test.mjs completed.<br>📊 FILE RESULT: 3bucket-refill.test.mjs &#124; mode=in-process &#124; assertions=32 &#124; passed=32 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running architecture-evidence.test.mjs in process...<br>--- Architecture Evidence Contract Tests ---<br>✅ Architecture evidence contract tests passed<br>✅ architecture-evidence.test.mjs completed.<br>📊 FILE RESULT: architecture-evidence.test.mjs &#124; mode=in-process &#124; assertions=24 &#124; passed=24 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running auto-optimize-fidelity<br>...[178874 characters omitted]...<br>ete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-storage.js:537:28)<br>    at initProfileSubpageLifecycle (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-navigation.js:157:5)<br>    at initProfileBridge (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-bridge.js:8:5)<br>    at async Promise.all (index 0)<br>    at async MockDocument.dispatch (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:80:9)<br>    at async runProfileUiContractTests (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:244:9)<br>    at async file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:257:9<br>[VALIDATION ERROR] Invalid input fields: [<br>  {<br>    fieldId: 'goGoMultiplier',<br>    message: 'goGoMultiplier muss zwischen 1.0 und 1.5 liegen.'<br>  }<br>] |
+
+#### Work Unit 08 – Slice 07
+
+- Auftrag: Persistenz sowie Export und Import
+- Scope: `app/shared/persistence-key-policy.js`, `app/simulator/stress-replay-contract.js`, `app/simulator/stress-replay-export.js`, `app/simulator/stress-replay-persistence.js`, `docs/internal/slice-stress-pfad-replay-arbeitsplan-07-persistenz-sowie-export-und-import.md`, `docs/internal/slice-stress-replay-implement-07-persistenz-sowie-export-und-import.md`, `docs/internal/stress-replay-implement-review-fa2904b2.md`, `tests/persistence.test.mjs`, `tests/stress-replay-export.test.mjs`, `tests/stress-replay-persistence.test.mjs`
+
+### Ereignis 1: `validation-c6a5eb7a405e`
+
+- Diff-Fingerprint: `c6a5eb7a405e31d9b43d4c4e1e3de056491c3828b5622a892ac571831dd0fb37`
+- Status: `PASS`
+- Vollständig: `YES`
+- Kurzresultat: 1 passed; 0 failed; 0 unavailable; 1 required
+- Ausgabedigest: `5d4b65294786677e13507a2a37e6ee49f88c6355589fa46b0df84fc3e6a3b4cc`
+
+| Matrixbefehl | Status | Exitcode | Kompaktausgabe |
+|---|---|---:|---|
+| shell: npm test | PASS | 0 | &gt; ruhestand-app-final@1.0.0 test<br>&gt; node tests/run-tests.mjs<br><br>🚀 Starting Test Runner...<br>Found 177 test files.<br><br>📂 Running 3bucket-config.test.mjs in process...<br>--- 3-Bucket Config Tests ---<br>✅ 3-Bucket config tests passed<br>✅ 3bucket-config.test.mjs completed.<br>📊 FILE RESULT: 3bucket-config.test.mjs &#124; mode=in-process &#124; assertions=17 &#124; passed=17 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running 3bucket-refill.test.mjs in process...<br>--- 3-Bucket Refill Tests ---<br>✅ 3-Bucket refill tests passed<br>✅ 3bucket-refill.test.mjs completed.<br>📊 FILE RESULT: 3bucket-refill.test.mjs &#124; mode=in-process &#124; assertions=32 &#124; passed=32 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running architecture-evidence.test.mjs in process...<br>--- Architecture Evidence Contract Tests ---<br>✅ Architecture evidence contract tests passed<br>✅ architecture-evidence.test.mjs completed.<br>📊 FILE RESULT: architecture-evidence.test.mjs &#124; mode=in-process &#124; assertions=24 &#124; passed=24 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running auto-optimize-fidelity<br>...[180381 characters omitted]...<br>ete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-storage.js:537:28)<br>    at initProfileSubpageLifecycle (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-navigation.js:157:5)<br>    at initProfileBridge (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-bridge.js:8:5)<br>    at async Promise.all (index 0)<br>    at async MockDocument.dispatch (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:80:9)<br>    at async runProfileUiContractTests (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:244:9)<br>    at async file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:257:9<br>[VALIDATION ERROR] Invalid input fields: [<br>  {<br>    fieldId: 'goGoMultiplier',<br>    message: 'goGoMultiplier muss zwischen 1.0 und 1.5 liegen.'<br>  }<br>] |
 <!-- audit:validation-attestation:end -->
 
 ### Testfreigabe und Pre-Mortem
@@ -562,6 +615,16 @@ Noch keine strukturierte Validierungsattestierung.
 - Pre-Mortems:
   - Ereignis 2: In three months, the most likely failure is that C-01 materializes — a persistence/export/UI consumer in Slices 07–09 diffs or hashes the stress-replay runner's &#96;scenarioLog&#96;/reconciliation output for a genuinely stressed (forced-sale/payout-fallback) year, and the now-permanent additive capture instrumentation (untested at this integration boundary) produces an unexpected divergence that gets silently masked or misinterpreted rather than caught by a regression test.
   - Ereignis 3: In three months, the most likely issue is that a downstream consumer in Slice 07 (export) or Slice 09 (UI) fails to check kpiDeltas[field].applicability or null absoluteDelta, directly formatting unobserved metrics (e.g. unobserved health-bucket or non-ruined ruinYear) and causing rendering exceptions or displaying '0.00 EUR' instead of the structured missingness reason.
+
+#### Work Unit 08 – Slice 07
+
+- Auftrag: Persistenz sowie Export und Import
+- Scope: `app/shared/persistence-key-policy.js`, `app/simulator/stress-replay-contract.js`, `app/simulator/stress-replay-export.js`, `app/simulator/stress-replay-persistence.js`, `docs/internal/slice-stress-pfad-replay-arbeitsplan-07-persistenz-sowie-export-und-import.md`, `docs/internal/slice-stress-replay-implement-07-persistenz-sowie-export-und-import.md`, `docs/internal/stress-replay-implement-review-fa2904b2.md`, `tests/persistence.test.mjs`, `tests/stress-replay-export.test.mjs`, `tests/stress-replay-persistence.test.mjs`
+
+- Teständerungsfreigabe: nicht erfasst.
+- Pre-Mortems:
+  - Ereignis 2: In three months, the most likely failure is that C-02 materializes — Slice 08 wires the UI to the default (no-override) &#96;saveStressReplayWorkspaceV1&#96;/&#96;discardStressReplayWorkspaceV1&#96; path, a real IndexedDB flush intermittently fails mid-transaction in the browser, and the untested &#96;replaceRecordsTransactional&#96; rollback contract (specifically whether &#96;cause.code === 'rollback_failed'&#96; is set correctly and whether the underlying facade truly restores the previous bytes) behaves differently than the manually-mocked non-transactional rollback this slice's tests validated, leaving the active stress-replay workspace either silently corrupted or duplicated across storage layers without a regression test having ever exercised that branch.
+  - Ereignis 3: In three months, the most likely issue is that during a future migration or backup restore, a third-party tool or browser extension injects unexpected technical metadata keys into localStorage alongside sim.stressReplay.active.v1, or a future schema update adds optional fields to the export format that fail the strict allowedKeys whitelist in validateStressReplayWorkspaceV1 / validateStressReplayComparisonExportV1, causing previously valid exported replay files to fail import inspection with STRESS_REPLAY_CONTRACT_INVALID rather than migrating gracefully.
 <!-- audit:test-approval-premortem:end -->
 
 ### Findings-Lebenszyklus
@@ -683,6 +746,19 @@ Noch keine strukturierten Findings.
 - Finding: &#96;runStressReplayPathV1&#96; now unconditionally enables &#96;STRESS_REPLAY_TRANSACTION_CAPTURE_INPUT&#96; for every year, reactivating exactly the "capture perturbs the log surface in a real forced-sale/payout-fallback year" scenario the Slice-05 pre-mortem predicted would surface in Slice 06. No test in this slice drives an actual forced-sale/payout-floor-fallback branch through the real runner (only Slice 05's isolated &#96;simulateOneYear&#96;-level test and this slice's trivial comparison fixture, which never triggers those branches), so the always-on capture's effect on this runner's own &#96;scenarioLog&#96;/&#96;reconciliation&#96; output in a genuinely stressed year is asserted but not demonstrated at the integration level.
 - Akzeptanztest: Add a stress-replay-runner or stress-replay-comparison test that forces &#96;applyForcedSaleLiquidityCoverage&#96;/&#96;applyPayoutFallbackSale&#96; to fire within an actual &#96;runStressReplayPathV1&#96; (or &#96;runStressReplayComparisonV1&#96;) call on a bear/crash-year materialized path, then assert byte-identical &#96;reconciliation&#96;/&#96;scenarioLog&#96; shape aside from the additive &#96;after_payout_fallback&#96; trace phase and the new &#96;stressReplayTransactionDiagnostics&#96;-equivalent fields, mirroring Slice 05's Test 6b but at this runner's integration boundary. VALIDATE: ["node","tests/run-single.mjs","tests/stress-replay-runner.test.mjs"]
 - Statusbegründung: –
+
+#### Work Unit 08 – Slice 07
+
+- Auftrag: Persistenz sowie Export und Import
+- Scope: `app/shared/persistence-key-policy.js`, `app/simulator/stress-replay-contract.js`, `app/simulator/stress-replay-export.js`, `app/simulator/stress-replay-persistence.js`, `docs/internal/slice-stress-pfad-replay-arbeitsplan-07-persistenz-sowie-export-und-import.md`, `docs/internal/slice-stress-replay-implement-07-persistenz-sowie-export-und-import.md`, `docs/internal/stress-replay-implement-review-fa2904b2.md`, `tests/persistence.test.mjs`, `tests/stress-replay-export.test.mjs`, `tests/stress-replay-persistence.test.mjs`
+
+### `C-02` — `OPEN`
+
+- Quelle: `claude`; Runde 1
+- Klasse: `OBSERVATION`
+- Finding: The transactional/production default-backend branch of &#96;saveStressReplayWorkspaceV1&#96;/&#96;discardStressReplayWorkspaceV1&#96; (the &#96;replaceRecordsTransactional&#96; path taken when no &#96;backend&#96; override is supplied) is never exercised by &#96;tests/stress-replay-persistence.test.mjs&#96;; all tests inject a custom in-memory &#96;backend.storage&#96;/&#96;backend.flush&#96;, forcing the non-transactional manual-rollback branch instead, leaving the real atomic write/rollback contract with &#96;persistence-facade.js&#96; unverified.
+- Akzeptanztest: Add a persistence test that omits &#96;backend&#96; (or only overrides &#96;persistenceStorage&#96;/&#96;flush&#96; indirectly via a stub of &#96;replaceRecordsTransactional&#96;) to drive &#96;saveStressReplayWorkspaceV1&#96;/&#96;discardStressReplayWorkspaceV1&#96; through the &#96;transactionalReplace&#96; branch, asserting a successful replace, a successful discard, and that a simulated &#96;replaceRecordsTransactional&#96; rejection with &#96;cause.code === 'rollback_failed'&#96; surfaces &#96;STRESS_REPLAY_PERSISTENCE_WRITE_FAILED&#96; with &#96;rollbackFailed: true&#96;. VALIDATE: ["node","tests/run-single.mjs","tests/stress-replay-persistence.test.mjs"]
+- Statusbegründung: –
 <!-- audit:findings:end -->
 
 ### Entscheidungstabelle
@@ -754,6 +830,15 @@ Noch keine strukturierten Findings.
 | ID | Quelle | Finding | Klasse | Entscheidung | Umsetzung |
 |---|---|---|---|---|---|
 | C-01 | claude | &#96;runStressReplayPathV1&#96; now unconditionally enables &#96;STRESS_REPLAY_TRANSACTION_CAPTURE_INPUT&#96; for every year, reactivating exactly the "capture perturbs the log surface in a real forced-sale/payout-fallback year" scenario the Slice-05 pre-mortem predicted would surface in Slice 06. No test in this slice drives an actual forced-sale/payout-floor-fallback branch through the real runner (only Slice 05's isolated &#96;simulateOneYear&#96;-level test and this slice's trivial comparison fixture, which never triggers those branches), so the always-on capture's effect on this runner's own &#96;scenarioLog&#96;/&#96;reconciliation&#96; output in a genuinely stressed year is asserted but not demonstrated at the integration level. | OBSERVATION | offen | offen |
+
+#### Work Unit 08 – Slice 07
+
+- Auftrag: Persistenz sowie Export und Import
+- Scope: `app/shared/persistence-key-policy.js`, `app/simulator/stress-replay-contract.js`, `app/simulator/stress-replay-export.js`, `app/simulator/stress-replay-persistence.js`, `docs/internal/slice-stress-pfad-replay-arbeitsplan-07-persistenz-sowie-export-und-import.md`, `docs/internal/slice-stress-replay-implement-07-persistenz-sowie-export-und-import.md`, `docs/internal/stress-replay-implement-review-fa2904b2.md`, `tests/persistence.test.mjs`, `tests/stress-replay-export.test.mjs`, `tests/stress-replay-persistence.test.mjs`
+
+| ID | Quelle | Finding | Klasse | Entscheidung | Umsetzung |
+|---|---|---|---|---|---|
+| C-02 | claude | The transactional/production default-backend branch of &#96;saveStressReplayWorkspaceV1&#96;/&#96;discardStressReplayWorkspaceV1&#96; (the &#96;replaceRecordsTransactional&#96; path taken when no &#96;backend&#96; override is supplied) is never exercised by &#96;tests/stress-replay-persistence.test.mjs&#96;; all tests inject a custom in-memory &#96;backend.storage&#96;/&#96;backend.flush&#96;, forcing the non-transactional manual-rollback branch instead, leaving the real atomic write/rollback contract with &#96;persistence-facade.js&#96; unverified. | OBSERVATION | offen | offen |
 <!-- audit:decision-table:end -->
 
 ### Freigabestatus
@@ -835,6 +920,18 @@ Noch keine strukturierten Findings.
 
 - Auftrag: Variantenvergleich und Delta-Ledger
 - Scope: `app/simulator/stress-replay-comparison.js`, `app/simulator/stress-replay-contract.js`, `app/simulator/stress-replay-runner.js`, `app/simulator/stress-replay-transactions.js`, `docs/internal/slice-stress-pfad-replay-arbeitsplan-06-variantenvergleich-und-delta-ledger.md`, `docs/internal/slice-stress-replay-implement-06-variantenvergleich-und-delta-ledger.md`, `docs/internal/stress-replay-implement-review-fa2904b2.md`, `tests/stress-replay-comparison.test.mjs`
+
+- Implementierung bereit: `YES`
+- Validierung: `PASS`
+- Claude-Freigabe: `YES`
+- Antigravity-Freigabe: `YES`
+- Red-State-Folgeslice: `NONE`
+- Commit autorisiert: `YES`
+
+#### Work Unit 08 – Slice 07
+
+- Auftrag: Persistenz sowie Export und Import
+- Scope: `app/shared/persistence-key-policy.js`, `app/simulator/stress-replay-contract.js`, `app/simulator/stress-replay-export.js`, `app/simulator/stress-replay-persistence.js`, `docs/internal/slice-stress-pfad-replay-arbeitsplan-07-persistenz-sowie-export-und-import.md`, `docs/internal/slice-stress-replay-implement-07-persistenz-sowie-export-und-import.md`, `docs/internal/stress-replay-implement-review-fa2904b2.md`, `tests/persistence.test.mjs`, `tests/stress-replay-export.test.mjs`, `tests/stress-replay-persistence.test.mjs`
 
 - Implementierung bereit: `YES`
 - Validierung: `PASS`

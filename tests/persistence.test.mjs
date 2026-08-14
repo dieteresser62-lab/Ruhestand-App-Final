@@ -1,8 +1,11 @@
 import { detectRuntime, isTauriRuntime } from '../app/shared/runtime-env.js';
 import {
     isAllowedPersistenceImportKey,
+    isAllowedSnapshotCaptureKey,
+    isAllowedSnapshotRestoreLiveKey,
     listAllowedPersistenceImportKeys,
-    LEGACY_MIGRATION_MARKER_KEYS
+    LEGACY_MIGRATION_MARKER_KEYS,
+    STRESS_REPLAY_ACTIVE_STORAGE_KEY
 } from '../app/shared/persistence-key-policy.js';
 import { createLocalStorageAdapter } from '../app/shared/persistence-adapter-localstorage.js';
 import { createIndexedDbAdapter } from '../app/shared/persistence-adapter-indexeddb.js';
@@ -320,6 +323,7 @@ try {
         storage.setItem('sim_dynamicFlex', 'true');
         storage.setItem('sim.dynamicFlex', 'true');
         storage.setItem('balance_expenses_v1', '{}');
+        storage.setItem(STRESS_REPLAY_ACTIVE_STORAGE_KEY, '{"workspace":true}');
         storage.setItem(LEGACY_MIGRATION_MARKER_KEYS.target, 'indexeddb');
         storage.setItem('private_unrelated_key', 'secret');
 
@@ -328,10 +332,14 @@ try {
         assert(isAllowedPersistenceImportKey('sim.dynamicFlex'), 'sim. Key ist erlaubt');
         assert(isAllowedPersistenceImportKey('balance_expenses_v1'), 'Ausgaben-Key ist erlaubt');
         assert(isAllowedPersistenceImportKey(LEGACY_MIGRATION_MARKER_KEYS.target), 'Migrationsmarker ist erlaubt');
+        assert(isAllowedPersistenceImportKey(STRESS_REPLAY_ACTIVE_STORAGE_KEY), 'Full-Backup-Policy erlaubt den Replay-Arbeitsstand');
+        assert(!isAllowedSnapshotCaptureKey(STRESS_REPLAY_ACTIVE_STORAGE_KEY), 'Snapshots schliessen den Replay-Arbeitsstand explizit aus');
+        assert(!isAllowedSnapshotRestoreLiveKey(STRESS_REPLAY_ACTIVE_STORAGE_KEY, { mode: 'full' }), 'Auch Full-Snapshot-Restore schliesst Replay explizit aus');
         assert(!isAllowedPersistenceImportKey('private_unrelated_key'), 'Fremder Key ist nicht erlaubt');
 
         const keys = listAllowedPersistenceImportKeys(storage);
         assert(keys.includes(CONFIG.STORAGE.LS_KEY), 'Allowlist-Listing enthaelt Balance-Key');
+        assert(keys.includes(STRESS_REPLAY_ACTIVE_STORAGE_KEY), 'Full-Backup-Listing enthaelt den Replay-Arbeitsstand');
         assert(!keys.includes('private_unrelated_key'), 'Allowlist-Listing filtert fremden Key');
     }
 
