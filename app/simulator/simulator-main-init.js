@@ -19,6 +19,7 @@ import { initStressPresetOptions } from './simulator-main-stress.js';
 import { initSimulatorProfileSelection } from './simulator-main-profiles.js';
 import { initMonteCarloMethodControls, initMonteCarloStartYearControls } from './monte-carlo-ui.js';
 import { initThreeBucketControls } from './simulator-main-3bucket.js';
+import { initStressReplayUI } from './stress-replay-ui.js';
 
 /**
  * Prüft Engine-Version
@@ -60,6 +61,7 @@ export function initializeSimulatorApp() {
     initStressPresetOptions();
     initMonteCarloMethodControls();
     initMonteCarloStartYearControls();
+    initStressReplayUI();
 
     initSweepUIControls();
     initTabSwitching();

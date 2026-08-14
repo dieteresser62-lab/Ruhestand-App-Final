@@ -1129,6 +1129,34 @@
                         <button type="button" id="exportMonteCarloRunJson" disabled>Vollständiges MC-Ergebnis (JSON)</button>
                         <span id="mcRunExportStatus" role="status" aria-live="polite"></span>
                     </div>
+                    <section id="stressReplayWorkspace" aria-labelledby="stressReplayHeading"
+                        style="margin-top: 18px; text-align: left;">
+                        <h4 id="stressReplayHeading">Stresspfad-Replay</h4>
+                        <p>Fixiert genau einen ausgewählten Monte-Carlo-Lauf. Varianten werden nur auf diesem
+                            Pfad verglichen und sind keine allgemeine Strategieempfehlung.</p>
+                        <div class="log-export-buttons" aria-label="Stresspfad-Aktionen">
+                            <button type="button" id="stressReplayFixButton" disabled>Diesen Lauf als Stresspfad fixieren</button>
+                            <button type="button" id="stressReplayExportButton" disabled>Stresspfad exportieren</button>
+                            <button type="button" id="stressReplayImportButton">Stresspfad importieren</button>
+                            <button type="button" id="stressReplayDiscardButton" disabled>Stresspfad verwerfen</button>
+                            <input type="file" id="stressReplayImportFile" accept="application/json,.json"
+                                class="visually-hidden" tabindex="-1" aria-hidden="true">
+                        </div>
+                        <div id="stressReplayStatus" role="status" aria-live="polite" tabindex="-1"></div>
+                        <aside id="stressReplayBanner" hidden tabindex="-1" aria-labelledby="stressReplayBannerTitle">
+                            <h5 id="stressReplayBannerTitle">Auf diesem fixierten Stresspfad</h5>
+                            <dl>
+                                <div><dt>Modus</dt><dd id="stressReplayBannerMode"></dd></div>
+                                <div><dt>Quelle</dt><dd id="stressReplayBannerSource"></dd></div>
+                                <div><dt>Horizont</dt><dd id="stressReplayBannerHorizon"></dd></div>
+                                <div><dt>Terminalstatus</dt><dd id="stressReplayBannerTerminal"></dd></div>
+                                <div><dt>Fortsetzung</dt><dd id="stressReplayBannerContinuation"></dd></div>
+                                <div><dt>Pfad-Fingerprint</dt><dd id="stressReplayBannerPathFingerprint"></dd></div>
+                                <div><dt>Baseline-Fingerprint</dt><dd id="stressReplayBannerBaselineFingerprint"></dd></div>
+                            </dl>
+                            <p id="stressReplayCompatibilityReasons" hidden></p>
+                        </aside>
+                    </section>
                     <div id="print-footer" class="print-footer"></div>
                     <div id="monteCarloResults" tabindex="-1" aria-label="Ergebnisse der Monte-Carlo-Analyse"
                         style="display:none; margin-top: 25px;">

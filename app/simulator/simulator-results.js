@@ -19,6 +19,10 @@ import {
     serializeScenarioLogCsvV2,
     serializeScenarioLogExportV2
 } from './monte-carlo-export.js';
+import {
+    publishStressReplayMonteCarloContext,
+    selectStressReplayScenario
+} from './stress-replay-ui.js';
 
 const formatPercent = (value, digits = 1) => formatPercentValue(Number(value) || 0, { fractionDigits: digits, invalid: '0.0%' });
 const formatPercentFromRatio = (value, digits = 1) => formatPercentRatio(Number(value) || 0, { fractionDigits: digits, invalid: '0.0%' });
@@ -109,6 +113,7 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
         window.globalScenarioLogs = scenarioLogs;
         window.globalScenarioCarThreshold = caR;
         window.globalCurrentScenarioData = null;
+        publishStressReplayMonteCarloContext({ inputs, scenarioLogs });
 
         // Dropdown erstellen im scenarioSelector
         const selectorDiv = document.getElementById('scenarioSelector');
@@ -156,6 +161,7 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
             const val = select.value;
             if (!val) {
                 output.style.display = 'none';
+                selectStressReplayScenario(null);
                 return;
             }
 
@@ -169,6 +175,7 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
             }
 
             if (scenario && scenario.logDataRows && scenario.logDataRows.length > 0) {
+                selectStressReplayScenario(scenario);
                 // Respect persisted detail toggles for care and log verbosity.
                 const showCareDetails = (persistenceStorage.getItem('showCareDetails') === '1');
                 const logDetailLevel = loadDetailLevel(WORST_LOG_DETAIL_KEY);
@@ -185,6 +192,7 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
                 };
                 exportButtons.style.display = 'flex';
             } else {
+                selectStressReplayScenario(null);
                 output.innerHTML = '<p style="color: var(--text-muted); padding: 10px;">Keine Log-Daten für dieses Szenario verfügbar.</p>';
                 output.style.display = 'block';
             }
@@ -272,6 +280,8 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
         renderSelectedScenario();
 
     } else if (scenarioContainer) {
+        publishStressReplayMonteCarloContext(null);
+        selectStressReplayScenario(null);
         scenarioContainer.style.display = 'none';
     }
 

@@ -164,6 +164,22 @@ Noch kein strukturiertes Reviewereignis.
 - Validierungsbindung: `validation-c6a5eb7a405e`
 - Testdateien: `tests/persistence.test.mjs`, `tests/stress-replay-export.test.mjs`, `tests/stress-replay-persistence.test.mjs`
 - Eigene Findings: `C-02`
+
+#### Work Unit 09 – Slice 08
+
+- Auftrag: Fixieren, Banner und Sitzungssteuerung
+- Scope: `Simulator.html`, `app/simulator/monte-carlo-ui.js`, `app/simulator/simulator-main-init.js`, `app/simulator/simulator-main.js`, `app/simulator/simulator-results.js`, `app/simulator/stress-replay-ui.js`, `docs/internal/slice-stress-pfad-replay-arbeitsplan-08-fixieren-banner-und-sitzungssteuerung.md`, `docs/internal/slice-stress-replay-implement-08-fixieren-banner-und-sitzungssteuerung.md`, `docs/internal/stress-replay-implement-review-fa2904b2.md`, `tests/browser-smoke.test.mjs`, `tests/stress-replay-ui.test.mjs`
+
+### Ereignis 2: Runde 1
+
+- Reviewer: `claude`
+- Freigabe: `YES`
+- Validierungsbindung: `validation-389eb8fdb571`
+- Testdateien: `tests/browser-smoke.test.mjs`, `tests/stress-replay-ui.test.mjs`
+- Prüfdimensionen: checked selection/RNG-gate invariants, error-path non-mutation of workspaceState, replace-confirmation fail-closed behavior, baseline input immutability, focus/live-region accessibility wiring, and scope/allowlist conformance of the diff
+- Größtes Restrisiko: Largest residual risk is the button-state race above plus an unverified assumption (not resolvable from this packet alone) that &#96;readMonteCarloParameters(inputs)&#96; called at result-display time reflects the exact parameters that produced the already-computed &#96;scenarioLogs&#96; rather than any live DOM edits made while a long-running MC batch was in flight; a mismatch there would at worst surface as a safe &#96;STRESS_REPLAY_BASELINE_RECONCILIATION_FAILED&#96; (fails closed, no silent corruption)
+- Realistische Bruchbedingung: Break condition: a user double-clicks or rapidly alternates Fix/Import/Discard/Export during an in-flight persistence call, producing two concurrent writes to the same &#96;sim.stressReplay.active.v1&#96; record with no ordering guarantee, or the storage backend genuinely takes multi-second latency (real IndexedDB) making the race practically reachable rather than theoretical.
+- Eigene Findings: `C-01`
 <!-- audit:claude-review:end -->
 
 ### Review-Feedback von Antigravity
@@ -287,6 +303,22 @@ Noch kein strukturiertes Reviewereignis.
 - Größtes Restrisiko: Residual risk is that downstream UI lifecycle integration in Slice 08 fails to pass the live runtime engine and data fingerprints during workspace load or comparison execution, causing valid persisted replays to be permanently classified as read_only or causing unexpected modal confirmations if replace actions are triggered without user-visible confirmation prompts
 - Realistische Bruchbedingung: In Slice 08, a user modifies a variant parameter in the UI and clicks save/re-evaluate without passing updated runtime data/engine fingerprints to loadStressReplayWorkspaceV1 / inspectStressReplayWorkspaceV1, which triggers a mismatchReason 'current_data_fingerprint_unavailable' and renders the entire workspace in read_only mode, preventing the user from running the comparison until the page is fully reloaded.
 - Eigene Findings: keine
+
+#### Work Unit 09 – Slice 08
+
+- Auftrag: Fixieren, Banner und Sitzungssteuerung
+- Scope: `Simulator.html`, `app/simulator/monte-carlo-ui.js`, `app/simulator/simulator-main-init.js`, `app/simulator/simulator-main.js`, `app/simulator/simulator-results.js`, `app/simulator/stress-replay-ui.js`, `docs/internal/slice-stress-pfad-replay-arbeitsplan-08-fixieren-banner-und-sitzungssteuerung.md`, `docs/internal/slice-stress-replay-implement-08-fixieren-banner-und-sitzungssteuerung.md`, `docs/internal/stress-replay-implement-review-fa2904b2.md`, `tests/browser-smoke.test.mjs`, `tests/stress-replay-ui.test.mjs`
+
+### Ereignis 3: Runde 1
+
+- Reviewer: `antigravity`
+- Freigabe: `YES`
+- Validierungsbindung: `validation-389eb8fdb571`
+- Testdateien: `tests/browser-smoke.test.mjs`, `tests/stress-replay-ui.test.mjs`
+- Prüfdimensionen: UI lifecycle and session state transitions (empty/executable/read_only/corrupt), deterministic single-run capture and baseline reconciliation gating, strict rejection of legacy RNG streams, deep-clone isolation of baseline inputs, import/export download wiring, replace and discard confirmation fail-closed semantics, accessible live regions and focus management, and strict slice path allowlist conformance
+- Größtes Restrisiko: Largest residual risk is the missing busy lock during asynchronous import and discard operations (as identified in C-01) where rapid repeated user interactions during delayed persistence I/O could trigger concurrent uncoordinated operations against the active workspace key
+- Realistische Bruchbedingung: Break condition: A user with a slow storage backend or rapid clicking clicks "Stresspfad importieren" and immediately clicks "Stresspfad verwerfen" or "Fixieren" before the initial asynchronous replace/discard promise resolves, causing racing persistence writes without synchronization.
+- Eigene Findings: keine
 <!-- audit:antigravity-review:end -->
 
 ### Review-Antworten von Codex
@@ -347,6 +379,13 @@ Noch keine strukturierten Codex-Antworten.
 
 - Auftrag: Persistenz sowie Export und Import
 - Scope: `app/shared/persistence-key-policy.js`, `app/simulator/stress-replay-contract.js`, `app/simulator/stress-replay-export.js`, `app/simulator/stress-replay-persistence.js`, `docs/internal/slice-stress-pfad-replay-arbeitsplan-07-persistenz-sowie-export-und-import.md`, `docs/internal/slice-stress-replay-implement-07-persistenz-sowie-export-und-import.md`, `docs/internal/stress-replay-implement-review-fa2904b2.md`, `tests/persistence.test.mjs`, `tests/stress-replay-export.test.mjs`, `tests/stress-replay-persistence.test.mjs`
+
+Noch keine strukturierten Codex-Antworten.
+
+#### Work Unit 09 – Slice 08
+
+- Auftrag: Fixieren, Banner und Sitzungssteuerung
+- Scope: `Simulator.html`, `app/simulator/monte-carlo-ui.js`, `app/simulator/simulator-main-init.js`, `app/simulator/simulator-main.js`, `app/simulator/simulator-results.js`, `app/simulator/stress-replay-ui.js`, `docs/internal/slice-stress-pfad-replay-arbeitsplan-08-fixieren-banner-und-sitzungssteuerung.md`, `docs/internal/slice-stress-replay-implement-08-fixieren-banner-und-sitzungssteuerung.md`, `docs/internal/stress-replay-implement-review-fa2904b2.md`, `tests/browser-smoke.test.mjs`, `tests/stress-replay-ui.test.mjs`
 
 Noch keine strukturierten Codex-Antworten.
 <!-- audit:codex-responses:end -->
@@ -539,6 +578,23 @@ Noch keine strukturierte Validierungsattestierung.
 | Matrixbefehl | Status | Exitcode | Kompaktausgabe |
 |---|---|---:|---|
 | shell: npm test | PASS | 0 | &gt; ruhestand-app-final@1.0.0 test<br>&gt; node tests/run-tests.mjs<br><br>🚀 Starting Test Runner...<br>Found 177 test files.<br><br>📂 Running 3bucket-config.test.mjs in process...<br>--- 3-Bucket Config Tests ---<br>✅ 3-Bucket config tests passed<br>✅ 3bucket-config.test.mjs completed.<br>📊 FILE RESULT: 3bucket-config.test.mjs &#124; mode=in-process &#124; assertions=17 &#124; passed=17 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running 3bucket-refill.test.mjs in process...<br>--- 3-Bucket Refill Tests ---<br>✅ 3-Bucket refill tests passed<br>✅ 3bucket-refill.test.mjs completed.<br>📊 FILE RESULT: 3bucket-refill.test.mjs &#124; mode=in-process &#124; assertions=32 &#124; passed=32 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running architecture-evidence.test.mjs in process...<br>--- Architecture Evidence Contract Tests ---<br>✅ Architecture evidence contract tests passed<br>✅ architecture-evidence.test.mjs completed.<br>📊 FILE RESULT: architecture-evidence.test.mjs &#124; mode=in-process &#124; assertions=24 &#124; passed=24 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running auto-optimize-fidelity<br>...[180381 characters omitted]...<br>ete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-storage.js:537:28)<br>    at initProfileSubpageLifecycle (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-navigation.js:157:5)<br>    at initProfileBridge (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-bridge.js:8:5)<br>    at async Promise.all (index 0)<br>    at async MockDocument.dispatch (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:80:9)<br>    at async runProfileUiContractTests (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:244:9)<br>    at async file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:257:9<br>[VALIDATION ERROR] Invalid input fields: [<br>  {<br>    fieldId: 'goGoMultiplier',<br>    message: 'goGoMultiplier muss zwischen 1.0 und 1.5 liegen.'<br>  }<br>] |
+
+#### Work Unit 09 – Slice 08
+
+- Auftrag: Fixieren, Banner und Sitzungssteuerung
+- Scope: `Simulator.html`, `app/simulator/monte-carlo-ui.js`, `app/simulator/simulator-main-init.js`, `app/simulator/simulator-main.js`, `app/simulator/simulator-results.js`, `app/simulator/stress-replay-ui.js`, `docs/internal/slice-stress-pfad-replay-arbeitsplan-08-fixieren-banner-und-sitzungssteuerung.md`, `docs/internal/slice-stress-replay-implement-08-fixieren-banner-und-sitzungssteuerung.md`, `docs/internal/stress-replay-implement-review-fa2904b2.md`, `tests/browser-smoke.test.mjs`, `tests/stress-replay-ui.test.mjs`
+
+### Ereignis 1: `validation-389eb8fdb571`
+
+- Diff-Fingerprint: `389eb8fdb5713fd56652e5b94d882ec8dd61f0f3157ca8e5861fe95ac22ee04c`
+- Status: `PASS`
+- Vollständig: `YES`
+- Kurzresultat: 1 passed; 0 failed; 0 unavailable; 1 required
+- Ausgabedigest: `4316b98e18312e66c577ba58a992e8822706a8c870a524b65ef2ed897ccde561`
+
+| Matrixbefehl | Status | Exitcode | Kompaktausgabe |
+|---|---|---:|---|
+| shell: npm test | PASS | 0 | &gt; ruhestand-app-final@1.0.0 test<br>&gt; node tests/run-tests.mjs<br><br>🚀 Starting Test Runner...<br>Found 178 test files.<br><br>📂 Running 3bucket-config.test.mjs in process...<br>--- 3-Bucket Config Tests ---<br>✅ 3-Bucket config tests passed<br>✅ 3bucket-config.test.mjs completed.<br>📊 FILE RESULT: 3bucket-config.test.mjs &#124; mode=in-process &#124; assertions=17 &#124; passed=17 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running 3bucket-refill.test.mjs in process...<br>--- 3-Bucket Refill Tests ---<br>✅ 3-Bucket refill tests passed<br>✅ 3bucket-refill.test.mjs completed.<br>📊 FILE RESULT: 3bucket-refill.test.mjs &#124; mode=in-process &#124; assertions=32 &#124; passed=32 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running architecture-evidence.test.mjs in process...<br>--- Architecture Evidence Contract Tests ---<br>✅ Architecture evidence contract tests passed<br>✅ architecture-evidence.test.mjs completed.<br>📊 FILE RESULT: architecture-evidence.test.mjs &#124; mode=in-process &#124; assertions=24 &#124; passed=24 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running auto-optimize-fidelity<br>...[181171 characters omitted]...<br>ete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-storage.js:537:28)<br>    at initProfileSubpageLifecycle (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-navigation.js:157:5)<br>    at initProfileBridge (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-bridge.js:8:5)<br>    at async Promise.all (index 0)<br>    at async MockDocument.dispatch (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:80:9)<br>    at async runProfileUiContractTests (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:244:9)<br>    at async file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:257:9<br>[VALIDATION ERROR] Invalid input fields: [<br>  {<br>    fieldId: 'goGoMultiplier',<br>    message: 'goGoMultiplier muss zwischen 1.0 und 1.5 liegen.'<br>  }<br>] |
 <!-- audit:validation-attestation:end -->
 
 ### Testfreigabe und Pre-Mortem
@@ -625,6 +681,16 @@ Noch keine strukturierte Validierungsattestierung.
 - Pre-Mortems:
   - Ereignis 2: In three months, the most likely failure is that C-02 materializes — Slice 08 wires the UI to the default (no-override) &#96;saveStressReplayWorkspaceV1&#96;/&#96;discardStressReplayWorkspaceV1&#96; path, a real IndexedDB flush intermittently fails mid-transaction in the browser, and the untested &#96;replaceRecordsTransactional&#96; rollback contract (specifically whether &#96;cause.code === 'rollback_failed'&#96; is set correctly and whether the underlying facade truly restores the previous bytes) behaves differently than the manually-mocked non-transactional rollback this slice's tests validated, leaving the active stress-replay workspace either silently corrupted or duplicated across storage layers without a regression test having ever exercised that branch.
   - Ereignis 3: In three months, the most likely issue is that during a future migration or backup restore, a third-party tool or browser extension injects unexpected technical metadata keys into localStorage alongside sim.stressReplay.active.v1, or a future schema update adds optional fields to the export format that fail the strict allowedKeys whitelist in validateStressReplayWorkspaceV1 / validateStressReplayComparisonExportV1, causing previously valid exported replay files to fail import inspection with STRESS_REPLAY_CONTRACT_INVALID rather than migrating gracefully.
+
+#### Work Unit 09 – Slice 08
+
+- Auftrag: Fixieren, Banner und Sitzungssteuerung
+- Scope: `Simulator.html`, `app/simulator/monte-carlo-ui.js`, `app/simulator/simulator-main-init.js`, `app/simulator/simulator-main.js`, `app/simulator/simulator-results.js`, `app/simulator/stress-replay-ui.js`, `docs/internal/slice-stress-pfad-replay-arbeitsplan-08-fixieren-banner-und-sitzungssteuerung.md`, `docs/internal/slice-stress-replay-implement-08-fixieren-banner-und-sitzungssteuerung.md`, `docs/internal/stress-replay-implement-review-fa2904b2.md`, `tests/browser-smoke.test.mjs`, `tests/stress-replay-ui.test.mjs`
+
+- Teständerungsfreigabe: nicht erfasst.
+- Pre-Mortems:
+  - Ereignis 2: In three months, the most likely failure is a support report of a "disappeared" or "corrupted" stress-replay workspace after a user clicked Import then immediately clicked Discard (or vice versa) before the first operation's persistence write completed — the unguarded concurrent write path in C-01 fires, and because no regression test ever drove that interleaving, the resulting inconsistent state (or a thrown-but-unhandled rejection from a second overlapping &#96;saveStressReplayWorkspaceV1&#96; call) ships undetected through this slice's otherwise-passing matrix.
+  - Ereignis 3: In three months, the most likely issue is a user report of inconsistent workspace state resulting from rapid alternating clicks on Import and Discard during high-latency storage I/O, hitting the unshielded concurrent async path before the initial persistence write completes.
 <!-- audit:test-approval-premortem:end -->
 
 ### Findings-Lebenszyklus
@@ -759,6 +825,19 @@ Noch keine strukturierten Findings.
 - Finding: The transactional/production default-backend branch of &#96;saveStressReplayWorkspaceV1&#96;/&#96;discardStressReplayWorkspaceV1&#96; (the &#96;replaceRecordsTransactional&#96; path taken when no &#96;backend&#96; override is supplied) is never exercised by &#96;tests/stress-replay-persistence.test.mjs&#96;; all tests inject a custom in-memory &#96;backend.storage&#96;/&#96;backend.flush&#96;, forcing the non-transactional manual-rollback branch instead, leaving the real atomic write/rollback contract with &#96;persistence-facade.js&#96; unverified.
 - Akzeptanztest: Add a persistence test that omits &#96;backend&#96; (or only overrides &#96;persistenceStorage&#96;/&#96;flush&#96; indirectly via a stub of &#96;replaceRecordsTransactional&#96;) to drive &#96;saveStressReplayWorkspaceV1&#96;/&#96;discardStressReplayWorkspaceV1&#96; through the &#96;transactionalReplace&#96; branch, asserting a successful replace, a successful discard, and that a simulated &#96;replaceRecordsTransactional&#96; rejection with &#96;cause.code === 'rollback_failed'&#96; surfaces &#96;STRESS_REPLAY_PERSISTENCE_WRITE_FAILED&#96; with &#96;rollbackFailed: true&#96;. VALIDATE: ["node","tests/run-single.mjs","tests/stress-replay-persistence.test.mjs"]
 - Statusbegründung: –
+
+#### Work Unit 09 – Slice 08
+
+- Auftrag: Fixieren, Banner und Sitzungssteuerung
+- Scope: `Simulator.html`, `app/simulator/monte-carlo-ui.js`, `app/simulator/simulator-main-init.js`, `app/simulator/simulator-main.js`, `app/simulator/simulator-results.js`, `app/simulator/stress-replay-ui.js`, `docs/internal/slice-stress-pfad-replay-arbeitsplan-08-fixieren-banner-und-sitzungssteuerung.md`, `docs/internal/slice-stress-replay-implement-08-fixieren-banner-und-sitzungssteuerung.md`, `docs/internal/stress-replay-implement-review-fa2904b2.md`, `tests/browser-smoke.test.mjs`, `tests/stress-replay-ui.test.mjs`
+
+### `C-01` — `OPEN`
+
+- Quelle: `claude`; Runde 1
+- Klasse: `OBSERVATION`
+- Finding: &#96;fixSelectedScenario()&#96; wraps its capture/materialize/reconcile/save flow in &#96;setBusy(true/false)&#96;, which disables all four session buttons (fix/export/import/discard) for its duration. However, &#96;importSerialized()&#96; and &#96;discardActiveWorkspace()&#96; never call &#96;setBusy&#96;: after the synchronous &#96;window.confirm&#96; gate, &#96;await replaceFromImport(...)&#96; / &#96;await discardWorkspace(...)&#96; run with every button still enabled. A user who clicks e.g. "Fixieren" or "Stresspfad exportieren" while an import or discard is still in flight can trigger a second concurrent &#96;saveWorkspace&#96;/&#96;discardWorkspace&#96;/&#96;exportActiveWorkspace&#96; call racing the same persisted workspace key; no test exercises this interleaving (all six tests in tests/stress-replay-ui.test.mjs drive the controller strictly sequentially with immediately-resolving mocks).
+- Akzeptanztest: Add a stress-replay-ui.test.mjs case where &#96;discardWorkspace&#96;/&#96;replaceFromImport&#96; are backed by a manually-controlled deferred promise; assert that stressReplayFixButton/Export/Discard/Import remain disabled for the duration of an in-flight import or discard, and that only one save/discard call is ever issued if a second action is triggered before the first resolves. VALIDATE: ["node","tests/run-single.mjs","tests/stress-replay-ui.test.mjs"]
+- Statusbegründung: –
 <!-- audit:findings:end -->
 
 ### Entscheidungstabelle
@@ -839,6 +918,15 @@ Noch keine strukturierten Findings.
 | ID | Quelle | Finding | Klasse | Entscheidung | Umsetzung |
 |---|---|---|---|---|---|
 | C-02 | claude | The transactional/production default-backend branch of &#96;saveStressReplayWorkspaceV1&#96;/&#96;discardStressReplayWorkspaceV1&#96; (the &#96;replaceRecordsTransactional&#96; path taken when no &#96;backend&#96; override is supplied) is never exercised by &#96;tests/stress-replay-persistence.test.mjs&#96;; all tests inject a custom in-memory &#96;backend.storage&#96;/&#96;backend.flush&#96;, forcing the non-transactional manual-rollback branch instead, leaving the real atomic write/rollback contract with &#96;persistence-facade.js&#96; unverified. | OBSERVATION | offen | offen |
+
+#### Work Unit 09 – Slice 08
+
+- Auftrag: Fixieren, Banner und Sitzungssteuerung
+- Scope: `Simulator.html`, `app/simulator/monte-carlo-ui.js`, `app/simulator/simulator-main-init.js`, `app/simulator/simulator-main.js`, `app/simulator/simulator-results.js`, `app/simulator/stress-replay-ui.js`, `docs/internal/slice-stress-pfad-replay-arbeitsplan-08-fixieren-banner-und-sitzungssteuerung.md`, `docs/internal/slice-stress-replay-implement-08-fixieren-banner-und-sitzungssteuerung.md`, `docs/internal/stress-replay-implement-review-fa2904b2.md`, `tests/browser-smoke.test.mjs`, `tests/stress-replay-ui.test.mjs`
+
+| ID | Quelle | Finding | Klasse | Entscheidung | Umsetzung |
+|---|---|---|---|---|---|
+| C-01 | claude | &#96;fixSelectedScenario()&#96; wraps its capture/materialize/reconcile/save flow in &#96;setBusy(true/false)&#96;, which disables all four session buttons (fix/export/import/discard) for its duration. However, &#96;importSerialized()&#96; and &#96;discardActiveWorkspace()&#96; never call &#96;setBusy&#96;: after the synchronous &#96;window.confirm&#96; gate, &#96;await replaceFromImport(...)&#96; / &#96;await discardWorkspace(...)&#96; run with every button still enabled. A user who clicks e.g. "Fixieren" or "Stresspfad exportieren" while an import or discard is still in flight can trigger a second concurrent &#96;saveWorkspace&#96;/&#96;discardWorkspace&#96;/&#96;exportActiveWorkspace&#96; call racing the same persisted workspace key; no test exercises this interleaving (all six tests in tests/stress-replay-ui.test.mjs drive the controller strictly sequentially with immediately-resolving mocks). | OBSERVATION | offen | offen |
 <!-- audit:decision-table:end -->
 
 ### Freigabestatus
@@ -932,6 +1020,18 @@ Noch keine strukturierten Findings.
 
 - Auftrag: Persistenz sowie Export und Import
 - Scope: `app/shared/persistence-key-policy.js`, `app/simulator/stress-replay-contract.js`, `app/simulator/stress-replay-export.js`, `app/simulator/stress-replay-persistence.js`, `docs/internal/slice-stress-pfad-replay-arbeitsplan-07-persistenz-sowie-export-und-import.md`, `docs/internal/slice-stress-replay-implement-07-persistenz-sowie-export-und-import.md`, `docs/internal/stress-replay-implement-review-fa2904b2.md`, `tests/persistence.test.mjs`, `tests/stress-replay-export.test.mjs`, `tests/stress-replay-persistence.test.mjs`
+
+- Implementierung bereit: `YES`
+- Validierung: `PASS`
+- Claude-Freigabe: `YES`
+- Antigravity-Freigabe: `YES`
+- Red-State-Folgeslice: `NONE`
+- Commit autorisiert: `YES`
+
+#### Work Unit 09 – Slice 08
+
+- Auftrag: Fixieren, Banner und Sitzungssteuerung
+- Scope: `Simulator.html`, `app/simulator/monte-carlo-ui.js`, `app/simulator/simulator-main-init.js`, `app/simulator/simulator-main.js`, `app/simulator/simulator-results.js`, `app/simulator/stress-replay-ui.js`, `docs/internal/slice-stress-pfad-replay-arbeitsplan-08-fixieren-banner-und-sitzungssteuerung.md`, `docs/internal/slice-stress-replay-implement-08-fixieren-banner-und-sitzungssteuerung.md`, `docs/internal/stress-replay-implement-review-fa2904b2.md`, `tests/browser-smoke.test.mjs`, `tests/stress-replay-ui.test.mjs`
 
 - Implementierung bereit: `YES`
 - Validierung: `PASS`

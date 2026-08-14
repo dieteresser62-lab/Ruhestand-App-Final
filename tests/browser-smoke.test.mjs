@@ -956,6 +956,16 @@ async function runSimulatorSmoke(browser, baseUrl) {
     assert((await mcEstimate.textContent()).includes('Speicherklasse'), 'Monte-Carlo resource estimate names its memory class');
     assert(await page.locator('#mc-progress-bar-container').getAttribute('role') === 'progressbar', 'Monte-Carlo progress is semantic in a real browser');
     assert(await page.locator('#mc-error-container').getAttribute('role') === 'alert', 'Monte-Carlo errors are not color-only in a real browser');
+    assert(await page.locator('#stressReplayFixButton').count() === 1,
+        'Simulator must expose exactly one stress replay fixation action');
+    assert(await page.locator('#stressReplayFixButton').isDisabled(),
+        'Stress replay fixation stays disabled before a scenario selection');
+    assert(await page.locator('#stressReplayStatus').getAttribute('aria-live') === 'polite',
+        'Stress replay session updates must use a polite live region');
+    assert(await page.locator('#stressReplayBanner').getAttribute('tabindex') === '-1',
+        'Stress replay banner must be programmatically focusable');
+    assert(await page.locator('#stressReplayImportFile').getAttribute('accept') === 'application/json,.json',
+        'Stress replay import must be constrained to JSON files');
 
     await mcRuns.fill('100001');
     await mcRuns.dispatchEvent('input');
