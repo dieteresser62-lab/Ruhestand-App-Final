@@ -43,6 +43,19 @@ Dieses Dokument wird vom Orchestrator geführt. Slice-Dokumente entstehen erst b
 - Größtes Restrisiko: Largest residual risk: the Test 6b reproduction relies on locally-recomputed sums to demonstrate float-order sensitivity rather than an independently visible trace of the internal &#96;totalAssets&#96; computation, so if a future refactor changes how &#96;totalAssets&#96; is derived from detail tranches, this test could keep passing without actually exercising the original bug path again
 - Realistische Bruchbedingung: Break condition: a future change to the detail-tranche/total-assets aggregation order that reintroduces order-dependent drift for a case Test 6b does not structurally cover (e.g., an asset category added to the visible total but not to &#96;sumDepotwertAlt+sumTagesgeld+sumGeldmarkt&#96;), silently resurfacing the false-positive warning while existing tests stay green.
 - Eigene Findings: keine
+
+#### Work Unit 03 – Gesamtreview
+
+- Auftrag: Branchweite Gesamtabnahme durch Codex, Claude und Antigravity
+- Scope: `app/simulator/simulator-profile-inputs.js`, `docs/internal/rundungsdiff-review-139ab5b3.md`, `docs/internal/slice-rundungsdiff-01-centgenaue-verm-genskonsistenzpr-fung-implementi.md`, `tests/simulator-multiprofile-aggregation.test.mjs`
+
+### Ereignis 2: Runde 1
+
+- Reviewer: `claude`
+- Freigabe: `YES`
+- Validierungsbindung: `validation-b623a5bd2571`
+- Testdateien: `tests/simulator-multiprofile-aggregation.test.mjs`
+- Eigene Findings: `C-01`
 <!-- audit:claude-review:end -->
 
 ### Review-Feedback von Antigravity
@@ -79,6 +92,22 @@ Dieses Dokument wird vom Orchestrator geführt. Slice-Dokumente entstehen erst b
 - Größtes Restrisiko: If future asset or liquidity categories (such as gold, crypto, or new pension buckets) are added to profile inputs or totalAssets calculation without being included in componentAssets (or vice versa), discrepancy warnings could be bypassed or incorrectly fired due to missing terms rather than float rounding drift.
 - Realistische Bruchbedingung: A subsequent feature introduces an optional asset tranche type into the simulator profile model that contributes to totalAssets but is omitted from the componentAssets summation in combineSimulatorProfiles, causing false-positive warnings for users holding that tranche.
 - Eigene Findings: keine
+
+#### Work Unit 03 – Gesamtreview
+
+- Auftrag: Branchweite Gesamtabnahme durch Codex, Claude und Antigravity
+- Scope: `app/simulator/simulator-profile-inputs.js`, `docs/internal/rundungsdiff-review-139ab5b3.md`, `docs/internal/slice-rundungsdiff-01-centgenaue-verm-genskonsistenzpr-fung-implementi.md`, `tests/simulator-multiprofile-aggregation.test.mjs`
+
+### Ereignis 3: Runde 1
+
+- Reviewer: `antigravity`
+- Freigabe: `YES`
+- Validierungsbindung: `validation-b623a5bd2571`
+- Testdateien: `tests/simulator-multiprofile-aggregation.test.mjs`
+- Prüfdimensionen: architecture drift, interface consistency, dead transition states, documentation synchronization, requirements R-1 through R-8, IEEE-754 float drift mitigation, cent-precision boundary enforcement, error propagation, regression coverage
+- Größtes Restrisiko: Future addition of a new asset or liquidity tranche category to the profile model that is aggregated into totalAssets but omitted from the explicit componentAssets summation in combineSimulatorProfiles
+- Realistische Bruchbedingung: An optional asset tranche (e.g. real estate equity, gold tranche, or crypto bucket) is added to simulator profile inputs and contributes to totalAssets, but componentAssets in combineSimulatorProfiles remains hardcoded to sumDepotwertAlt + sumTagesgeld + sumGeldmarkt, causing false-positive asset mismatch warnings for profiles holding that tranche
+- Eigene Findings: keine
 <!-- audit:antigravity-review:end -->
 
 ### Review-Antworten von Codex
@@ -94,6 +123,13 @@ Noch keine strukturierten Codex-Antworten.
 #### Work Unit 02 – Slice 01
 
 - Auftrag: Centgenaue Vermögenskonsistenzprüfung implementieren und IEEE-754-Regressionsfall testen
+- Scope: `app/simulator/simulator-profile-inputs.js`, `docs/internal/rundungsdiff-review-139ab5b3.md`, `docs/internal/slice-rundungsdiff-01-centgenaue-verm-genskonsistenzpr-fung-implementi.md`, `tests/simulator-multiprofile-aggregation.test.mjs`
+
+Noch keine strukturierten Codex-Antworten.
+
+#### Work Unit 03 – Gesamtreview
+
+- Auftrag: Branchweite Gesamtabnahme durch Codex, Claude und Antigravity
 - Scope: `app/simulator/simulator-profile-inputs.js`, `docs/internal/rundungsdiff-review-139ab5b3.md`, `docs/internal/slice-rundungsdiff-01-centgenaue-verm-genskonsistenzpr-fung-implementi.md`, `tests/simulator-multiprofile-aggregation.test.mjs`
 
 Noch keine strukturierten Codex-Antworten.
@@ -135,6 +171,23 @@ Noch keine strukturierten Codex-Antworten.
 | Matrixbefehl | Status | Exitcode | Kompaktausgabe |
 |---|---|---:|---|
 | shell: npm test | PASS | 0 | &gt; ruhestand-app-final@1.0.0 test<br>&gt; node tests/run-tests.mjs<br><br>🚀 Starting Test Runner...<br>Found 169 test files.<br><br>📂 Running 3bucket-config.test.mjs in process...<br>--- 3-Bucket Config Tests ---<br>✅ 3-Bucket config tests passed<br>✅ 3bucket-config.test.mjs completed.<br>📊 FILE RESULT: 3bucket-config.test.mjs &#124; mode=in-process &#124; assertions=17 &#124; passed=17 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running 3bucket-refill.test.mjs in process...<br>--- 3-Bucket Refill Tests ---<br>✅ 3-Bucket refill tests passed<br>✅ 3bucket-refill.test.mjs completed.<br>📊 FILE RESULT: 3bucket-refill.test.mjs &#124; mode=in-process &#124; assertions=32 &#124; passed=32 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running architecture-evidence.test.mjs in process...<br>--- Architecture Evidence Contract Tests ---<br>✅ Architecture evidence contract tests passed<br>✅ architecture-evidence.test.mjs completed.<br>📊 FILE RESULT: architecture-evidence.test.mjs &#124; mode=in-process &#124; assertions=24 &#124; passed=24 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running auto-optimize-fidelity<br>...[174147 characters omitted]...<br>ete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-storage.js:537:28)<br>    at initProfileSubpageLifecycle (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-navigation.js:157:5)<br>    at initProfileBridge (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-bridge.js:8:5)<br>    at async Promise.all (index 0)<br>    at async MockDocument.dispatch (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:80:9)<br>    at async runProfileUiContractTests (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:244:9)<br>    at async file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:257:9<br>[VALIDATION ERROR] Invalid input fields: [<br>  {<br>    fieldId: 'goGoMultiplier',<br>    message: 'goGoMultiplier muss zwischen 1.0 und 1.5 liegen.'<br>  }<br>] |
+
+#### Work Unit 03 – Gesamtreview
+
+- Auftrag: Branchweite Gesamtabnahme durch Codex, Claude und Antigravity
+- Scope: `app/simulator/simulator-profile-inputs.js`, `docs/internal/rundungsdiff-review-139ab5b3.md`, `docs/internal/slice-rundungsdiff-01-centgenaue-verm-genskonsistenzpr-fung-implementi.md`, `tests/simulator-multiprofile-aggregation.test.mjs`
+
+### Ereignis 1: `validation-b623a5bd2571`
+
+- Diff-Fingerprint: `b623a5bd2571eeccc7a9bf036e3148913dca1369c01f084eef8b7074ed657f4e`
+- Status: `PASS`
+- Vollständig: `YES`
+- Kurzresultat: 1 passed; 0 failed; 0 unavailable; 1 required
+- Ausgabedigest: `6017d0a4b5181eccac4fa696c094c2460dda900260659a4df9fa2d289413515b`
+
+| Matrixbefehl | Status | Exitcode | Kompaktausgabe |
+|---|---|---:|---|
+| shell: npm test | PASS | 0 | &gt; ruhestand-app-final@1.0.0 test<br>&gt; node tests/run-tests.mjs<br><br>🚀 Starting Test Runner...<br>Found 169 test files.<br><br>📂 Running 3bucket-config.test.mjs in process...<br>--- 3-Bucket Config Tests ---<br>✅ 3-Bucket config tests passed<br>✅ 3bucket-config.test.mjs completed.<br>📊 FILE RESULT: 3bucket-config.test.mjs &#124; mode=in-process &#124; assertions=17 &#124; passed=17 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running 3bucket-refill.test.mjs in process...<br>--- 3-Bucket Refill Tests ---<br>✅ 3-Bucket refill tests passed<br>✅ 3bucket-refill.test.mjs completed.<br>📊 FILE RESULT: 3bucket-refill.test.mjs &#124; mode=in-process &#124; assertions=32 &#124; passed=32 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running architecture-evidence.test.mjs in process...<br>--- Architecture Evidence Contract Tests ---<br>✅ Architecture evidence contract tests passed<br>✅ architecture-evidence.test.mjs completed.<br>📊 FILE RESULT: architecture-evidence.test.mjs &#124; mode=in-process &#124; assertions=24 &#124; passed=24 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running auto-optimize-fidelity<br>...[174147 characters omitted]...<br>ete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-storage.js:537:28)<br>    at initProfileSubpageLifecycle (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-navigation.js:157:5)<br>    at initProfileBridge (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-bridge.js:8:5)<br>    at async Promise.all (index 0)<br>    at async MockDocument.dispatch (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:80:9)<br>    at async runProfileUiContractTests (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:244:9)<br>    at async file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:257:9<br>[VALIDATION ERROR] Invalid input fields: [<br>  {<br>    fieldId: 'goGoMultiplier',<br>    message: 'goGoMultiplier muss zwischen 1.0 und 1.5 liegen.'<br>  }<br>] |
 <!-- audit:validation-attestation:end -->
 
 ### Testfreigabe und Pre-Mortem
@@ -164,6 +217,21 @@ Noch keine strukturierten Codex-Antworten.
 - Pre-Mortems:
   - Ereignis 2: In three months, a new asset/liquidity category is added to profile inputs and included in &#96;totalAssets&#96; but not added to the &#96;componentAssets&#96; sum (or vice versa), reintroducing an order-independent but component-incomplete false positive (or false negative) that this cent-normalization fix does not protect against, since it only removes float-precision noise, not component-set drift.
   - Ereignis 3: In three months, an additional asset class or tranche category is integrated into profile input models and aggregated into totalAssets, but the explicit componentAssets summation in combineSimulatorProfiles is not updated, triggering an asset mismatch warning for profiles containing the new asset category.
+
+#### Work Unit 03 – Gesamtreview
+
+- Auftrag: Branchweite Gesamtabnahme durch Codex, Claude und Antigravity
+- Scope: `app/simulator/simulator-profile-inputs.js`, `docs/internal/rundungsdiff-review-139ab5b3.md`, `docs/internal/slice-rundungsdiff-01-centgenaue-verm-genskonsistenzpr-fung-implementi.md`, `tests/simulator-multiprofile-aggregation.test.mjs`
+
+- Teständerungsfreigabe: `YES`
+- Freigebende Stelle: dieter
+- Freigabezeitpunkt: 2026-08-14T15:10:02.949979+00:00
+- Test-Diff-Fingerprint: `5f1501b4e4eb37513ca3be6091204a94f5b7ec83acc2781b476c6f706f151664`
+- Begründung: Geplanten IEEE-754-Regressionstest geprüft und freigegeben
+- Pfade: `tests/simulator-multiprofile-aggregation.test.mjs`
+- Pre-Mortems:
+  - Ereignis 2: In three months a new asset/liquidity category is added to profile inputs and folded into &#96;totalAssets&#96; (or a new detail-tranche type) but not into the explicit &#96;componentAssets&#96; sum in &#96;combineSimulatorProfiles&#96;, silently reintroducing either a false-positive or a masked genuine shortfall for that category; because no test pins the true-positive (genuine deficit) path or the multi-profile combination path, this regression would not be caught by the current suite.
+  - Ereignis 3: In three months, a new asset category or liquidity tranche is introduced in profile inputs and added to totalAssets calculation without updating the explicit componentAssets summation in combineSimulatorProfiles, reintroducing false-positive consistency warnings for profiles utilizing the new asset category.
 <!-- audit:test-approval-premortem:end -->
 
 ### Findings-Lebenszyklus
@@ -182,6 +250,19 @@ Noch keine strukturierten Findings.
 - Scope: `app/simulator/simulator-profile-inputs.js`, `docs/internal/rundungsdiff-review-139ab5b3.md`, `docs/internal/slice-rundungsdiff-01-centgenaue-verm-genskonsistenzpr-fung-implementi.md`, `tests/simulator-multiprofile-aggregation.test.mjs`
 
 Noch keine strukturierten Findings.
+
+#### Work Unit 03 – Gesamtreview
+
+- Auftrag: Branchweite Gesamtabnahme durch Codex, Claude und Antigravity
+- Scope: `app/simulator/simulator-profile-inputs.js`, `docs/internal/rundungsdiff-review-139ab5b3.md`, `docs/internal/slice-rundungsdiff-01-centgenaue-verm-genskonsistenzpr-fung-implementi.md`, `tests/simulator-multiprofile-aggregation.test.mjs`
+
+### `C-01` — `OPEN`
+
+- Quelle: `claude`; Runde 1
+- Klasse: `OBSERVATION`
+- Finding: Test 6b proves the false-positive is suppressed for cent-identical totals but does not add a companion assertion that a genuine ≥1-cent shortfall (e.g. totalAssets one cent below componentAssets) still triggers the warning, and does not cover the combined Dieter+Karin selection explicitly named in the acceptance criteria; both were independently flagged as the largest residual risk by Codex, Claude, and Antigravity across prior rounds without a closing test.
+- Akzeptanztest: Add a focused assertion in tests/simulator-multiprofile-aggregation.test.mjs that (a) a single-profile case with totalAssets exactly one cent below componentAssets still produces the warning, and (b) combining Dieter+Karin with cent-consistent components produces no warning; VALIDATE: ["node","tests/run-single.mjs","tests/simulator-multiprofile-aggregation.test.mjs"]
+- Statusbegründung: –
 <!-- audit:findings:end -->
 
 ### Entscheidungstabelle
@@ -204,6 +285,15 @@ Noch keine strukturierten Findings.
 | ID | Quelle | Finding | Klasse | Entscheidung | Umsetzung |
 |---|---|---|---|---|---|
 | – | – | Noch keine Findings | – | – | – |
+
+#### Work Unit 03 – Gesamtreview
+
+- Auftrag: Branchweite Gesamtabnahme durch Codex, Claude und Antigravity
+- Scope: `app/simulator/simulator-profile-inputs.js`, `docs/internal/rundungsdiff-review-139ab5b3.md`, `docs/internal/slice-rundungsdiff-01-centgenaue-verm-genskonsistenzpr-fung-implementi.md`, `tests/simulator-multiprofile-aggregation.test.mjs`
+
+| ID | Quelle | Finding | Klasse | Entscheidung | Umsetzung |
+|---|---|---|---|---|---|
+| C-01 | claude | Test 6b proves the false-positive is suppressed for cent-identical totals but does not add a companion assertion that a genuine ≥1-cent shortfall (e.g. totalAssets one cent below componentAssets) still triggers the warning, and does not cover the combined Dieter+Karin selection explicitly named in the acceptance criteria; both were independently flagged as the largest residual risk by Codex, Claude, and Antigravity across prior rounds without a closing test. | OBSERVATION | offen | offen |
 <!-- audit:decision-table:end -->
 
 ### Freigabestatus
@@ -232,4 +322,16 @@ Noch keine strukturierten Findings.
 - Antigravity-Freigabe: `YES`
 - Red-State-Folgeslice: `NONE`
 - Commit autorisiert: `YES`
+
+#### Work Unit 03 – Gesamtreview
+
+- Auftrag: Branchweite Gesamtabnahme durch Codex, Claude und Antigravity
+- Scope: `app/simulator/simulator-profile-inputs.js`, `docs/internal/rundungsdiff-review-139ab5b3.md`, `docs/internal/slice-rundungsdiff-01-centgenaue-verm-genskonsistenzpr-fung-implementi.md`, `tests/simulator-multiprofile-aggregation.test.mjs`
+
+- Implementierung bereit: `YES`
+- Validierung: `PASS`
+- Claude-Freigabe: `YES`
+- Antigravity-Freigabe: `YES`
+- Red-State-Folgeslice: `NONE`
+- Commit autorisiert: `NO`
 <!-- audit:approval-status:end -->
