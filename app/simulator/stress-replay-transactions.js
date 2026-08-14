@@ -142,3 +142,60 @@ export function collectStressReplayTransactions(years) {
 }
 
 export const extractStressReplayTransactions = collectStressReplayTransactions;
+
+/**
+ * Builds deterministic per-class totals without turning unobserved money into
+ * zero. A null total therefore always carries explicit field-level
+ * missingness from at least one source event.
+ */
+export function summarizeStressReplayTransactionsV1(transactions) {
+    if (!Array.isArray(transactions)) {
+        throw new TypeError('Stress replay transactions must be an array');
+    }
+    const byClass = new Map();
+    for (const [index, transaction] of transactions.entries()) {
+        if (!transaction || typeof transaction !== 'object' || Array.isArray(transaction)) {
+            throw new TypeError(`Stress replay transaction ${index} must be an object`);
+        }
+        if (transaction.schemaVersion !== STRESS_REPLAY_TRANSACTION_EVENT_VERSION
+            || !SUPPORTED_CLASSES.has(transaction.class)) {
+            throw new TypeError(`Stress replay transaction ${index} has an unsupported contract`);
+        }
+        const aggregate = byClass.get(transaction.class) || {
+            class: transaction.class,
+            count: 0,
+            firstYearIndex: transaction.yearIndex,
+            firstHistoricalYear: transaction.historicalYear,
+            grossEur: 0,
+            netEur: 0,
+            taxEur: 0,
+            missingness: []
+        };
+        aggregate.count += 1;
+        for (const field of MONETARY_FIELDS) {
+            if (transaction[field] === null || transaction[field] === undefined) {
+                aggregate[field] = null;
+                const reasons = Array.isArray(transaction.missingness)
+                    ? transaction.missingness
+                        .filter(entry => entry?.field === field)
+                        .map(entry => entry.reason)
+                    : [];
+                aggregate.missingness.push({
+                    transactionId: String(transaction.id || ''),
+                    field,
+                    reasons
+                });
+            } else if (aggregate[field] !== null) {
+                const numeric = Number(transaction[field]);
+                if (!Number.isFinite(numeric) || numeric < 0) {
+                    throw new TypeError(`Stress replay transaction ${index}.${field} is invalid`);
+                }
+                aggregate[field] += numeric;
+            }
+        }
+        byClass.set(transaction.class, aggregate);
+    }
+    return deepFreeze([...byClass.values()]
+        .sort((left, right) => left.class.localeCompare(right.class))
+        .map(aggregate => cloneValue(aggregate)));
+}

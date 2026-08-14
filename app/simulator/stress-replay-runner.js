@@ -22,6 +22,10 @@ import {
 } from './mc-log-builder.js';
 import { projectScenarioLogV2 } from './monte-carlo-export.js';
 import { applyStressReplayVariantV1 } from './stress-replay-variant.js';
+import {
+    STRESS_REPLAY_TRANSACTION_CAPTURE_INPUT,
+    buildStressReplayTransactionsForYear
+} from './stress-replay-transactions.js';
 
 export const STRESS_REPLAY_RUNNER_VERSION = 'StressReplayRunnerV1';
 export const STRESS_REPLAY_BASELINE_VARIANT_ID = 'baseline';
@@ -150,6 +154,34 @@ function computeMaxDrawdown(values) {
     return maximum;
 }
 
+function sumObserved(rows, resolver) {
+    let observed = 0;
+    let total = 0;
+    for (const row of rows) {
+        const value = resolver(row);
+        if (!Number.isFinite(value)) continue;
+        observed += 1;
+        total += value;
+    }
+    return observed > 0 ? total : null;
+}
+
+function buildSummaryMissingness(logRows) {
+    const financialRows = logRows.filter(row => row.recordType === 'financial_year');
+    const fields = [
+        ['totalFlexFulfilledEur', row => row.flex_erfuellt_nominal],
+        ['totalMinimumFlexShortfallEur', row => row.minimumFlexShortfallAnnual],
+        ['totalHealthBucketUsedEur', row => row.health_bucket_used]
+    ];
+    return fields
+        .filter(([, resolver]) => sumObserved(financialRows, resolver) === null)
+        .map(([field]) => ({
+            code: 'summary_measurement_unobserved',
+            field,
+            reason: 'no_finite_financial_year_observation'
+        }));
+}
+
 function createFingerprintBasis(result) {
     const { resultFingerprint: _resultFingerprint, ...basis } = result;
     return basis;
@@ -245,6 +277,7 @@ export function runStressReplayPathV1({
     const realValues = [initialValue];
     const yearResults = [];
     const logRows = [];
+    const transactions = [];
     let totalTaxesEur = 0;
     let totalWithdrawalsEur = 0;
     let terminalStatus = null;
@@ -293,6 +326,7 @@ export function runStressReplayPathV1({
         });
         const adjustedInputs = {
             ...inputs,
+            [STRESS_REPLAY_TRANSACTION_CAPTURE_INPUT]: true,
             rentAdjPct: computeRentAdjRate(inputs, yearData),
             transitionYear: household.effectiveTransitionYear ?? inputs.transitionYear ?? 0,
             capeRatio: record.capeRatio,
@@ -361,6 +395,13 @@ export function runStressReplayPathV1({
             });
         }
         if (result?.kind === 'ruin' || result?.isRuin === true) {
+            if (result?.logData) {
+                transactions.push(...buildStressReplayTransactionsForYear({
+                    logData: result.logData,
+                    yearIndex: record.yearIndex,
+                    historicalYear: record.historicalYear
+                }));
+            }
             logRows.push(buildStressReplayLogRow({ record, result, inputs }));
             terminalStatus = 'ruin';
             nominalValues.push(0);
@@ -393,6 +434,11 @@ export function runStressReplayPathV1({
         const withdrawalEur = Number(result.logData?.entscheidung?.jahresEntnahme) || 0;
         totalTaxesEur += Number(result.totalTaxesThisYear) || 0;
         totalWithdrawalsEur += withdrawalEur;
+        transactions.push(...buildStressReplayTransactionsForYear({
+            logData: result.logData,
+            yearIndex: record.yearIndex,
+            historicalYear: record.historicalYear
+        }));
         nominalValues.push(nominalValueEur);
         realValues.push(realValueEur);
         logRows.push(buildStressReplayLogRow({ record, result, inputs }));
@@ -431,6 +477,8 @@ export function runStressReplayPathV1({
     const finalValueRealEur = terminalStatus === 'ruin'
         ? 0
         : finalValueNominalEur / resolveSimulatorCumulativeInflationFactor(state);
+    const financialLogRows = logRows.filter(row => row.recordType === 'financial_year');
+    const resultMissingness = buildSummaryMissingness(logRows);
     return finalizeResult({
         schemaVersion: STRESS_REPLAY_SCHEMA_VERSIONS.variantResult,
         runnerVersion: STRESS_REPLAY_RUNNER_VERSION,
@@ -447,13 +495,16 @@ export function runStressReplayPathV1({
             maximumDrawdownRealPct: computeMaxDrawdown(realValues),
             totalWithdrawalsEur,
             totalTaxesEur,
+            totalFlexFulfilledEur: sumObserved(financialLogRows, row => row.flex_erfuellt_nominal),
+            totalMinimumFlexShortfallEur: sumObserved(financialLogRows, row => row.minimumFlexShortfallAnnual),
+            totalHealthBucketUsedEur: sumObserved(financialLogRows, row => row.health_bucket_used),
             financiallyEvaluatedYears: yearResults.filter(year => year.status === 'financial_year').length,
             ruinYear: terminalStatus === 'ruin' ? yearResults.at(-1)?.yearIndex ?? null : null
         },
         yearResults,
         scenarioLog: projectScenarioLogV2(logRows),
-        transactions: [],
-        missingness: [],
+        transactions,
+        missingness: resultMissingness,
         warnings,
         technicalError: null,
         reconciliation
