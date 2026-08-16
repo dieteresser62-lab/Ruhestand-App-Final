@@ -148,6 +148,54 @@ const inactivePreview = previewStressReplayVariantPatchV1({
 assertJsonEqual(inactivePreview.patch, {}, 'Inactive 3-bucket subfield must normalize away');
 
 console.log('Test 4: no-op alternatives fail and independent changes get a multi-factor marker');
+for (const [field, baselineValue, acceptedValues] of [
+    ['maxSkimPctOfEq', 10, [0, 50]],
+    ['maxBearRefillPctOfEq', 5, [0, 70]]
+]) {
+    for (const value of acceptedValues) {
+        const boundedVariant = createStressReplayVariantV1({
+            id: `${field}-${value}`,
+            label: `${field} ${value}`,
+            baselineInputs: baselineInputs({ [field]: baselineValue }),
+            patch: { strategy: { [field]: value } }
+        });
+        assertEqual(
+            applyStressReplayVariantV1({
+                baselineInputs: baselineInputs({ [field]: baselineValue }),
+                variant: boundedVariant
+            })[field],
+            value,
+            `${field} direct creation must preserve boundary ${value}`
+        );
+    }
+}
+for (const [field, value] of [
+    ['maxSkimPctOfEq', -0.1],
+    ['maxSkimPctOfEq', 50.1],
+    ['maxBearRefillPctOfEq', -0.1],
+    ['maxBearRefillPctOfEq', 70.1]
+]) {
+    assertContractError(
+        () => createStressReplayVariantV1({
+            id: `invalid-${field}-${value}`,
+            label: 'Invalid percentage',
+            baselineInputs: inputs,
+            patch: { strategy: { [field]: value } }
+        }),
+        'STRESS_REPLAY_CONTRACT_INVALID',
+        `${field} direct creation must reject ${value}`
+    );
+}
+const persistedOutOfRange = {
+    ...skimVariant,
+    patch: { strategy: { maxSkimPctOfEq: 50.1 } }
+};
+persistedOutOfRange.variantFingerprint = createStressReplayVariantFingerprint(persistedOutOfRange);
+assertContractError(
+    () => validateStressReplayVariantV1(persistedOutOfRange),
+    'STRESS_REPLAY_CONTRACT_INVALID',
+    'Recomputed variant fingerprint must not bypass percentage bounds'
+);
 assertContractError(
     () => createStressReplayVariantV1({
         id: 'noop',

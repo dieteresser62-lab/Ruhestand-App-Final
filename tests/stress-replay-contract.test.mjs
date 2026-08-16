@@ -144,6 +144,54 @@ for (const candidate of [
 }
 
 console.log('Test 4: conditional fields normalize against their controlling modes without clamping');
+const percentageDescriptors = Object.fromEntries(
+    STRESS_REPLAY_VARIANT_WHITELIST_V1
+        .filter(entry => ['maxSkimPctOfEq', 'maxBearRefillPctOfEq'].includes(entry.inputPath))
+        .map(entry => [entry.inputPath, entry])
+);
+assertJsonEqual(
+    { minimum: percentageDescriptors.maxSkimPctOfEq.minimum, maximum: percentageDescriptors.maxSkimPctOfEq.maximum },
+    { minimum: 0, maximum: 50 },
+    'Skim percentage descriptor must expose the UI/import bounds'
+);
+assertJsonEqual(
+    { minimum: percentageDescriptors.maxBearRefillPctOfEq.minimum, maximum: percentageDescriptors.maxBearRefillPctOfEq.maximum },
+    { minimum: 0, maximum: 70 },
+    'Bear-refill percentage descriptor must expose the UI/import bounds'
+);
+for (const [field, acceptedValues] of [
+    ['maxSkimPctOfEq', [0, 12.5, 50]],
+    ['maxBearRefillPctOfEq', [0, 35.5, 70]]
+]) {
+    for (const value of acceptedValues) {
+        assertEqual(
+            normalizeStressReplayVariantPatch({ strategy: { [field]: value } }).strategy[field],
+            value,
+            `${field} must accept ${value} without clamping`
+        );
+    }
+}
+for (const [field, invalidValues] of [
+    ['maxSkimPctOfEq', [-0.1, 50.1]],
+    ['maxBearRefillPctOfEq', [-0.1, 70.1]]
+]) {
+    for (const value of invalidValues) {
+        assertContractError(
+            () => normalizeStressReplayVariantPatch({ strategy: { [field]: value } }),
+            'STRESS_REPLAY_CONTRACT_INVALID',
+            `${field} must reject ${value} instead of clamping`,
+            error => error.details.path === `strategy.${field}`
+        );
+    }
+    for (const value of [NaN, Infinity, -Infinity]) {
+        assertContractError(
+            () => normalizeStressReplayVariantPatch({ strategy: { [field]: value } }),
+            'STRESS_REPLAY_NON_FINITE',
+            `${field} must reject ${String(value)}`,
+            error => error.details.path === `patch.strategy.${field}`
+        );
+    }
+}
 assertJsonEqual(
     normalizeStressReplayVariantPatch({ strategy: { decumulation: { mode: 'standard', bondTargetFactor: 2 } } }),
     { strategy: { decumulation: { mode: 'standard' } } },

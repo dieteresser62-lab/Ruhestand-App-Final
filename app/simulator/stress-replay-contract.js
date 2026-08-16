@@ -215,8 +215,8 @@ const field = (inputPath, contractPath, options) => deepFreeze({ inputPath, cont
 
 export const STRESS_REPLAY_VARIANT_WHITELIST_V1 = deepFreeze([
     field('liquidityRunwayYears', 'strategy.liquidityRunwayYears', { type: 'liquidity_runway_years' }),
-    field('maxSkimPctOfEq', 'strategy.maxSkimPctOfEq', { type: 'finite_number' }),
-    field('maxBearRefillPctOfEq', 'strategy.maxBearRefillPctOfEq', { type: 'finite_number' }),
+    field('maxSkimPctOfEq', 'strategy.maxSkimPctOfEq', { type: 'finite_number', minimum: 0, maximum: 50 }),
+    field('maxBearRefillPctOfEq', 'strategy.maxBearRefillPctOfEq', { type: 'finite_number', minimum: 0, maximum: 70 }),
     field('decumulation.mode', 'strategy.decumulation.mode', { type: 'decumulation_mode' }),
     field('decumulation.bondTargetFactor', 'strategy.decumulation.bondTargetFactor', { type: 'finite_number', minimum: 0, activeWhen: 'strategy.decumulation.mode=3_bucket_jilge' }),
     field('decumulation.drawdownTrigger', 'strategy.decumulation.drawdownTrigger', { type: 'finite_number', activeWhen: 'strategy.decumulation.mode=3_bucket_jilge' }),

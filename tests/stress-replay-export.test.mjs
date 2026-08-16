@@ -5,6 +5,8 @@ import {
     STRESS_REPLAY_UNITS_V1,
     StressReplayContractError,
     createStressReplayFingerprint,
+    createStressReplayVariantFingerprint,
+    createStressReplayWorkspaceFingerprint,
     createStressReplayWorkspaceV1
 } from '../app/simulator/stress-replay-contract.js';
 import {
@@ -14,7 +16,10 @@ import {
     serializeStressReplayComparisonExportV1,
     validateStressReplayComparisonExportV1
 } from '../app/simulator/stress-replay-export.js';
-import { createStressReplayBaselineVariantV1 } from '../app/simulator/stress-replay-variant.js';
+import {
+    createStressReplayBaselineVariantV1,
+    createStressReplayVariantV1
+} from '../app/simulator/stress-replay-variant.js';
 
 function fingerprint(character) {
     return { algorithm: 'sha256-canonical-json-v1', value: character.repeat(64) };
@@ -120,6 +125,34 @@ assertContractError(
     () => parseStressReplayComparisonExportV1(JSON.stringify({ ...document, schemaVersion: 'FutureExportV9' })),
     'STRESS_REPLAY_VERSION_UNSUPPORTED',
     'Unknown export versions are rejected'
+);
+const importInputs = inputsFixture();
+const importedAlternative = createStressReplayVariantV1({
+    id: 'skim-upper-bound',
+    label: 'Skim upper bound',
+    baselineInputs: importInputs,
+    patch: { strategy: { maxSkimPctOfEq: 50 } }
+});
+const importWorkspace = createStressReplayWorkspaceV1({
+    path: pathFixture(),
+    baselineSnapshot: importInputs,
+    variants: [createStressReplayBaselineVariantV1({ baselineInputs: importInputs }), importedAlternative],
+    createdAtUtc: '2026-08-14T10:00:00.000Z'
+});
+const manipulatedImport = structuredClone(buildStressReplayComparisonExportV1({
+    workspace: importWorkspace,
+    exportedAt: '2026-08-14T12:00:00.000Z'
+}));
+manipulatedImport.workspace.variants[1].patch.strategy.maxSkimPctOfEq = 50.1;
+manipulatedImport.workspace.variants[1].variantFingerprint = createStressReplayVariantFingerprint(
+    manipulatedImport.workspace.variants[1]
+);
+manipulatedImport.workspace.workspaceFingerprint = createStressReplayWorkspaceFingerprint(manipulatedImport.workspace);
+manipulatedImport.exportFingerprint = createStressReplayComparisonExportFingerprint(manipulatedImport);
+assertContractError(
+    () => parseStressReplayComparisonExportV1(JSON.stringify(manipulatedImport)),
+    'STRESS_REPLAY_CONTRACT_INVALID',
+    'Recomputed nested and outer fingerprints must not bypass imported percentage bounds'
 );
 
 console.log('Test 4: secrets and local filesystem paths are rejected before export');
