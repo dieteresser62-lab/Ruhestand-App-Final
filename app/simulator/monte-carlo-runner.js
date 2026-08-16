@@ -973,6 +973,16 @@ export async function runMonteCarloChunk({
                         householdEvent: replayHouseholdEvent
                     }));
                     replayCapture.sourcePrefixLength = replayCapture.years.length;
+                    // A successful year receives this transition through
+                    // result.newState. Ruin has no financial successor state,
+                    // but its effective market year still belongs to the
+                    // canonical replay path and must seed the first shadow year.
+                    simState.marketDataHist = buildNextMarketDataHist({
+                        marketDataHist: simState.marketDataHist,
+                        yearData,
+                        rA: Number(yearData.rendite),
+                        resolvedCapeRatio
+                    });
                 }
                 if (BREAK_ON_RUIN) break;
             } else if ((result?.kind === undefined || result.kind === 'success')

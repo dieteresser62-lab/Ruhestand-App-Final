@@ -1495,6 +1495,100 @@ console.log('Test: opt-in stress replay capture leaves normal MC financial outpu
     );
 }
 
+console.log('Test: stress replay advances the terminal ruin market year exactly once before shadow continuation');
+{
+    const monteCarloParams = {
+        anzahl: 1,
+        maxDauer: 7,
+        blockSize: 7,
+        seed: 91234,
+        methode: 'block',
+        rngMode: 'per-run-seed'
+    };
+    const ruinInputs = {
+        ...baseInputs,
+        startVermoegen: 150000,
+        depotwertAlt: 150000,
+        einstandAlt: 150000,
+        zielLiquiditaet: 0,
+        startFloorBedarf: 60000,
+        startFlexBedarf: 0
+    };
+    const request = {
+        inputs: ruinInputs,
+        monteCarloParams,
+        widowOptions,
+        useCapeSampling: false,
+        runRange: { start: 0, count: 1 },
+        logIndices: [0],
+        stressReplayCapture: createStressReplayCaptureRequest([0]),
+        engine: EngineAPI
+    };
+    const pilot = await runMonteCarloChunk(request);
+    const pilotCapture = pilot.runMeta[0].stressReplayCapture;
+    const ruinYearIndex = pilotCapture.sourcePrefixLength - 1;
+    const firstShadowYearIndex = pilotCapture.sourcePrefixLength;
+    const secondShadowYearIndex = firstShadowYearIndex + 1;
+    assert(
+        ruinYearIndex > 0 && secondShadowYearIndex < pilotCapture.years.length,
+        'Canonical ruin transition fixture must expose two shadow years after a non-initial ruin year'
+    );
+
+    const fixtureYears = [ruinYearIndex, firstShadowYearIndex, secondShadowYearIndex]
+        .map(yearIndex => pilotCapture.years[yearIndex].historicalYear);
+    const fixtureEntries = fixtureYears.map(historicalYear => annualData.find(entry => entry.jahr === historicalYear));
+    assert(fixtureEntries.every(Boolean), 'Canonical ruin transition fixture must resolve all sampled historical years');
+    const originals = new Map(fixtureEntries.map(entry => [entry, {
+        rendite: entry.rendite,
+        capeRatio: entry.capeRatio
+    }]));
+
+    try {
+        const [ruinEntry, firstShadowEntry, secondShadowEntry] = fixtureEntries;
+        ruinEntry.rendite = -0.8;
+        ruinEntry.capeRatio = 47;
+        firstShadowEntry.capeRatio = null;
+        secondShadowEntry.capeRatio = null;
+
+        const contrasted = await runMonteCarloChunk(request);
+        const capture = contrasted.runMeta[0].stressReplayCapture;
+        assertEqual(capture.terminalStatus, 'ruin', 'Contrasted fixture must retain the ruin terminal status');
+        assertEqual(
+            capture.sourcePrefixLength,
+            pilotCapture.sourcePrefixLength,
+            'Contrasted ruin year must not shift the source-prefix boundary'
+        );
+        assertClose(
+            capture.years[ruinYearIndex].equityReturnPct,
+            -80,
+            1e-9,
+            'Terminal ruin record must retain its effective contrast return'
+        );
+        assertClose(
+            capture.years[firstShadowYearIndex].capeRatio,
+            47,
+            1e-9,
+            'First shadow year must resolve CAPE from the terminal ruin market state'
+        );
+        assertClose(
+            capture.years[secondShadowYearIndex].capeRatio,
+            47,
+            1e-9,
+            'Later path-dependent CAPE must retain the once-advanced canonical state'
+        );
+        assertEqual(
+            JSON.stringify(capture.years.map(year => year.yearIndex)),
+            JSON.stringify([...Array(monteCarloParams.maxDauer).keys()]),
+            'Contrasted capture year indices must remain strictly increasing'
+        );
+    } finally {
+        for (const [entry, original] of originals) {
+            entry.rendite = original.rendite;
+            entry.capeRatio = original.capeRatio;
+        }
+    }
+}
+
 console.log('Test: stress replay capture isolates a technical-error run from sibling runs');
 {
     let engineInvocationCount = 0;
