@@ -290,12 +290,28 @@ export function runStressReplayPathV1({
         const household = readHouseholdEvent(record);
         const lifeLogContext = buildStressReplayLifeLogContext(record);
         if (record.recordType === 'terminal_death') {
+            const nominalValueEur = portfolioTotal(state.portfolio);
+            const realValueEur = nominalValueEur / resolveSimulatorCumulativeInflationFactor(state);
             logRows.push(buildStressReplayLogRow({
                 record,
                 inputs,
                 portfolioSnapshot: state.portfolio,
                 currentRunLogLength: logRows.length
             }));
+            yearResults.push({
+                yearIndex: record.yearIndex,
+                historicalYear: record.historicalYear,
+                status: 'terminal_death',
+                financiallyEvaluable: false,
+                nominalValueEur,
+                realValueEur,
+                withdrawalEur: null,
+                taxEur: null,
+                missingness: [
+                    { field: 'withdrawalEur', reason: 'not_applicable_terminal_death' },
+                    { field: 'taxEur', reason: 'not_applicable_terminal_death' }
+                ]
+            });
             terminalStatus = 'all_dead';
             break;
         }

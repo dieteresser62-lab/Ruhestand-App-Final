@@ -78,6 +78,7 @@ const HORIZON_METHODS = new Set(['mean', 'survival_quantile']);
 const TERMINAL_STATUSES = new Set(['horizon_exhausted', 'all_dead', 'ruin']);
 const RESULT_TERMINAL_STATUSES = new Set([...TERMINAL_STATUSES, 'technical_error']);
 const RECORD_TYPES = new Set(['financial_year', 'terminal_ruin', 'terminal_death']);
+const YEAR_RESULT_STATUSES = new Set(['financial_year', 'ruin', 'terminal_death']);
 const SOURCE_TIE_BREAK = 'smallest_absolute_run_index';
 const FINGERPRINT_EXCLUDED_KEYS = new Set([
     'createdAtUtc',
@@ -606,6 +607,50 @@ export function validateStressReplayVariantV1(variant) {
 
 export const assertStressReplayVariantV1 = validateStressReplayVariantV1;
 
+function validateYearResult(record, index) {
+    const path = `result.yearResults[${index}]`;
+    requirePlainObject(record, path);
+    requireInteger(record.yearIndex, `${path}.yearIndex`, 0);
+    if (record.yearIndex !== index) {
+        fail('STRESS_REPLAY_INDEX_BASIS_INVALID', `${path}.yearIndex must be zero-based and contiguous`, {
+            path: `${path}.yearIndex`,
+            expected: index,
+            actual: record.yearIndex
+        });
+    }
+    requireInteger(record.historicalYear, `${path}.historicalYear`);
+    if (!YEAR_RESULT_STATUSES.has(record.status)) {
+        fail('STRESS_REPLAY_CONTRACT_INVALID', `${path}.status is unsupported`, {
+            path: `${path}.status`,
+            status: record.status
+        });
+    }
+    requireFinite(record.nominalValueEur, `${path}.nominalValueEur`);
+    requireFinite(record.realValueEur, `${path}.realValueEur`);
+    if (record.status !== 'terminal_death') return;
+    if (record.financiallyEvaluable !== false
+        || record.withdrawalEur !== null
+        || record.taxEur !== null) {
+        fail('STRESS_REPLAY_CONTRACT_INVALID', 'A terminal death year must remain financially unevaluable', {
+            path
+        });
+    }
+    if (!Array.isArray(record.missingness)) {
+        fail('STRESS_REPLAY_CONTRACT_INVALID', `${path}.missingness must be an array`, { path: `${path}.missingness` });
+    }
+    const missingFields = new Set(record.missingness.map(entry => {
+        requirePlainObject(entry, `${path}.missingness[]`);
+        requireString(entry.reason, `${path}.missingness[].reason`);
+        return requireString(entry.field, `${path}.missingness[].field`);
+    }));
+    if (!missingFields.has('withdrawalEur') || !missingFields.has('taxEur')) {
+        fail('STRESS_REPLAY_CONTRACT_INVALID', 'A terminal death year must explain missing financial values', {
+            path,
+            missingFields: [...missingFields]
+        });
+    }
+}
+
 export function validateStressReplayVariantResultV1(result) {
     requirePlainObject(result, 'result');
     if (result.schemaVersion !== STRESS_REPLAY_SCHEMA_VERSIONS.variantResult) {
@@ -628,6 +673,7 @@ export function validateStressReplayVariantResultV1(result) {
         || !Array.isArray(result.missingness) || !Array.isArray(result.warnings)) {
         fail('STRESS_REPLAY_CONTRACT_INVALID', 'Stress replay result collections are invalid');
     }
+    result.yearResults.forEach(validateYearResult);
     if (result.terminalStatus === 'technical_error') {
         requirePlainObject(result.technicalError, 'result.technicalError');
         if (result.summary !== null || result.reconciliation?.matched === true) {
@@ -637,6 +683,22 @@ export function validateStressReplayVariantResultV1(result) {
         requirePlainObject(result.summary, 'result.summary');
         if (result.technicalError !== null) {
             fail('STRESS_REPLAY_CONTRACT_INVALID', 'Financial results must not contain a technical error');
+        }
+        const financiallyEvaluatedYears = result.yearResults.filter(record => record.status === 'financial_year').length;
+        if (result.summary.financiallyEvaluatedYears !== financiallyEvaluatedYears) {
+            fail('STRESS_REPLAY_CONTRACT_INVALID', 'Financially evaluated years must count only financial year records', {
+                expected: financiallyEvaluatedYears,
+                actual: result.summary.financiallyEvaluatedYears
+            });
+        }
+        if (result.terminalStatus === 'all_dead') {
+            const deathRows = result.yearResults.filter(record => record.status === 'terminal_death');
+            if (deathRows.length !== 1 || result.yearResults.at(-1)?.status !== 'terminal_death') {
+                fail('STRESS_REPLAY_CONTRACT_INVALID', 'An all-dead result must end in exactly one terminal death year');
+            }
+            if (result.summary.ruinYear !== null) {
+                fail('STRESS_REPLAY_CONTRACT_INVALID', 'An all-dead result must not expose a ruin year');
+            }
         }
     }
     assertStressReplayFinite(result, 'result');

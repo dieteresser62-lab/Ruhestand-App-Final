@@ -166,6 +166,30 @@ function resultFor(variant, {
     return result;
 }
 
+function terminalDeathYear(yearIndex, nominalValueEur) {
+    return {
+        yearIndex,
+        historicalYear: 2000 + yearIndex,
+        status: 'terminal_death',
+        financiallyEvaluable: false,
+        nominalValueEur,
+        realValueEur: nominalValueEur,
+        withdrawalEur: null,
+        taxEur: null,
+        missingness: [
+            { field: 'withdrawalEur', reason: 'not_applicable_terminal_death' },
+            { field: 'taxEur', reason: 'not_applicable_terminal_death' }
+        ]
+    };
+}
+
+function withResultChanges(result, changes) {
+    const changed = { ...structuredClone(result), ...changes };
+    delete changed.resultFingerprint;
+    changed.resultFingerprint = createStressReplayFingerprint(changed);
+    return changed;
+}
+
 console.log('Test 1: comparison is order-independent and emits paired delta markers');
 const baselineResult = resultFor(baseline, { includeTransactions: true });
 const singleResult = resultFor(single, { finalValue: 120, flex: 900, minimumShortfall: 100, includeTransactions: true });
@@ -257,6 +281,51 @@ assertEqual(blocked.overallStatus, 'blocked_technical_error', 'Aggregate status 
 assertEqual(blocked.pairwise[0].comparable, false, 'Technical pair must not expose financial deltas');
 assertEqual(blocked.pairwise[0].kpiDeltas, null, 'Technical pair must not convert failure into zero-valued KPIs');
 assertEqual(blocked.pairwise[0].interpretation, 'financial_comparison_blocked_by_technical_error', 'Technical interpretation must be explicit');
+
+console.log('Test 5b: asymmetric death horizons retain terminal rows and explicit missing sides');
+const earlyDeathBaseline = withResultChanges(baselineResult, {
+    terminalStatus: 'all_dead',
+    summary: { ...baselineResult.summary, financiallyEvaluatedYears: 0 },
+    yearResults: [terminalDeathYear(0, 100)]
+});
+const lateDeathSingle = withResultChanges(singleResult, {
+    terminalStatus: 'all_dead',
+    yearResults: [{ ...singleResult.yearResults[0], nominalValueEur: 100, realValueEur: 100 }, terminalDeathYear(1, 120)]
+});
+const earlyBaselineComparison = buildStressReplayComparisonV1({
+    variants: [baseline, single],
+    results: [earlyDeathBaseline, lateDeathSingle]
+});
+const lateOnlyMarker = earlyBaselineComparison.pairwise[0].firstDeltaMarkers.find(marker => marker.yearIndex === 1);
+assertEqual(lateOnlyMarker.baselineValue, null, 'A shorter baseline side must be explicit null, never undefined');
+assertEqual(lateOnlyMarker.variantValue.nominalValueEur, 120, 'The longer variant terminal row must not be clipped');
+
+const lateDeathBaseline = withResultChanges(baselineResult, {
+    terminalStatus: 'all_dead',
+    yearResults: [baselineResult.yearResults[0], terminalDeathYear(1, 100)]
+});
+const earlyDeathSingle = withResultChanges(singleResult, {
+    terminalStatus: 'all_dead',
+    summary: { ...singleResult.summary, financiallyEvaluatedYears: 0 },
+    yearResults: [terminalDeathYear(0, 100)]
+});
+const lateBaselineComparison = buildStressReplayComparisonV1({
+    variants: [baseline, single],
+    results: [lateDeathBaseline, earlyDeathSingle]
+});
+const missingVariantMarker = lateBaselineComparison.pairwise[0].firstDeltaMarkers.find(marker => marker.yearIndex === 1);
+assertEqual(missingVariantMarker.variantValue, null, 'A shorter variant side must be explicit null, never undefined');
+assert(!JSON.stringify(lateBaselineComparison).includes('undefined'), 'Comparison output must remain deterministically serializable');
+
+const malformedDeath = structuredClone(earlyDeathSingle);
+malformedDeath.yearResults[0].missingness = [];
+delete malformedDeath.resultFingerprint;
+malformedDeath.resultFingerprint = createStressReplayFingerprint(malformedDeath);
+assertContractError(
+    () => buildStressReplayComparisonV1({ variants: [baseline, single], results: [earlyDeathBaseline, malformedDeath] }),
+    'STRESS_REPLAY_CONTRACT_INVALID',
+    'Terminal death financial missingness must fail closed when incomplete'
+);
 
 function replayPath() {
     return {

@@ -25,7 +25,7 @@ function fingerprint(character) {
     return { algorithm: 'sha256-canonical-json-v1', value: character.repeat(64) };
 }
 
-function pathFixture() {
+function pathFixture({ terminalDeath = false } = {}) {
     return {
         schemaVersion: STRESS_REPLAY_SCHEMA_VERSIONS.path,
         contractVersion: STRESS_REPLAY_CONTRACT_VERSION,
@@ -41,10 +41,12 @@ function pathFixture() {
         units: { ...STRESS_REPLAY_UNITS_V1 },
         horizonYears: 1,
         effectiveLength: 1,
-        terminalStatus: 'horizon_exhausted',
+        terminalStatus: terminalDeath ? 'all_dead' : 'horizon_exhausted',
         initialMarketDataHist: [{ year: 2025, kurs: 100, capeRatio: 25 }],
         years: [{
-            yearIndex: 0, recordType: 'financial_year', financiallyEvaluable: true,
+            yearIndex: 0,
+            recordType: terminalDeath ? 'terminal_death' : 'financial_year',
+            financiallyEvaluable: !terminalDeath,
             equityReturnPct: -10, goldReturnPct: 2, cashReturnPct: 1,
             inflationPct: 2, wageGrowthPct: 2, capeRatio: 24, regime: 'bear',
             stressEvents: [], tailRiskEvents: [], householdEvents: []
@@ -71,10 +73,10 @@ function inputsFixture(overrides = {}) {
     };
 }
 
-function workspaceFixture(inputs = inputsFixture()) {
+function workspaceFixture(inputs = inputsFixture(), path = pathFixture()) {
     const baseline = createStressReplayBaselineVariantV1({ baselineInputs: inputs });
     return createStressReplayWorkspaceV1({
-        path: pathFixture(),
+        path,
         baselineSnapshot: inputs,
         variants: [baseline],
         createdAtUtc: '2026-08-14T10:00:00.000Z'
@@ -92,7 +94,7 @@ function assertContractError(callback, code, message) {
 }
 
 console.log('Test 1: versioned comparison export roundtrips without reproducible result logs');
-const workspace = workspaceFixture();
+const workspace = workspaceFixture(inputsFixture(), pathFixture({ terminalDeath: true }));
 const document = buildStressReplayComparisonExportV1({
     workspace,
     exportedAt: '2026-08-14T12:00:00.000Z'
@@ -101,6 +103,7 @@ const serialized = serializeStressReplayComparisonExportV1(document);
 const parsed = parseStressReplayComparisonExportV1(serialized);
 assertEqual(parsed.schemaVersion, 'StressReplayComparisonExportV1', 'Export schema is explicit');
 assertEqual(parsed.workspace.workspaceFingerprint.value, workspace.workspaceFingerprint.value, 'Workspace roundtrip is exact');
+assertEqual(parsed.workspace.path.years[0].recordType, 'terminal_death', 'Export roundtrip preserves the terminal death path row');
 assertEqual(parsed.comparison, null, 'Reproducible comparison result is optional and no yearly result logs are persisted');
 assertEqual(parsed.privacy.excludes.length, 3, 'Privacy exclusions are explicit');
 assert(Object.isFrozen(parsed) && Object.isFrozen(parsed.workspace), 'Imported export is deeply immutable');

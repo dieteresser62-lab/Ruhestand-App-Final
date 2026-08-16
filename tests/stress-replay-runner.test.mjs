@@ -259,18 +259,29 @@ const ruinResult = runStressReplayPathV1({
 assertEqual(ruinResult.terminalStatus, 'ruin', 'Ruin must remain a financial terminal status');
 assertEqual(ruinResult.technicalError, null, 'Ruin must not be reported as a technical error');
 
-const deathRecord = year(0, {
+const deathRecord = year(1, {
     recordType: 'terminal_death',
     financiallyEvaluable: false,
     householdEvents: household({ p1Alive: 0 })
 });
 const deathResult = runStressReplayPathV1({
-    path: pathFor([deathRecord], 'all_dead'),
+    path: pathFor([year(0), deathRecord], 'all_dead'),
     baselineInputs: inputs,
-    sourceScenarioLog: [{ recordType: 'terminal_death', jahr: 1, histJahr: 2000 }],
+    sourceScenarioLog: [...sourceFinancialRows(1), { recordType: 'terminal_death', jahr: 2, histJahr: 2001 }],
     dependencies
 });
 assertEqual(deathResult.terminalStatus, 'all_dead', 'Death must remain distinct from ruin');
+assertEqual(deathResult.yearResults.length, 2, 'The processed death year must remain in yearly results');
+assertEqual(deathResult.yearResults[1].status, 'terminal_death', 'Death needs an unambiguous yearly status');
+assertEqual(deathResult.yearResults[1].historicalYear, 2001, 'Death retains its historical year');
+assertEqual(deathResult.yearResults[1].nominalValueEur, deathResult.yearResults[0].nominalValueEur, 'Death must not change the nominal portfolio');
+assertEqual(deathResult.yearResults[1].realValueEur, deathResult.yearResults[0].realValueEur, 'Death must not change the real portfolio');
+assertEqual(deathResult.yearResults[1].withdrawalEur, null, 'Death must not invent a withdrawal');
+assertEqual(deathResult.yearResults[1].taxEur, null, 'Death must not invent tax');
+assertEqual(deathResult.yearResults[1].financiallyEvaluable, false, 'Death must remain financially unevaluable');
+assertEqual(deathResult.summary.financiallyEvaluatedYears, 1, 'Death must not count as a financial year');
+assertEqual(deathResult.summary.ruinYear, null, 'Death must not be reported as ruin');
+assertEqual(deathResult.yearResults[1].missingness.length, 2, 'Death financial missingness must be explicit');
 
 const technical = runStressReplayPathV1({
     path: pathFor([year(0)]),

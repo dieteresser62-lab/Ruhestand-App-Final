@@ -118,10 +118,10 @@ function buildFirstDeltaMarkers(baseline, variant) {
     const markers = [];
     const baselineYears = yearResultsByYear(baseline);
     const variantYears = yearResultsByYear(variant);
-    const portfolioDelta = firstChangedYear(baselineYears, variantYears, year => year && ({
+    const portfolioDelta = firstChangedYear(baselineYears, variantYears, year => year ? ({
         nominalValueEur: year.nominalValueEur,
         realValueEur: year.realValueEur
-    }));
+    }) : null);
     if (portfolioDelta) {
         const record = baselineYears.get(portfolioDelta.yearIndex) || variantYears.get(portfolioDelta.yearIndex);
         markers.push(marker({

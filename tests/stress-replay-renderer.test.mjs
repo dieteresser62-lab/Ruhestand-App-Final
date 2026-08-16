@@ -20,6 +20,28 @@ function result(variantId, nominalValueEur) {
     };
 }
 
+function deathResult(variantId, financialValueEur, deathValueEur, deathYearIndex) {
+    return {
+        variantId,
+        yearResults: [
+            {
+                yearIndex: 0,
+                historicalYear: 2001,
+                status: deathYearIndex === 0 ? 'terminal_death' : 'financial_year',
+                nominalValueEur: financialValueEur
+            },
+            ...(deathYearIndex === 1 ? [{
+                yearIndex: 1,
+                historicalYear: 2002,
+                status: 'terminal_death',
+                nominalValueEur: deathValueEur,
+                withdrawalEur: null,
+                taxEur: null
+            }] : [])
+        ]
+    };
+}
+
 const baselineEntry = {
     variantId: 'baseline', role: 'baseline', label: 'Baseline', terminalStatus: 'horizon_exhausted',
     summary: {
@@ -97,6 +119,16 @@ assert(/Jahrestabelle/.test(comparisonHtml) && /2001/.test(comparisonHtml), 'Ann
 assert(/keine Kausalitätsaussage/.test(comparisonHtml), 'First delta is not presented as causality');
 assert(/keine allgemeine Rangfolge/.test(comparisonHtml), 'Fixed-path results are not presented as general ranking');
 assertEqual((comparisonHtml.match(/stress-replay-table-scroll/g) || []).length, 2, 'Both wide tables use local scroll containers');
+
+const asymmetricDeathHtml = renderStressReplayComparisonV1({
+    comparison,
+    results: [
+        deathResult('baseline', 100000, 100000, 0),
+        deathResult('alternative-1', 110000, 110000, 1)
+    ]
+});
+assert(/2002/.test(asymmetricDeathHtml), 'The later terminal death row must not be clipped');
+assert(/—/.test(asymmetricDeathHtml), 'A missing shorter-path cell must remain visibly missing instead of becoming zero');
 
 console.log('Test 4: technical errors suppress financial deltas instead of fabricating zeros');
 const blockedHtml = renderStressReplayComparisonV1({
