@@ -962,10 +962,14 @@ async function runSimulatorSmoke(browser, baseUrl) {
         'Stress replay fixation stays disabled before a scenario selection');
     assert(await page.locator('#stressReplayStatus').getAttribute('aria-live') === 'polite',
         'Stress replay session updates must use a polite live region');
+    assert(await page.locator('#stressReplayWorkspace').getAttribute('aria-busy') === 'false',
+        'Stress replay workspace exposes its initially idle mutation state');
     assert(await page.locator('#stressReplayBanner').getAttribute('tabindex') === '-1',
         'Stress replay banner must be programmatically focusable');
     assert(await page.locator('#stressReplayImportFile').getAttribute('accept') === 'application/json,.json',
         'Stress replay import must be constrained to JSON files');
+    assert(!(await page.locator('#stressReplayImportFile').isDisabled()),
+        'Stress replay file selection is available while the workspace is idle');
     const variantFieldsetState = await page.locator('#stressReplayVariantFields').evaluate(fieldset => ({
         disabledProperty: fieldset.disabled === true,
         hasDisabledAttribute: fieldset.hasAttribute('disabled')

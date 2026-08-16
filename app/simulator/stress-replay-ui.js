@@ -247,8 +247,14 @@ export function createStressReplayController({
         busy = nextBusy === true;
         for (const id of ['stressReplayFixButton', 'stressReplayExportButton', 'stressReplayImportButton', 'stressReplayDiscardButton']) {
             const button = element(id);
-            if (button) button.disabled = busy || (id === 'stressReplayFixButton' && !selectedScenario);
+            if (button) {
+                const fixationUnavailable = id === 'stressReplayFixButton'
+                    && (!runContext || !selectedScenario || runContext.monteCarloParams.rngMode !== 'per-run-seed');
+                button.disabled = busy || fixationUnavailable;
+            }
         }
+        const importFile = element('stressReplayImportFile');
+        if (importFile) importFile.disabled = busy;
         element('stressReplayWorkspace')?.setAttribute?.('aria-busy', String(busy));
     };
     const render = ({ focusBanner = false } = {}) => {
@@ -279,6 +285,21 @@ export function createStressReplayController({
             readOnly
         });
         if (focusBanner && hasWorkspace) focusElement(element('stressReplayBanner'));
+    };
+    const beginBusyAction = () => {
+        if (busy) return false;
+        applyBusy(true);
+        try {
+            render();
+        } catch (error) {
+            applyBusy(false);
+            throw error;
+        }
+        return true;
+    };
+    const finishBusyAction = () => {
+        applyBusy(false);
+        render();
     };
 
     const renderBaselineValues = () => {
@@ -315,6 +336,7 @@ export function createStressReplayController({
     };
 
     const previewEditorPatch = () => {
+        if (busy) return null;
         patchPreview = null;
         patchPreviewError = null;
         if (!workspaceState.workspace) {
@@ -333,7 +355,7 @@ export function createStressReplayController({
         return patchPreview;
     };
 
-    const recomputeComparison = ({ focusComparison = false } = {}) => {
+    const computeComparison = ({ focusComparison = false } = {}) => {
         comparison = null;
         comparisonResults = [];
         if (!workspaceState.workspace || workspaceState.compatibility?.readOnly === true) {
@@ -354,6 +376,15 @@ export function createStressReplayController({
             status(`Variantenvergleich fehlgeschlagen: ${formatStressReplayUiError(error)}`, { error: true, focus: true });
             render();
             return null;
+        }
+    };
+
+    const recomputeComparison = (options = {}) => {
+        if (!beginBusyAction()) return null;
+        try {
+            return computeComparison(options);
+        } finally {
+            finishBusyAction();
         }
     };
 
@@ -381,19 +412,19 @@ export function createStressReplayController({
     };
 
     const addVariant = async () => {
-        if (!workspaceState.workspace || workspaceState.compatibility?.readOnly === true) return null;
-        if (workspaceState.workspace.variants.length >= STRESS_REPLAY_LIMITS.maximumVariants) {
-            status('Maximal drei Alternativen neben der Baseline sind zulässig.', { error: true, focus: true });
-            return null;
-        }
-        const form = element('stressReplayVariantEditor');
-        if (form?.checkValidity?.() === false) {
-            form.reportValidity?.();
-            status('Bitte korrigieren Sie die markierten Variantenfelder.', { error: true });
-            return null;
-        }
-        applyBusy(true);
+        if (!beginBusyAction()) return null;
         try {
+            if (!workspaceState.workspace || workspaceState.compatibility?.readOnly === true) return null;
+            if (workspaceState.workspace.variants.length >= STRESS_REPLAY_LIMITS.maximumVariants) {
+                status('Maximal drei Alternativen neben der Baseline sind zulässig.', { error: true, focus: true });
+                return null;
+            }
+            const form = element('stressReplayVariantEditor');
+            if (form?.checkValidity?.() === false) {
+                form.reportValidity?.();
+                status('Bitte korrigieren Sie die markierten Variantenfelder.', { error: true });
+                return null;
+            }
             const label = String(element('stressReplayVariantLabel')?.value || '').trim();
             const id = `variant-${Date.now()}-${workspaceState.workspace.variants.length}`;
             const variant = createVariant({
@@ -405,7 +436,7 @@ export function createStressReplayController({
             await persistVariants([...workspaceState.workspace.variants, variant]);
             comparison = null;
             comparisonResults = [];
-            recomputeComparison({ focusComparison: true });
+            computeComparison({ focusComparison: true });
             element('stressReplayVariantEditor')?.reset?.();
             updateConditionalFields();
             patchPreview = null;
@@ -418,31 +449,30 @@ export function createStressReplayController({
             status(`Variante konnte nicht berechnet werden: ${formatStressReplayUiError(error)}`, { error: true, focus: true });
             return null;
         } finally {
-            applyBusy(false);
-            render();
+            finishBusyAction();
         }
     };
 
     const removeVariant = async variantId => {
-        if (!workspaceState.workspace || variantId === 'baseline' || workspaceState.compatibility?.readOnly === true) return false;
-        applyBusy(true);
+        if (!beginBusyAction()) return false;
         try {
+            if (!workspaceState.workspace || variantId === 'baseline' || workspaceState.compatibility?.readOnly === true) return false;
             const variants = workspaceState.workspace.variants.filter(variant => variant.id !== variantId);
             if (variants.length === workspaceState.workspace.variants.length) return false;
             await persistVariants(variants);
-            recomputeComparison();
+            computeComparison();
             status('Variante entfernt; der Vergleich wurde neu berechnet.');
             return true;
         } catch (error) {
             status(`Variante konnte nicht entfernt werden: ${formatStressReplayUiError(error)}`, { error: true, focus: true });
             return false;
         } finally {
-            applyBusy(false);
-            render();
+            finishBusyAction();
         }
     };
 
     const setMonteCarloContext = ({ inputs, scenarioLogs } = {}) => {
+        if (busy) return;
         runContext = inputs && scenarioLogs
             ? {
                 inputs: cloneValue(inputs),
@@ -460,6 +490,7 @@ export function createStressReplayController({
     };
 
     const selectScenario = scenario => {
+        if (busy) return;
         selectedScenario = scenario?.sourceIdentity ? scenario : null;
         const button = element('stressReplayFixButton');
         if (button) button.disabled = !selectedScenario;
@@ -474,18 +505,18 @@ export function createStressReplayController({
     };
 
     const fixSelectedScenario = async () => {
-        if (!runContext || !selectedScenario) {
-            status('Wählen Sie zuerst ein Szenario aus einem abgeschlossenen Monte-Carlo-Lauf.', { error: true, focus: true });
-            return null;
-        }
-        if (runContext.monteCarloParams.rngMode !== 'per-run-seed') {
-            const error = Object.assign(new Error('Unsupported RNG mode'), { code: 'STRESS_REPLAY_SOURCE_UNSUPPORTED' });
-            status(formatStressReplayUiError(error), { error: true, focus: true });
-            return null;
-        }
-        applyBusy(true);
-        status('Der ausgewählte Lauf wird deterministisch nachgerechnet und abgeglichen.');
+        if (!beginBusyAction()) return null;
         try {
+            if (!runContext || !selectedScenario) {
+                status('Wählen Sie zuerst ein Szenario aus einem abgeschlossenen Monte-Carlo-Lauf.', { error: true, focus: true });
+                return null;
+            }
+            if (runContext.monteCarloParams.rngMode !== 'per-run-seed') {
+                const error = Object.assign(new Error('Unsupported RNG mode'), { code: 'STRESS_REPLAY_SOURCE_UNSUPPORTED' });
+                status(formatStressReplayUiError(error), { error: true, focus: true });
+                return null;
+            }
+            status('Der ausgewählte Lauf wird deterministisch nachgerechnet und abgeglichen.');
             const sourceIdentity = selectedScenario.sourceIdentity;
             const rerun = await captureSelectedRun({
                 inputs: cloneValue(runContext.inputs),
@@ -548,7 +579,7 @@ export function createStressReplayController({
             patchPreviewError = null;
             renderBaselineValues();
             updateConditionalFields();
-            recomputeComparison();
+            computeComparison();
             render({ focusBanner: true });
             status('Stresspfad fixiert. Baseline und Fingerprints wurden abgeglichen.');
             return workspace;
@@ -556,17 +587,17 @@ export function createStressReplayController({
             status(formatStressReplayUiError(error), { error: true, focus: true });
             return null;
         } finally {
-            applyBusy(false);
-            render();
+            finishBusyAction();
         }
     };
 
     const exportActiveWorkspace = () => {
-        if (!workspaceState.workspace) {
-            status('Es gibt keinen aktiven Stresspfad zum Exportieren.', { error: true, focus: true });
-            return null;
-        }
+        if (!beginBusyAction()) return null;
         try {
+            if (!workspaceState.workspace) {
+                status('Es gibt keinen aktiven Stresspfad zum Exportieren.', { error: true, focus: true });
+                return null;
+            }
             const serialized = serializeExport(buildExport({
                 workspace: workspaceState.workspace,
                 comparison
@@ -577,10 +608,12 @@ export function createStressReplayController({
         } catch (error) {
             status(`Export fehlgeschlagen: ${formatStressReplayUiError(error)}`, { error: true, focus: true });
             return null;
+        } finally {
+            finishBusyAction();
         }
     };
 
-    const importSerialized = async serialized => {
+    const performImportSerialized = async serialized => {
         try {
             const replacing = workspaceState.status !== 'empty';
             if (replacing && windowRef?.confirm?.('Den aktiven Stresspfad durch den Import ersetzen?') !== true) {
@@ -606,7 +639,7 @@ export function createStressReplayController({
             patchPreviewError = null;
             renderBaselineValues();
             updateConditionalFields();
-            if (imported.compatibility.readOnly !== true) recomputeComparison();
+            if (imported.compatibility.readOnly !== true) computeComparison();
             render({ focusBanner: true });
             status(imported.compatibility.readOnly
                 ? 'Stresspfad importiert und wegen abweichender Laufzeit nur zur Inspektion geöffnet.'
@@ -618,13 +651,23 @@ export function createStressReplayController({
         }
     };
 
-    const discardActiveWorkspace = async () => {
-        if (!workspaceState.workspace && workspaceState.status !== 'corrupt') return false;
-        if (windowRef?.confirm?.('Den aktiven Stresspfad dauerhaft verwerfen?') !== true) {
-            status('Der aktive Stresspfad wurde beibehalten.');
-            return false;
-        }
+    const importSerialized = async serialized => {
+        if (!beginBusyAction()) return null;
         try {
+            return await performImportSerialized(serialized);
+        } finally {
+            finishBusyAction();
+        }
+    };
+
+    const discardActiveWorkspace = async () => {
+        if (!beginBusyAction()) return false;
+        try {
+            if (!workspaceState.workspace && workspaceState.status !== 'corrupt') return false;
+            if (windowRef?.confirm?.('Den aktiven Stresspfad dauerhaft verwerfen?') !== true) {
+                status('Der aktive Stresspfad wurde beibehalten.');
+                return false;
+            }
             await discardWorkspace({ confirmDiscard: true });
             workspaceState = EMPTY_STATE;
             sourceScenarioLog = null;
@@ -641,6 +684,8 @@ export function createStressReplayController({
         } catch (error) {
             status(`Verwerfen fehlgeschlagen: ${formatStressReplayUiError(error)}`, { error: true, focus: true });
             return false;
+        } finally {
+            finishBusyAction();
         }
     };
 
@@ -648,9 +693,10 @@ export function createStressReplayController({
         if (initialized) return workspaceState;
         initialized = true;
         workspaceState = loadWorkspace({ currentCompatibility: resolveCompatibility() });
+        applyBusy(false);
         renderBaselineValues();
         updateConditionalFields();
-        if (workspaceState.workspace && workspaceState.compatibility?.readOnly !== true) recomputeComparison();
+        if (workspaceState.workspace && workspaceState.compatibility?.readOnly !== true) computeComparison();
         render();
         if (workspaceState.status === 'corrupt') {
             status(`Der gespeicherte Stresspfad ist beschädigt und wurde nicht automatisch gelöscht: ${workspaceState.error?.message || 'unbekannter Fehler'}`, { error: true });
@@ -663,14 +709,18 @@ export function createStressReplayController({
         }
         element('stressReplayFixButton')?.addEventListener?.('click', () => void fixSelectedScenario());
         element('stressReplayExportButton')?.addEventListener?.('click', exportActiveWorkspace);
-        element('stressReplayImportButton')?.addEventListener?.('click', () => element('stressReplayImportFile')?.click?.());
+        element('stressReplayImportButton')?.addEventListener?.('click', () => {
+            if (!busy) element('stressReplayImportFile')?.click?.();
+        });
         element('stressReplayDiscardButton')?.addEventListener?.('click', () => void discardActiveWorkspace());
         element('stressReplayVariantEditor')?.addEventListener?.('input', () => {
+            if (busy) return;
             updateConditionalFields();
             previewEditorPatch();
         });
         element('stressReplayAddVariantButton')?.addEventListener?.('click', () => void addVariant());
         element('stressReplayVariantList')?.addEventListener?.('click', event => {
+            if (busy) return;
             const action = event?.target?.closest?.('[data-stress-replay-action]');
             if (!action) return;
             const variantId = action.dataset.variantId;
@@ -683,8 +733,13 @@ export function createStressReplayController({
         element('stressReplayImportFile')?.addEventListener?.('change', async event => {
             const file = event?.target?.files?.[0];
             if (!file) return;
-            await importSerialized(await file.text());
-            event.target.value = '';
+            if (!beginBusyAction()) return;
+            try {
+                await performImportSerialized(await file.text());
+            } finally {
+                event.target.value = '';
+                finishBusyAction();
+            }
         });
         return workspaceState;
     };

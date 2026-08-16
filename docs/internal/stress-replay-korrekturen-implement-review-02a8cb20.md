@@ -118,6 +118,19 @@ Noch kein strukturiertes Reviewereignis.
 - Validierungsbindung: `validation-1ea6ef556ff8`
 - Testdateien: `tests/persistence.test.mjs`, `tests/stress-replay-persistence.test.mjs`
 - Eigene Findings: `C-01`
+
+#### Work Unit 09 – Slice 08
+
+- Auftrag: Busy- und Parallelitaetsvertrag der UI
+- Scope: `app/simulator/stress-replay-ui.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-08-busy-und-parallelitaetsvertrag-der-ui.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `tests/browser-smoke.test.mjs`, `tests/stress-replay-ui.test.mjs`
+
+### Ereignis 2: Runde 1
+
+- Reviewer: `claude`
+- Freigabe: `YES`
+- Validierungsbindung: `validation-54178bdc5481`
+- Testdateien: `tests/browser-smoke.test.mjs`, `tests/stress-replay-ui.test.mjs`
+- Eigene Findings: `C-01`
 <!-- audit:claude-review:end -->
 
 ### Review-Feedback von Antigravity
@@ -241,6 +254,22 @@ Noch kein strukturiertes Reviewereignis.
 - Größtes Restrisiko: Non-standard storage adapters throwing primitive non-Error exceptions during rollback leading to null rollbackCause in diagnostic details
 - Realistische Bruchbedingung: A custom storage adapter throws a raw string on saveBatch failure during rollback, causing rollbackError.message to be undefined and rollbackCause to become null in failure metadata
 - Eigene Findings: keine
+
+#### Work Unit 09 – Slice 08
+
+- Auftrag: Busy- und Parallelitaetsvertrag der UI
+- Scope: `app/simulator/stress-replay-ui.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-08-busy-und-parallelitaetsvertrag-der-ui.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `tests/browser-smoke.test.mjs`, `tests/stress-replay-ui.test.mjs`
+
+### Ereignis 3: Runde 1
+
+- Reviewer: `antigravity`
+- Freigabe: `YES`
+- Validierungsbindung: `validation-54178bdc5481`
+- Testdateien: `tests/browser-smoke.test.mjs`, `tests/stress-replay-ui.test.mjs`
+- Prüfdimensionen: UI concurrency and reentrancy serialization (single busy contract via beginBusyAction/finishBusyAction covering fixation, export, import, discard, add/remove variant, and comparison recompute), deferred Promise lifecycle and error resilience (unconditional cleanup in finally blocks on rejected promises and thrown exceptions), DOM and ARIA synchronization (aria-busy on workspace container, native disabled properties on buttons/fieldsets/file inputs), non-reentrant internal computeComparison vs public recomputeComparison separation, event listener guards across click, input, and file change handlers
+- Größtes Restrisiko: Native browser file picker cancellation or custom user agent file dialog events firing in unexpected sequence before change event resolution, potentially dropping subsequent identical file selections if value reset is bypassed
+- Realistische Bruchbedingung: An unhandled exception during native file input dispatch before the change handler begins, leaving the file input in an untracked state without activating or releasing the busy cycle &#124;
+- Eigene Findings: keine
 <!-- audit:antigravity-review:end -->
 
 ### Review-Antworten von Codex
@@ -299,6 +328,13 @@ Noch keine strukturierten Codex-Antworten.
 
 - Auftrag: Produktiver transaktionaler Persistenzpfad
 - Scope: `app/shared/persistence-facade.js`, `app/simulator/stress-replay-persistence.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-07-produktiver-transaktionaler-persistenzpfad.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `tests/persistence.test.mjs`, `tests/stress-replay-persistence.test.mjs`
+
+Noch keine strukturierten Codex-Antworten.
+
+#### Work Unit 09 – Slice 08
+
+- Auftrag: Busy- und Parallelitaetsvertrag der UI
+- Scope: `app/simulator/stress-replay-ui.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-08-busy-und-parallelitaetsvertrag-der-ui.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `tests/browser-smoke.test.mjs`, `tests/stress-replay-ui.test.mjs`
 
 Noch keine strukturierten Codex-Antworten.
 <!-- audit:codex-responses:end -->
@@ -431,6 +467,23 @@ Noch keine strukturierte Validierungsattestierung.
 | Matrixbefehl | Status | Exitcode | Kompaktausgabe |
 |---|---|---:|---|
 | shell: npm test | PASS | 0 | &gt; ruhestand-app-final@1.0.0 test<br>&gt; node tests/run-tests.mjs<br><br>🚀 Starting Test Runner...<br>Found 180 test files.<br><br>📂 Running 3bucket-config.test.mjs in process...<br>--- 3-Bucket Config Tests ---<br>✅ 3-Bucket config tests passed<br>✅ 3bucket-config.test.mjs completed.<br>📊 FILE RESULT: 3bucket-config.test.mjs &#124; mode=in-process &#124; assertions=17 &#124; passed=17 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running 3bucket-refill.test.mjs in process...<br>--- 3-Bucket Refill Tests ---<br>✅ 3-Bucket refill tests passed<br>✅ 3bucket-refill.test.mjs completed.<br>📊 FILE RESULT: 3bucket-refill.test.mjs &#124; mode=in-process &#124; assertions=32 &#124; passed=32 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running architecture-evidence.test.mjs in process...<br>--- Architecture Evidence Contract Tests ---<br>✅ Architecture evidence contract tests passed<br>✅ architecture-evidence.test.mjs completed.<br>📊 FILE RESULT: architecture-evidence.test.mjs &#124; mode=in-process &#124; assertions=24 &#124; passed=24 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running auto-optimize-fidelity<br>...[182976 characters omitted]...<br>ete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-storage.js:537:28)<br>    at initProfileSubpageLifecycle (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-navigation.js:157:5)<br>    at initProfileBridge (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-bridge.js:8:5)<br>    at async Promise.all (index 0)<br>    at async MockDocument.dispatch (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:80:9)<br>    at async runProfileUiContractTests (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:244:9)<br>    at async file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:257:9<br>[VALIDATION ERROR] Invalid input fields: [<br>  {<br>    fieldId: 'goGoMultiplier',<br>    message: 'goGoMultiplier muss zwischen 1.0 und 1.5 liegen.'<br>  }<br>] |
+
+#### Work Unit 09 – Slice 08
+
+- Auftrag: Busy- und Parallelitaetsvertrag der UI
+- Scope: `app/simulator/stress-replay-ui.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-08-busy-und-parallelitaetsvertrag-der-ui.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `tests/browser-smoke.test.mjs`, `tests/stress-replay-ui.test.mjs`
+
+### Ereignis 1: `validation-54178bdc5481`
+
+- Diff-Fingerprint: `54178bdc5481f34827fa5ca192510fed0f18f8465e2cbeaca5783696fed6fb9e`
+- Status: `PASS`
+- Vollständig: `YES`
+- Kurzresultat: 1 passed; 0 failed; 0 unavailable; 1 required
+- Ausgabedigest: `b581f33012c08c3217c32ed24b279d279196cfef9ad159d3260a8aabe38b43bf`
+
+| Matrixbefehl | Status | Exitcode | Kompaktausgabe |
+|---|---|---:|---|
+| shell: npm test | PASS | 0 | &gt; ruhestand-app-final@1.0.0 test<br>&gt; node tests/run-tests.mjs<br><br>🚀 Starting Test Runner...<br>Found 180 test files.<br><br>📂 Running 3bucket-config.test.mjs in process...<br>--- 3-Bucket Config Tests ---<br>✅ 3-Bucket config tests passed<br>✅ 3bucket-config.test.mjs completed.<br>📊 FILE RESULT: 3bucket-config.test.mjs &#124; mode=in-process &#124; assertions=17 &#124; passed=17 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running 3bucket-refill.test.mjs in process...<br>--- 3-Bucket Refill Tests ---<br>✅ 3-Bucket refill tests passed<br>✅ 3bucket-refill.test.mjs completed.<br>📊 FILE RESULT: 3bucket-refill.test.mjs &#124; mode=in-process &#124; assertions=32 &#124; passed=32 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running architecture-evidence.test.mjs in process...<br>--- Architecture Evidence Contract Tests ---<br>✅ Architecture evidence contract tests passed<br>✅ architecture-evidence.test.mjs completed.<br>📊 FILE RESULT: architecture-evidence.test.mjs &#124; mode=in-process &#124; assertions=24 &#124; passed=24 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running auto-optimize-fidelity<br>...[183226 characters omitted]...<br>ete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-storage.js:537:28)<br>    at initProfileSubpageLifecycle (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-navigation.js:157:5)<br>    at initProfileBridge (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-bridge.js:8:5)<br>    at async Promise.all (index 0)<br>    at async MockDocument.dispatch (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:80:9)<br>    at async runProfileUiContractTests (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:244:9)<br>    at async file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:257:9<br>[VALIDATION ERROR] Invalid input fields: [<br>  {<br>    fieldId: 'goGoMultiplier',<br>    message: 'goGoMultiplier muss zwischen 1.0 und 1.5 liegen.'<br>  }<br>] |
 <!-- audit:validation-attestation:end -->
 
 ### Testfreigabe und Pre-Mortem
@@ -513,6 +566,16 @@ Noch keine strukturierte Validierungsattestierung.
 - Pre-Mortems:
   - Ereignis 2: In three months, the most likely failure cause is a maintainer refactoring the rollback-readback check in persistence-facade.js (e.g. changing comparison order or exception wrapping) and inadvertently causing &#96;persistence_rollback_readback_mismatch&#96; failures to be mis-tagged as generic &#96;persistence_transaction_rollback_failed&#96; (or vice versa) — since no test asserts the exact code for that specific branch, the regression would only surface later as a diagnostics-quality complaint from an operator trying to distinguish "rollback write failed" from "rollback write succeeded but state diverged" during an incident, not as a functional test failure.
   - Ereignis 3: In three months, the most likely failure cause is an integration layer or custom storage driver throwing non-standard error structures (such as string rejections or plain objects without a .message property) during compensating rollback, resulting in rollbackCause resolving to null in structured failure telemetry while rollbackFailed is true, mildly degrading operator observability during backend contention incidents.
+
+#### Work Unit 09 – Slice 08
+
+- Auftrag: Busy- und Parallelitaetsvertrag der UI
+- Scope: `app/simulator/stress-replay-ui.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-08-busy-und-parallelitaetsvertrag-der-ui.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `tests/browser-smoke.test.mjs`, `tests/stress-replay-ui.test.mjs`
+
+- Teständerungsfreigabe: nicht erfasst.
+- Pre-Mortems:
+  - Ereignis 2: In three months, the most likely failure cause is a support ticket where a user runs a new Monte-Carlo simulation immediately after triggering an import/discard on the stress-replay panel; the second run's context is silently dropped, and the user's subsequent "Fix" action on a scenario from the new run replays against stale inputs, producing an opaque &#96;STRESS_REPLAY_SOURCE_UNSUPPORTED&#96;-style or fingerprint-mismatch error that looks like a bug in the fixation logic rather than the actual root cause (a dropped context update with no user-visible signal).
+  - Ereignis 3: In three months, the most likely failure cause is an external long-running async operation (such as an extended background Monte-Carlo calculation or large file read) finishing while a user triggers a rapid sequence of discard and re-import actions, where context updates dropped during the busy window lead to stale parameter references if future maintainers add new asynchronous UI workflows without routing them through the centralized beginBusyAction/finishBusyAction lifecycle.
 <!-- audit:test-approval-premortem:end -->
 
 ### Findings-Lebenszyklus
@@ -609,6 +672,19 @@ Noch keine strukturierten Findings.
 - Finding: The newly introduced &#96;persistence_rollback_readback_mismatch&#96; code path in &#96;createRestoreError&#96;/&#96;replaceRecordsTransactional&#96; (persistence-facade.js) — reached when a rollback's compensating write resolves without throwing but the post-rollback backend/cache readback still disagrees with the pre-transaction snapshot (e.g. a concurrent writer or an eventually-consistent backend) — is not exercised by any test added in this slice. &#96;createFacadeAdapter&#96; in tests/stress-replay-persistence.test.mjs only supports fault modes that either throw (&#96;write_once&#96;, &#96;write_and_rollback&#96;) or silently no-op the write (&#96;readback_mismatch&#96;); it has no mode that lets the rollback write "succeed" while leaving the store in a state that still fails the post-rollback verification, so &#96;rollbackCode==='persistence_rollback_readback_mismatch'&#96; is never asserted. This is a diagnostics-only gap (the outer throw/rollback-attempted behavior itself is unchanged and covered), but a future refactor could silently mis-tag this specific failure mode without any test catching the regression.
 - Akzeptanztest: Add a fault-injection mode to the stress-replay-persistence test facade adapter (or a dedicated persistence.test.mjs case) where the compensating rollback &#96;saveBatch&#96; resolves normally but a subsequent readback returns a value diverging from the pre-transaction snapshot, then assert &#96;error.rollbackCode === 'persistence_rollback_readback_mismatch'&#96; and &#96;error.code === 'rollback_failed'&#96;.
 - Statusbegründung: –
+
+#### Work Unit 09 – Slice 08
+
+- Auftrag: Busy- und Parallelitaetsvertrag der UI
+- Scope: `app/simulator/stress-replay-ui.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-08-busy-und-parallelitaetsvertrag-der-ui.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `tests/browser-smoke.test.mjs`, `tests/stress-replay-ui.test.mjs`
+
+### `C-01` — `OPEN`
+
+- Quelle: `claude`; Runde 1
+- Klasse: `OBSERVATION`
+- Finding: &#96;setMonteCarloContext&#96; now silently no-ops (&#96;if (busy) return;&#96;) instead of queueing when a stress-replay busy action (import/discard/fix/etc.) is in flight. If a Monte-Carlo run completes and calls &#96;setMonteCarloContext&#96; while the stress-replay UI is mid-async-action, the new inputs/scenarioLogs are dropped permanently — &#96;runContext&#96; stays bound to the previous run with no retry, no status message, and no visual indicator that the context is stale. A subsequent &#96;selectScenario&#96; (once busy clears) can then reference a scenario from the newer run while &#96;fixSelectedScenario&#96; replays against the stale &#96;runContext.inputs&#96;, risking a source-identity/fingerprint mismatch surfaced as a confusing recomputation error rather than a clear "run context outdated, please retry" message. No test in this slice (or elsewhere in the packet) exercises &#96;setMonteCarloContext&#96; invoked while &#96;busy === true&#96;.
+- Akzeptanztest: Add a unit test in tests/stress-replay-ui.test.mjs that starts a deferred discard/import action, calls &#96;controller.setMonteCarloContext({...newInputs})&#96; while busy is true, resolves the pending action, and asserts either that the context update is applied once busy clears (queued) or that the fixation button/status explicitly communicates a stale/rejected context — whichever behavior is intended.
+- Statusbegründung: –
 <!-- audit:findings:end -->
 
 ### Entscheidungstabelle
@@ -685,6 +761,15 @@ Noch keine strukturierten Findings.
 | ID | Quelle | Finding | Klasse | Entscheidung | Umsetzung |
 |---|---|---|---|---|---|
 | C-01 | claude | The newly introduced &#96;persistence_rollback_readback_mismatch&#96; code path in &#96;createRestoreError&#96;/&#96;replaceRecordsTransactional&#96; (persistence-facade.js) — reached when a rollback's compensating write resolves without throwing but the post-rollback backend/cache readback still disagrees with the pre-transaction snapshot (e.g. a concurrent writer or an eventually-consistent backend) — is not exercised by any test added in this slice. &#96;createFacadeAdapter&#96; in tests/stress-replay-persistence.test.mjs only supports fault modes that either throw (&#96;write_once&#96;, &#96;write_and_rollback&#96;) or silently no-op the write (&#96;readback_mismatch&#96;); it has no mode that lets the rollback write "succeed" while leaving the store in a state that still fails the post-rollback verification, so &#96;rollbackCode==='persistence_rollback_readback_mismatch'&#96; is never asserted. This is a diagnostics-only gap (the outer throw/rollback-attempted behavior itself is unchanged and covered), but a future refactor could silently mis-tag this specific failure mode without any test catching the regression. | OBSERVATION | offen | offen |
+
+#### Work Unit 09 – Slice 08
+
+- Auftrag: Busy- und Parallelitaetsvertrag der UI
+- Scope: `app/simulator/stress-replay-ui.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-08-busy-und-parallelitaetsvertrag-der-ui.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `tests/browser-smoke.test.mjs`, `tests/stress-replay-ui.test.mjs`
+
+| ID | Quelle | Finding | Klasse | Entscheidung | Umsetzung |
+|---|---|---|---|---|---|
+| C-01 | claude | &#96;setMonteCarloContext&#96; now silently no-ops (&#96;if (busy) return;&#96;) instead of queueing when a stress-replay busy action (import/discard/fix/etc.) is in flight. If a Monte-Carlo run completes and calls &#96;setMonteCarloContext&#96; while the stress-replay UI is mid-async-action, the new inputs/scenarioLogs are dropped permanently — &#96;runContext&#96; stays bound to the previous run with no retry, no status message, and no visual indicator that the context is stale. A subsequent &#96;selectScenario&#96; (once busy clears) can then reference a scenario from the newer run while &#96;fixSelectedScenario&#96; replays against the stale &#96;runContext.inputs&#96;, risking a source-identity/fingerprint mismatch surfaced as a confusing recomputation error rather than a clear "run context outdated, please retry" message. No test in this slice (or elsewhere in the packet) exercises &#96;setMonteCarloContext&#96; invoked while &#96;busy === true&#96;. | OBSERVATION | offen | offen |
 <!-- audit:decision-table:end -->
 
 ### Freigabestatus
@@ -778,6 +863,18 @@ Noch keine strukturierten Findings.
 
 - Auftrag: Produktiver transaktionaler Persistenzpfad
 - Scope: `app/shared/persistence-facade.js`, `app/simulator/stress-replay-persistence.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-07-produktiver-transaktionaler-persistenzpfad.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `tests/persistence.test.mjs`, `tests/stress-replay-persistence.test.mjs`
+
+- Implementierung bereit: `YES`
+- Validierung: `PASS`
+- Claude-Freigabe: `YES`
+- Antigravity-Freigabe: `YES`
+- Red-State-Folgeslice: `NONE`
+- Commit autorisiert: `YES`
+
+#### Work Unit 09 – Slice 08
+
+- Auftrag: Busy- und Parallelitaetsvertrag der UI
+- Scope: `app/simulator/stress-replay-ui.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-08-busy-und-parallelitaetsvertrag-der-ui.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `tests/browser-smoke.test.mjs`, `tests/stress-replay-ui.test.mjs`
 
 - Implementierung bereit: `YES`
 - Validierung: `PASS`

@@ -16,12 +16,16 @@ class FakeElement {
         this.listeners = new Map();
         this.attributes = new Map();
         this.focused = false;
+        this.clicks = 0;
     }
 
     addEventListener(type, handler) { this.listeners.set(type, handler); }
     setAttribute(name, value) { this.attributes.set(name, String(value)); }
     focus() { this.focused = true; }
-    click() { this.listeners.get('click')?.({ preventDefault() {} }); }
+    click() { this.clicks += 1; this.listeners.get('click')?.({ preventDefault() {} }); }
+    querySelectorAll() { return []; }
+    checkValidity() { return true; }
+    reset() {}
 }
 
 function createDocument() {
@@ -32,7 +36,8 @@ function createDocument() {
         'stressReplayBannerSource', 'stressReplayBannerHorizon', 'stressReplayBannerTerminal',
         'stressReplayBannerContinuation', 'stressReplayBannerPathFingerprint',
         'stressReplayBannerBaselineFingerprint', 'stressReplayCompatibilityReasons',
-        'useCapeSampling'
+        'stressReplayVariantFields', 'stressReplayAddVariantButton', 'stressReplayVariantList', 'stressReplayDynamicAction',
+        'stressReplayPatchPreview', 'stressReplayComparison', 'useCapeSampling'
     ];
     const elements = new Map(ids.map(id => [id, new FakeElement(id)]));
     return {
@@ -62,7 +67,11 @@ function pathFixture() {
 function workspaceFixture() {
     return {
         path: pathFixture(),
-        baselineScenarioFingerprint: fingerprint('b')
+        baselineScenarioFingerprint: fingerprint('b'),
+        baselineSnapshot: {},
+        variants: [{ id: 'baseline', role: 'baseline', label: 'Baseline' }],
+        createdAtUtc: '2026-08-16T00:00:00.000Z',
+        updatedAtUtc: '2026-08-16T00:00:00.000Z'
     };
 }
 
@@ -82,7 +91,7 @@ function scenarioFixture() {
 function controllerFixture(overrides = {}) {
     const documentRef = createDocument();
     const workspace = workspaceFixture();
-    const calls = { saves: 0, discards: 0, downloads: 0 };
+    const calls = { saves: 0, discards: 0, imports: 0, downloads: 0 };
     const compatibility = {
         status: 'executable', executable: true, readOnly: false, mismatchReasons: [],
         dataFingerprint: fingerprint('c'), engineFingerprint: fingerprint('d')
@@ -102,13 +111,26 @@ function controllerFixture(overrides = {}) {
         createWorkspace: () => workspace,
         saveWorkspace: async () => { calls.saves += 1; },
         discardWorkspace: async () => { calls.discards += 1; },
-        replaceFromImport: async () => ({ workspace, compatibility }),
+        replaceFromImport: async () => { calls.imports += 1; return { workspace, compatibility }; },
         buildExport: () => ({ exported: true }),
         serializeExport: () => '{"exported":true}',
         triggerDownload: () => { calls.downloads += 1; },
+        renderViews: ({ busy }) => {
+            documentRef.getElementById('stressReplayDynamicAction').disabled = busy;
+        },
         ...overrides
     });
     return { controller, documentRef, workspace, calls, compatibility };
+}
+
+function deferred() {
+    let resolve;
+    let reject;
+    const promise = new Promise((resolvePromise, rejectPromise) => {
+        resolve = resolvePromise;
+        reject = rejectPromise;
+    });
+    return { promise, resolve, reject };
 }
 
 console.log('Test 1: no scenario keeps fixation blocked and reports the prerequisite in the live region');
@@ -207,5 +229,101 @@ console.log('Test 6: reload, export, import and explicit discard retain session 
 console.log('Test 7: user-facing failure labels keep technical terminal states separate');
 assert(/Legacy-Zufallsstrom/.test(formatStressReplayUiError({ code: 'STRESS_REPLAY_SOURCE_UNSUPPORTED' })), 'Unsupported RNG has a distinct message');
 assert(/nicht gespeichert/.test(formatStressReplayUiError({ code: 'STRESS_REPLAY_BASELINE_RECONCILIATION_FAILED' })), 'Reconciliation failures explicitly reject persistence');
+
+console.log('Test 8: deferred import owns the shared busy contract and rejects competing actions');
+{
+    const pendingImport = deferred();
+    const workspace = workspaceFixture();
+    const compatibility = { status: 'executable', executable: true, readOnly: false, mismatchReasons: [] };
+    const importedWorkspace = { ...workspace, path: { ...workspace.path, effectiveLength: 7 } };
+    const { controller, documentRef, calls } = controllerFixture({
+        loadWorkspace: () => ({ status: 'executable', workspace, compatibility, error: null }),
+        replaceFromImport: async () => {
+            calls.imports += 1;
+            await pendingImport.promise;
+            return { workspace: importedWorkspace, compatibility };
+        }
+    });
+    controller.initialize();
+    const importPromise = controller.importSerialized('{"import":true}');
+    assertEqual(calls.imports, 1, 'Import starts exactly one persistence operation');
+    assertEqual(documentRef.getElementById('stressReplayWorkspace').attributes.get('aria-busy'), 'true', 'Workspace exposes busy while import is pending');
+    for (const id of [
+        'stressReplayFixButton', 'stressReplayExportButton', 'stressReplayImportButton',
+        'stressReplayDiscardButton', 'stressReplayImportFile', 'stressReplayVariantFields',
+        'stressReplayAddVariantButton', 'stressReplayDynamicAction'
+    ]) {
+        assertEqual(documentRef.getElementById(id).disabled, true, `${id} is disabled while import is pending`);
+    }
+    const importFileClicks = documentRef.getElementById('stressReplayImportFile').clicks;
+    documentRef.getElementById('stressReplayImportButton').click();
+    assertEqual(documentRef.getElementById('stressReplayImportFile').clicks, importFileClicks, 'Busy import selection cannot reopen the file picker');
+    assertEqual(await controller.discardActiveWorkspace(), false, 'Competing discard is rejected instead of queued');
+    assertEqual(await controller.addVariant(), null, 'Competing variant mutation is rejected instead of queued');
+    assertEqual(controller.exportActiveWorkspace(), null, 'Competing export is rejected while workspace mutation is pending');
+    assertEqual(controller.recomputeComparison(), null, 'Competing recompute is rejected while workspace mutation is pending');
+    assertEqual(calls.discards, 0, 'Rejected discard never reaches persistence');
+    assertEqual(calls.saves, 0, 'Rejected variant never reaches persistence');
+    pendingImport.resolve();
+    assert(await importPromise, 'Winning import completes');
+    assertEqual(controller.getState().workspace, importedWorkspace, 'Winning import determines the active workspace');
+    assertEqual(documentRef.getElementById('stressReplayWorkspace').attributes.get('aria-busy'), 'false', 'Workspace clears busy after import success');
+    assertEqual(documentRef.getElementById('stressReplayVariantFields').disabled, false, 'Editor unlocks after import success');
+    assertEqual(documentRef.getElementById('stressReplayDynamicAction').disabled, false, 'Dynamic actions unlock after import success');
+}
+
+console.log('Test 9: deferred discard rejects a second discard and fixation, then unlocks after success');
+{
+    const pendingDiscard = deferred();
+    let captures = 0;
+    const workspace = workspaceFixture();
+    const compatibility = { status: 'executable', executable: true, readOnly: false, mismatchReasons: [] };
+    const { controller, documentRef, calls } = controllerFixture({
+        loadWorkspace: () => ({ status: 'executable', workspace, compatibility, error: null }),
+        discardWorkspace: async () => { calls.discards += 1; await pendingDiscard.promise; },
+        captureSelectedRun: async () => { captures += 1; return { capturesByIndex: new Map() }; }
+    });
+    controller.initialize();
+    controller.setMonteCarloContext({ inputs: { widowOptions: {} }, scenarioLogs: { characteristic: [] } });
+    controller.selectScenario(scenarioFixture());
+    const discardPromise = controller.discardActiveWorkspace();
+    assertEqual(await controller.discardActiveWorkspace(), false, 'Second discard is rejected immediately');
+    assertEqual(await controller.fixSelectedScenario(), null, 'Fixation cannot overlap discard');
+    assertEqual(calls.discards, 1, 'Rapid discard calls produce one persistence operation');
+    assertEqual(captures, 0, 'Rejected fixation never starts capture');
+    pendingDiscard.resolve();
+    assertEqual(await discardPromise, true, 'Winning discard completes');
+    assertEqual(controller.getState().status, 'empty', 'Winning discard clears the workspace');
+    assertEqual(documentRef.getElementById('stressReplayWorkspace').attributes.get('aria-busy'), 'false', 'Workspace clears busy after discard success');
+}
+
+console.log('Test 10: rejected import and discard promises always release the UI lock');
+{
+    const workspace = workspaceFixture();
+    const compatibility = { status: 'executable', executable: true, readOnly: false, mismatchReasons: [] };
+    const importFailure = deferred();
+    const importFixture = controllerFixture({
+        loadWorkspace: () => ({ status: 'executable', workspace, compatibility, error: null }),
+        replaceFromImport: async () => importFailure.promise
+    });
+    importFixture.controller.initialize();
+    const importPromise = importFixture.controller.importSerialized('{"import":true}');
+    importFailure.reject(new Error('Import backend unavailable'));
+    assertEqual(await importPromise, null, 'Rejected import is reported as failure');
+    assertEqual(importFixture.documentRef.getElementById('stressReplayWorkspace').attributes.get('aria-busy'), 'false', 'Rejected import releases busy');
+    assertEqual(importFixture.controller.getState().workspace, workspace, 'Rejected import retains the previous workspace');
+
+    const discardFailure = deferred();
+    const discardFixture = controllerFixture({
+        loadWorkspace: () => ({ status: 'executable', workspace, compatibility, error: null }),
+        discardWorkspace: async () => discardFailure.promise
+    });
+    discardFixture.controller.initialize();
+    const discardPromise = discardFixture.controller.discardActiveWorkspace();
+    discardFailure.reject(new Error('Discard backend unavailable'));
+    assertEqual(await discardPromise, false, 'Rejected discard is reported as failure');
+    assertEqual(discardFixture.documentRef.getElementById('stressReplayWorkspace').attributes.get('aria-busy'), 'false', 'Rejected discard releases busy');
+    assertEqual(discardFixture.controller.getState().workspace, workspace, 'Rejected discard retains the previous workspace');
+}
 
 console.log('Stress replay UI tests passed.');
