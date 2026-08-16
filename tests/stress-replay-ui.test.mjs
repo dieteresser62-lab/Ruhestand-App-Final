@@ -470,4 +470,65 @@ console.log('Test 12: expert toggle is DOM-local and preserves control values an
     assertEqual(previewCalls, callsBeforeToggle, 'Pure display toggling does not create or refresh a patch');
 }
 
+console.log('Test 13: preview status tracks transitions between different errors and final recovery');
+{
+    const workspace = {
+        ...workspaceFixture(),
+        baselineSnapshot: editorBaselineFixture()
+    };
+    const previewOutcomes = [
+        Object.assign(new Error('Effective minimum flex must not exceed effective flex need'), {
+            code: 'STRESS_REPLAY_MINIMUM_FLEX_EXCEEDS_FLEX',
+            details: { startFlexBedarf: 5000, minimumFlexAnnual: 6000 }
+        }),
+        Object.assign(new Error('Schema rejection'), {
+            code: 'STRESS_REPLAY_VARIANT_FIELD_FORBIDDEN'
+        }),
+        { materialChangeGroups: ['startFloorBedarf'], warnings: [] }
+    ];
+    const { controller, documentRef, compatibility } = controllerFixture({
+        loadWorkspace: () => ({ status: 'executable', workspace, compatibility, error: null }),
+        previewVariantPatch: () => {
+            const outcome = previewOutcomes.shift();
+            if (outcome instanceof Error) throw outcome;
+            return outcome;
+        }
+    });
+    const form = new FakeElement('stressReplayVariantEditor');
+    form.queryResults.set('[data-stress-replay-path]', []);
+    documentRef.elements.set(form.id, form);
+    controller.initialize();
+
+    const region = documentRef.getElementById('stressReplayStatus');
+    let regionText = region.textContent;
+    const announcements = [];
+    Object.defineProperty(region, 'textContent', {
+        configurable: true,
+        get: () => regionText,
+        set: value => {
+            regionText = value;
+            announcements.push(value);
+        }
+    });
+
+    controller.previewEditorPatch();
+    assertEqual(region.dataset.patchError, 'STRESS_REPLAY_MINIMUM_FLEX_EXCEEDS_FLEX',
+        'The first preview error becomes the current error sentinel');
+    assertEqual(region.dataset.status, 'error', 'The first preview error marks the live region as an error');
+    assert(/Mindest-Flex p\. a\./.test(region.textContent), 'The first preview error has its specific message');
+
+    controller.previewEditorPatch();
+    assertEqual(region.dataset.patchError, 'STRESS_REPLAY_VARIANT_FIELD_FORBIDDEN',
+        'A different preview error replaces the stale relation-error sentinel');
+    assertEqual(region.dataset.status, 'error', 'The replacement preview error remains an error state');
+    assertEqual(region.textContent, 'Schema rejection', 'The live region exposes only the current preview error');
+
+    controller.previewEditorPatch();
+    assertEqual(region.dataset.patchError, undefined, 'Successful preview clears the last error sentinel');
+    assertEqual(region.dataset.status, 'ok', 'Successful preview restores the live region success state');
+    assertEqual(region.textContent, 'Die Patchvorschau ist zulässig.', 'Recovery is announced after the actual last error');
+    assertEqual(announcements.filter(message => message === 'Die Patchvorschau ist zulässig.').length, 1,
+        'Recovery is announced exactly once across the error transition');
+}
+
 console.log('Stress replay UI tests passed.');

@@ -371,17 +371,15 @@ export function createStressReplayController({
                 patch: readVariantPatch(element('stressReplayVariantEditor'))
             });
             const region = element('stressReplayStatus');
-            if (region?.dataset?.patchError === 'STRESS_REPLAY_MINIMUM_FLEX_EXCEEDS_FLEX') {
+            if (region?.dataset?.patchError) {
                 status('Die Patchvorschau ist zulässig.');
                 delete region.dataset.patchError;
             }
         } catch (error) {
             patchPreviewError = error;
-            if (error?.code === 'STRESS_REPLAY_MINIMUM_FLEX_EXCEEDS_FLEX') {
-                status(formatStressReplayUiError(error), { error: true });
-                const region = element('stressReplayStatus');
-                if (region) region.dataset.patchError = error.code;
-            }
+            status(formatStressReplayUiError(error), { error: true });
+            const region = element('stressReplayStatus');
+            if (region) region.dataset.patchError = error?.code || 'STRESS_REPLAY_PREVIEW_ERROR';
         }
         render();
         return patchPreview;

@@ -156,6 +156,25 @@ assertContractError(
     'STRESS_REPLAY_VERSION_UNSUPPORTED',
     'Unknown whitelist version must fail closed'
 );
+const invalidNeedsBaseline = baselineInputs({
+    startFlexBedarf: 5000,
+    minimumFlexAnnual: 6000
+});
+assertContractError(
+    () => createStressReplayBaselineVariantV1({ baselineInputs: invalidNeedsBaseline }),
+    'STRESS_REPLAY_MINIMUM_FLEX_EXCEEDS_FLEX',
+    'Baseline creation must fail closed when its effective minimum flex exceeds flex need'
+);
+assertContractError(
+    () => createStressReplayVariantV1({
+        id: 'unrelated-invalid-needs-baseline',
+        label: 'Unrelated patch on invalid needs baseline',
+        baselineInputs: invalidNeedsBaseline,
+        patch: { strategy: { maxSkimPctOfEq: 12 } }
+    }),
+    'STRESS_REPLAY_MINIMUM_FLEX_EXCEEDS_FLEX',
+    'An unrelated patch must not bypass the effective-needs invariant of its baseline'
+);
 
 console.log('Test 3: mode-bound fields retain their controller and count as one factor');
 const bucketVariant = createStressReplayVariantV1({

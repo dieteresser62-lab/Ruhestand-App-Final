@@ -202,8 +202,16 @@ assert(needsReplay.summary.totalWithdrawalsEur !== baselineReplay.summary.totalW
 'Changed floor and flex needs must have an observable financial effect on the fixed path');
 const needsFinancialRows = needsReplay.scenarioLog.records.filter(record => record.recordType === 'financial_year');
 assert(needsFinancialRows.length > 0, 'The V2 need replay must expose financially evaluated years');
-assert(needsFinancialRows.some(record => record.minimumFlexConfiguredAnnualEur === 8000),
-    'The configured V2 minimum flex must reach the real yearly engine diagnostics');
+assertEqual(needsFinancialRows[0].minimumFlexConfiguredAnnualEur, 8000,
+    'The configured V2 minimum flex must reach the first real yearly engine diagnostic');
+for (let index = 1; index < needsFinancialRows.length; index++) {
+    const previousRow = needsFinancialRows[index - 1];
+    const currentRow = needsFinancialRows[index];
+    const expectedMinimumFlex = previousRow.minimumFlexConfiguredAnnualEur
+        * (1 + previousRow.inflation / 100);
+    assert(Math.abs(currentRow.minimumFlexConfiguredAnnualEur - expectedMinimumFlex) < 0.000001,
+        `Year ${index + 1} minimum flex must continue the prior year's nominal inflation trajectory`);
+}
 assert(Number.isFinite(needsReplay.summary.totalMinimumFlexShortfallEur),
     'The V2 minimum-flex run must expose its aggregated shortfall diagnostic');
 
