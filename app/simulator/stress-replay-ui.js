@@ -93,10 +93,25 @@ function readVariantPatch(form) {
     return patch;
 }
 
-function formatBaselineValue(value) {
+function formatBaselineValue(value, format) {
     if (typeof value === 'boolean') return value ? 'aktiv' : 'inaktiv';
     if (value === undefined || value === null || value === '') return 'nicht gesetzt';
+    if (format === 'currency-eur' && Number.isFinite(value)) {
+        return new Intl.NumberFormat('de-DE', {
+            style: 'currency',
+            currency: 'EUR',
+            maximumFractionDigits: 0
+        }).format(value);
+    }
     return String(value);
+}
+
+function formatNeedCurrency(value) {
+    return Number.isFinite(value)
+        ? new Intl.NumberFormat('de-DE', {
+            style: 'currency', currency: 'EUR', maximumFractionDigits: 0
+        }).format(value)
+        : 'unbekannt';
 }
 
 function defaultRunComparison({ workspace }) {
@@ -145,6 +160,9 @@ function downloadJson(serialized, filename, {
 
 export function formatStressReplayUiError(error) {
     const code = error?.code;
+    if (code === 'STRESS_REPLAY_MINIMUM_FLEX_EXCEEDS_FLEX') {
+        return `Mindest-Flex p. a. (${formatNeedCurrency(error?.details?.minimumFlexAnnual)}) darf den effektiven Flex-Bedarf p. a. (${formatNeedCurrency(error?.details?.startFlexBedarf)}) nicht überschreiten.`;
+    }
     if (code === 'STRESS_REPLAY_SOURCE_UNSUPPORTED') {
         return 'Dieser Monte-Carlo-Lauf nutzt den Legacy-Zufallsstrom und kann in V1 nicht fixiert werden.';
     }
@@ -233,6 +251,17 @@ export function createStressReplayController({
         region.dataset.status = error ? 'error' : 'ok';
         if (focus) focusElement(region);
     };
+    const setExpertFieldsExpanded = expanded => {
+        const toggle = element('stressReplayExpertToggle');
+        const fields = element('stressReplayExpertFields');
+        if (!toggle || !fields) return false;
+        const nextExpanded = expanded === true;
+        fields.hidden = !nextExpanded;
+        toggle.setAttribute?.('aria-expanded', String(nextExpanded));
+        toggle.textContent = nextExpanded ? 'Expertenfelder ausblenden' : 'Expertenfelder anzeigen';
+        return nextExpanded;
+    };
+    const toggleExpertFields = () => setExpertFieldsExpanded(element('stressReplayExpertFields')?.hidden === true);
     const applyBusy = nextBusy => {
         busy = nextBusy === true;
         for (const id of ['stressReplayFixButton', 'stressReplayExportButton', 'stressReplayImportButton', 'stressReplayDiscardButton']) {
@@ -300,7 +329,10 @@ export function createStressReplayController({
             : null;
         for (const output of outputs) {
             output.textContent = strategy
-                ? formatBaselineValue(getPath(strategy, output.dataset.stressReplayBaseline))
+                ? formatBaselineValue(
+                    getPath(strategy, output.dataset.stressReplayBaseline),
+                    output.dataset.stressReplayFormat
+                )
                 : '—';
         }
     };
@@ -338,8 +370,18 @@ export function createStressReplayController({
                 baselineInputs: workspaceState.workspace.baselineSnapshot,
                 patch: readVariantPatch(element('stressReplayVariantEditor'))
             });
+            const region = element('stressReplayStatus');
+            if (region?.dataset?.patchError === 'STRESS_REPLAY_MINIMUM_FLEX_EXCEEDS_FLEX') {
+                status('Die Patchvorschau ist zulässig.');
+                delete region.dataset.patchError;
+            }
         } catch (error) {
             patchPreviewError = error;
+            if (error?.code === 'STRESS_REPLAY_MINIMUM_FLEX_EXCEEDS_FLEX') {
+                status(formatStressReplayUiError(error), { error: true });
+                const region = element('stressReplayStatus');
+                if (region) region.dataset.patchError = error.code;
+            }
         }
         render();
         return patchPreview;
@@ -691,6 +733,7 @@ export function createStressReplayController({
         initialized = true;
         workspaceState = loadWorkspace({ currentCompatibility: resolveCompatibility() });
         applyBusy(false);
+        setExpertFieldsExpanded(false);
         renderBaselineValues();
         updateConditionalFields();
         if (workspaceState.workspace && workspaceState.compatibility?.readOnly !== true) computeComparison();
@@ -710,6 +753,7 @@ export function createStressReplayController({
             if (!busy) element('stressReplayImportFile')?.click?.();
         });
         element('stressReplayDiscardButton')?.addEventListener?.('click', () => void discardActiveWorkspace());
+        element('stressReplayExpertToggle')?.addEventListener?.('click', toggleExpertFields);
         element('stressReplayVariantEditor')?.addEventListener?.('input', () => {
             if (busy) return;
             updateConditionalFields();
@@ -750,6 +794,7 @@ export function createStressReplayController({
         importSerialized,
         discardActiveWorkspace,
         previewEditorPatch,
+        toggleExpertFields,
         addVariant,
         removeVariant,
         recomputeComparison,

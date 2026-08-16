@@ -17,13 +17,14 @@ class FakeElement {
         this.attributes = new Map();
         this.focused = false;
         this.clicks = 0;
+        this.queryResults = new Map();
     }
 
     addEventListener(type, handler) { this.listeners.set(type, handler); }
     setAttribute(name, value) { this.attributes.set(name, String(value)); }
     focus() { this.focused = true; }
     click() { this.clicks += 1; this.listeners.get('click')?.({ preventDefault() {} }); }
-    querySelectorAll() { return []; }
+    querySelectorAll(selector) { return this.queryResults.get(selector) || []; }
     checkValidity() { return true; }
     reset() {}
 }
@@ -40,9 +41,14 @@ function createDocument() {
         'stressReplayPatchPreview', 'stressReplayComparison', 'useCapeSampling'
     ];
     const elements = new Map(ids.map(id => [id, new FakeElement(id)]));
+    const baselineOutputs = [];
     return {
         elements,
-        getElementById(id) { return elements.get(id) || null; }
+        baselineOutputs,
+        getElementById(id) { return elements.get(id) || null; },
+        querySelectorAll(selector) {
+            return selector === '[data-stress-replay-baseline]' ? baselineOutputs : [];
+        }
     };
 }
 
@@ -77,6 +83,34 @@ function workspaceFixture() {
         variants: [{ id: 'baseline', role: 'baseline', label: 'Baseline' }],
         createdAtUtc: '2026-08-16T00:00:00.000Z',
         updatedAtUtc: '2026-08-16T00:00:00.000Z'
+    };
+}
+
+function editorBaselineFixture(overrides = {}) {
+    return {
+        liquidityRunwayYears: 5,
+        maxSkimPctOfEq: 10,
+        maxBearRefillPctOfEq: 5,
+        decumulation: {
+            mode: 'standard',
+            bondTargetFactor: 2,
+            drawdownTrigger: 0.2,
+            bondRefillThreshold: 0.1
+        },
+        dynamicFlex: false,
+        horizonMethod: 'mean',
+        horizonYears: 30,
+        survivalQuantile: 0.85,
+        goGoActive: false,
+        goGoMultiplier: 1,
+        longevityMode: 'none',
+        longevityQuantileShift: 0,
+        longevityRelativePct: 0,
+        longevityBufferYears: 0,
+        startFloorBedarf: 24000,
+        startFlexBedarf: 12000,
+        minimumFlexAnnual: 6000,
+        ...overrides
     };
 }
 
@@ -340,6 +374,100 @@ console.log('Test 10: rejected import and discard promises always release the UI
     assertEqual(await discardPromise, false, 'Rejected discard is reported as failure');
     assertEqual(discardFixture.documentRef.getElementById('stressReplayWorkspace').attributes.get('aria-busy'), 'false', 'Rejected discard releases busy');
     assertEqual(discardFixture.controller.getState().workspace, workspace, 'Rejected discard retains the previous workspace');
+}
+
+console.log('Test 11: focused need editor preserves explicit zero and reports the effective relation in German');
+{
+    const workspace = {
+        ...workspaceFixture(),
+        baselineSnapshot: editorBaselineFixture({ startFloorBedarf: 0 })
+    };
+    const controls = [
+        { value: '0', dataset: { valueType: 'number', stressReplayPath: 'strategy.startFloorBedarf' }, disabled: false },
+        { value: '', dataset: { valueType: 'number', stressReplayPath: 'strategy.startFlexBedarf' }, disabled: false },
+        { value: '', dataset: { valueType: 'number', stressReplayPath: 'strategy.minimumFlexAnnual' }, disabled: false },
+        { value: '7', dataset: { valueType: 'number', stressReplayPath: 'strategy.liquidityRunwayYears' }, disabled: false }
+    ];
+    const capturedPatches = [];
+    let renderedPreviewError = null;
+    const { controller, documentRef, compatibility, calls } = controllerFixture({
+        loadWorkspace: () => ({ status: 'executable', workspace, compatibility, error: null }),
+        previewVariantPatch: ({ patch }) => {
+            capturedPatches.push(structuredClone(patch));
+            const flex = patch.strategy?.startFlexBedarf ?? workspace.baselineSnapshot.startFlexBedarf;
+            const minimum = patch.strategy?.minimumFlexAnnual ?? workspace.baselineSnapshot.minimumFlexAnnual;
+            if (minimum > flex) {
+                throw Object.assign(new Error('Effective minimum flex must not exceed effective flex need'), {
+                    code: 'STRESS_REPLAY_MINIMUM_FLEX_EXCEEDS_FLEX',
+                    details: { startFlexBedarf: flex, minimumFlexAnnual: minimum }
+                });
+            }
+            return { materialChangeGroups: ['startFloorBedarf'], warnings: [] };
+        },
+        renderViews: ({ previewError }) => { renderedPreviewError = previewError; }
+    });
+    const form = new FakeElement('stressReplayVariantEditor');
+    documentRef.elements.set(form.id, form);
+    form.queryResults.set('[data-stress-replay-path]', controls);
+    for (const path of ['startFloorBedarf', 'startFlexBedarf', 'minimumFlexAnnual']) {
+        const output = new FakeElement(`baseline-${path}`);
+        output.dataset.stressReplayBaseline = path;
+        output.dataset.stressReplayFormat = 'currency-eur';
+        documentRef.baselineOutputs.push(output);
+    }
+    controller.initialize();
+
+    const outputs = Object.fromEntries(documentRef.baselineOutputs.map(output => [output.dataset.stressReplayBaseline, output.textContent]));
+    assert(/^0(?:[.,]00)?\s*€$/.test(outputs.startFloorBedarf), 'A zero baseline is rendered as a Euro amount, not as missing');
+    assert(/12[.\s]000(?:,00)?\s*€$/.test(outputs.startFlexBedarf), 'Flex baseline uses German Euro formatting');
+    assert(/6[.\s]000(?:,00)?\s*€$/.test(outputs.minimumFlexAnnual), 'Minimum-flex baseline uses German Euro formatting');
+
+    controller.previewEditorPatch();
+    assertEqual(capturedPatches.at(-1).strategy.startFloorBedarf, 0, 'The string zero reaches preview as numeric zero');
+    assert(!Object.hasOwn(capturedPatches.at(-1).strategy, 'startFlexBedarf'), 'An empty flex control creates no patch leaf');
+
+    controls[1].value = '100';
+    controls[2].value = '101';
+    const comparisonsBeforeError = calls.sourceIdentities.length;
+    controller.previewEditorPatch();
+    assertEqual(renderedPreviewError?.code, 'STRESS_REPLAY_MINIMUM_FLEX_EXCEEDS_FLEX', 'Relation error reaches patch preview rendering');
+    assert(/Mindest-Flex p\. a\..*101\s*€.*Flex-Bedarf p\. a\..*100\s*€/i.test(documentRef.getElementById('stressReplayStatus').textContent),
+        'Live status explains both effective values without clamping');
+    assertEqual(documentRef.getElementById('stressReplayStatus').dataset.status, 'error', 'Invalid effective need relation is marked as an error');
+    assertEqual(documentRef.getElementById('stressReplayAddVariantButton').disabled, true, 'Invalid effective need relation disables variant creation');
+    assertEqual(calls.sourceIdentities.length, comparisonsBeforeError, 'Invalid preview does not start another replay comparison');
+}
+
+console.log('Test 12: expert toggle is DOM-local and preserves control values and patch materiality');
+{
+    let previewCalls = 0;
+    const workspace = {
+        ...workspaceFixture(),
+        baselineSnapshot: editorBaselineFixture()
+    };
+    const { controller, documentRef, compatibility } = controllerFixture({
+        loadWorkspace: () => ({ status: 'executable', workspace, compatibility, error: null }),
+        previewVariantPatch: () => { previewCalls += 1; return { materialChangeGroups: [], warnings: [] }; }
+    });
+    const expertControl = { value: '7', dataset: { valueType: 'number', stressReplayPath: 'strategy.liquidityRunwayYears' } };
+    const form = new FakeElement('stressReplayVariantEditor');
+    form.queryResults.set('[data-stress-replay-path]', [expertControl]);
+    documentRef.elements.set(form.id, form);
+    documentRef.elements.set('stressReplayExpertToggle', new FakeElement('stressReplayExpertToggle'));
+    documentRef.elements.set('stressReplayExpertFields', new FakeElement('stressReplayExpertFields'));
+    controller.initialize();
+    const fields = documentRef.getElementById('stressReplayExpertFields');
+    const toggle = documentRef.getElementById('stressReplayExpertToggle');
+    assertEqual(fields.hidden, true, 'Expert fields start closed');
+    assertEqual(toggle.attributes.get('aria-expanded'), 'false', 'Collapsed state is exposed through ARIA');
+    const callsBeforeToggle = previewCalls;
+    toggle.click();
+    assertEqual(fields.hidden, false, 'Native toggle opens the expert container');
+    assertEqual(toggle.attributes.get('aria-expanded'), 'true', 'Expanded state is exposed through ARIA');
+    toggle.click();
+    toggle.click();
+    assertEqual(expertControl.value, '7', 'Closing and reopening preserves the expert value byte-for-byte');
+    assertEqual(previewCalls, callsBeforeToggle, 'Pure display toggling does not create or refresh a patch');
 }
 
 console.log('Stress replay UI tests passed.');

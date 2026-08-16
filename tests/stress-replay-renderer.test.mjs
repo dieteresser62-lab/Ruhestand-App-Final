@@ -95,6 +95,15 @@ const multiPreview = renderStressReplayPatchPreviewV1({
     preview: { materialChangeGroups: ['dynamicFlex', 'longevity'], warnings: [{ code: 'multi' }] }
 });
 assert(/keinem einzelnen Faktor/.test(multiPreview), 'Multi-factor preview rejects false attribution');
+const needsPreview = renderStressReplayPatchPreviewV1({
+    preview: {
+        materialChangeGroups: ['startFloorBedarf', 'startFlexBedarf', 'minimumFlexAnnual'],
+        warnings: [{ code: 'multi' }]
+    }
+});
+assert(/Floor-Bedarf p\. a\./.test(needsPreview), 'Floor need uses a readable material-group label');
+assert(/Flex-Bedarf p\. a\./.test(needsPreview), 'Flex need uses a readable material-group label');
+assert(/Mindest-Flex p\. a\./.test(needsPreview), 'Minimum flex uses a readable material-group label');
 const forbiddenPreview = renderStressReplayPatchPreviewV1({
     error: new Error('strategy.goldAktiv is not whitelisted')
 });
@@ -113,6 +122,11 @@ assertEqual((listHtml.match(/Neu berechnen/g) || []).length, 3, 'Every alternati
 assertEqual((listHtml.match(/>Entfernen</g) || []).length, 3, 'Every alternative has a native remove button');
 const baselineListItem = listHtml.match(/<li data-variant-id="baseline">[\s\S]*?<\/li>/)?.[0] || '';
 assert(!/data-stress-replay-action="remove"/.test(baselineListItem), 'Baseline has no remove action');
+const needsListHtml = renderStressReplayVariantListV1({
+    workspace: { variants: [variant('baseline', 'baseline', []), variant('needs', 'alternative', ['startFloorBedarf', 'minimumFlexAnnual'])] }
+});
+assert(/Patch: Floor-Bedarf p\. a\., Mindest-Flex p\. a\./.test(needsListHtml),
+    'Variant list names the new need groups instead of exposing raw contract paths');
 
 console.log('Test 3: complete comparison renders KPI, semantic delta and annual tables without ranking');
 const comparison = {
@@ -237,10 +251,19 @@ console.log('Test 6: controller persists add/remove and recomputes without touch
     };
     const status = { textContent: '', dataset: {}, focus() {} };
     const label = { value: 'Dynamisch' };
+    const expertFields = { hidden: true };
+    const expertToggle = {
+        textContent: '',
+        attributes: new Map(),
+        setAttribute(name, value) { this.attributes.set(name, String(value)); },
+        addEventListener() {}
+    };
     const elements = new Map([
         ['stressReplayVariantEditor', form],
         ['stressReplayVariantLabel', label],
-        ['stressReplayStatus', status]
+        ['stressReplayStatus', status],
+        ['stressReplayExpertFields', expertFields],
+        ['stressReplayExpertToggle', expertToggle]
     ]);
     const documentRef = {
         getElementById(id) { return elements.get(id) || null; },
@@ -269,12 +292,15 @@ console.log('Test 6: controller persists add/remove and recomputes without touch
         buildExport: () => ({}), serializeExport: () => '{}', triggerDownload: () => {}
     });
     controller.initialize();
+    controller.toggleExpertFields();
     controller.previewEditorPatch();
     const added = await controller.addVariant();
     assert(added?.role === 'alternative', 'Editor adds a contract-shaped alternative');
     assertEqual(currentWorkspace.variants.length, 2, 'Added alternative is persisted with the baseline');
     assertEqual(saves, 1, 'Adding performs one workspace persistence write');
     assert(computations >= 2, 'Adding recomputes the fixed-path comparison');
+    assertEqual(controls[0].value, '', 'Successful add resets variant patch controls');
+    assertEqual(expertFields.hidden, false, 'Form reset does not persist or collapse the DOM-local expert disclosure');
     assertEqual(await controller.removeVariant(added.id), true, 'Alternative can be removed');
     assertEqual(currentWorkspace.variants.length, 1, 'Removal persists only the immutable baseline');
     assertEqual(saves, 2, 'Removal performs one additional persistence write');

@@ -15,6 +15,9 @@ const KPI_LABELS = Object.freeze({
 });
 
 const GROUP_LABELS = Object.freeze({
+    startFloorBedarf: 'Floor-Bedarf p. a.',
+    startFlexBedarf: 'Flex-Bedarf p. a.',
+    minimumFlexAnnual: 'Mindest-Flex p. a.',
     decumulation: 'Entnahmestrategie',
     longevity: 'Langlebigkeitsannahme',
     liquidityRunwayYears: 'Liquiditätsreichweite',

@@ -1166,6 +1166,21 @@ fieldset.collapsible legend .legend-text {
     color: var(--text-light);
 }
 
+.stress-replay-expert-toggle {
+    margin-bottom: 12px;
+}
+
+.stress-replay-expert-fields {
+    padding: 12px;
+    border: 1px solid var(--border-color, #d0d7de);
+    border-radius: 6px;
+    margin-bottom: 12px;
+}
+
+.stress-replay-expert-fields > p {
+    margin-top: 0;
+}
+
 .stress-replay-patch-preview,
 .stress-replay-interpretation,
 .stress-replay-message {

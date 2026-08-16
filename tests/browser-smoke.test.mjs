@@ -984,11 +984,52 @@ async function runSimulatorSmoke(browser, baseUrl) {
         'Empty stress replay status requests a Monte-Carlo run before scenario selection');
     assert(await page.locator('#stressReplayVariantLabel').getAttribute('maxlength') === '60',
         'Variant labels have a bounded keyboard-editable control');
+    const focusedEditorPaths = await page.locator('#stressReplayVariantFields > .stress-replay-editor-grid').evaluate(grid =>
+        [...grid.querySelectorAll('input, select')].map(control => control.id || control.dataset.stressReplayPath));
+    assert(JSON.stringify(focusedEditorPaths) === JSON.stringify([
+        'stressReplayVariantLabel',
+        'strategy.startFloorBedarf',
+        'strategy.startFlexBedarf',
+        'strategy.minimumFlexAnnual'
+    ]), `Focused editor exposes exactly name, floor need, flex need and minimum flex: ${JSON.stringify(focusedEditorPaths)}`);
     assert(await page.locator('#stressReplayAddVariantButton').count() === 1,
         'Variant calculation uses one native button');
-    assert(await page.locator('#stressReplayVariantEditor [data-stress-replay-path="strategy.goldAktiv"]').count() === 0
-        && await page.locator('#stressReplayVariantEditor [data-stress-replay-path="strategy.minimumFlexAnnual"]').count() === 0,
-    'Forbidden asset and minimum-flex fields are absent from the variant editor');
+    assert(await page.locator('#stressReplayVariantEditor [data-stress-replay-path="strategy.goldAktiv"]').count() === 0,
+        'Forbidden asset fields are absent from the variant editor');
+    for (const path of ['strategy.startFloorBedarf', 'strategy.startFlexBedarf', 'strategy.minimumFlexAnnual']) {
+        const needControl = page.locator(`#stressReplayVariantEditor [data-stress-replay-path="${path}"]`);
+        assert(await needControl.count() === 1, `Focused editor exposes ${path} exactly once`);
+        assert(await needControl.inputValue() === '', `${path} starts empty and inherits its baseline`);
+        assert(await needControl.getAttribute('min') === '0', `${path} rejects negative values in the browser`);
+        assert(await needControl.isVisible(), `${path} is visible in the focused editor`);
+    }
+    assert(await page.locator('#stressReplayVariantEditor [data-stress-replay-format="currency-eur"]').count() === 3,
+        'Exactly the three focused baseline outputs opt into Euro formatting');
+    const expertToggle = page.locator('#stressReplayExpertToggle');
+    const expertFields = page.locator('#stressReplayExpertFields');
+    assert(await expertToggle.getAttribute('type') === 'button', 'Expert disclosure uses a native non-submit button');
+    assert(await expertToggle.getAttribute('aria-expanded') === 'false', 'Expert disclosure starts collapsed');
+    assert(await expertToggle.getAttribute('aria-controls') === 'stressReplayExpertFields', 'Expert disclosure names its controlled container');
+    assert(await expertFields.isHidden(), 'All expert controls start hidden');
+    assert(await expertFields.locator('[data-stress-replay-path]').count() === 17,
+        'All 17 existing expert controls remain present inside the disclosure');
+    const previewBeforeToggle = await page.locator('#stressReplayPatchPreview').innerHTML();
+    const addDisabledBeforeToggle = await page.locator('#stressReplayAddVariantButton').isDisabled();
+    await page.locator('#stressReplayVariantFields').evaluate(fieldset => { fieldset.disabled = false; });
+    await expertToggle.press('Enter');
+    assert(await expertFields.isVisible() && await expertToggle.getAttribute('aria-expanded') === 'true',
+        'Enter opens the native expert disclosure and synchronizes ARIA');
+    const retainedExpert = expertFields.locator('[data-stress-replay-path="strategy.liquidityRunwayYears"]');
+    await retainedExpert.fill('7');
+    await expertToggle.press('Space');
+    assert(await expertFields.isHidden() && await expertToggle.getAttribute('aria-expanded') === 'false',
+        'Space closes the native expert disclosure and synchronizes ARIA');
+    await expertToggle.press('Enter');
+    assert(await retainedExpert.inputValue() === '7', 'Closing and reopening preserves an entered expert value');
+    assert(await page.locator('#stressReplayPatchPreview').innerHTML() === previewBeforeToggle,
+        'Opening and closing alone does not change patch preview');
+    assert(await page.locator('#stressReplayAddVariantButton').isDisabled() === addDisabledBeforeToggle,
+        'Opening and closing alone does not change add-button materiality');
     assert(await page.locator('#stressReplayVariantEditor [data-active-when="decumulation:3_bucket_jilge"]').first().isHidden(),
         'Three-bucket-only controls start hidden when their strategy mode is inactive');
     assert((await page.locator('#stressReplayWorkspace').textContent()).includes('Auf diesem fixierten Stresspfad'),

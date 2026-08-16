@@ -1168,6 +1168,21 @@
                                             <input id="stressReplayVariantLabel" type="text" maxlength="60" required
                                                 autocomplete="off" placeholder="z. B. längere Liquiditätsreichweite">
                                         </label>
+                                        <label>Floor-Bedarf p. a. <small>Baseline: <output data-stress-replay-baseline="startFloorBedarf" data-stress-replay-format="currency-eur">—</output></small>
+                                            <input type="number" min="0" step="1" data-value-type="number" data-stress-replay-path="strategy.startFloorBedarf" placeholder="Baseline übernehmen">
+                                        </label>
+                                        <label>Flex-Bedarf p. a. <small>Baseline: <output data-stress-replay-baseline="startFlexBedarf" data-stress-replay-format="currency-eur">—</output></small>
+                                            <input type="number" min="0" step="1" data-value-type="number" data-stress-replay-path="strategy.startFlexBedarf" placeholder="Baseline übernehmen">
+                                        </label>
+                                        <label>Mindest-Flex p. a. <small>Baseline: <output data-stress-replay-baseline="minimumFlexAnnual" data-stress-replay-format="currency-eur">—</output></small>
+                                            <input type="number" min="0" step="1" data-value-type="number" data-stress-replay-path="strategy.minimumFlexAnnual" placeholder="Baseline übernehmen">
+                                        </label>
+                                    </div>
+                                    <button type="button" id="stressReplayExpertToggle" class="stress-replay-expert-toggle"
+                                        aria-expanded="false" aria-controls="stressReplayExpertFields">Expertenfelder anzeigen</button>
+                                    <div id="stressReplayExpertFields" class="stress-replay-expert-fields" hidden>
+                                        <p>Optionale Strategieparameter für gezielte Expertenvergleiche.</p>
+                                        <div class="stress-replay-editor-grid">
                                         <label>Liquiditätsreichweite in Jahren <small>Baseline: <output data-stress-replay-baseline="liquidityRunwayYears">—</output></small>
                                             <input type="number" min="1" max="10" step="0.5" data-value-type="number" data-stress-replay-path="strategy.liquidityRunwayYears" placeholder="Baseline übernehmen">
                                         </label>
@@ -1219,6 +1234,7 @@
                                         <label data-active-when="longevity:buffer_years" hidden>Pufferjahre <small>Baseline: <output data-stress-replay-baseline="longevityBufferYears">—</output></small>
                                             <input type="number" min="0" max="10" step="1" data-value-type="number" data-stress-replay-path="strategy.longevityBufferYears" placeholder="Baseline übernehmen">
                                         </label>
+                                        </div>
                                     </div>
                                     <div id="stressReplayPatchPreview" class="stress-replay-patch-preview" aria-live="polite"></div>
                                     <button type="button" id="stressReplayAddVariantButton">Als Variante berechnen</button>
