@@ -16,6 +16,11 @@ import {
     saveStressReplayWorkspaceV1
 } from '../app/simulator/stress-replay-persistence.js';
 import { createStressReplayBaselineVariantV1 } from '../app/simulator/stress-replay-variant.js';
+import {
+    init as initPersistence,
+    resetPersistenceForTests,
+    resetPersistenceRuntimeForTests
+} from '../app/shared/persistence-facade.js';
 
 function fingerprint(character) {
     return { algorithm: 'sha256-canonical-json-v1', value: character.repeat(64) };
@@ -94,6 +99,41 @@ function createBackend(initial = null, options = {}) {
             async flush() {
                 flushCalls += 1;
                 if (options.failFirstFlush && flushCalls === 1) throw new Error('fixture flush failed');
+            }
+        }
+    };
+}
+
+function createFacadeAdapter(initial = {}) {
+    const store = new Map(Object.entries(initial).map(([key, value]) => [String(key), String(value)]));
+    const batches = [];
+    let nextFailure = null;
+    return {
+        name: 'stress-replay-facade-test',
+        store,
+        batches,
+        failNext(mode) {
+            nextFailure = mode;
+        },
+        async open() {},
+        async loadAll() {
+            return Object.fromEntries(store.entries());
+        },
+        async saveBatch(batch) {
+            const failure = nextFailure;
+            nextFailure = failure === 'write_and_rollback' ? 'write_and_rollback' : null;
+            batches.push({
+                deletes: [...batch.deletes],
+                upserts: batch.upserts.map(([key, value]) => [key, value])
+            });
+            if (failure === 'readback_mismatch') return;
+            batch.deletes.forEach(key => store.delete(String(key)));
+            batch.upserts.forEach(([key, value]) => store.set(String(key), String(value)));
+            if (failure === 'write_once') {
+                throw new Error('controlled write failure');
+            }
+            if (failure === 'write_and_rollback') {
+                throw new Error('controlled persistent write failure');
             }
         }
     };
@@ -217,5 +257,89 @@ assertContractError(
     'STRESS_REPLAY_PERSISTENCE_SIZE_LIMIT',
     'Oversized workspace is rejected'
 );
+
+console.log('Test 9: default facade path is transactional, verified and isolated');
+{
+    const sentinelKey = 'stress-replay-unrelated-sentinel';
+    const sentinelValue = 'must-remain-byte-identical';
+    const facadeAdapter = createFacadeAdapter({ [sentinelKey]: sentinelValue });
+    try {
+        resetPersistenceForTests(facadeAdapter);
+        await initPersistence();
+
+        const first = workspaceFixture(21);
+        const firstSerialized = JSON.stringify(first);
+        const firstSave = await saveStressReplayWorkspaceV1(first);
+        assertEqual(firstSave.replaced, false, 'Default facade path stores the first workspace');
+        assertEqual(facadeAdapter.store.get(STRESS_REPLAY_ACTIVE_STORAGE_KEY), firstSerialized,
+            'First save is confirmed by backend readback');
+        assertEqual(facadeAdapter.store.get(sentinelKey), sentinelValue, 'First save preserves unrelated records');
+
+        const batchesAfterFirstSave = facadeAdapter.batches.length;
+        const unchanged = await saveStressReplayWorkspaceV1(first);
+        assertEqual(unchanged.unchanged, true, 'Unchanged default save is idempotent');
+        assertEqual(facadeAdapter.batches.length, batchesAfterFirstSave, 'Unchanged save performs no backend write');
+
+        const replacement = workspaceFixture(22);
+        await saveStressReplayWorkspaceV1(replacement, { confirmReplace: true });
+        assertEqual(facadeAdapter.store.get(STRESS_REPLAY_ACTIVE_STORAGE_KEY), JSON.stringify(replacement),
+            'Confirmed replace is visible in the backend');
+        assertEqual(facadeAdapter.store.get(sentinelKey), sentinelValue, 'Replace preserves unrelated records');
+
+        await discardStressReplayWorkspaceV1({ confirmDiscard: true });
+        assertEqual(facadeAdapter.store.has(STRESS_REPLAY_ACTIVE_STORAGE_KEY), false,
+            'Confirmed discard is visible in the backend');
+        assertEqual(facadeAdapter.store.get(sentinelKey), sentinelValue, 'Discard preserves unrelated records');
+
+        await saveStressReplayWorkspaceV1(first);
+        for (const [failureMode, expectedFailureCode] of [
+            ['write_once', 'persistence_transaction_write_failed'],
+            ['readback_mismatch', 'persistence_readback_mismatch']
+        ]) {
+            facadeAdapter.failNext(failureMode);
+            let failure = null;
+            try {
+                await saveStressReplayWorkspaceV1(replacement, { confirmReplace: true });
+            } catch (error) {
+                failure = error;
+            }
+            assertEqual(failure?.code, 'STRESS_REPLAY_PERSISTENCE_WRITE_FAILED',
+                `${failureMode} exposes the stable stress-replay error code`);
+            assertEqual(failure?.details?.persistenceCode, 'restore_rolled_back',
+                `${failureMode} exposes the stable facade outcome code`);
+            assertEqual(failure?.details?.failureCode, expectedFailureCode,
+                `${failureMode} exposes the stable primary failure code`);
+            assertEqual(failure?.details?.rollbackFailed, false,
+                `${failureMode} reports a verified compensating rollback`);
+            assertEqual(facadeAdapter.store.get(STRESS_REPLAY_ACTIVE_STORAGE_KEY), firstSerialized,
+                `${failureMode} restores the previous workspace byte-identically`);
+            assertEqual(facadeAdapter.store.get(sentinelKey), sentinelValue,
+                `${failureMode} preserves unrelated records`);
+        }
+
+        facadeAdapter.failNext('write_and_rollback');
+        let rollbackFailure = null;
+        try {
+            await saveStressReplayWorkspaceV1(replacement, { confirmReplace: true });
+        } catch (error) {
+            rollbackFailure = error;
+        }
+        assertEqual(rollbackFailure?.code, 'STRESS_REPLAY_PERSISTENCE_WRITE_FAILED',
+            'Failed rollback exposes the stable stress-replay error code');
+        assertEqual(rollbackFailure?.details?.persistenceCode, 'rollback_failed',
+            'Failed rollback exposes the stable facade error code');
+        assertEqual(rollbackFailure?.details?.failureCode, 'persistence_transaction_write_failed',
+            'Failed rollback retains the stable primary failure code');
+        assertEqual(rollbackFailure?.details?.rollbackCode, 'persistence_transaction_rollback_failed',
+            'Failed rollback exposes the stable rollback failure code');
+        assertEqual(rollbackFailure?.details?.rollbackFailed, true,
+            'Failed rollback is machine-readable');
+        assert(Boolean(rollbackFailure?.details?.rollbackCause), 'Failed rollback retains its diagnostic cause');
+        assertEqual(facadeAdapter.store.get(sentinelKey), sentinelValue,
+            'Failed rollback never mutates unrelated records');
+    } finally {
+        resetPersistenceRuntimeForTests();
+    }
+}
 
 console.log('Stress replay persistence tests passed.');

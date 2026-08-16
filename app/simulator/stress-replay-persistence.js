@@ -55,6 +55,17 @@ function serializedBytes(serialized, subject) {
     return bytes;
 }
 
+function transactionalFailureDetails(cause) {
+    return {
+        cause: cause?.cause?.message || cause?.message || String(cause),
+        persistenceCode: cause?.code || 'persistence_transaction_failed',
+        failureCode: cause?.failureCode || cause?.code || 'persistence_transaction_failed',
+        rollbackFailed: cause?.code === 'rollback_failed',
+        rollbackCause: cause?.rollbackError?.message || null,
+        rollbackCode: cause?.rollbackCode || null
+    };
+}
+
 function parseWorkspace(serialized) {
     if (typeof serialized !== 'string') {
         fail('STRESS_REPLAY_PERSISTENCE_CORRUPT', 'Persisted stress replay workspace must be JSON text');
@@ -182,8 +193,7 @@ export async function saveStressReplayWorkspaceV1(workspace, {
     } catch (cause) {
         if (transactionalReplace) {
             fail('STRESS_REPLAY_PERSISTENCE_WRITE_FAILED', 'Stress replay workspace could not be stored atomically', {
-                cause: cause?.message || String(cause),
-                rollbackFailed: cause?.code === 'rollback_failed'
+                ...transactionalFailureDetails(cause)
             });
         }
         let rollbackError = null;
@@ -231,8 +241,7 @@ export async function discardStressReplayWorkspaceV1({ backend, confirmDiscard =
     } catch (cause) {
         if (transactionalReplace) {
             fail('STRESS_REPLAY_PERSISTENCE_WRITE_FAILED', 'Stress replay workspace could not be discarded atomically', {
-                cause: cause?.message || String(cause),
-                rollbackFailed: cause?.code === 'rollback_failed'
+                ...transactionalFailureDetails(cause)
             });
         }
         try {

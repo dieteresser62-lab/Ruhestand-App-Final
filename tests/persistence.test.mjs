@@ -826,6 +826,36 @@ try {
             'Transaktionaler Ersatz darf ohne Backend-Readback nicht auf den Cache ausweichen');
     }
 
+    console.log('Test 11c4: transactional readback mismatch retains stable failure metadata');
+    {
+        const adapter = createMemoryAdapter({ sim_old: 'keep-backend' }, {
+            acknowledgeWithoutFirstUpsertOnce: true
+        });
+        resetPersistenceForTests(adapter);
+        await init();
+
+        let mismatchError = null;
+        try {
+            await replaceRecordsTransactional(
+                { sim_next: 'must-be-verified' },
+                { allowKey: isAllowedPersistenceImportKey }
+            );
+        } catch (error) {
+            mismatchError = error;
+        }
+
+        assertEqual(mismatchError?.code, 'restore_rolled_back',
+            'Readback-Mismatch meldet einen bestaetigten Rollback');
+        assertEqual(mismatchError?.failureCode, 'persistence_readback_mismatch',
+            'Readback-Mismatch behaelt seinen stabilen primaeren Fehlercode');
+        assertEqual(mismatchError?.rollbackCode, null,
+            'Bestaetigter Rollback meldet keinen Rollbackfehlercode');
+        assertEqual(adapter.store.get('sim_old'), 'keep-backend',
+            'Readback-Mismatch stellt den vorherigen Backendwert wieder her');
+        assertEqual(adapter.store.has('sim_next'), false,
+            'Readback-Mismatch hinterlaesst keinen Zielwert');
+    }
+
     console.log('Test 11d: recovery and post-load fault injection remain fail-closed');
     {
         const snapshotFailureAdapter = createMemoryAdapter({

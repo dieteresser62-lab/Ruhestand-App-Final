@@ -365,6 +365,13 @@ function recordsMatch(expected, actual) {
     ));
 }
 
+function createPersistenceError(code, message) {
+    const error = new Error(message);
+    error.name = 'PersistenceError';
+    error.code = code;
+    return error;
+}
+
 function createFullReplacePlan(targetRecords, currentRecords, allowKey) {
     const targetKeys = new Set(Object.keys(targetRecords));
     return {
@@ -384,6 +391,9 @@ function createRestoreError(cause, rollbackError = null) {
     error.code = rollbackError ? 'rollback_failed' : 'restore_rolled_back';
     error.cause = cause;
     error.rollbackError = rollbackError;
+    error.failureCode = cause?.code || 'persistence_transaction_write_failed';
+    error.rollbackCode = rollbackError?.code
+        || (rollbackError ? 'persistence_transaction_rollback_failed' : null);
     return error;
 }
 
@@ -418,7 +428,10 @@ export async function replaceRecordsTransactional(records, options = {}) {
         const confirmedRecords = await capturePersistedRecordsByPolicy(allowKey);
         const confirmedCache = captureRecordsByPolicy(allowKey);
         if (!recordsMatch(targetRecords, confirmedRecords) || !recordsMatch(targetRecords, confirmedCache)) {
-            throw new Error('Backend oder Cache stimmt nicht mit dem Restore-Ziel ueberein.');
+            throw createPersistenceError(
+                'persistence_readback_mismatch',
+                'Backend oder Cache stimmt nicht mit dem Restore-Ziel ueberein.'
+            );
         }
         if (typeof options.postValidate === 'function') {
             const validationResult = await options.postValidate(confirmedRecords);
@@ -454,7 +467,10 @@ export async function replaceRecordsTransactional(records, options = {}) {
             const confirmedRollbackCache = captureRecordsByPolicy(allowKey);
             if (!recordsMatch(previousRecords, confirmedRollback)
                 || !recordsMatch(previousRecords, confirmedRollbackCache)) {
-                throw new Error('Backend oder Cache ist nach dem Rollback nicht bytegleich zum vorherigen Livebestand.');
+                throw createPersistenceError(
+                    'persistence_rollback_readback_mismatch',
+                    'Backend oder Cache ist nach dem Rollback nicht bytegleich zum vorherigen Livebestand.'
+                );
             }
         } catch (error) {
             rollbackError = error;
