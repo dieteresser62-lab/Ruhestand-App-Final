@@ -92,6 +92,19 @@ Noch kein strukturiertes Reviewereignis.
 - Größtes Restrisiko: Largest residual risk: the forced-sale eq/gold breakdown-index-to-assetClass mapping is hand-coded per branch condition rather than derived structurally from the breakdown array itself. It is safe today only because the contract layer's cross-validation (&#96;assetClass !== breakdownEntry.assetClass&#96;, etc.) throws on any future mismatch instead of silently mis-tagging — a correctness guard, but not a substitute for direct test coverage of a widened breakdown shape.
 - Realistische Bruchbedingung: Break condition: a future producer change adds a third (e.g. bonds) bucket to the forced-sale or payout-fallback breakdown array in 3-bucket mode without adding the matching missingness branch/index arithmetic. &#96;buildStressReplayTransactionsForYear&#96; would then throw "Missing breakdown N.field requires explicit missingness" or an assetClass-mismatch TypeError at runtime for that new bucket — a fail-closed outcome — but only if some test path actually exercises a 3-bucket forced sale with a populated third breakdown bucket; no such test exists in the current scope, so the gap could persist undetected in review while remaining safely fail-closed in production.
 - Eigene Findings: keine
+
+#### Work Unit 07 – Slice 06
+
+- Auftrag: Runner-Capture-Paritaet im echten Stressverkauf
+- Scope: `app/simulator/simulator-engine-direct.js`, `app/simulator/stress-replay-runner.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-06-runner-capture-paritaet-im-echten-stressverkauf.md`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-06-runner-capture-paritaet-im-stressverkauf.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `tests/stress-replay-runner.test.mjs`, `tests/stress-replay-transactions.test.mjs`
+
+### Ereignis 2: Runde 1
+
+- Reviewer: `claude`
+- Freigabe: `YES`
+- Validierungsbindung: `validation-af5da6215f95`
+- Testdateien: `tests/stress-replay-runner.test.mjs`
+- Eigene Findings: `C-01`
 <!-- audit:claude-review:end -->
 
 ### Review-Feedback von Antigravity
@@ -183,6 +196,22 @@ Noch kein strukturiertes Reviewereignis.
 - Größtes Restrisiko: Index-to-asset-class mapping in simulator-forced-sale.js relies on branch-specific manual index arithmetic (forcedExecutedEq &gt; 0 ? 1 : 0) rather than structural derivation from the breakdown array, relying on the contract layer's strict runtime cross-validation (assetClass !== breakdownEntry.assetClass) to fail closed on any drift
 - Realistische Bruchbedingung: A maintainer adds a third asset class (e.g. a distinct geldmarkt tranche) to simulator-forced-sale.js in 3-bucket mode without adapting the hard-coded missingness index offsets; buildStressReplayTransactionsForYear would fail closed with an assetClass or index mismatch TypeError, but the failure would only surface when a test or run exercises that specific multi-asset forced-sale configuration
 - Eigene Findings: keine
+
+#### Work Unit 07 – Slice 06
+
+- Auftrag: Runner-Capture-Paritaet im echten Stressverkauf
+- Scope: `app/simulator/simulator-engine-direct.js`, `app/simulator/stress-replay-runner.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-06-runner-capture-paritaet-im-echten-stressverkauf.md`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-06-runner-capture-paritaet-im-stressverkauf.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `tests/stress-replay-runner.test.mjs`, `tests/stress-replay-transactions.test.mjs`
+
+### Ereignis 3: Runde 1
+
+- Reviewer: `antigravity`
+- Freigabe: `YES`
+- Validierungsbindung: `validation-af5da6215f95`
+- Testdateien: `tests/stress-replay-runner.test.mjs`
+- Prüfdimensionen: Implementation correctness of &#96;captureTransactions&#96; flag propagation to engine inputs; backward-compatible default behavior (&#96;captureTransactions = true&#96;); strict diagnostic isolation ensuring zero financial KPI / summary / yearly result divergence between capture-on and capture-off runs; trace phase purity ensuring only the additive &#96;after_payout_fallback&#96; entry is appended without mutating surrounding trace ordering; input immutability of &#96;crashPath&#96; and &#96;crashInputs&#96;; byte-level replay determinism across repeated runs
+- Größtes Restrisiko: Downstream callers or external integration scripts passing truthy non-boolean values (such as &#96;"true"&#96; or &#96;1&#96; parsed from query parameters or CLI arguments) directly into &#96;runStressReplayPathV1({ captureTransactions })&#96;, where strict &#96;=== true&#96; comparison silently disables transaction capture without throwing an error
+- Realistische Bruchbedingung: A CLI command or UI URL parameter parser forwards uncoerced string &#96;"true"&#96; to &#96;runStressReplayPathV1&#96;, causing transaction capture to be disabled and resulting in empty transaction arrays despite active forced sales occurring during simulation
+- Eigene Findings: keine
 <!-- audit:antigravity-review:end -->
 
 ### Review-Antworten von Codex
@@ -227,6 +256,13 @@ Noch keine strukturierten Codex-Antworten.
 
 - Auftrag: Explizite Missingness bis in Transaktions-Breakdowns
 - Scope: `app/simulator/simulator-bond-refill.js`, `app/simulator/simulator-engine-direct.js`, `app/simulator/simulator-forced-sale.js`, `app/simulator/stress-replay-transactions.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-05-explizite-missingness-bis-in-transaktions-breakdowns.md`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-05-explizite-transaktions-missingness.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `tests/stress-replay-comparison.test.mjs`, `tests/stress-replay-transactions.test.mjs`
+
+Noch keine strukturierten Codex-Antworten.
+
+#### Work Unit 07 – Slice 06
+
+- Auftrag: Runner-Capture-Paritaet im echten Stressverkauf
+- Scope: `app/simulator/simulator-engine-direct.js`, `app/simulator/stress-replay-runner.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-06-runner-capture-paritaet-im-echten-stressverkauf.md`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-06-runner-capture-paritaet-im-stressverkauf.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `tests/stress-replay-runner.test.mjs`, `tests/stress-replay-transactions.test.mjs`
 
 Noch keine strukturierten Codex-Antworten.
 <!-- audit:codex-responses:end -->
@@ -325,6 +361,23 @@ Noch keine strukturierte Validierungsattestierung.
 | Matrixbefehl | Status | Exitcode | Kompaktausgabe |
 |---|---|---:|---|
 | shell: npm test | PASS | 0 | &gt; ruhestand-app-final@1.0.0 test<br>&gt; node tests/run-tests.mjs<br><br>🚀 Starting Test Runner...<br>Found 180 test files.<br><br>📂 Running 3bucket-config.test.mjs in process...<br>--- 3-Bucket Config Tests ---<br>✅ 3-Bucket config tests passed<br>✅ 3bucket-config.test.mjs completed.<br>📊 FILE RESULT: 3bucket-config.test.mjs &#124; mode=in-process &#124; assertions=17 &#124; passed=17 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running 3bucket-refill.test.mjs in process...<br>--- 3-Bucket Refill Tests ---<br>✅ 3-Bucket refill tests passed<br>✅ 3bucket-refill.test.mjs completed.<br>📊 FILE RESULT: 3bucket-refill.test.mjs &#124; mode=in-process &#124; assertions=32 &#124; passed=32 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running architecture-evidence.test.mjs in process...<br>--- Architecture Evidence Contract Tests ---<br>✅ Architecture evidence contract tests passed<br>✅ architecture-evidence.test.mjs completed.<br>📊 FILE RESULT: architecture-evidence.test.mjs &#124; mode=in-process &#124; assertions=24 &#124; passed=24 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running auto-optimize-fidelity<br>...[182748 characters omitted]...<br>ete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-storage.js:537:28)<br>    at initProfileSubpageLifecycle (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-navigation.js:157:5)<br>    at initProfileBridge (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-bridge.js:8:5)<br>    at async Promise.all (index 0)<br>    at async MockDocument.dispatch (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:80:9)<br>    at async runProfileUiContractTests (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:244:9)<br>    at async file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:257:9<br>[VALIDATION ERROR] Invalid input fields: [<br>  {<br>    fieldId: 'goGoMultiplier',<br>    message: 'goGoMultiplier muss zwischen 1.0 und 1.5 liegen.'<br>  }<br>] |
+
+#### Work Unit 07 – Slice 06
+
+- Auftrag: Runner-Capture-Paritaet im echten Stressverkauf
+- Scope: `app/simulator/simulator-engine-direct.js`, `app/simulator/stress-replay-runner.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-06-runner-capture-paritaet-im-echten-stressverkauf.md`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-06-runner-capture-paritaet-im-stressverkauf.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `tests/stress-replay-runner.test.mjs`, `tests/stress-replay-transactions.test.mjs`
+
+### Ereignis 1: `validation-af5da6215f95`
+
+- Diff-Fingerprint: `af5da6215f95dee08884ea854043c20895c71738688d041cb70edabcea36f0a3`
+- Status: `PASS`
+- Vollständig: `YES`
+- Kurzresultat: 1 passed; 0 failed; 0 unavailable; 1 required
+- Ausgabedigest: `ecc4f56d433dfddd22947b7ab047ac2ebc13fffd591942dc2654c2fd60c12e71`
+
+| Matrixbefehl | Status | Exitcode | Kompaktausgabe |
+|---|---|---:|---|
+| shell: npm test | PASS | 0 | &gt; ruhestand-app-final@1.0.0 test<br>&gt; node tests/run-tests.mjs<br><br>🚀 Starting Test Runner...<br>Found 180 test files.<br><br>📂 Running 3bucket-config.test.mjs in process...<br>--- 3-Bucket Config Tests ---<br>✅ 3-Bucket config tests passed<br>✅ 3bucket-config.test.mjs completed.<br>📊 FILE RESULT: 3bucket-config.test.mjs &#124; mode=in-process &#124; assertions=17 &#124; passed=17 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running 3bucket-refill.test.mjs in process...<br>--- 3-Bucket Refill Tests ---<br>✅ 3-Bucket refill tests passed<br>✅ 3bucket-refill.test.mjs completed.<br>📊 FILE RESULT: 3bucket-refill.test.mjs &#124; mode=in-process &#124; assertions=32 &#124; passed=32 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running architecture-evidence.test.mjs in process...<br>--- Architecture Evidence Contract Tests ---<br>✅ Architecture evidence contract tests passed<br>✅ architecture-evidence.test.mjs completed.<br>📊 FILE RESULT: architecture-evidence.test.mjs &#124; mode=in-process &#124; assertions=24 &#124; passed=24 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running auto-optimize-fidelity<br>...[182833 characters omitted]...<br>ete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-storage.js:537:28)<br>    at initProfileSubpageLifecycle (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-navigation.js:157:5)<br>    at initProfileBridge (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-bridge.js:8:5)<br>    at async Promise.all (index 0)<br>    at async MockDocument.dispatch (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:80:9)<br>    at async runProfileUiContractTests (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:244:9)<br>    at async file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:257:9<br>[VALIDATION ERROR] Invalid input fields: [<br>  {<br>    fieldId: 'goGoMultiplier',<br>    message: 'goGoMultiplier muss zwischen 1.0 und 1.5 liegen.'<br>  }<br>] |
 <!-- audit:validation-attestation:end -->
 
 ### Testfreigabe und Pre-Mortem
@@ -387,6 +440,16 @@ Noch keine strukturierte Validierungsattestierung.
 - Pre-Mortems:
   - Ereignis 2: In three months, the most likely failure cause is exactly the residual risk above: a maintainer extends &#96;simulator-forced-sale.js&#96; for a bonds-bucket-aware forced sale/payout fallback and forgets to extend the paired missingness-generation branch, and because no test exercises a 3-bucket forced sale with more than two populated breakdown entries, the gap ships silently reviewed-green until a real 3-bucket production run first hits that code path and throws at runtime (fail-closed, but as an unplanned incident rather than a caught regression).
   - Ereignis 3: In three months, the most likely failure cause would be an engine refactoring that introduces a new transaction source or sale mechanic (e.g. automated cross-tranche rebalancing or cash buffer replenishment) with non-standard field naming (e.g. missing canonical grossEur/brutto properties or emitting string-encoded amounts), triggering runtime type errors in readBreakdownMoney and normalizeBreakdown during transaction ingestion.
+
+#### Work Unit 07 – Slice 06
+
+- Auftrag: Runner-Capture-Paritaet im echten Stressverkauf
+- Scope: `app/simulator/simulator-engine-direct.js`, `app/simulator/stress-replay-runner.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-06-runner-capture-paritaet-im-echten-stressverkauf.md`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-06-runner-capture-paritaet-im-stressverkauf.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `tests/stress-replay-runner.test.mjs`, `tests/stress-replay-transactions.test.mjs`
+
+- Teständerungsfreigabe: nicht erfasst.
+- Pre-Mortems:
+  - Ereignis 2: In three months, the most likely failure cause is a future maintainer wiring &#96;captureTransactions&#96; from an external boolean-like source (e.g. a UI checkbox value, a JSON config flag serialized as &#96;"true"&#96;/&#96;1&#96;) without knowing the strict &#96;=== true&#96; requirement, causing transaction diagnostics to silently vanish from a replay run with no error — a quiet capability regression rather than a crash, only caught if someone later notices missing diagnostics in output review.
+  - Ereignis 3: In three months, the most likely failure cause is an integration layer or batch test script passing a non-boolean truthy config value (e.g. from JSON or CLI options) to &#96;runStressReplayPathV1({ captureTransactions })&#96;, leading to silent deactivation of transaction diagnostics and false negatives in transaction audit reporting while core financial simulation metrics remain fully green.
 <!-- audit:test-approval-premortem:end -->
 
 ### Findings-Lebenszyklus
@@ -457,6 +520,19 @@ Noch keine strukturierten Findings.
 - Scope: `app/simulator/simulator-bond-refill.js`, `app/simulator/simulator-engine-direct.js`, `app/simulator/simulator-forced-sale.js`, `app/simulator/stress-replay-transactions.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-05-explizite-missingness-bis-in-transaktions-breakdowns.md`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-05-explizite-transaktions-missingness.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `tests/stress-replay-comparison.test.mjs`, `tests/stress-replay-transactions.test.mjs`
 
 Noch keine strukturierten Findings.
+
+#### Work Unit 07 – Slice 06
+
+- Auftrag: Runner-Capture-Paritaet im echten Stressverkauf
+- Scope: `app/simulator/simulator-engine-direct.js`, `app/simulator/stress-replay-runner.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-06-runner-capture-paritaet-im-echten-stressverkauf.md`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-06-runner-capture-paritaet-im-stressverkauf.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `tests/stress-replay-runner.test.mjs`, `tests/stress-replay-transactions.test.mjs`
+
+### `C-01` — `OPEN`
+
+- Quelle: `claude`; Runde 1
+- Klasse: `OBSERVATION`
+- Finding: The new &#96;captureTransactions&#96; parameter is compared with strict &#96;=== true&#96;, so any future caller passing a truthy-but-non-boolean value (e.g. &#96;1&#96;, &#96;"true"&#96;) silently disables transaction capture instead of erroring or coercing — no test exercises this non-boolean-truthy path today.
+- Akzeptanztest: Add a unit test in tests/stress-replay-runner.test.mjs asserting that &#96;runStressReplayPathV1({..., captureTransactions: 1, ...})&#96; yields &#96;transactions.length === 0&#96;, so the strict-boolean contract is explicit and regression-proof rather than incidental.
+- Statusbegründung: –
 <!-- audit:findings:end -->
 
 ### Entscheidungstabelle
@@ -515,6 +591,15 @@ Noch keine strukturierten Findings.
 | ID | Quelle | Finding | Klasse | Entscheidung | Umsetzung |
 |---|---|---|---|---|---|
 | – | – | Noch keine Findings | – | – | – |
+
+#### Work Unit 07 – Slice 06
+
+- Auftrag: Runner-Capture-Paritaet im echten Stressverkauf
+- Scope: `app/simulator/simulator-engine-direct.js`, `app/simulator/stress-replay-runner.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-06-runner-capture-paritaet-im-echten-stressverkauf.md`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-06-runner-capture-paritaet-im-stressverkauf.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `tests/stress-replay-runner.test.mjs`, `tests/stress-replay-transactions.test.mjs`
+
+| ID | Quelle | Finding | Klasse | Entscheidung | Umsetzung |
+|---|---|---|---|---|---|
+| C-01 | claude | The new &#96;captureTransactions&#96; parameter is compared with strict &#96;=== true&#96;, so any future caller passing a truthy-but-non-boolean value (e.g. &#96;1&#96;, &#96;"true"&#96;) silently disables transaction capture instead of erroring or coercing — no test exercises this non-boolean-truthy path today. | OBSERVATION | offen | offen |
 <!-- audit:decision-table:end -->
 
 ### Freigabestatus
@@ -584,6 +669,18 @@ Noch keine strukturierten Findings.
 
 - Auftrag: Explizite Missingness bis in Transaktions-Breakdowns
 - Scope: `app/simulator/simulator-bond-refill.js`, `app/simulator/simulator-engine-direct.js`, `app/simulator/simulator-forced-sale.js`, `app/simulator/stress-replay-transactions.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-05-explizite-missingness-bis-in-transaktions-breakdowns.md`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-05-explizite-transaktions-missingness.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `tests/stress-replay-comparison.test.mjs`, `tests/stress-replay-transactions.test.mjs`
+
+- Implementierung bereit: `YES`
+- Validierung: `PASS`
+- Claude-Freigabe: `YES`
+- Antigravity-Freigabe: `YES`
+- Red-State-Folgeslice: `NONE`
+- Commit autorisiert: `YES`
+
+#### Work Unit 07 – Slice 06
+
+- Auftrag: Runner-Capture-Paritaet im echten Stressverkauf
+- Scope: `app/simulator/simulator-engine-direct.js`, `app/simulator/stress-replay-runner.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-06-runner-capture-paritaet-im-echten-stressverkauf.md`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-06-runner-capture-paritaet-im-stressverkauf.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `tests/stress-replay-runner.test.mjs`, `tests/stress-replay-transactions.test.mjs`
 
 - Implementierung bereit: `YES`
 - Validierung: `PASS`

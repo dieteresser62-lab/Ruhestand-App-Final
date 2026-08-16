@@ -235,6 +235,7 @@ export function runStressReplayPathV1({
     sourceScenarioLog,
     variant = null,
     engine = null,
+    captureTransactions = true,
     dependencies = {}
 }) {
     const validatedPath = validateStressReplayPathV1(path);
@@ -342,7 +343,7 @@ export function runStressReplayPathV1({
         });
         const adjustedInputs = {
             ...inputs,
-            [STRESS_REPLAY_TRANSACTION_CAPTURE_INPUT]: true,
+            [STRESS_REPLAY_TRANSACTION_CAPTURE_INPUT]: captureTransactions === true,
             rentAdjPct: computeRentAdjRate(inputs, yearData),
             transitionYear: household.effectiveTransitionYear ?? inputs.transitionYear ?? 0,
             capeRatio: record.capeRatio,
