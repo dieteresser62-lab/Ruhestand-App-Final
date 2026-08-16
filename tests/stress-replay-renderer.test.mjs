@@ -58,13 +58,28 @@ const alternativeEntry = {
     summary: { ...baselineEntry.summary, finalValueNominalEur: 110000 }
 };
 
-function deltas() {
-    return Object.fromEntries(Object.keys(baselineEntry.summary).map(field => [field, {
-        baselineValue: baselineEntry.summary[field],
-        variantValue: alternativeEntry.summary[field],
-        absoluteDelta: Number.isFinite(baselineEntry.summary[field])
-            && Number.isFinite(alternativeEntry.summary[field])
-            ? alternativeEntry.summary[field] - baselineEntry.summary[field]
+const KPI_UNITS = {
+    finalValueNominalEur: 'nominal_eur',
+    finalValueRealEur: 'real_eur',
+    maximumDrawdownNominalPct: 'percentage_points',
+    maximumDrawdownRealPct: 'percentage_points',
+    totalWithdrawalsEur: 'nominal_eur',
+    totalFlexFulfilledEur: 'nominal_eur',
+    totalMinimumFlexShortfallEur: 'nominal_eur',
+    totalTaxesEur: 'nominal_eur',
+    totalHealthBucketUsedEur: 'nominal_eur',
+    financiallyEvaluatedYears: 'years',
+    ruinYear: 'zero_based_year_index'
+};
+
+function deltas(baseline = baselineEntry, alternative = alternativeEntry) {
+    return Object.fromEntries(Object.keys(baseline.summary).map(field => [field, {
+        unit: KPI_UNITS[field],
+        baselineValue: baseline.summary[field],
+        variantValue: alternative.summary[field],
+        absoluteDelta: Number.isFinite(baseline.summary[field])
+            && Number.isFinite(alternative.summary[field])
+            ? alternative.summary[field] - baseline.summary[field]
             : null,
         applicability: field === 'ruinYear' ? 'not_applicable_neither_ruined' : 'applicable'
     }]));
@@ -119,6 +134,47 @@ assert(/Jahrestabelle/.test(comparisonHtml) && /2001/.test(comparisonHtml), 'Ann
 assert(/keine Kausalitätsaussage/.test(comparisonHtml), 'First delta is not presented as causality');
 assert(/keine allgemeine Rangfolge/.test(comparisonHtml), 'Fixed-path results are not presented as general ranking');
 assertEqual((comparisonHtml.match(/stress-replay-table-scroll/g) || []).length, 2, 'Both wide tables use local scroll containers');
+
+const ruinBaseline = { ...baselineEntry, summary: { ...baselineEntry.summary, ruinYear: 3 } };
+const ruinAlternative = {
+    ...alternativeEntry,
+    summary: {
+        ...alternativeEntry.summary,
+        maximumDrawdownNominalPct: 12.5,
+        maximumDrawdownRealPct: 11,
+        financiallyEvaluatedYears: 2,
+        ruinYear: 5
+    }
+};
+const semanticDeltaHtml = renderStressReplayComparisonV1({
+    comparison: {
+        ...comparison,
+        variants: [ruinBaseline, ruinAlternative],
+        pairwise: [{ ...comparison.pairwise[0], kpiDeltas: deltas(ruinBaseline, ruinAlternative) }]
+    }
+});
+assert(/Jahr 4/.test(semanticDeltaHtml) && /Jahr 6/.test(semanticDeltaHtml),
+    'Absolute ruin years remain readable as one-based year values');
+assert(/Δ 2 Jahre/.test(semanticDeltaHtml) && !/Δ Jahr 3/.test(semanticDeltaHtml),
+    'Ruin-year deltas are rendered as elapsed years rather than absolute year labels');
+assert(/Δ 2,5 Prozentpunkte/.test(semanticDeltaHtml) && /Δ -1 Prozentpunkt/.test(semanticDeltaHtml),
+    'Drawdown deltas retain their sign and use an explicit percentage-point unit');
+assert(/Δ 1 Jahr/.test(semanticDeltaHtml), 'A singular year delta uses the singular unit');
+
+for (const [absoluteDelta, expected] of [[0, 'Δ 0 Jahre'], [-1, 'Δ -1 Jahr']]) {
+    const variant = { ...ruinAlternative, summary: { ...ruinAlternative.summary, ruinYear: 3 + absoluteDelta } };
+    const html = renderStressReplayComparisonV1({
+        comparison: {
+            ...comparison,
+            variants: [ruinBaseline, variant],
+            pairwise: [{ ...comparison.pairwise[0], kpiDeltas: deltas(ruinBaseline, variant) }]
+        }
+    });
+    assert(html.includes(expected), `Ruin-year delta ${absoluteDelta} has an unambiguous year-count label`);
+}
+const notApplicableRuinRow = comparisonHtml.match(/<tr><th scope="row">Jahr des Vermögensaufbrauchs<\/th>[\s\S]*?<\/tr>/)?.[0] || '';
+assert(/nicht anwendbar/.test(notApplicableRuinRow) && !/Δ 0 Jahre/.test(notApplicableRuinRow),
+    'Jointly absent ruin years remain not applicable instead of becoming a zero delta');
 
 const asymmetricDeathHtml = renderStressReplayComparisonV1({
     comparison,

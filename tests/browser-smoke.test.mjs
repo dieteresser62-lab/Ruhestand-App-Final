@@ -1008,6 +1008,57 @@ async function runSimulatorSmoke(browser, baseUrl) {
     assert(replayScrollStyle === 'auto',
         'Stress replay comparison tables contain horizontal overflow locally');
 
+    const replayKpiSemantics = await page.evaluate(async () => {
+        const { renderStressReplayComparisonV1 } = await import('./app/simulator/stress-replay-renderer.js');
+        const summary = {
+            maximumDrawdownNominalPct: 10,
+            ruinYear: 3
+        };
+        const comparison = {
+            overallStatus: 'complete',
+            variants: [
+                { variantId: 'baseline', label: 'Baseline', summary },
+                {
+                    variantId: 'alternative-1',
+                    label: 'Variante',
+                    summary: { ...summary, maximumDrawdownNominalPct: 12.5, ruinYear: 5 }
+                }
+            ],
+            pairwise: [{
+                variantId: 'alternative-1',
+                comparable: true,
+                factorMode: 'single_factor',
+                firstDeltaMarkers: [],
+                kpiDeltas: {
+                    maximumDrawdownNominalPct: {
+                        unit: 'percentage_points', absoluteDelta: 2.5, applicability: 'applicable'
+                    },
+                    ruinYear: {
+                        unit: 'zero_based_year_index', absoluteDelta: 2, applicability: 'applicable'
+                    }
+                }
+            }]
+        };
+        const target = document.getElementById('stressReplayComparison');
+        target.innerHTML = renderStressReplayComparisonV1({ comparison });
+        const rowText = label => [...target.querySelectorAll('tr')]
+            .find(row => row.querySelector('th[scope="row"]')?.textContent.trim() === label)
+            ?.textContent.replace(/\s+/g, ' ').trim();
+        return {
+            ruin: rowText('Jahr des Vermögensaufbrauchs'),
+            drawdown: rowText('Maximaler Drawdown nominal')
+        };
+    });
+    assert(replayKpiSemantics.ruin?.includes('Jahr 4')
+        && replayKpiSemantics.ruin.includes('Jahr 6')
+        && replayKpiSemantics.ruin.includes('Δ 2 Jahre')
+        && !replayKpiSemantics.ruin.includes('Δ Jahr 3'),
+    'Browser KPI row separates absolute ruin years from a year-count delta');
+    assert(replayKpiSemantics.drawdown?.includes('10 %')
+        && replayKpiSemantics.drawdown.includes('12,5 %')
+        && replayKpiSemantics.drawdown.includes('Δ 2,5 Prozentpunkte'),
+    'Browser KPI row maps absolute drawdown percent and delta percentage points semantically');
+
     await mcRuns.fill('100001');
     await mcRuns.dispatchEvent('input');
     await mcConfirmationRow.waitFor({ state: 'visible' });

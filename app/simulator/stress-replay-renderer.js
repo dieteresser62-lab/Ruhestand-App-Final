@@ -69,6 +69,25 @@ function formatKpi(field, value) {
     return formatNumber(value, 0);
 }
 
+function formatYearDelta(value) {
+    return `${formatNumber(value, 0)} ${Math.abs(value) === 1 ? 'Jahr' : 'Jahre'}`;
+}
+
+function formatKpiDelta(delta) {
+    if (!Number.isFinite(delta?.absoluteDelta)) {
+        return delta?.applicability === 'not_applicable_neither_ruined'
+            ? 'nicht anwendbar'
+            : 'Δ nicht beobachtet';
+    }
+    const value = delta.absoluteDelta;
+    if (delta.unit === 'nominal_eur' || delta.unit === 'real_eur') return `Δ ${formatCurrency(value)}`;
+    if (delta.unit === 'percentage_points') {
+        return `Δ ${formatNumber(value)} ${Math.abs(value) === 1 ? 'Prozentpunkt' : 'Prozentpunkte'}`;
+    }
+    if (delta.unit === 'years' || delta.unit === 'zero_based_year_index') return `Δ ${formatYearDelta(value)}`;
+    return `Δ ${formatNumber(value)}`;
+}
+
 function resultMap(results) {
     if (results instanceof Map) return results;
     return new Map((results || []).map(result => [result.variantId, result]));
@@ -116,9 +135,7 @@ function renderKpiTable(comparison) {
             const pair = comparison.pairwise.find(candidate => candidate.variantId === entry.variantId);
             if (!pair?.comparable) return '<td>Vergleich wegen technischem Fehler gesperrt</td>';
             const delta = pair.kpiDeltas?.[field];
-            const deltaText = Number.isFinite(delta?.absoluteDelta)
-                ? `Δ ${formatKpi(field, delta.absoluteDelta)}`
-                : delta?.applicability === 'not_applicable_neither_ruined' ? 'nicht anwendbar' : 'Δ nicht beobachtet';
+            const deltaText = formatKpiDelta(delta);
             return `<td>${formatKpi(field, entry.summary?.[field])}<small>${escapeHtml(deltaText)}</small></td>`;
         }).join('');
         return `<tr><th scope="row">${escapeHtml(KPI_LABELS[field])}</th><td>${formatKpi(field, baseline.summary?.[field])}</td>${cells}</tr>`;
