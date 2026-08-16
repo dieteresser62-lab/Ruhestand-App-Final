@@ -46,6 +46,12 @@ function diagnostic(transactionClass, overrides = {}) {
 
 console.log('Test 1: structured diagnostics isolate every supported transaction class');
 const classes = Object.values(STRESS_REPLAY_TRANSACTION_CLASSES);
+assertJsonEqual(classes, [
+    'liquidity_shortfall_forced_sale',
+    'payout_floor_fallback_sale',
+    'bond_refill_sale',
+    'policy_rebalancing_sale'
+], 'The transaction contract must expose only classes backed by real V1 producers');
 const events = buildStressReplayTransactionsForYear({
     yearIndex: 4,
     historicalYear: 2008,

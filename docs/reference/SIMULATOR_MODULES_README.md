@@ -259,26 +259,40 @@ fuer denselben absoluten Index identische Log- und Capture-Daten.
 
 - `stress-replay-contract.js` – Schemas, kanonische SHA-256-Fingerprints,
   Whitelist, Varianten-/Workspace-/Vergleichsvalidierung und Groessenlimits.
+  `maxSkimPctOfEq` gilt nur von 0 bis 50, `maxBearRefillPctOfEq` nur von 0 bis
+  70; nicht endliche und ausserhalb liegende Werte werden nicht geklemmt.
 - `stress-replay-path-materializer.js` – Quellidentitaet, ScenarioLog-Abgleich,
   vollstaendiger Markt-/Household-Pfad und unabhaengiger Post-Ruin-Shadow-Seed.
+  Vor dem ersten Shadow-Jahr ist der kanonische Marktstatus des Ruinjahres
+  genau einmal fortgeschrieben.
 - `stress-replay-runner.js` – RNG-freier Single-Path-Lauf mit unveraenderter
   Baseline oder validiertem Strategiepatch; Ruin, Tod, Horizont und technischer
-  Fehler bleiben getrennte Statuswerte.
+  Fehler bleiben getrennte Statuswerte. `ruin` und `all_dead` enden beide mit
+  einer expliziten Terminalzeile; `terminal_death` ist kein Finanzjahr.
 - `stress-replay-variant.js` – Baseline und maximal drei Alternativen. Erlaubt
   sind nur bestehende Strategieparameter; Asset-, Profil-, Tranchen- und
   Mindest-Flex-Werte bleiben fixiert.
 - `stress-replay-transactions.js` und `stress-replay-comparison.js` – additive
-  Transaktionsklassen, KPI-Deltas und erste Delta-Marker. Mehr-Faktor-Varianten
-  werden sichtbar benannt; ein allgemeines Finanzranking ist ausgeschlossen.
+  Transaktionsklassen mit belegten Simulator-Producern, explizite Missingness
+  fuer unbekannte Event- und Breakdown-Werte, KPI-Deltas und erste
+  Delta-Marker. Mehr-Faktor-Varianten werden sichtbar benannt; ein allgemeines
+  Finanzranking und eine Asset-Allokations-Gegenfaktik sind ausgeschlossen.
 - `stress-replay-persistence.js` und `stress-replay-export.js` – genau ein
-  lokaler Workspace, bestaetigtes Ersetzen/Verwerfen, versionierter JSON-
-  Roundtrip und Nur-Lesen-Modus bei Kompatibilitaetsabweichung. Der aktive Key
-  `sim.stressReplay.active.v1` wird nicht in allgemeine Snapshots aufgenommen.
+  lokal transaktional gespeicherter Workspace mit Readback/Rollbackvertrag,
+  bestaetigtes Ersetzen/Verwerfen, versionierter JSON-Roundtrip und Nur-Lesen-
+  Modus bei Kompatibilitaetsabweichung. Die unabhaengig aus den originalen
+  ScenarioLog-Zeilen gebildete Herkunftsidentitaet bleibt bei Reload und Import
+  erhalten. Der aktive Key `sim.stressReplay.active.v1` wird nicht in
+  allgemeine Snapshots aufgenommen.
 
 **UI-Module:** `stress-replay-ui.js` steuert Sitzung, Fixieren, Varianten und
 Import/Export; `stress-replay-renderer.js` rendert Patchvorschau, KPIs,
 Delta-Timeline und Jahrestabelle. Statuscopy, Fokus und Live-Regionen machen
-deutlich, dass alle Aussagen nur fuer den fixierten Pfad gelten.
+deutlich, dass alle Aussagen nur fuer den fixierten Pfad gelten. Ein
+controllerweiter Busy-Zustand sperrt Fixieren, Variantenmutationen,
+Neuberechnung, Import, Export und Verwerfen gegen Parallelaufrufe. KPI-Deltas
+verwenden eigene Einheiten fuer Jahre und Prozentpunkte statt der Formatter
+der absoluten KPI-Werte.
 
 **Performancevertrag:** Der End-to-End-Test misst Baseline plus eine
 Alternative auf einem materialisierten 60-Jahres-Pfad. Die eingecheckte

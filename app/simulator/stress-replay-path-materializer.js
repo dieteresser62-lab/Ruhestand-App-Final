@@ -177,4 +177,3 @@ export function materializeStressReplayPathV1({
     };
     return validateStressReplayPathV1(path);
 }
-

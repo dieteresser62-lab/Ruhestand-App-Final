@@ -7,8 +7,7 @@ export const STRESS_REPLAY_TRANSACTION_CLASSES = Object.freeze({
     LIQUIDITY_SHORTFALL_FORCED_SALE: 'liquidity_shortfall_forced_sale',
     PAYOUT_FLOOR_FALLBACK_SALE: 'payout_floor_fallback_sale',
     BOND_REFILL_SALE: 'bond_refill_sale',
-    POLICY_REBALANCING_SALE: 'policy_rebalancing_sale',
-    ASSET_ALLOCATION_INITIAL_TRANSFORM: 'asset_allocation_initial_transform'
+    POLICY_REBALANCING_SALE: 'policy_rebalancing_sale'
 });
 
 const SUPPORTED_CLASSES = new Set(Object.values(STRESS_REPLAY_TRANSACTION_CLASSES));

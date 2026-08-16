@@ -163,6 +163,19 @@ Noch kein strukturiertes Reviewereignis.
 - Größtes Restrisiko: largest residual risk: silent generic-number fallback for an unrecognized &#96;delta.unit&#96; decouples the renderer from the upstream contract without a fail-loud guard or covering test
 - Realistische Bruchbedingung: break condition: a new or renamed KPI field is wired into &#96;kpiDeltas&#96; with a unit value outside {nominal_eur, real_eur, percentage_points, years, zero_based_year_index}, causing its delta to silently render as an unlabeled bare number, undetected because the fallback branch has no test coverage
 - Eigene Findings: `C-01`
+
+#### Work Unit 12 – Slice 11
+
+- Auftrag: Abschlussbereinigung, Dokumentationssync und Gesamtgates
+- Scope: `README.md`, `app/simulator/stress-replay-path-materializer.js`, `app/simulator/stress-replay-transactions.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-11-abschlussbereinigung-dokumentationssync-und-gesamtgates.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `docs/reference/SIMULATOR_MODULES_README.md`, `docs/reference/TECHNICAL.md`, `tests/README.md`, `tests/stress-replay-transactions.test.mjs`
+
+### Ereignis 2: Runde 1
+
+- Reviewer: `claude`
+- Freigabe: `YES`
+- Validierungsbindung: `validation-4fa62ea67746`
+- Testdateien: `tests/README.md`, `tests/stress-replay-transactions.test.mjs`
+- Eigene Findings: `C-01`
 <!-- audit:claude-review:end -->
 
 ### Review-Feedback von Antigravity
@@ -334,6 +347,22 @@ Noch kein strukturiertes Reviewereignis.
 - Größtes Restrisiko: Future KPI additions or unit renamings in stress-replay-comparison.js could cause delta formatting to drop into the generic numeric fallback without explicit unit labels if formatKpiDelta is not updated concurrently
 - Realistische Bruchbedingung: A new metric with a novel unit identifier (such as ratio or count_months) is added to STRESS_REPLAY_COMPARISON_KPIS_V1 without extending formatKpiDelta, resulting in bare unlabeled delta numbers in the comparison table
 - Eigene Findings: keine
+
+#### Work Unit 12 – Slice 11
+
+- Auftrag: Abschlussbereinigung, Dokumentationssync und Gesamtgates
+- Scope: `README.md`, `app/simulator/stress-replay-path-materializer.js`, `app/simulator/stress-replay-transactions.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-11-abschlussbereinigung-dokumentationssync-und-gesamtgates.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `docs/reference/SIMULATOR_MODULES_README.md`, `docs/reference/TECHNICAL.md`, `tests/README.md`, `tests/stress-replay-transactions.test.mjs`
+
+### Ereignis 3: Runde 1
+
+- Reviewer: `antigravity`
+- Freigabe: `YES`
+- Validierungsbindung: `validation-4fa62ea67746`
+- Testdateien: `tests/README.md`, `tests/stress-replay-transactions.test.mjs`
+- Prüfdimensionen: contract cleanliness and dead enum pruning, downstream consumer compatibility, fail-closed transaction validation, documentation synchronicity across product/architecture/module/test references, test assertion completeness, and immutability invariants
+- Größtes Restrisiko: future simulator engine extensions introducing a novel transaction diagnostic class without updating STRESS_REPLAY_TRANSACTION_CLASSES, leading to a fail-closed TypeError in buildStressReplayTransactionsForYear
+- Realistische Bruchbedingung: a future commit introduces a new transaction diagnostic (e.g. 'gold_rebalancing_sale' or 'pension_payout_fallback') into stressReplayTransactionDiagnostics without adding the identifier to STRESS_REPLAY_TRANSACTION_CLASSES, causing buildStressReplayTransactionsForYear to throw 'Unsupported stress replay transaction class' on opt-in replay runs
+- Eigene Findings: keine
 <!-- audit:antigravity-review:end -->
 
 ### Review-Antworten von Codex
@@ -413,6 +442,13 @@ Noch keine strukturierten Codex-Antworten.
 
 - Auftrag: Eindeutige KPI-Deltadarstellung
 - Scope: `app/simulator/stress-replay-renderer.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-10-eindeutige-kpi-deltadarstellung.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `tests/browser-smoke.test.mjs`, `tests/stress-replay-renderer.test.mjs`
+
+Noch keine strukturierten Codex-Antworten.
+
+#### Work Unit 12 – Slice 11
+
+- Auftrag: Abschlussbereinigung, Dokumentationssync und Gesamtgates
+- Scope: `README.md`, `app/simulator/stress-replay-path-materializer.js`, `app/simulator/stress-replay-transactions.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-11-abschlussbereinigung-dokumentationssync-und-gesamtgates.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `docs/reference/SIMULATOR_MODULES_README.md`, `docs/reference/TECHNICAL.md`, `tests/README.md`, `tests/stress-replay-transactions.test.mjs`
 
 Noch keine strukturierten Codex-Antworten.
 <!-- audit:codex-responses:end -->
@@ -596,6 +632,23 @@ Noch keine strukturierte Validierungsattestierung.
 | Matrixbefehl | Status | Exitcode | Kompaktausgabe |
 |---|---|---:|---|
 | shell: npm test | PASS | 0 | &gt; ruhestand-app-final@1.0.0 test<br>&gt; node tests/run-tests.mjs<br><br>🚀 Starting Test Runner...<br>Found 180 test files.<br><br>📂 Running 3bucket-config.test.mjs in process...<br>--- 3-Bucket Config Tests ---<br>✅ 3-Bucket config tests passed<br>✅ 3bucket-config.test.mjs completed.<br>📊 FILE RESULT: 3bucket-config.test.mjs &#124; mode=in-process &#124; assertions=17 &#124; passed=17 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running 3bucket-refill.test.mjs in process...<br>--- 3-Bucket Refill Tests ---<br>✅ 3-Bucket refill tests passed<br>✅ 3bucket-refill.test.mjs completed.<br>📊 FILE RESULT: 3bucket-refill.test.mjs &#124; mode=in-process &#124; assertions=32 &#124; passed=32 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running architecture-evidence.test.mjs in process...<br>--- Architecture Evidence Contract Tests ---<br>✅ Architecture evidence contract tests passed<br>✅ architecture-evidence.test.mjs completed.<br>📊 FILE RESULT: architecture-evidence.test.mjs &#124; mode=in-process &#124; assertions=24 &#124; passed=24 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running auto-optimize-fidelity<br>...[183390 characters omitted]...<br>ete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-storage.js:537:28)<br>    at initProfileSubpageLifecycle (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-navigation.js:157:5)<br>    at initProfileBridge (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-bridge.js:8:5)<br>    at async Promise.all (index 0)<br>    at async MockDocument.dispatch (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:80:9)<br>    at async runProfileUiContractTests (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:244:9)<br>    at async file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:257:9<br>[VALIDATION ERROR] Invalid input fields: [<br>  {<br>    fieldId: 'goGoMultiplier',<br>    message: 'goGoMultiplier muss zwischen 1.0 und 1.5 liegen.'<br>  }<br>] |
+
+#### Work Unit 12 – Slice 11
+
+- Auftrag: Abschlussbereinigung, Dokumentationssync und Gesamtgates
+- Scope: `README.md`, `app/simulator/stress-replay-path-materializer.js`, `app/simulator/stress-replay-transactions.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-11-abschlussbereinigung-dokumentationssync-und-gesamtgates.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `docs/reference/SIMULATOR_MODULES_README.md`, `docs/reference/TECHNICAL.md`, `tests/README.md`, `tests/stress-replay-transactions.test.mjs`
+
+### Ereignis 1: `validation-4fa62ea67746`
+
+- Diff-Fingerprint: `4fa62ea67746b126a60c4d0a1a80c99ac58b9ed71d6740e755742790856421bc`
+- Status: `PASS`
+- Vollständig: `YES`
+- Kurzresultat: 1 passed; 0 failed; 0 unavailable; 1 required
+- Ausgabedigest: `ffe3a1e29d2569cef915822b486c60fa74cf5a166736ce5cd164e83495073d3c`
+
+| Matrixbefehl | Status | Exitcode | Kompaktausgabe |
+|---|---|---:|---|
+| shell: npm test | PASS | 0 | &gt; ruhestand-app-final@1.0.0 test<br>&gt; node tests/run-tests.mjs<br><br>🚀 Starting Test Runner...<br>Found 180 test files.<br><br>📂 Running 3bucket-config.test.mjs in process...<br>--- 3-Bucket Config Tests ---<br>✅ 3-Bucket config tests passed<br>✅ 3bucket-config.test.mjs completed.<br>📊 FILE RESULT: 3bucket-config.test.mjs &#124; mode=in-process &#124; assertions=17 &#124; passed=17 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running 3bucket-refill.test.mjs in process...<br>--- 3-Bucket Refill Tests ---<br>✅ 3-Bucket refill tests passed<br>✅ 3bucket-refill.test.mjs completed.<br>📊 FILE RESULT: 3bucket-refill.test.mjs &#124; mode=in-process &#124; assertions=32 &#124; passed=32 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running architecture-evidence.test.mjs in process...<br>--- Architecture Evidence Contract Tests ---<br>✅ Architecture evidence contract tests passed<br>✅ architecture-evidence.test.mjs completed.<br>📊 FILE RESULT: architecture-evidence.test.mjs &#124; mode=in-process &#124; assertions=24 &#124; passed=24 &#124; failedAssertions=0 &#124; failedFiles=0<br><br>📂 Running auto-optimize-fidelity<br>...[183391 characters omitted]...<br>ete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-storage.js:537:28)<br>    at initProfileSubpageLifecycle (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-navigation.js:157:5)<br>    at initProfileBridge (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/profile/profile-bridge.js:8:5)<br>    at async Promise.all (index 0)<br>    at async MockDocument.dispatch (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:80:9)<br>    at async runProfileUiContractTests (file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:244:9)<br>    at async file:///mnt/c/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/tests/profile-ui-contract.test.mjs:257:9<br>[VALIDATION ERROR] Invalid input fields: [<br>  {<br>    fieldId: 'goGoMultiplier',<br>    message: 'goGoMultiplier muss zwischen 1.0 und 1.5 liegen.'<br>  }<br>] |
 <!-- audit:validation-attestation:end -->
 
 ### Testfreigabe und Pre-Mortem
@@ -708,6 +761,16 @@ Noch keine strukturierte Validierungsattestierung.
 - Pre-Mortems:
   - Ereignis 2: In three months, the most likely failure is a new engine/report KPI being wired into &#96;kpiDeltas&#96; with a &#96;unit&#96; value that doesn't match one of the four handled branches in &#96;formatKpiDelta&#96; (typo, renamed contract constant, or a currency subfield using a differently-spelled unit token), so its delta silently falls through to the generic &#96;formatNumber&#96; branch, producing an ambiguous unlabeled number in the KPI comparison table that could be misread as unitless or as a percentage — with no test failure to surface it, since the fallback path is currently untested.
   - Ereignis 3: In three months, the most likely failure cause is an engine or reporting extension that introduces an additional summary KPI with a unit type outside the existing four unit categories (e.g., ratio or count_months); because formatKpiDelta falls back gracefully to Δ ${formatNumber(value)} rather than failing loudly or emitting a diagnostic in development mode, the new metric would render in the comparison table without unit descriptors or singular/plural localization, remaining unnoticed until visual inspection in production.
+
+#### Work Unit 12 – Slice 11
+
+- Auftrag: Abschlussbereinigung, Dokumentationssync und Gesamtgates
+- Scope: `README.md`, `app/simulator/stress-replay-path-materializer.js`, `app/simulator/stress-replay-transactions.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-11-abschlussbereinigung-dokumentationssync-und-gesamtgates.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `docs/reference/SIMULATOR_MODULES_README.md`, `docs/reference/TECHNICAL.md`, `tests/README.md`, `tests/stress-replay-transactions.test.mjs`
+
+- Teständerungsfreigabe: nicht erfasst.
+- Pre-Mortems:
+  - Ereignis 2: In three months, the most likely failure cause is a future slice or hotfix reintroducing a transaction-class reference (e.g. via a copy-pasted producer stub or a renamed asset-allocation feature) that targets the now-removed &#96;ASSET_ALLOCATION_INITIAL_TRANSFORM&#96; string without noticing the enum was pruned, causing a silent &#96;undefined&#96;-class entry to pass through comparison/rendering paths undetected because no consumer-side test enumerates or fail-closes on unknown classes.
+  - Ereignis 3: In three months, the most likely failure cause is an engine or decumulation extension introducing a new transaction event type in the core simulator without concurrently updating the frozen STRESS_REPLAY_TRANSACTION_CLASSES enum in stress-replay-transactions.js, causing opt-in replay path materialization to fail closed with an unsupported class error.
 <!-- audit:test-approval-premortem:end -->
 
 ### Findings-Lebenszyklus
@@ -843,6 +906,19 @@ Noch keine strukturierten Findings.
 - Finding: formatKpiDelta dispatches purely on the contract-supplied &#96;delta.unit&#96; string with no validation and a silent generic-number fallback (&#96;Δ ${formatNumber(value)}&#96;) for any unrecognized or missing unit, decoupling delta formatting from the field-name-based dispatch that &#96;formatKpi&#96; still uses for absolute values. If a future KPI field is added to &#96;kpiDeltas&#96; without a correctly-produced &#96;unit&#96; (or with a typo'd unit string, e.g. from a change in stress-replay-comparison.js), its delta would silently render as a bare, unlabeled number instead of failing loudly or clearly indicating a mapping gap. Additionally, no test in tests/stress-replay-renderer.test.mjs exercises this unknown-unit fallback branch, and only the &#96;zero_based_year_index&#96; unit (ruinYear) is explicitly asserted in rendered text — the sibling &#96;years&#96; unit (e.g. &#96;financiallyEvaluatedYears&#96;) is exercised in the semantic-delta HTML fixture but never independently asserted, so a regression isolated to that branch (distinct from &#96;zero_based_year_index&#96;) would not be caught.
 - Akzeptanztest: Add a unit test in tests/stress-replay-renderer.test.mjs that (a) renders a kpiDelta with an unrecognized/missing &#96;unit&#96; value and asserts the output is a clearly-flagged fallback rather than a plausible bare number, and (b) asserts the rendered text for a &#96;years&#96;-unit field (e.g. &#96;financiallyEvaluatedYears&#96;) explicitly, mirroring the existing &#96;zero_based_year_index&#96; assertions.
 - Statusbegründung: –
+
+#### Work Unit 12 – Slice 11
+
+- Auftrag: Abschlussbereinigung, Dokumentationssync und Gesamtgates
+- Scope: `README.md`, `app/simulator/stress-replay-path-materializer.js`, `app/simulator/stress-replay-transactions.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-11-abschlussbereinigung-dokumentationssync-und-gesamtgates.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `docs/reference/SIMULATOR_MODULES_README.md`, `docs/reference/TECHNICAL.md`, `tests/README.md`, `tests/stress-replay-transactions.test.mjs`
+
+### `C-01` — `OPEN`
+
+- Quelle: `claude`; Runde 1
+- Klasse: `OBSERVATION`
+- Finding: Removing &#96;ASSET_ALLOCATION_INITIAL_TRANSFORM&#96; from the frozen, exported &#96;STRESS_REPLAY_TRANSACTION_CLASSES&#96; map narrows the contract's supported-class set, but this slice's file scope excludes every downstream consumer (&#96;stress-replay-comparison.js&#96;, &#96;stress-replay-runner.js&#96;, &#96;stress-replay-renderer.js&#96;, and their test files). Because property access on a frozen object silently yields &#96;undefined&#96; rather than throwing, any stray reference to the removed identifier or its string literal in a downstream module would degrade to a silent unmatched/undefined-class path instead of a loud failure, and no test in the current diff proves the identifier is unreferenced outside &#96;stress-replay-transactions.js&#96;.
+- Akzeptanztest: A repository-wide search confirms zero remaining references to &#96;ASSET_ALLOCATION_INITIAL_TRANSFORM&#96; or the literal &#96;'asset_allocation_initial_transform'&#96; outside &#96;stress-replay-transactions.js&#96; and its test, and a consumer-side test (e.g. in &#96;stress-replay-comparison.test.mjs&#96; or &#96;stress-replay-renderer.test.mjs&#96;) asserts that an unrecognized/removed transaction class is rejected fail-closed rather than silently coerced to &#96;undefined&#96;.
+- Statusbegründung: –
 <!-- audit:findings:end -->
 
 ### Entscheidungstabelle
@@ -946,6 +1022,15 @@ Noch keine strukturierten Findings.
 | ID | Quelle | Finding | Klasse | Entscheidung | Umsetzung |
 |---|---|---|---|---|---|
 | C-01 | claude | formatKpiDelta dispatches purely on the contract-supplied &#96;delta.unit&#96; string with no validation and a silent generic-number fallback (&#96;Δ ${formatNumber(value)}&#96;) for any unrecognized or missing unit, decoupling delta formatting from the field-name-based dispatch that &#96;formatKpi&#96; still uses for absolute values. If a future KPI field is added to &#96;kpiDeltas&#96; without a correctly-produced &#96;unit&#96; (or with a typo'd unit string, e.g. from a change in stress-replay-comparison.js), its delta would silently render as a bare, unlabeled number instead of failing loudly or clearly indicating a mapping gap. Additionally, no test in tests/stress-replay-renderer.test.mjs exercises this unknown-unit fallback branch, and only the &#96;zero_based_year_index&#96; unit (ruinYear) is explicitly asserted in rendered text — the sibling &#96;years&#96; unit (e.g. &#96;financiallyEvaluatedYears&#96;) is exercised in the semantic-delta HTML fixture but never independently asserted, so a regression isolated to that branch (distinct from &#96;zero_based_year_index&#96;) would not be caught. | OBSERVATION | offen | offen |
+
+#### Work Unit 12 – Slice 11
+
+- Auftrag: Abschlussbereinigung, Dokumentationssync und Gesamtgates
+- Scope: `README.md`, `app/simulator/stress-replay-path-materializer.js`, `app/simulator/stress-replay-transactions.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-11-abschlussbereinigung-dokumentationssync-und-gesamtgates.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `docs/reference/SIMULATOR_MODULES_README.md`, `docs/reference/TECHNICAL.md`, `tests/README.md`, `tests/stress-replay-transactions.test.mjs`
+
+| ID | Quelle | Finding | Klasse | Entscheidung | Umsetzung |
+|---|---|---|---|---|---|
+| C-01 | claude | Removing &#96;ASSET_ALLOCATION_INITIAL_TRANSFORM&#96; from the frozen, exported &#96;STRESS_REPLAY_TRANSACTION_CLASSES&#96; map narrows the contract's supported-class set, but this slice's file scope excludes every downstream consumer (&#96;stress-replay-comparison.js&#96;, &#96;stress-replay-runner.js&#96;, &#96;stress-replay-renderer.js&#96;, and their test files). Because property access on a frozen object silently yields &#96;undefined&#96; rather than throwing, any stray reference to the removed identifier or its string literal in a downstream module would degrade to a silent unmatched/undefined-class path instead of a loud failure, and no test in the current diff proves the identifier is unreferenced outside &#96;stress-replay-transactions.js&#96;. | OBSERVATION | offen | offen |
 <!-- audit:decision-table:end -->
 
 ### Freigabestatus
@@ -1075,6 +1160,18 @@ Noch keine strukturierten Findings.
 
 - Auftrag: Eindeutige KPI-Deltadarstellung
 - Scope: `app/simulator/stress-replay-renderer.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-10-eindeutige-kpi-deltadarstellung.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `tests/browser-smoke.test.mjs`, `tests/stress-replay-renderer.test.mjs`
+
+- Implementierung bereit: `YES`
+- Validierung: `PASS`
+- Claude-Freigabe: `YES`
+- Antigravity-Freigabe: `YES`
+- Red-State-Folgeslice: `NONE`
+- Commit autorisiert: `YES`
+
+#### Work Unit 12 – Slice 11
+
+- Auftrag: Abschlussbereinigung, Dokumentationssync und Gesamtgates
+- Scope: `README.md`, `app/simulator/stress-replay-path-materializer.js`, `app/simulator/stress-replay-transactions.js`, `docs/internal/slice-stress-replay-korrektur-arbeitsplan-11-abschlussbereinigung-dokumentationssync-und-gesamtgates.md`, `docs/internal/stress-replay-korrekturen-implement-review-02a8cb20.md`, `docs/reference/SIMULATOR_MODULES_README.md`, `docs/reference/TECHNICAL.md`, `tests/README.md`, `tests/stress-replay-transactions.test.mjs`
 
 - Implementierung bereit: `YES`
 - Validierung: `PASS`
