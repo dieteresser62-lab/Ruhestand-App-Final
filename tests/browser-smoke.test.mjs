@@ -966,8 +966,18 @@ async function runSimulatorSmoke(browser, baseUrl) {
         'Stress replay banner must be programmatically focusable');
     assert(await page.locator('#stressReplayImportFile').getAttribute('accept') === 'application/json,.json',
         'Stress replay import must be constrained to JSON files');
-    assert(await page.locator('#stressReplayVariantFields').isDisabled(),
-        'Variant editor stays disabled until an executable fixed path exists');
+    const variantFieldsetState = await page.locator('#stressReplayVariantFields').evaluate(fieldset => ({
+        disabledProperty: fieldset.disabled === true,
+        hasDisabledAttribute: fieldset.hasAttribute('disabled')
+    }));
+    assert(variantFieldsetState.disabledProperty,
+        'Variant editor fieldset has its disabled DOM property until an executable fixed path exists');
+    assert(variantFieldsetState.hasDisabledAttribute,
+        'Variant editor fieldset keeps its disabled HTML attribute until an executable fixed path exists');
+    assert(await page.locator('#stressReplayVariantFields #stressReplayVariantLabel').isDisabled(),
+        'Variant editor contains an effectively disabled control until an executable fixed path exists');
+    assert((await page.locator('#stressReplayStatus').textContent()).includes('Starten Sie zuerst einen Monte-Carlo-Lauf.'),
+        'Empty stress replay status requests a Monte-Carlo run before scenario selection');
     assert(await page.locator('#stressReplayVariantLabel').getAttribute('maxlength') === '60',
         'Variant labels have a bounded keyboard-editable control');
     assert(await page.locator('#stressReplayAddVariantButton').count() === 1,
