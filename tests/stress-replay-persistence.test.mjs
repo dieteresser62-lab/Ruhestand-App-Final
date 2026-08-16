@@ -4,6 +4,7 @@ import {
     STRESS_REPLAY_SCOPE,
     STRESS_REPLAY_UNITS_V1,
     StressReplayContractError,
+    createStressReplayWorkspaceFingerprint,
     createStressReplayWorkspaceV1
 } from '../app/simulator/stress-replay-contract.js';
 import { buildStressReplayComparisonExportV1, serializeStressReplayComparisonExportV1 } from '../app/simulator/stress-replay-export.js';
@@ -76,6 +77,7 @@ function workspaceFixture(seed = 7, inputs = inputsFixture()) {
     const baseline = createStressReplayBaselineVariantV1({ baselineInputs: inputs });
     return createStressReplayWorkspaceV1({
         path: pathFixture(seed),
+        sourceScenarioLog: [{ recordType: 'financial_year', jahr: 1, histJahr: null }],
         baselineSnapshot: inputs,
         variants: [baseline],
         createdAtUtc: '2026-08-14T10:00:00.000Z'
@@ -340,6 +342,25 @@ console.log('Test 9: default facade path is transactional, verified and isolated
     } finally {
         resetPersistenceRuntimeForTests();
     }
+}
+
+console.log('Test 10: legacy V1 workspaces remain inspectable but never synthesize source evidence');
+{
+    const legacyWorkspace = structuredClone(workspaceFixture(31));
+    delete legacyWorkspace.sourceIdentity;
+    legacyWorkspace.workspaceFingerprint = createStressReplayWorkspaceFingerprint(legacyWorkspace);
+    const legacyBackend = createBackend(JSON.stringify(legacyWorkspace));
+    const legacyLoaded = loadStressReplayWorkspaceV1({
+        backend: legacyBackend.backend,
+        currentCompatibility: {
+            contractVersion: STRESS_REPLAY_CONTRACT_VERSION,
+            dataFingerprint: fingerprint('a'),
+            engineFingerprint: fingerprint('b')
+        }
+    });
+    assertEqual(legacyLoaded.status, 'read_only', 'Legacy workspace is available for inspection only');
+    assertEqual(legacyLoaded.compatibility.mismatchReasons.join(','), 'source_identity_unavailable',
+        'Legacy read-only reason is stable and does not derive evidence from the path');
 }
 
 console.log('Stress replay persistence tests passed.');

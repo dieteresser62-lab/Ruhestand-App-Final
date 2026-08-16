@@ -116,7 +116,8 @@ export function validateStressReplayComparisonExportV1(document) {
         || !Array.isArray(privacy.excludes)
         || !privacy.excludes.includes('local-filesystem-paths')
         || !privacy.excludes.includes('secrets-and-credentials')
-        || !privacy.excludes.includes('unrelated-storage-records')) {
+        || !privacy.excludes.includes('unrelated-storage-records')
+        || !privacy.excludes.includes('complete-source-scenario-logs')) {
         fail('STRESS_REPLAY_EXPORT_INVALID', 'Export privacy policy is incomplete');
     }
     assertStressReplayFinite(document, 'document');
@@ -154,7 +155,8 @@ export function buildStressReplayComparisonExportV1({
             excludes: [
                 'local-filesystem-paths',
                 'secrets-and-credentials',
-                'unrelated-storage-records'
+                'unrelated-storage-records',
+                'complete-source-scenario-logs'
             ]
         }
     };

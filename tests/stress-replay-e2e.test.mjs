@@ -165,6 +165,7 @@ assertEqual(first.financialRankingAllowed, false,
 
 const workspace = createStressReplayWorkspaceV1({
     path,
+    sourceScenarioLog: sourceMeta.logDataRows,
     baselineSnapshot: inputs,
     variants: [createStressReplayBaselineVariantV1({ baselineInputs: inputs }), alternative],
     createdAtUtc: '2026-08-15T10:00:00.000Z'
@@ -181,6 +182,17 @@ assertEqual(imported.workspace.workspaceFingerprint.value, workspace.workspaceFi
     'Export/import must retain the complete fixed workspace identity');
 assertEqual(imported.comparison.comparisonFingerprint.value, first.comparisonFingerprint.value,
     'Export/import must retain the deterministic comparison identity');
+assertEqual(imported.workspace.sourceIdentity.identityFingerprint.value,
+    workspace.sourceIdentity.identityFingerprint.value,
+    'Export/import must retain the independently captured source identity');
+const importedBaselineReplay = runStressReplayPathV1({
+    path: imported.workspace.path,
+    baselineInputs: imported.workspace.baselineSnapshot,
+    sourceIdentity: imported.workspace.sourceIdentity,
+    engine: EngineAPI
+});
+assertEqual(importedBaselineReplay.reconciliation.matched, true,
+    'Imported baseline must reconcile from persisted source identity without original logs');
 const maximumRelativeExportBytes = Math.ceil(
     baselineFixture.measurement.exportBytes * baselineFixture.budgets.maximumExportMultiplier
 );

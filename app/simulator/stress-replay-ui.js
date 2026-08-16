@@ -4,6 +4,7 @@ import {
     STRESS_REPLAY_CONTRACT_VERSION,
     STRESS_REPLAY_LIMITS,
     createStressReplayFingerprint,
+    createStressReplaySourceIdentityV1,
     createStressReplayStrategySnapshot,
     createStressReplayWorkspaceV1
 } from './stress-replay-contract.js';
@@ -98,23 +99,11 @@ function formatBaselineValue(value) {
     return String(value);
 }
 
-function deriveReplayIdentityRows(path) {
-    const prefixLength = path?.reconciliation?.sourcePrefixLength ?? path?.years?.length ?? 0;
-    return (path?.years || []).slice(0, prefixLength).map(record => ({
-        recordType: record.recordType,
-        jahr: record.yearIndex + 1,
-        histJahr: record.historicalYear
-    }));
-}
-
-function defaultRunComparison({ workspace, sourceScenarioLog = null }) {
-    const baselineSourceRows = Array.isArray(sourceScenarioLog)
-        ? sourceScenarioLog
-        : deriveReplayIdentityRows(workspace.path);
+function defaultRunComparison({ workspace }) {
     const results = workspace.variants.map(variant => runStressReplayPathV1({
         path: cloneValue(workspace.path),
         baselineInputs: cloneValue(workspace.baselineSnapshot),
-        sourceScenarioLog: variant.role === 'baseline' ? cloneValue(baselineSourceRows) : null,
+        sourceIdentity: variant.role === 'baseline' ? cloneValue(workspace.sourceIdentity) : null,
         variant
     }));
     return { comparison: buildStressReplayComparisonV1({ variants: workspace.variants, results }), results };
@@ -211,6 +200,7 @@ export function createStressReplayController({
     materializePath = materializeStressReplayPathV1,
     runBaseline = runStressReplayBaselineV1,
     createBaselineVariant = createStressReplayBaselineVariantV1,
+    createSourceIdentity = createStressReplaySourceIdentityV1,
     createVariant = createStressReplayVariantV1,
     previewVariantPatch = previewStressReplayVariantPatchV1,
     createWorkspace = createStressReplayWorkspaceV1,
@@ -365,6 +355,7 @@ export function createStressReplayController({
         try {
             const computed = runComparison({
                 workspace: workspaceState.workspace,
+                sourceIdentity: workspaceState.workspace.sourceIdentity,
                 sourceScenarioLog
             });
             comparison = computed.comparison;
@@ -397,6 +388,7 @@ export function createStressReplayController({
         ].filter(Boolean);
         const workspace = createWorkspace({
             path: current.path,
+            sourceIdentity: current.sourceIdentity,
             baselineSnapshot: current.baselineSnapshot,
             variants: orderedVariants,
             createdAtUtc: current.createdAtUtc,
@@ -559,8 +551,13 @@ export function createStressReplayController({
                     code: 'STRESS_REPLAY_BASELINE_RECONCILIATION_FAILED'
                 });
             }
+            const sourceIdentityContract = createSourceIdentity({
+                path,
+                sourceRows
+            });
             const workspace = createWorkspace({
                 path,
+                sourceIdentity: sourceIdentityContract,
                 baselineSnapshot: runContext.inputs,
                 variants: [baselineVariant]
             });

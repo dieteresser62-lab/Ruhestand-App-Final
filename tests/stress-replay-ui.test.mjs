@@ -67,6 +67,11 @@ function pathFixture() {
 function workspaceFixture() {
     return {
         path: pathFixture(),
+        sourceIdentity: {
+            schemaVersion: 'StressReplaySourceIdentityV1',
+            identityFingerprint: fingerprint('e'),
+            rows: [{ recordType: 'financial_year', jahr: 1, histJahr: 2001 }]
+        },
         baselineScenarioFingerprint: fingerprint('b'),
         baselineSnapshot: {},
         variants: [{ id: 'baseline', role: 'baseline', label: 'Baseline' }],
@@ -91,7 +96,7 @@ function scenarioFixture() {
 function controllerFixture(overrides = {}) {
     const documentRef = createDocument();
     const workspace = workspaceFixture();
-    const calls = { saves: 0, discards: 0, imports: 0, downloads: 0 };
+    const calls = { saves: 0, discards: 0, imports: 0, downloads: 0, sourceIdentities: [], workspaceInputs: [] };
     const compatibility = {
         status: 'executable', executable: true, readOnly: false, mismatchReasons: [],
         dataFingerprint: fingerprint('c'), engineFingerprint: fingerprint('d')
@@ -108,7 +113,12 @@ function controllerFixture(overrides = {}) {
         materializePath: () => workspace.path,
         runBaseline: () => ({ reconciliation: { matched: true }, technicalError: null }),
         createBaselineVariant: () => ({ id: 'baseline', role: 'baseline' }),
-        createWorkspace: () => workspace,
+        createSourceIdentity: ({ sourceRows }) => ({ ...workspace.sourceIdentity, rows: structuredClone(sourceRows) }),
+        createWorkspace: input => { calls.workspaceInputs.push(input); return workspace; },
+        runComparison: ({ sourceIdentity }) => {
+            calls.sourceIdentities.push(sourceIdentity);
+            return { comparison: null, results: [] };
+        },
         saveWorkspace: async () => { calls.saves += 1; },
         discardWorkspace: async () => { calls.discards += 1; },
         replaceFromImport: async () => { calls.imports += 1; return { workspace, compatibility }; },
@@ -171,6 +181,8 @@ console.log('Test 3: a reconciled source is fixed without mutating its baseline 
     const fixed = await controller.fixSelectedScenario();
     assertEqual(fixed, workspace, 'Reconciled workspace is returned');
     assertEqual(calls.saves, 1, 'Reconciled workspace is persisted once');
+    assertEqual(calls.workspaceInputs[0].sourceIdentity.rows[0].recordType, 'financial_year',
+        'Fixation persists identity projected from original scenario rows');
     assertEqual(JSON.stringify(baselineInputs), before, 'Fixation does not mutate source inputs');
     assertEqual(documentRef.getElementById('stressReplayBanner').hidden, false, 'Fixed workspace shows its banner');
     assertEqual(documentRef.getElementById('stressReplayBanner').focused, true, 'Focus moves to the new banner');
@@ -215,10 +227,14 @@ console.log('Test 6: reload, export, import and explicit discard retain session 
         loadWorkspace: () => ({ status: 'executable', workspace, compatibility, error: null })
     });
     controller.initialize();
+    assertEqual(calls.sourceIdentities[0], workspace.sourceIdentity,
+        'Reload comparison receives the persisted source identity');
     assert(/wurde geladen/.test(documentRef.getElementById('stressReplayStatus').textContent), 'Reload status is visible');
     assertEqual(controller.exportActiveWorkspace(), '{"exported":true}', 'Export returns serialized workspace');
     assertEqual(calls.downloads, 1, 'Export starts one download');
     assert(await controller.importSerialized('{"import":true}'), 'Confirmed import replaces the session');
+    assertEqual(JSON.stringify(calls.sourceIdentities.at(-1)), JSON.stringify(workspace.sourceIdentity),
+        'Compatible import comparison receives the persisted source identity');
     assertEqual(await controller.discardActiveWorkspace(), true, 'Confirmed discard succeeds');
     assertEqual(calls.discards, 1, 'Discard invokes persistence once');
     assertEqual(controller.getState().status, 'empty', 'Discard clears in-memory state');

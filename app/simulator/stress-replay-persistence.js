@@ -85,6 +85,9 @@ function parseWorkspace(serialized) {
 export function classifyStressReplayWorkspaceCompatibility(workspace, current = {}) {
     const validated = validateStressReplayWorkspaceV1(workspace);
     const mismatchReasons = [];
+    if (!validated.sourceIdentity) {
+        mismatchReasons.push('source_identity_unavailable');
+    }
     if (current.contractVersion !== undefined && current.contractVersion !== STRESS_REPLAY_CONTRACT_VERSION) {
         mismatchReasons.push('contract_version_mismatch');
     }

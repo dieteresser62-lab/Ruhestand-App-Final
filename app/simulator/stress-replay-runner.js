@@ -5,7 +5,9 @@ import {
     StressReplayContractError,
     createStressReplayFingerprint,
     createStressReplayPathFingerprint,
+    createStressReplaySourceIdentityRowFingerprint,
     validateStressReplayPathV1,
+    validateStressReplaySourceIdentityV1,
     validateStressReplayVariantResultV1
 } from './stress-replay-contract.js';
 import {
@@ -63,7 +65,10 @@ function portfolioTotal(portfolio = {}) {
     }) + (Number(portfolio.liquiditaet) || 0) + (Number(portfolio.healthBucketGeldmarkt) || 0);
 }
 
-function normalizeSourceRows(sourceScenarioLog) {
+function normalizeSourceRows(sourceScenarioLog, sourceIdentity, path) {
+    if (sourceIdentity !== undefined && sourceIdentity !== null) {
+        return validateStressReplaySourceIdentityV1(sourceIdentity, path).rows;
+    }
     const rows = Array.isArray(sourceScenarioLog)
         ? sourceScenarioLog
         : sourceScenarioLog?.records;
@@ -113,6 +118,18 @@ function reconcileRows(generatedRows, sourceRows, path) {
     for (let index = 0; index < prefixLength; index++) {
         const actual = generatedRows[index];
         const expected = sourceRows[index];
+        if (expected?.reconciliationFingerprint) {
+            const actualFingerprint = createStressReplaySourceIdentityRowFingerprint(actual);
+            if (actualFingerprint.value !== expected.reconciliationFingerprint.value) {
+                mismatches.push({
+                    index,
+                    field: 'reconciliationFingerprint',
+                    actual: actualFingerprint.value,
+                    expected: expected.reconciliationFingerprint.value
+                });
+            }
+            continue;
+        }
         for (const field of ['recordType', 'jahr', 'histJahr']) {
             if (expected?.[field] !== undefined && actual?.[field] !== expected[field]) {
                 mismatches.push({ index, field, actual: actual?.[field] ?? null, expected: expected[field] });
@@ -233,6 +250,7 @@ export function runStressReplayPathV1({
     path,
     baselineInputs,
     sourceScenarioLog,
+    sourceIdentity,
     variant = null,
     engine = null,
     captureTransactions = true,
@@ -249,7 +267,9 @@ export function runStressReplayPathV1({
         ? cloneValue(applyStressReplayVariantV1({ baselineInputs, variant }))
         : cloneValue(baselineInputs);
     const normalizedInputFingerprint = createStressReplayFingerprint(inputs);
-    const sourceRows = role === 'baseline' ? normalizeSourceRows(sourceScenarioLog) : null;
+    const sourceRows = role === 'baseline'
+        ? normalizeSourceRows(sourceScenarioLog, sourceIdentity, validatedPath)
+        : null;
     const pathFingerprint = createStressReplayPathFingerprint(validatedPath);
     if (validatedPath.pathFingerprint && validatedPath.pathFingerprint.value !== pathFingerprint.value) {
         fail('STRESS_REPLAY_PATH_FINGERPRINT_MISMATCH', 'The stress replay path fingerprint does not match its contents.');

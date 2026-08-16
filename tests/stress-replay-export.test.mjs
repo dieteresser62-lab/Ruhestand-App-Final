@@ -5,6 +5,7 @@ import {
     STRESS_REPLAY_UNITS_V1,
     StressReplayContractError,
     createStressReplayFingerprint,
+    createStressReplayPathFingerprint,
     createStressReplayVariantFingerprint,
     createStressReplayWorkspaceFingerprint,
     createStressReplayWorkspaceV1
@@ -77,6 +78,7 @@ function workspaceFixture(inputs = inputsFixture(), path = pathFixture()) {
     const baseline = createStressReplayBaselineVariantV1({ baselineInputs: inputs });
     return createStressReplayWorkspaceV1({
         path,
+        sourceScenarioLog: [{ recordType: path.years[0].recordType, jahr: 1, histJahr: null }],
         baselineSnapshot: inputs,
         variants: [baseline],
         createdAtUtc: '2026-08-14T10:00:00.000Z'
@@ -105,7 +107,8 @@ assertEqual(parsed.schemaVersion, 'StressReplayComparisonExportV1', 'Export sche
 assertEqual(parsed.workspace.workspaceFingerprint.value, workspace.workspaceFingerprint.value, 'Workspace roundtrip is exact');
 assertEqual(parsed.workspace.path.years[0].recordType, 'terminal_death', 'Export roundtrip preserves the terminal death path row');
 assertEqual(parsed.comparison, null, 'Reproducible comparison result is optional and no yearly result logs are persisted');
-assertEqual(parsed.privacy.excludes.length, 3, 'Privacy exclusions are explicit');
+assertEqual(parsed.privacy.excludes.length, 4, 'Privacy exclusions are explicit');
+assert(parsed.privacy.excludes.includes('complete-source-scenario-logs'), 'Complete source logs are explicitly excluded');
 assert(Object.isFrozen(parsed) && Object.isFrozen(parsed.workspace), 'Imported export is deeply immutable');
 
 console.log('Test 2: export timestamps are excluded from the technical fingerprint');
@@ -138,6 +141,7 @@ const importedAlternative = createStressReplayVariantV1({
 });
 const importWorkspace = createStressReplayWorkspaceV1({
     path: pathFixture(),
+    sourceScenarioLog: [{ recordType: 'financial_year', jahr: 1, histJahr: null }],
     baselineSnapshot: importInputs,
     variants: [createStressReplayBaselineVariantV1({ baselineInputs: importInputs }), importedAlternative],
     createdAtUtc: '2026-08-14T10:00:00.000Z'
@@ -156,6 +160,27 @@ assertContractError(
     () => parseStressReplayComparisonExportV1(JSON.stringify(manipulatedImport)),
     'STRESS_REPLAY_CONTRACT_INVALID',
     'Recomputed nested and outer fingerprints must not bypass imported percentage bounds'
+);
+
+const identityTamper = structuredClone(document);
+identityTamper.workspace.sourceIdentity.rows[0].reconciliationFingerprint.value = 'f'.repeat(64);
+identityTamper.exportFingerprint = createStressReplayComparisonExportFingerprint(identityTamper);
+assertContractError(
+    () => validateStressReplayComparisonExportV1(identityTamper),
+    'STRESS_REPLAY_SOURCE_IDENTITY_FINGERPRINT_MISMATCH',
+    'Recomputed outer fingerprint cannot hide source identity drift'
+);
+const pathSourceTamper = structuredClone(document);
+pathSourceTamper.workspace.path.source.absoluteRunIndex = 1;
+pathSourceTamper.workspace.path.source.displayRunNumber = 2;
+pathSourceTamper.workspace.path.pathFingerprint = createStressReplayPathFingerprint(pathSourceTamper.workspace.path);
+pathSourceTamper.workspace.pathFingerprint = pathSourceTamper.workspace.path.pathFingerprint;
+pathSourceTamper.workspace.workspaceFingerprint = createStressReplayWorkspaceFingerprint(pathSourceTamper.workspace);
+pathSourceTamper.exportFingerprint = createStressReplayComparisonExportFingerprint(pathSourceTamper);
+assertContractError(
+    () => validateStressReplayComparisonExportV1(pathSourceTamper),
+    'STRESS_REPLAY_SOURCE_IDENTITY_MISMATCH',
+    'Recomputed path, workspace and outer fingerprints cannot rebind the source identity'
 );
 
 console.log('Test 4: secrets and local filesystem paths are rejected before export');

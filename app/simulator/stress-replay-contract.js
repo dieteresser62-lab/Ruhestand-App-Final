@@ -16,6 +16,7 @@ import { normalizeDecumulationMode } from './simulator-input-strategy.js';
 
 export const STRESS_REPLAY_SCHEMA_VERSIONS = Object.freeze({
     path: 'StressReplayPathV1',
+    sourceIdentity: 'StressReplaySourceIdentityV1',
     variant: 'StressReplayVariantV1',
     variantResult: 'StressReplayVariantResultV1',
     comparison: 'StressReplayComparisonV1',
@@ -45,7 +46,8 @@ export const STRESS_REPLAY_LIMITS = Object.freeze({
     maximumPathBytes: 1024 * 1024,
     maximumEnvelopeBytes: 2 * 1024 * 1024,
     maximumAlternatives: 3,
-    maximumVariants: 4
+    maximumVariants: 4,
+    maximumSourceIdentityRows: 60
 });
 
 export const STRESS_REPLAY_COMPARISON_KPIS_V1 = Object.freeze([
@@ -80,6 +82,16 @@ const RESULT_TERMINAL_STATUSES = new Set([...TERMINAL_STATUSES, 'technical_error
 const RECORD_TYPES = new Set(['financial_year', 'terminal_ruin', 'terminal_death']);
 const YEAR_RESULT_STATUSES = new Set(['financial_year', 'ruin', 'terminal_death']);
 const SOURCE_TIE_BREAK = 'smallest_absolute_run_index';
+const SOURCE_RECONCILIATION_FIELDS = Object.freeze([
+    'recordType', 'jahr', 'histJahr',
+    ...['wertAktien', 'wertGold', 'liquiditaet', 'floor_brutto', 'rente1', 'rente2',
+        'renteSum', 'flex_erfuellt_nominal', 'jahresentnahme_real'],
+    ...['inflation', 'FlexRatePct', 'QuoteEndPct', 'RealReturnEquityPct', 'RealReturnGoldPct'],
+    'entscheidung'
+]);
+const SOURCE_IDENTITY_FIELD_SET = new Set([
+    'recordType', 'jahr', 'histJahr', 'reconciliationFingerprint'
+]);
 const FINGERPRINT_EXCLUDED_KEYS = new Set([
     'createdAtUtc',
     'updatedAtUtc',
@@ -196,6 +208,160 @@ export function createStressReplayFingerprint(value) {
         algorithm: STRESS_REPLAY_FINGERPRINT_ALGORITHM,
         value: sha256Hex(canonicalizeHistoricalContractValue(projected))
     });
+}
+
+function sourceDescriptorFingerprint(path) {
+    return createStressReplayFingerprint({
+        requestFingerprint: path.source.requestFingerprint,
+        seed: path.source.seed,
+        rngMode: path.source.rngMode,
+        absoluteRunIndex: path.source.absoluteRunIndex,
+        displayRunNumber: path.source.displayRunNumber,
+        scenarioKey: path.source.scenarioKey,
+        selectionMetric: path.source.selectionMetric,
+        tieBreak: path.source.tieBreak,
+        ...(path.source.startYearIndex !== undefined ? { startYearIndex: path.source.startYearIndex } : {})
+    });
+}
+
+function projectSourceIdentityRow(row, index) {
+    requirePlainObject(row, `sourceRows[${index}]`);
+    const projected = {};
+    for (const fieldName of SOURCE_RECONCILIATION_FIELDS) {
+        if (!Object.hasOwn(row, fieldName) || row[fieldName] === undefined) continue;
+        if (fieldName === 'entscheidung') {
+            const decision = requirePlainObject(row.entscheidung, `sourceRows[${index}].entscheidung`);
+            if (Object.hasOwn(decision, 'jahresEntnahme') && decision.jahresEntnahme !== undefined) {
+                projected.entscheidung = { jahresEntnahme: decision.jahresEntnahme };
+            }
+        } else {
+            projected[fieldName] = row[fieldName];
+        }
+    }
+    return {
+        recordType: projected.recordType,
+        jahr: projected.jahr,
+        histJahr: projected.histJahr,
+        reconciliationFingerprint: createStressReplayFingerprint(projected)
+    };
+}
+
+export function createStressReplaySourceIdentityRowFingerprint(row) {
+    requirePlainObject(row, 'sourceRow');
+    const projected = {};
+    for (const fieldName of SOURCE_RECONCILIATION_FIELDS) {
+        if (!Object.hasOwn(row, fieldName) || row[fieldName] === undefined) continue;
+        if (fieldName === 'entscheidung') {
+            if (row.entscheidung && Object.hasOwn(row.entscheidung, 'jahresEntnahme')
+                && row.entscheidung.jahresEntnahme !== undefined) {
+                projected.entscheidung = { jahresEntnahme: row.entscheidung.jahresEntnahme };
+            }
+        } else {
+            projected[fieldName] = row[fieldName];
+        }
+    }
+    return createStressReplayFingerprint(projected);
+}
+
+function sourceIdentityFingerprintBasis(identity) {
+    const { identityFingerprint: _identityFingerprint, ...basis } = identity;
+    return basis;
+}
+
+export function createStressReplaySourceIdentityFingerprint(identity) {
+    requirePlainObject(identity, 'sourceIdentity');
+    return createStressReplayFingerprint(sourceIdentityFingerprintBasis(identity));
+}
+
+export function validateStressReplaySourceIdentityV1(identity, path) {
+    requirePlainObject(identity, 'sourceIdentity');
+    const validatedPath = validateStressReplayPathV1(path);
+    const allowedKeys = new Set([
+        'schemaVersion', 'contractVersion', 'sourcePrefixLength',
+        'sourceDescriptorFingerprint', 'rows', 'identityFingerprint'
+    ]);
+    const unknownKeys = Object.keys(identity).filter(key => !allowedKeys.has(key)).sort();
+    if (unknownKeys.length > 0) {
+        fail('STRESS_REPLAY_SOURCE_IDENTITY_INVALID', 'Source identity contains unknown fields', { fields: unknownKeys });
+    }
+    if (identity.schemaVersion !== STRESS_REPLAY_SCHEMA_VERSIONS.sourceIdentity
+        || identity.contractVersion !== STRESS_REPLAY_CONTRACT_VERSION) {
+        fail('STRESS_REPLAY_VERSION_UNSUPPORTED', 'Unsupported stress replay source identity contract');
+    }
+    const expectedPrefixLength = validatedPath.reconciliation.sourcePrefixLength
+        ?? validatedPath.years.length;
+    requireInteger(identity.sourcePrefixLength, 'sourceIdentity.sourcePrefixLength', 1);
+    if (identity.sourcePrefixLength !== expectedPrefixLength
+        || identity.sourcePrefixLength > STRESS_REPLAY_LIMITS.maximumSourceIdentityRows
+        || !Array.isArray(identity.rows)
+        || identity.rows.length !== identity.sourcePrefixLength) {
+        fail('STRESS_REPLAY_SOURCE_IDENTITY_INVALID', 'Source identity length does not match the fixed source prefix', {
+            expectedPrefixLength,
+            actualPrefixLength: identity.sourcePrefixLength,
+            rowCount: Array.isArray(identity.rows) ? identity.rows.length : null
+        });
+    }
+    validateFingerprint(identity.sourceDescriptorFingerprint, 'sourceIdentity.sourceDescriptorFingerprint');
+    if (identity.sourceDescriptorFingerprint.value !== sourceDescriptorFingerprint(validatedPath).value) {
+        fail('STRESS_REPLAY_SOURCE_IDENTITY_MISMATCH', 'Source identity does not belong to the fixed source run');
+    }
+    const rows = identity.rows.map((row, index) => {
+        requirePlainObject(row, `sourceIdentity.rows[${index}]`);
+        const rowUnknownKeys = Object.keys(row).filter(key => !SOURCE_IDENTITY_FIELD_SET.has(key)).sort();
+        if (rowUnknownKeys.length > 0) {
+            fail('STRESS_REPLAY_SOURCE_IDENTITY_INVALID', 'Source identity row contains unknown fields', {
+                index,
+                fields: rowUnknownKeys
+            });
+        }
+        if (!RECORD_TYPES.has(row.recordType)) {
+            fail('STRESS_REPLAY_SOURCE_IDENTITY_INVALID', 'Source identity row record type is invalid', { index });
+        }
+        requireInteger(row.jahr, `sourceIdentity.rows[${index}].jahr`, 1);
+        if (row.jahr !== index + 1) {
+            fail('STRESS_REPLAY_SOURCE_IDENTITY_INVALID', 'Source identity rows must retain their original order', { index });
+        }
+        if (row.histJahr !== null) requireFinite(row.histJahr, `sourceIdentity.rows[${index}].histJahr`, { integer: true });
+        const pathRow = validatedPath.years[index];
+        if (row.recordType !== pathRow.recordType
+            || row.histJahr !== (pathRow.historicalYear ?? null)) {
+            fail('STRESS_REPLAY_SOURCE_IDENTITY_MISMATCH', 'Source identity prefix does not match the fixed path structure', {
+                index
+            });
+        }
+        validateFingerprint(row.reconciliationFingerprint, `sourceIdentity.rows[${index}].reconciliationFingerprint`);
+        assertStressReplayFinite(row, `sourceIdentity.rows[${index}]`);
+        return cloneValue(row);
+    });
+    validateFingerprint(identity.identityFingerprint, 'sourceIdentity.identityFingerprint');
+    const normalized = { ...identity, rows };
+    if (identity.identityFingerprint.value !== createStressReplaySourceIdentityFingerprint(normalized).value) {
+        fail('STRESS_REPLAY_SOURCE_IDENTITY_FINGERPRINT_MISMATCH', 'Source identity fingerprint does not match its rows');
+    }
+    return deepFreeze(cloneValue(normalized));
+}
+
+export function createStressReplaySourceIdentityV1({ path, sourceRows } = {}) {
+    const validatedPath = validateStressReplayPathV1(path);
+    if (!Array.isArray(sourceRows)) {
+        fail('STRESS_REPLAY_SOURCE_IDENTITY_INVALID', 'Original source scenario rows are required');
+    }
+    const sourcePrefixLength = validatedPath.reconciliation.sourcePrefixLength
+        ?? validatedPath.years.length;
+    if (sourceRows.length < sourcePrefixLength) {
+        fail('STRESS_REPLAY_SOURCE_IDENTITY_INVALID', 'Original source scenario prefix is incomplete');
+    }
+    const identityWithoutFingerprint = {
+        schemaVersion: STRESS_REPLAY_SCHEMA_VERSIONS.sourceIdentity,
+        contractVersion: STRESS_REPLAY_CONTRACT_VERSION,
+        sourcePrefixLength,
+        sourceDescriptorFingerprint: sourceDescriptorFingerprint(validatedPath),
+        rows: sourceRows.slice(0, sourcePrefixLength).map(projectSourceIdentityRow)
+    };
+    return validateStressReplaySourceIdentityV1({
+        ...identityWithoutFingerprint,
+        identityFingerprint: createStressReplaySourceIdentityFingerprint(identityWithoutFingerprint)
+    }, validatedPath);
 }
 
 export function assertStressReplaySize(value, maximumBytes, subject = 'value') {
@@ -902,6 +1068,7 @@ export function validateStressReplayWorkspaceV1(workspace) {
         'updatedAtUtc',
         'path',
         'pathFingerprint',
+        'sourceIdentity',
         'baselineSnapshot',
         'baselineScenarioFingerprint',
         'variantOrder',
@@ -942,6 +1109,9 @@ export function validateStressReplayWorkspaceV1(workspace) {
         || (path.pathFingerprint && path.pathFingerprint.value !== expectedPathFingerprint.value)) {
         fail('STRESS_REPLAY_PATH_FINGERPRINT_MISMATCH', 'Workspace path fingerprint does not match its path');
     }
+    const sourceIdentity = workspace.sourceIdentity === undefined
+        ? null
+        : validateStressReplaySourceIdentityV1(workspace.sourceIdentity, path);
     requirePlainObject(workspace.baselineSnapshot, 'workspace.baselineSnapshot');
     assertStressReplayFinite(workspace.baselineSnapshot, 'workspace.baselineSnapshot');
     validateFingerprint(workspace.baselineScenarioFingerprint, 'workspace.baselineScenarioFingerprint');
@@ -975,13 +1145,15 @@ export function validateStressReplayWorkspaceV1(workspace) {
         fail('STRESS_REPLAY_WORKSPACE_FINGERPRINT_MISMATCH', 'Workspace fingerprint does not match its contents');
     }
     assertStressReplaySize(workspace, STRESS_REPLAY_LIMITS.maximumEnvelopeBytes, 'workspace');
-    return deepFreeze(cloneValue({ ...workspace, path, variants }));
+    return deepFreeze(cloneValue({ ...workspace, path, variants, ...(sourceIdentity ? { sourceIdentity } : {}) }));
 }
 
 export const assertStressReplayWorkspaceV1 = validateStressReplayWorkspaceV1;
 
 export function createStressReplayWorkspaceV1({
     path,
+    sourceIdentity,
+    sourceScenarioLog,
     baselineSnapshot,
     variants,
     variantOrder = variants?.map(variant => variant?.id),
@@ -1001,6 +1173,11 @@ export function createStressReplayWorkspaceV1({
         updatedAtUtc,
         path: validatedPath,
         pathFingerprint: createStressReplayPathFingerprint(validatedPath),
+        ...(sourceIdentity !== undefined || sourceScenarioLog !== undefined
+            ? { sourceIdentity: sourceIdentity === undefined
+                ? createStressReplaySourceIdentityV1({ path: validatedPath, sourceRows: sourceScenarioLog })
+                : validateStressReplaySourceIdentityV1(sourceIdentity, validatedPath) }
+            : {}),
         baselineSnapshot: cloneValue(baselineSnapshot),
         baselineScenarioFingerprint: createStressReplayFingerprint(baselineSnapshot),
         variantOrder: cloneValue(variantOrder),

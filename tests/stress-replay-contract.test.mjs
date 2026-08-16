@@ -9,9 +9,12 @@ import {
     StressReplayContractError,
     assertStressReplaySize,
     createStressReplayFingerprint,
+    createStressReplaySourceIdentityFingerprint,
+    createStressReplaySourceIdentityV1,
     createStressReplayStrategySnapshot,
     normalizeStressReplayVariantPatch,
-    validateStressReplayPathV1
+    validateStressReplayPathV1,
+    validateStressReplaySourceIdentityV1
 } from '../app/simulator/stress-replay-contract.js';
 
 function assertJsonEqual(actual, expected, message) {
@@ -323,5 +326,58 @@ assertContractError(
 );
 assertEqual(STRESS_REPLAY_LIMITS.maximumPathBytes, 1024 * 1024, 'Path limit must be 1 MiB');
 assertEqual(STRESS_REPLAY_LIMITS.maximumEnvelopeBytes, 2 * 1024 * 1024, 'Envelope limit must be 2 MiB');
+
+console.log('Test 9: independent source identity is minimal, ordered and fingerprint-bound');
+const identityPath = validPath({
+    years: [{ ...annualRecord(), historicalYear: 2001 }],
+    reconciliation: { sourcePrefixMatched: true, sourcePrefixLength: 1 }
+});
+const identity = createStressReplaySourceIdentityV1({
+    path: identityPath,
+    sourceRows: [{
+        recordType: 'financial_year', jahr: 1, histJahr: 2001,
+        wertAktien: 1234, inflation: 2.5,
+        entscheidung: { jahresEntnahme: 500, privateNote: 'excluded' },
+        unrelatedFullLogField: 'excluded'
+    }]
+});
+assertEqual(identity.rows.length, 1, 'Identity retains exactly the reconciled source prefix');
+assertEqual(identity.rows[0].reconciliationFingerprint.algorithm, 'sha256-canonical-json-v1',
+    'Identity retains only a canonical baseline reconciliation proof');
+assert(!Object.hasOwn(identity.rows[0], 'unrelatedFullLogField'), 'Identity excludes unrelated source log fields');
+assert(!Object.hasOwn(identity.rows[0], 'wertAktien'), 'Identity does not persist source financial details');
+for (const mutate of [
+    candidate => { candidate.rows[0].reconciliationFingerprint.value = 'f'.repeat(64); },
+    candidate => { candidate.rows[0].invented = true; },
+    candidate => { candidate.rows[0].jahr = Infinity; }
+]) {
+    const candidate = structuredClone(identity);
+    mutate(candidate);
+    assertContractError(
+        () => validateStressReplaySourceIdentityV1(candidate, identityPath),
+        candidate.rows[0].invented ? 'STRESS_REPLAY_SOURCE_IDENTITY_INVALID'
+            : candidate.rows[0].jahr === Infinity ? 'STRESS_REPLAY_CONTRACT_INVALID'
+                : 'STRESS_REPLAY_SOURCE_IDENTITY_FINGERPRINT_MISMATCH',
+        'Mutated source identity must fail closed'
+    );
+}
+const reordered = structuredClone(identity);
+reordered.rows = [structuredClone(identity.rows[0]), { ...identity.rows[0], jahr: 2 }];
+reordered.sourcePrefixLength = 2;
+reordered.identityFingerprint = createStressReplaySourceIdentityFingerprint(reordered);
+assertContractError(
+    () => validateStressReplaySourceIdentityV1(reordered, identityPath),
+    'STRESS_REPLAY_SOURCE_IDENTITY_INVALID',
+    'Identity length drift must fail before replay'
+);
+const foreignPath = validPath({
+    source: { ...validPath().source, absoluteRunIndex: 3, displayRunNumber: 4 },
+    reconciliation: { sourcePrefixMatched: true, sourcePrefixLength: 1 }
+});
+assertContractError(
+    () => validateStressReplaySourceIdentityV1(identity, foreignPath),
+    'STRESS_REPLAY_SOURCE_IDENTITY_MISMATCH',
+    'Identity cannot be rebound to another source run'
+);
 
 console.log('Stress replay contract tests passed.');
