@@ -1032,6 +1032,46 @@ async function runSimulatorSmoke(browser, baseUrl) {
         'Opening and closing alone does not change add-button materiality');
     assert(await page.locator('#stressReplayVariantEditor [data-active-when="decumulation:3_bucket_jilge"]').first().isHidden(),
         'Three-bucket-only controls start hidden when their strategy mode is inactive');
+    const realNeedsError = await page.evaluate(async () => {
+        const { createStressReplayController } = await import('./app/simulator/stress-replay-ui.js');
+        const documentRef = {
+            getElementById(id) {
+                return id === 'stressReplayBanner' ? null : document.getElementById(id);
+            },
+            querySelectorAll(selector) {
+                return document.querySelectorAll(selector);
+            }
+        };
+        const controller = createStressReplayController({
+            documentRef,
+            loadWorkspace: () => ({
+                status: 'executable',
+                workspace: {
+                    baselineSnapshot: {
+                        startFloorBedarf: 24000,
+                        startFlexBedarf: 12000,
+                        minimumFlexAnnual: 0
+                    },
+                    variants: [{ id: 'baseline', role: 'baseline' }]
+                },
+                compatibility: { readOnly: false },
+                error: null
+            }),
+            renderViews: () => {}
+        });
+        controller.initialize();
+        document.querySelector('[data-stress-replay-path="strategy.startFlexBedarf"]').value = '5000';
+        document.querySelector('[data-stress-replay-path="strategy.minimumFlexAnnual"]').value = '6000';
+        controller.previewEditorPatch();
+        const status = document.getElementById('stressReplayStatus');
+        return { code: status.dataset.patchError, text: status.textContent, status: status.dataset.status };
+    });
+    assert(realNeedsError.code === 'STRESS_REPLAY_MINIMUM_FLEX_EXCEEDS_FLEX'
+        && realNeedsError.status === 'error'
+        && realNeedsError.text.includes('Mindest-Flex p. a.')
+        && realNeedsError.text.includes('6.000')
+        && realNeedsError.text.includes('5.000'),
+    `The real contract error must render both effective amounts in the live status region: ${JSON.stringify(realNeedsError)}`);
     assert((await page.locator('#stressReplayWorkspace').textContent()).includes('Auf diesem fixierten Stresspfad'),
         'The browser workflow must explain the paired fixed-path interpretation');
     assert(!(await page.locator('#stressReplayWorkspace').textContent()).toLowerCase().includes('optimale strategie'),

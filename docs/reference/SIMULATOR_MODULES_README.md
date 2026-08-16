@@ -259,6 +259,12 @@ fuer denselben absoluten Index identische Log- und Capture-Daten.
 
 - `stress-replay-contract.js` – Schemas, kanonische SHA-256-Fingerprints,
   Whitelist, Varianten-/Workspace-/Vergleichsvalidierung und Groessenlimits.
+  Persistierte Varianten dispatchen ueber ihre `whitelistVersion`: V1 bleibt
+  unveraendert, V2 ergaenzt `startFloorBedarf`, `startFlexBedarf` und
+  `minimumFlexAnnual`. Ein explizites `0` bleibt ein Patchblatt; nur
+  wirkungsgleiche Blaetter werden nach der Praesenzpruefung entfernt. Die
+  effektive Relation `minimumFlexAnnual <= startFlexBedarf` wird mit Baseline-
+  Fallback fail-closed validiert und niemals geklemmt.
   `maxSkimPctOfEq` gilt nur von 0 bis 50, `maxBearRefillPctOfEq` nur von 0 bis
   70; nicht endliche und ausserhalb liegende Werte werden nicht geklemmt.
 - `stress-replay-path-materializer.js` – Quellidentitaet, ScenarioLog-Abgleich,
@@ -270,8 +276,9 @@ fuer denselben absoluten Index identische Log- und Capture-Daten.
   Fehler bleiben getrennte Statuswerte. `ruin` und `all_dead` enden beide mit
   einer expliziten Terminalzeile; `terminal_death` ist kein Finanzjahr.
 - `stress-replay-variant.js` – Baseline und maximal drei Alternativen. Erlaubt
-  sind nur bestehende Strategieparameter; Asset-, Profil-, Tranchen- und
-  Mindest-Flex-Werte bleiben fixiert.
+  sind nur bestehende Strategieparameter sowie in V2 die drei Ausgangsbedarfe;
+  Asset-, Profil- und Tranchenwerte bleiben fixiert. Neue Varianten werden als
+  V2 erzeugt, geladene V1-Varianten behalten ihre alten Regeln und Fingerprints.
 - `stress-replay-transactions.js` und `stress-replay-comparison.js` – additive
   Transaktionsklassen mit belegten Simulator-Producern, explizite Missingness
   fuer unbekannte Event- und Breakdown-Werte, KPI-Deltas und erste
@@ -287,7 +294,10 @@ fuer denselben absoluten Index identische Log- und Capture-Daten.
 
 **UI-Module:** `stress-replay-ui.js` steuert Sitzung, Fixieren, Varianten und
 Import/Export; `stress-replay-renderer.js` rendert Patchvorschau, KPIs,
-Delta-Timeline und Jahrestabelle. Statuscopy, Fokus und Live-Regionen machen
+Delta-Timeline und Jahrestabelle. Der fokussierte Editor zeigt Name, Floor,
+Flex und Mindest-Flex; die 17 bisherigen Felder liegen in einem initial
+geschlossenen, nativen Experten-Disclosure. Leere Bedarfsfelder bedeuten
+Baselineuebernahme, `0` bedeutet explizite Null. Statuscopy, Fokus und Live-Regionen machen
 deutlich, dass alle Aussagen nur fuer den fixierten Pfad gelten. Ein
 controllerweiter Busy-Zustand sperrt Fixieren, Variantenmutationen,
 Neuberechnung, Import, Export und Verwerfen gegen Parallelaufrufe. KPI-Deltas

@@ -24,6 +24,7 @@ import {
     parseStressReplayComparisonExportV1,
     serializeStressReplayComparisonExportV1
 } from '../app/simulator/stress-replay-export.js';
+import { formatStressReplayUiError } from '../app/simulator/stress-replay-ui.js';
 
 console.log('--- Stress Replay End-to-End Tests ---');
 
@@ -31,6 +32,10 @@ const baselineFixture = JSON.parse(fs.readFileSync(
     new URL('./fixtures/stress-replay-performance-baseline-v1.json', import.meta.url),
     'utf8'
 ));
+const legacyExportFixture = fs.readFileSync(
+    new URL('./fixtures/stress-replay-comparison-export-v1.json', import.meta.url),
+    'utf8'
+);
 
 function median(values) {
     const sorted = [...values].sort((left, right) => left - right);
@@ -163,6 +168,62 @@ assertEqual(baselineReplay.reconciliation.matched, true,
 assertEqual(first.financialRankingAllowed, false,
     'The end-to-end result must remain a paired counterfactual, not a general ranking');
 
+const baselineInputsBeforeNeedsReplay = JSON.stringify(inputs);
+const pathFingerprintBeforeNeedsReplay = path.pathFingerprint.value;
+const sourceFingerprintBeforeNeedsReplay = createStressReplayFingerprint(sourceMeta.logDataRows).value;
+const needsAlternative = createStressReplayVariantV1({
+    id: 'needs-v2',
+    label: 'Bedarfe V2',
+    baselineInputs: inputs,
+    patch: {
+        strategy: {
+            startFloorBedarf: 30000,
+            startFlexBedarf: 16000,
+            minimumFlexAnnual: 8000
+        }
+    }
+});
+const needsReplay = runStressReplayPathV1({
+    path,
+    baselineInputs: inputs,
+    variant: needsAlternative,
+    engine: EngineAPI
+});
+assertEqual(needsAlternative.whitelistVersion, 'StressReplayVariantWhitelistV2',
+    'New need variants must use the V2 whitelist');
+assertEqual(needsReplay.pathFingerprint.value, pathFingerprintBeforeNeedsReplay,
+    'A need variant must run on the unchanged materialized path');
+assertEqual(JSON.stringify(inputs), baselineInputsBeforeNeedsReplay,
+    'A need variant must not mutate the frozen baseline inputs');
+assertEqual(createStressReplayFingerprint(sourceMeta.logDataRows).value, sourceFingerprintBeforeNeedsReplay,
+    'A need variant must not mutate the source scenario log');
+assert(needsReplay.summary.totalWithdrawalsEur !== baselineReplay.summary.totalWithdrawalsEur
+    || needsReplay.summary.finalValueNominalEur !== baselineReplay.summary.finalValueNominalEur,
+'Changed floor and flex needs must have an observable financial effect on the fixed path');
+const needsFinancialRows = needsReplay.scenarioLog.records.filter(record => record.recordType === 'financial_year');
+assert(needsFinancialRows.length > 0, 'The V2 need replay must expose financially evaluated years');
+assert(needsFinancialRows.some(record => record.minimumFlexConfiguredAnnualEur === 8000),
+    'The configured V2 minimum flex must reach the real yearly engine diagnostics');
+assert(Number.isFinite(needsReplay.summary.totalMinimumFlexShortfallEur),
+    'The V2 minimum-flex run must expose its aggregated shortfall diagnostic');
+
+let genuineNeedsError = null;
+try {
+    createStressReplayVariantV1({
+        id: 'invalid-needs-v2',
+        label: 'Unzulaessiger Mindest-Flex',
+        baselineInputs: inputs,
+        patch: { strategy: { startFlexBedarf: 5000, minimumFlexAnnual: 6000 } }
+    });
+} catch (error) {
+    genuineNeedsError = error;
+}
+assertEqual(genuineNeedsError?.code, 'STRESS_REPLAY_MINIMUM_FLEX_EXCEEDS_FLEX',
+    'The genuine contract must reject minimum flex above effective flex');
+const genuineNeedsMessage = formatStressReplayUiError(genuineNeedsError);
+assert(genuineNeedsMessage.includes('6.000') && genuineNeedsMessage.includes('5.000'),
+    'The UI formatter must interpolate both amounts from the genuine contract error details');
+
 const workspace = createStressReplayWorkspaceV1({
     path,
     sourceScenarioLog: sourceMeta.logDataRows,
@@ -193,6 +254,101 @@ const importedBaselineReplay = runStressReplayPathV1({
 });
 assertEqual(importedBaselineReplay.reconciliation.matched, true,
     'Imported baseline must reconcile from persisted source identity without original logs');
+
+const zeroBaselineInputs = { ...inputs, minimumFlexAnnual: 6000 };
+const zeroAlternative = createStressReplayVariantV1({
+    id: 'zero-needs-v2',
+    label: 'Bedarfe explizit null',
+    baselineInputs: zeroBaselineInputs,
+    patch: {
+        strategy: {
+            startFloorBedarf: 0,
+            startFlexBedarf: 0,
+            minimumFlexAnnual: 0
+        }
+    }
+});
+const zeroWorkspace = createStressReplayWorkspaceV1({
+    path,
+    sourceScenarioLog: sourceMeta.logDataRows,
+    baselineSnapshot: zeroBaselineInputs,
+    variants: [createStressReplayBaselineVariantV1({ baselineInputs: zeroBaselineInputs }), zeroAlternative],
+    createdAtUtc: '2026-08-15T12:00:00.000Z'
+});
+const importedZero = parseStressReplayComparisonExportV1(serializeStressReplayComparisonExportV1(
+    buildStressReplayComparisonExportV1({
+        workspace: zeroWorkspace,
+        comparison: null,
+        exportedAt: '2026-08-15T12:30:00.000Z'
+    })
+));
+const importedZeroVariant = importedZero.workspace.variants.find(variant => variant.id === 'zero-needs-v2');
+assertEqual(importedZeroVariant.patch.strategy.startFloorBedarf, 0,
+    'Export/import must preserve an explicit zero floor need');
+assertEqual(importedZeroVariant.patch.strategy.startFlexBedarf, 0,
+    'Export/import must preserve an explicit zero flex need');
+assertEqual(importedZeroVariant.patch.strategy.minimumFlexAnnual, 0,
+    'Export/import must preserve an explicit zero minimum flex');
+const importedZeroReplay = runStressReplayPathV1({
+    path: importedZero.workspace.path,
+    baselineInputs: importedZero.workspace.baselineSnapshot,
+    variant: importedZeroVariant,
+    engine: EngineAPI
+});
+assert(importedZeroReplay.scenarioLog.records
+    .filter(record => record.recordType === 'financial_year')
+    .every(record => record.minimumFlexConfiguredAnnualEur === 0),
+'The imported explicit-zero variant must reach every applicable real engine year as zero');
+
+const legacyImported = parseStressReplayComparisonExportV1(legacyExportFixture);
+assert(legacyImported.workspace.variants.every(variant => (
+    variant.whitelistVersion === 'StressReplayVariantWhitelistV1'
+)), 'The golden legacy export fixture must retain V1 whitelist dispatch');
+const legacyBaselineVariant = createStressReplayBaselineVariantV1({
+    baselineInputs: inputs,
+    whitelistVersion: 'StressReplayVariantWhitelistV1'
+});
+const legacyAlternative = createStressReplayVariantV1({
+    id: 'legacy-runway',
+    label: 'Legacy-Runway',
+    baselineInputs: inputs,
+    whitelistVersion: 'StressReplayVariantWhitelistV1',
+    patch: { strategy: { liquidityRunwayYears: 2.5 } }
+});
+const legacyComparison = runStressReplayComparisonV1({
+    path,
+    baselineInputs: inputs,
+    sourceScenarioLog: sourceMeta.logDataRows,
+    alternatives: [legacyAlternative],
+    engine: EngineAPI
+});
+const legacyWorkspace = createStressReplayWorkspaceV1({
+    path,
+    sourceScenarioLog: sourceMeta.logDataRows,
+    baselineSnapshot: inputs,
+    variants: [legacyBaselineVariant, legacyAlternative],
+    createdAtUtc: '2026-08-15T13:00:00.000Z'
+});
+const legacyRoundtrip = parseStressReplayComparisonExportV1(serializeStressReplayComparisonExportV1(
+    buildStressReplayComparisonExportV1({
+        workspace: legacyWorkspace,
+        comparison: legacyComparison,
+        exportedAt: '2026-08-15T13:30:00.000Z'
+    })
+));
+const importedLegacyAlternative = legacyRoundtrip.workspace.variants
+    .find(variant => variant.id === legacyAlternative.id);
+const legacyReplay = runStressReplayPathV1({
+    path: legacyRoundtrip.workspace.path,
+    baselineInputs: legacyRoundtrip.workspace.baselineSnapshot,
+    variant: importedLegacyAlternative,
+    engine: EngineAPI
+});
+assertEqual(legacyReplay.technicalError, null,
+    'A legacy V1 alternative without new leaves must remain executable');
+const legacyFinancialRow = legacyReplay.scenarioLog.records.find(record => record.recordType === 'financial_year');
+assertEqual(legacyFinancialRow.minimumFlexConfiguredAnnualEur, inputs.minimumFlexAnnual,
+    'A missing legacy minimum-flex patch leaf must inherit the frozen baseline value');
 const maximumRelativeExportBytes = Math.ceil(
     baselineFixture.measurement.exportBytes * baselineFixture.budgets.maximumExportMultiplier
 );

@@ -1063,6 +1063,31 @@
                                 Worker-Pool entsteht erst beim nächsten ausdrücklichen Start.</li>
                         </ol>
                     </div>
+                    <div class="detail-block" id="simulator-stress-replay">
+                        <h3>Fixierten Stresspfad mit Bedarfsvarianten vergleichen</h3>
+                        <p>Nach einem Monte-Carlo-Lauf können Sie ein ausgewähltes Szenario als Stresspfad fixieren.
+                            Die erneute Rechnung verändert nur die gewählte Variante; Markt-, Haushalts- und
+                            Ereignispfad bleiben identisch. Der Vergleich gilt deshalb nur für diesen Pfad und ist
+                            weder ein allgemeines Strategieranking noch eine Finanzempfehlung.</p>
+                        <ol style="margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Pfad fixieren:</strong> Wählen Sie ein Szenario eines Per-Run-Seed-Laufs und
+                                prüfen Sie nach dem Fixieren Baseline-Abgleich und Fingerprints.</li>
+                            <li><strong>Bedarfe variieren:</strong> Standardmäßig sehen Sie Variantenname,
+                                Floor-Bedarf p. a., Flex-Bedarf p. a. und Mindest-Flex p. a. Der jeweils getrennt
+                                angezeigte Baselinebetrag bleibt wirksam, wenn das Eingabefeld leer ist.</li>
+                            <li><strong>Null bewusst setzen:</strong> Die Eingabe <code>0</code> ist ein echter
+                                Variantenwert und nicht dasselbe wie ein leeres Feld.</li>
+                            <li><strong>Mindest-Flex prüfen:</strong> Mindest-Flex darf den effektiven Flex-Bedarf
+                                nicht überschreiten. Die App zeigt beide Beträge als Fehler an; sie begrenzt den Wert
+                                nicht automatisch.</li>
+                            <li><strong>Expertenfelder:</strong> „Expertenfelder anzeigen“ öffnet die bisherigen
+                                Strategieparameter. Ein- und Ausblenden verändert keine eingegebenen Werte und wird
+                                nicht im Workspace gespeichert.</li>
+                            <li><strong>Altbestände:</strong> Importierte V1-Varianten bleiben nach ihren damaligen
+                                Regeln ausführbar. Fehlen die neuen Bedarfsblätter, gelten die eingefrorenen
+                                Baselinewerte.</li>
+                        </ol>
+                    </div>
                     <div class="detail-block" id="simulator-backtest">
                         <h3>Backtesting (historische In-sample-Diagnose)</h3>
                         <p>Im Tab „Backtesting“ untersuchen Sie Ihre Strategie an bereits bekannten historischen
