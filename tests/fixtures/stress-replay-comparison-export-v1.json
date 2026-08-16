@@ -1,0 +1,210 @@
+{
+  "schemaId": "de.ruhestandsapp.stress-replay.comparison",
+  "schemaVersion": "StressReplayComparisonExportV1",
+  "contractVersion": "stress-replay-contract-v1",
+  "exportedAtUtc": "2026-08-14T12:00:00.000Z",
+  "workspace": {
+    "schemaVersion": "StressReplayWorkspaceV1",
+    "contractVersion": "stress-replay-contract-v1",
+    "scope": "single-materialized-monte-carlo-path",
+    "createdAtUtc": "2026-08-14T10:00:00.000Z",
+    "updatedAtUtc": "2026-08-14T10:00:00.000Z",
+    "path": {
+      "schemaVersion": "StressReplayPathV1",
+      "contractVersion": "stress-replay-contract-v1",
+      "scope": "single-materialized-monte-carlo-path",
+      "source": {
+        "requestFingerprint": {
+          "algorithm": "sha256-canonical-json-v1",
+          "value": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "seed": 77,
+        "rngMode": "per-run-seed",
+        "absoluteRunIndex": 0,
+        "displayRunNumber": 1,
+        "scenarioKey": "legacy-golden",
+        "selectionMetric": "nominal_terminal_wealth_eur",
+        "tieBreak": "smallest_absolute_run_index"
+      },
+      "breakOnRuin": true,
+      "dataFingerprint": {
+        "algorithm": "sha256-canonical-json-v1",
+        "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "engineFingerprint": {
+        "algorithm": "sha256-canonical-json-v1",
+        "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "units": {
+        "equityReturnPct": "percent_per_year",
+        "goldReturnPct": "percent_per_year",
+        "cashReturnPct": "percent_per_year",
+        "inflationPct": "percent_per_year",
+        "wageGrowthPct": "percent_per_year",
+        "capeRatio": "ratio",
+        "monetaryValues": "nominal_eur"
+      },
+      "horizonYears": 1,
+      "effectiveLength": 1,
+      "terminalStatus": "horizon_exhausted",
+      "initialMarketDataHist": [
+        {
+          "year": 2025,
+          "kurs": 100,
+          "capeRatio": 25
+        }
+      ],
+      "years": [
+        {
+          "yearIndex": 0,
+          "recordType": "financial_year",
+          "financiallyEvaluable": true,
+          "equityReturnPct": -10,
+          "goldReturnPct": 2,
+          "cashReturnPct": 1,
+          "inflationPct": 2,
+          "wageGrowthPct": 2,
+          "capeRatio": 24,
+          "regime": "bear",
+          "stressEvents": [],
+          "tailRiskEvents": [],
+          "householdEvents": []
+        }
+      ],
+      "reconciliation": {
+        "sourcePrefixMatched": true
+      }
+    },
+    "pathFingerprint": {
+      "algorithm": "sha256-canonical-json-v1",
+      "value": "8bd5e765859c2bcc3462fdff4419a464f317fd7c8f5b5231f1984df65a471341"
+    },
+    "sourceIdentity": {
+      "schemaVersion": "StressReplaySourceIdentityV1",
+      "contractVersion": "stress-replay-contract-v1",
+      "sourcePrefixLength": 1,
+      "sourceDescriptorFingerprint": {
+        "algorithm": "sha256-canonical-json-v1",
+        "value": "836939a6d1a3674d3d69a252446cbc470fa6ce9cd96e26f0815dbe67b8e94497"
+      },
+      "rows": [
+        {
+          "recordType": "financial_year",
+          "jahr": 1,
+          "histJahr": null,
+          "reconciliationFingerprint": {
+            "algorithm": "sha256-canonical-json-v1",
+            "value": "a4ceadba1f5bbb52868d761842e872bee553f31234e71f9ed0eb2d4000c08f12"
+          }
+        }
+      ],
+      "identityFingerprint": {
+        "algorithm": "sha256-canonical-json-v1",
+        "value": "8cf32efd41d4fda23a6ccea0de0a840f6288cc36b7d94fecbd1662fcc50e3a23"
+      }
+    },
+    "baselineSnapshot": {
+      "startAlter": 65,
+      "startFloorBedarf": 24000,
+      "startFlexBedarf": 12000,
+      "minimumFlexAnnual": 6000,
+      "liquidityRunwayYears": 5,
+      "maxSkimPctOfEq": 10,
+      "maxBearRefillPctOfEq": 5,
+      "decumulation": {
+        "mode": "standard"
+      },
+      "dynamicFlex": false,
+      "horizonMethod": "mean",
+      "horizonYears": 30,
+      "survivalQuantile": 0.85,
+      "goGoActive": false,
+      "goGoMultiplier": 1,
+      "longevityMode": "none"
+    },
+    "baselineScenarioFingerprint": {
+      "algorithm": "sha256-canonical-json-v1",
+      "value": "e7f82cbbb2c6203c65022c1eb74d4438b4f871fdc2d4412e1729c86a455fa222"
+    },
+    "variantOrder": [
+      "baseline",
+      "legacy-skim"
+    ],
+    "variants": [
+      {
+        "schemaVersion": "StressReplayVariantV1",
+        "contractVersion": "stress-replay-contract-v1",
+        "whitelistVersion": "StressReplayVariantWhitelistV1",
+        "id": "baseline",
+        "role": "baseline",
+        "label": "Baseline",
+        "baselineScenarioFingerprint": {
+          "algorithm": "sha256-canonical-json-v1",
+          "value": "e7f82cbbb2c6203c65022c1eb74d4438b4f871fdc2d4412e1729c86a455fa222"
+        },
+        "patch": {},
+        "normalizedInputFingerprint": {
+          "algorithm": "sha256-canonical-json-v1",
+          "value": "e7f82cbbb2c6203c65022c1eb74d4438b4f871fdc2d4412e1729c86a455fa222"
+        },
+        "materialChangeGroups": [],
+        "warnings": [],
+        "variantFingerprint": {
+          "algorithm": "sha256-canonical-json-v1",
+          "value": "e6744aecab90ba7bcba9cc28fc8f9a89916269bae42377877f4e1f29800855ee"
+        }
+      },
+      {
+        "schemaVersion": "StressReplayVariantV1",
+        "contractVersion": "stress-replay-contract-v1",
+        "whitelistVersion": "StressReplayVariantWhitelistV1",
+        "id": "legacy-skim",
+        "role": "alternative",
+        "label": "Legacy skim",
+        "baselineScenarioFingerprint": {
+          "algorithm": "sha256-canonical-json-v1",
+          "value": "e7f82cbbb2c6203c65022c1eb74d4438b4f871fdc2d4412e1729c86a455fa222"
+        },
+        "patch": {
+          "strategy": {
+            "maxSkimPctOfEq": 12
+          }
+        },
+        "normalizedInputFingerprint": {
+          "algorithm": "sha256-canonical-json-v1",
+          "value": "3534600c374fc9a8a06a6f80ad9cb92d8e1b64a4f0dc30f9e76a9c9a3c2f0cc2"
+        },
+        "materialChangeGroups": [
+          "maxSkimPctOfEq"
+        ],
+        "warnings": [],
+        "variantFingerprint": {
+          "algorithm": "sha256-canonical-json-v1",
+          "value": "06d2f94d516867b8c2820bbb94708b4e77d7d3a8a926dcb05df9ff2e2f3efb8c"
+        }
+      }
+    ],
+    "workspaceFingerprint": {
+      "algorithm": "sha256-canonical-json-v1",
+      "value": "4e98bd686a30e009bfb76fd5564723f776431d162f6e11743c345ccd29ccbaca"
+    }
+  },
+  "comparison": null,
+  "compatibility": {
+    "mismatchPolicy": "read_only_inspection",
+    "unknownSchemaVersions": "reject"
+  },
+  "privacy": {
+    "scope": "single-stress-replay-workspace",
+    "excludes": [
+      "local-filesystem-paths",
+      "secrets-and-credentials",
+      "unrelated-storage-records",
+      "complete-source-scenario-logs"
+    ]
+  },
+  "exportFingerprint": {
+    "algorithm": "sha256-canonical-json-v1",
+    "value": "ac688871ba0baa0c3cac1188d7c880c9cf562c313b6dc47dc36d38f2e501c88d"
+  }
+}

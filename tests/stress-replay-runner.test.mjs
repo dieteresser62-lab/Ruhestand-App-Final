@@ -9,6 +9,7 @@ import {
     StressReplayRunnerError,
     runStressReplayPathV1
 } from '../app/simulator/stress-replay-runner.js';
+import { createStressReplayVariantV1 } from '../app/simulator/stress-replay-variant.js';
 import {
     STRESS_REPLAY_TRANSACTION_CAPTURE_INPUT,
     STRESS_REPLAY_TRANSACTION_CLASSES
@@ -130,10 +131,19 @@ const inputs = {
     partner: { aktiv: false },
     startFloorBedarf: 10000,
     startFlexBedarf: 2000,
+    minimumFlexAnnual: 1000,
+    liquidityRunwayYears: 5,
+    maxSkimPctOfEq: 10,
+    maxBearRefillPctOfEq: 5,
+    decumulation: { mode: 'standard' },
     renteMonatlich: 0,
     horizonYears: 30,
     horizonMethod: 'direct',
     dynamicFlex: false,
+    survivalQuantile: 0.85,
+    goGoActive: false,
+    goGoMultiplier: 1,
+    longevityMode: 'none',
     rentAdjMode: 'fix',
     rentAdjPct: 0
 };
@@ -277,6 +287,47 @@ assertEqual(observed[0].context.widowBenefits.p1FromP2, true, 'Materialized wido
 assertEqual(observed[0].adjusted.transitionYear, 2, 'Materialized accumulation transition must reach the engine');
 assertEqual(observed[0].marketDataHist.endeVJ_3, 85, 'Materialized market start state must replace reconstructed history');
 assertEqual(observed[0].adjusted[STRESS_REPLAY_TRANSACTION_CAPTURE_INPUT], true, 'Replay transaction capture must remain enabled by default');
+
+console.log('Test 2b: V2 floor, flex and minimum-flex values reach runner dependencies unchanged');
+const needsBaselineInputs = { ...inputs, horizonMethod: 'mean' };
+const needsVariant = createStressReplayVariantV1({
+    id: 'needs-through-runner',
+    label: 'Needs through runner',
+    baselineInputs: needsBaselineInputs,
+    patch: {
+        strategy: {
+            startFloorBedarf: 0,
+            startFlexBedarf: 750,
+            minimumFlexAnnual: 500
+        }
+    }
+});
+let observedNeeds = null;
+const needsPathBefore = JSON.stringify(householdPath);
+const needsInputsBefore = JSON.stringify(needsBaselineInputs);
+runStressReplayPathV1({
+    path: householdPath,
+    baselineInputs: needsBaselineInputs,
+    variant: needsVariant,
+    dependencies: {
+        initMcRunState(adjustedInputs) {
+            observedNeeds = {
+                startFloorBedarf: adjustedInputs.startFloorBedarf,
+                startFlexBedarf: adjustedInputs.startFlexBedarf,
+                minimumFlexAnnual: adjustedInputs.minimumFlexAnnual
+            };
+            return initialState();
+        },
+        simulateOneYear: successResult
+    }
+});
+assertJsonEqual(
+    observedNeeds,
+    { startFloorBedarf: 0, startFlexBedarf: 750, minimumFlexAnnual: 500 },
+    'Runner initialization must receive all V2 need patch values including zero'
+);
+assertEqual(JSON.stringify(householdPath), needsPathBefore, 'V2 runner must not mutate the materialized path');
+assertEqual(JSON.stringify(needsBaselineInputs), needsInputsBefore, 'V2 runner must not mutate baseline inputs');
 
 console.log('Test 3: ruin, death and technical errors remain distinct');
 const ruinYear = year(0, { recordType: 'terminal_ruin', financiallyEvaluable: false });

@@ -1,18 +1,24 @@
 import {
     STRESS_REPLAY_CONTRACT_VERSION,
     STRESS_REPLAY_FORBIDDEN_VARIANT_PATHS_V1,
+    STRESS_REPLAY_FORBIDDEN_VARIANT_PATHS_V2,
     STRESS_REPLAY_LIMITS,
     STRESS_REPLAY_SCHEMA_VERSIONS,
     STRESS_REPLAY_SCOPE,
     STRESS_REPLAY_UNITS_V1,
     STRESS_REPLAY_VARIANT_WHITELIST_V1,
+    STRESS_REPLAY_VARIANT_WHITELIST_V2,
+    STRESS_REPLAY_VARIANT_WHITELIST_VERSION_V1,
+    STRESS_REPLAY_VARIANT_WHITELIST_VERSION_V2,
     StressReplayContractError,
     assertStressReplaySize,
     createStressReplayFingerprint,
     createStressReplaySourceIdentityFingerprint,
     createStressReplaySourceIdentityV1,
     createStressReplayStrategySnapshot,
+    getStressReplayVariantContract,
     normalizeStressReplayVariantPatch,
+    validateStressReplayEffectiveNeeds,
     validateStressReplayPathV1,
     validateStressReplaySourceIdentityV1
 } from '../app/simulator/stress-replay-contract.js';
@@ -100,6 +106,8 @@ const fullInputs = {
     longevityRelativePct: 0.05,
     longevityBufferYears: 10,
     goldAktiv: true,
+    startFloorBedarf: 24000,
+    startFlexBedarf: 12000,
     minimumFlexAnnual: 12000
 };
 
@@ -118,6 +126,17 @@ assertJsonEqual(
 );
 assert(STRESS_REPLAY_FORBIDDEN_VARIANT_PATHS_V1.includes('strategy.goldAktiv'), 'Gold activation must be forbidden');
 assert(STRESS_REPLAY_FORBIDDEN_VARIANT_PATHS_V1.includes('strategy.minimumFlexAnnual'), 'minimumFlexAnnual must be forbidden');
+assertEqual(STRESS_REPLAY_VARIANT_WHITELIST_V2.length, 20, 'V2 whitelist must add exactly three need paths');
+assertJsonEqual(
+    STRESS_REPLAY_VARIANT_WHITELIST_V2.slice(-3).map(entry => [entry.inputPath, entry.contractPath]),
+    [
+        ['startFloorBedarf', 'strategy.startFloorBedarf'],
+        ['startFlexBedarf', 'strategy.startFlexBedarf'],
+        ['minimumFlexAnnual', 'strategy.minimumFlexAnnual']
+    ],
+    'V2 need descriptors must map directly to getCommonInputs'
+);
+assert(!STRESS_REPLAY_FORBIDDEN_VARIANT_PATHS_V2.includes('strategy.minimumFlexAnnual'), 'V2 must allow minimumFlexAnnual');
 assertEqual(STRESS_REPLAY_UNITS_V1.equityReturnPct, 'percent_per_year', 'Equity return unit must be explicit');
 
 console.log('Test 2: maximal strategy snapshot uses only real, normalized inputs and is immutable');
@@ -127,7 +146,13 @@ assertEqual(snapshot.decumulation.bondTargetFactor, 2, 'Active 3-bucket field mu
 assertEqual(snapshot.longevityMode, 'buffer_years', 'Longevity mode must survive snapshotting');
 assertEqual(snapshot.longevityBufferYears, 10, 'Active longevity field must survive snapshotting');
 assert(!Object.hasOwn(snapshot, 'goldAktiv'), 'Snapshot must exclude Gold activation');
-assert(!Object.hasOwn(snapshot, 'minimumFlexAnnual'), 'Snapshot must exclude minimumFlexAnnual');
+assertEqual(snapshot.startFloorBedarf, 24000, 'V2 snapshot must retain floor need');
+assertEqual(snapshot.startFlexBedarf, 12000, 'V2 snapshot must retain flex need');
+assertEqual(snapshot.minimumFlexAnnual, 12000, 'V2 snapshot must retain minimum flex');
+const legacySnapshot = createStressReplayStrategySnapshot(fullInputs, {
+    whitelistVersion: STRESS_REPLAY_VARIANT_WHITELIST_VERSION_V1
+});
+assert(!Object.hasOwn(legacySnapshot, 'minimumFlexAnnual'), 'V1 snapshot must retain its historical projection');
 assert(Object.isFrozen(snapshot), 'Snapshot must be frozen');
 assert(Object.isFrozen(snapshot.decumulation), 'Nested snapshot must be frozen');
 
@@ -139,12 +164,68 @@ for (const candidate of [
     { strategy: { invented: true } }
 ]) {
     assertContractError(
-        () => normalizeStressReplayVariantPatch(candidate),
+        () => normalizeStressReplayVariantPatch(candidate, {
+            whitelistVersion: STRESS_REPLAY_VARIANT_WHITELIST_VERSION_V1
+        }),
         'STRESS_REPLAY_VARIANT_FIELD_FORBIDDEN',
         `Patch ${JSON.stringify(candidate)} must fail closed`,
         error => error.details.fields.length === 1
     );
 }
+
+console.log('Test 3b: V2 need values retain explicit zero and reject invalid domains and relations');
+const zeroNeeds = normalizeStressReplayVariantPatch({
+    strategy: { startFloorBedarf: 0, startFlexBedarf: 0, minimumFlexAnnual: 0 }
+});
+assertJsonEqual(
+    zeroNeeds.strategy,
+    { startFloorBedarf: 0, startFlexBedarf: 0, minimumFlexAnnual: 0 },
+    'Explicit zero must survive V2 normalization'
+);
+for (const key of ['startFloorBedarf', 'startFlexBedarf', 'minimumFlexAnnual']) {
+    for (const invalid of [-1, null, '0']) {
+        assertContractError(
+            () => normalizeStressReplayVariantPatch({ strategy: { [key]: invalid } }),
+            'STRESS_REPLAY_CONTRACT_INVALID',
+            `${key} must reject ${String(invalid)}`
+        );
+    }
+    assertContractError(
+        () => normalizeStressReplayVariantPatch({ strategy: { [key]: Infinity } }),
+        'STRESS_REPLAY_NON_FINITE',
+        `${key} must reject Infinity`
+    );
+}
+assertJsonEqual(
+    validateStressReplayEffectiveNeeds({
+        baselineInputs: fullInputs,
+        patch: { strategy: { startFlexBedarf: 0, minimumFlexAnnual: 0 } }
+    }),
+    { startFloorBedarf: 24000, startFlexBedarf: 0, minimumFlexAnnual: 0 },
+    'Effective relation must treat zero as present'
+);
+for (const patch of [
+    { strategy: { startFlexBedarf: 1000, minimumFlexAnnual: 1001 } },
+    { strategy: { startFlexBedarf: 11000 } },
+    { strategy: { minimumFlexAnnual: 12001 } }
+]) {
+    assertContractError(
+        () => validateStressReplayEffectiveNeeds({ baselineInputs: fullInputs, patch }),
+        'STRESS_REPLAY_MINIMUM_FLEX_EXCEEDS_FLEX',
+        'Effective minimum flex above flex must fail without clamping',
+        error => error.details.startFlexBedarf < error.details.minimumFlexAnnual
+    );
+}
+assertEqual(
+    getStressReplayVariantContract(STRESS_REPLAY_VARIANT_WHITELIST_VERSION_V2).whitelist.length,
+    20,
+    'Known V2 dispatch must resolve'
+);
+assertContractError(
+    () => getStressReplayVariantContract('StressReplayVariantWhitelistV3'),
+    'STRESS_REPLAY_VERSION_UNSUPPORTED',
+    'Unknown future whitelist must fail closed'
+);
 
 console.log('Test 4: conditional fields normalize against their controlling modes without clamping');
 const percentageDescriptors = Object.fromEntries(

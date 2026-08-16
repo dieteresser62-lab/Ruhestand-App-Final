@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import {
     STRESS_REPLAY_CONTRACT_VERSION,
     STRESS_REPLAY_SCHEMA_VERSIONS,
@@ -58,6 +60,9 @@ function pathFixture(seed = 7) {
 function inputsFixture(overrides = {}) {
     return {
         startAlter: 65,
+        startFloorBedarf: 24000,
+        startFlexBedarf: 12000,
+        minimumFlexAnnual: 6000,
         liquidityRunwayYears: 5,
         maxSkimPctOfEq: 10,
         maxBearRefillPctOfEq: 5,
@@ -361,6 +366,38 @@ console.log('Test 10: legacy V1 workspaces remain inspectable but never synthesi
     assertEqual(legacyLoaded.status, 'read_only', 'Legacy workspace is available for inspection only');
     assertEqual(legacyLoaded.compatibility.mismatchReasons.join(','), 'source_identity_unavailable',
         'Legacy read-only reason is stable and does not derive evidence from the path');
+}
+
+console.log('Test 11: checked-in V1 import remains non-mutating and fingerprint-stable');
+{
+    const legacyGoldenJson = readFileSync(
+        new URL('./fixtures/stress-replay-comparison-export-v1.json', import.meta.url),
+        'utf8'
+    );
+    const legacyMemory = createBackend();
+    const inspection = inspectStressReplayImportV1(legacyGoldenJson, {
+        currentCompatibility: {
+            contractVersion: STRESS_REPLAY_CONTRACT_VERSION,
+            dataFingerprint: fingerprint('a'),
+            engineFingerprint: fingerprint('b')
+        }
+    });
+    assertEqual(legacyMemory.mutations.length, 0, 'V1 import inspection must not write storage');
+    assertEqual(
+        inspection.workspace.workspaceFingerprint.value,
+        inspection.document.workspace.workspaceFingerprint.value,
+        'V1 workspace fingerprint must survive import inspection'
+    );
+    assertEqual(
+        inspection.workspace.variants[1].patch.strategy.maxSkimPctOfEq,
+        12,
+        'V1 alternative patch must survive without synthesized need leaves'
+    );
+    assertEqual(
+        Object.hasOwn(inspection.workspace.variants[1].patch.strategy, 'minimumFlexAnnual'),
+        false,
+        'V1 import must not synthesize a minimum-flex patch'
+    );
 }
 
 console.log('Stress replay persistence tests passed.');

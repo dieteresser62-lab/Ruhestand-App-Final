@@ -25,7 +25,9 @@ export const STRESS_REPLAY_SCHEMA_VERSIONS = Object.freeze({
 });
 
 export const STRESS_REPLAY_CONTRACT_VERSION = 'stress-replay-contract-v1';
-export const STRESS_REPLAY_VARIANT_WHITELIST_VERSION = 'StressReplayVariantWhitelistV1';
+export const STRESS_REPLAY_VARIANT_WHITELIST_VERSION_V1 = 'StressReplayVariantWhitelistV1';
+export const STRESS_REPLAY_VARIANT_WHITELIST_VERSION_V2 = 'StressReplayVariantWhitelistV2';
+export const STRESS_REPLAY_VARIANT_WHITELIST_VERSION = STRESS_REPLAY_VARIANT_WHITELIST_VERSION_V2;
 export const STRESS_REPLAY_VARIANT_CONTRACT_KEYS_V1 = Object.freeze([
     'schemaVersion',
     'contractVersion',
@@ -400,6 +402,13 @@ export const STRESS_REPLAY_VARIANT_WHITELIST_V1 = deepFreeze([
     field('longevityBufferYears', 'strategy.longevityBufferYears', { type: 'finite_integer', minimum: LONGEVITY_LIMITS.bufferYearsMin, maximum: LONGEVITY_LIMITS.bufferYearsMax, activeWhen: 'strategy.longevityMode=buffer_years' })
 ]);
 
+export const STRESS_REPLAY_VARIANT_WHITELIST_V2 = deepFreeze([
+    ...STRESS_REPLAY_VARIANT_WHITELIST_V1,
+    field('startFloorBedarf', 'strategy.startFloorBedarf', { type: 'finite_number', minimum: 0 }),
+    field('startFlexBedarf', 'strategy.startFlexBedarf', { type: 'finite_number', minimum: 0 }),
+    field('minimumFlexAnnual', 'strategy.minimumFlexAnnual', { type: 'finite_number', minimum: 0 })
+]);
+
 export const STRESS_REPLAY_FORBIDDEN_VARIANT_PATHS_V1 = Object.freeze([
     'strategy.goldAktiv',
     'strategy.goldZielProzent',
@@ -414,9 +423,31 @@ export const STRESS_REPLAY_FORBIDDEN_VARIANT_PATHS_V1 = Object.freeze([
     'strategy.tranchen'
 ]);
 
-const WHITELIST_BY_CONTRACT_PATH = new Map(
-    STRESS_REPLAY_VARIANT_WHITELIST_V1.map(descriptor => [descriptor.contractPath, descriptor])
+export const STRESS_REPLAY_FORBIDDEN_VARIANT_PATHS_V2 = Object.freeze(
+    STRESS_REPLAY_FORBIDDEN_VARIANT_PATHS_V1.filter(path => path !== 'strategy.minimumFlexAnnual')
 );
+
+const VARIANT_CONTRACTS = new Map([
+    [STRESS_REPLAY_VARIANT_WHITELIST_VERSION_V1, Object.freeze({
+        whitelist: STRESS_REPLAY_VARIANT_WHITELIST_V1,
+        forbiddenPaths: STRESS_REPLAY_FORBIDDEN_VARIANT_PATHS_V1
+    })],
+    [STRESS_REPLAY_VARIANT_WHITELIST_VERSION_V2, Object.freeze({
+        whitelist: STRESS_REPLAY_VARIANT_WHITELIST_V2,
+        forbiddenPaths: STRESS_REPLAY_FORBIDDEN_VARIANT_PATHS_V2
+    })]
+]);
+
+export function getStressReplayVariantContract(whitelistVersion = STRESS_REPLAY_VARIANT_WHITELIST_VERSION) {
+    const contract = VARIANT_CONTRACTS.get(whitelistVersion);
+    if (!contract) {
+        fail('STRESS_REPLAY_VERSION_UNSUPPORTED', 'Unsupported stress replay variant whitelist version', {
+            whitelistVersion,
+            supportedWhitelistVersions: [...VARIANT_CONTRACTS.keys()]
+        });
+    }
+    return contract;
+}
 
 function flattenLeaves(value, prefix = '', output = []) {
     if (value && typeof value === 'object' && !Array.isArray(value)) {
@@ -470,16 +501,24 @@ function normalizeWhitelistedValue(value, descriptor) {
  * Validates an already contract-shaped patch. Conditional subfields are kept
  * only when their controlling mode is effective in this patch or baseline.
  */
-export function normalizeStressReplayVariantPatch(patch, { baselineStrategy = {} } = {}) {
+export function normalizeStressReplayVariantPatch(patch, {
+    baselineStrategy = {},
+    whitelistVersion = STRESS_REPLAY_VARIANT_WHITELIST_VERSION
+} = {}) {
     requirePlainObject(patch, 'patch');
     assertStressReplayFinite(patch, 'patch');
+    const { whitelist } = getStressReplayVariantContract(whitelistVersion);
+    const whitelistByContractPath = new Map(
+        whitelist.map(descriptor => [descriptor.contractPath, descriptor])
+    );
     const leaves = flattenLeaves(patch);
     const forbidden = [...new Set(leaves
         .map(([path]) => path)
-        .filter(path => !WHITELIST_BY_CONTRACT_PATH.has(path)))].sort();
+        .filter(path => !whitelistByContractPath.has(path)))].sort();
     if (forbidden.length > 0) {
-        fail('STRESS_REPLAY_VARIANT_FIELD_FORBIDDEN', 'Variant patch contains fields outside the V1 whitelist', {
-            fields: forbidden
+        fail('STRESS_REPLAY_VARIANT_FIELD_FORBIDDEN', 'Variant patch contains fields outside its whitelist', {
+            fields: forbidden,
+            whitelistVersion
         });
     }
 
@@ -495,7 +534,7 @@ export function normalizeStressReplayVariantPatch(patch, { baselineStrategy = {}
     );
     const normalized = {};
     for (const [path, value] of leaves) {
-        const descriptor = WHITELIST_BY_CONTRACT_PATH.get(path);
+        const descriptor = whitelistByContractPath.get(path);
         const inactiveDecumulationField = descriptor.activeWhen?.startsWith('strategy.decumulation.mode=')
             && effectiveDecumulationMode !== THREE_BUCKET_MODE;
         const activeLongevityMode = descriptor.activeWhen?.startsWith('strategy.longevityMode=')
@@ -510,8 +549,15 @@ export function normalizeStressReplayVariantPatch(patch, { baselineStrategy = {}
 }
 
 /** Builds the exact replay strategy projection from getCommonInputs(). */
-export function createStressReplayStrategySnapshot(inputs) {
+export function createStressReplayStrategySnapshot(
+    inputs,
+    { whitelistVersion = STRESS_REPLAY_VARIANT_WHITELIST_VERSION } = {}
+) {
     requirePlainObject(inputs, 'inputs');
+    const { whitelist } = getStressReplayVariantContract(whitelistVersion);
+    const whitelistByContractPath = new Map(
+        whitelist.map(descriptor => [descriptor.contractPath, descriptor])
+    );
     const runway = resolveLiquidityRunwayYears(inputs).years;
     const decumulationMode = inputs.decumulation?.mode;
     const longevityMode = inputs.longevityMode;
@@ -536,12 +582,90 @@ export function createStressReplayStrategySnapshot(inputs) {
         longevityRelativePct: inputs.longevityRelativePct,
         longevityBufferYears: inputs.longevityBufferYears
     };
-    const contractPatch = normalizeStressReplayVariantPatch({ strategy }, { baselineStrategy: strategy });
+    if (whitelistVersion === STRESS_REPLAY_VARIANT_WHITELIST_VERSION_V2) {
+        for (const key of ['startFloorBedarf', 'startFlexBedarf', 'minimumFlexAnnual']) {
+            if (Object.hasOwn(inputs, key)) strategy[key] = inputs[key];
+        }
+    }
+    const contractPatch = normalizeStressReplayVariantPatch(
+        { strategy },
+        { baselineStrategy: strategy, whitelistVersion }
+    );
     const snapshot = cloneValue(contractPatch.strategy);
     snapshot.decumulation ??= {};
-    snapshot.decumulation.mode = normalizeWhitelistedValue(decumulationMode, WHITELIST_BY_CONTRACT_PATH.get('strategy.decumulation.mode'));
-    snapshot.longevityMode = normalizeWhitelistedValue(longevityMode, WHITELIST_BY_CONTRACT_PATH.get('strategy.longevityMode'));
+    snapshot.decumulation.mode = normalizeWhitelistedValue(decumulationMode, whitelistByContractPath.get('strategy.decumulation.mode'));
+    snapshot.longevityMode = normalizeWhitelistedValue(longevityMode, whitelistByContractPath.get('strategy.longevityMode'));
     return deepFreeze(snapshot);
+}
+
+function getPath(value, path) {
+    return path.split('.').reduce((cursor, segment) => cursor?.[segment], value);
+}
+
+function cloneAndSetPath(target, path, value) {
+    const segments = path.split('.');
+    let cursor = target;
+    for (let index = 0; index < segments.length - 1; index++) {
+        const segment = segments[index];
+        if (!cursor[segment] || typeof cursor[segment] !== 'object' || Array.isArray(cursor[segment])) {
+            cursor[segment] = {};
+        }
+        cursor = cursor[segment];
+    }
+    cursor[segments.at(-1)] = cloneValue(value);
+}
+
+export function validateStressReplayEffectiveNeeds({ baselineInputs, patch = {} } = {}) {
+    requirePlainObject(baselineInputs, 'baselineInputs');
+    requirePlainObject(patch, 'patch');
+    const effective = {};
+    const needKeys = ['startFloorBedarf', 'startFlexBedarf', 'minimumFlexAnnual'];
+    const hasNeedPatch = needKeys.some(key => getPath(patch, `strategy.${key}`) !== undefined);
+    for (const key of needKeys) {
+        const patched = getPath(patch, `strategy.${key}`);
+        const value = patched !== undefined ? patched : baselineInputs[key];
+        if (value === undefined && hasNeedPatch) {
+            fail('STRESS_REPLAY_CONTRACT_INVALID', `effectiveNeeds.${key} is required for a V2 need patch`, {
+                path: `effectiveNeeds.${key}`
+            });
+        }
+        if (value !== undefined) effective[key] = requireFinite(value, `effectiveNeeds.${key}`, { minimum: 0 });
+    }
+    if (effective.startFlexBedarf !== undefined
+        && effective.minimumFlexAnnual !== undefined
+        && effective.minimumFlexAnnual > effective.startFlexBedarf) {
+        fail(
+            'STRESS_REPLAY_MINIMUM_FLEX_EXCEEDS_FLEX',
+            'Effective minimum flex must not exceed effective flex need',
+            {
+                startFlexBedarf: effective.startFlexBedarf,
+                minimumFlexAnnual: effective.minimumFlexAnnual,
+                fields: ['strategy.startFlexBedarf', 'strategy.minimumFlexAnnual']
+            }
+        );
+    }
+    return deepFreeze(effective);
+}
+
+export function applyStressReplayVariantPatch({
+    baselineInputs,
+    patch,
+    whitelistVersion = STRESS_REPLAY_VARIANT_WHITELIST_VERSION
+} = {}) {
+    requirePlainObject(baselineInputs, 'baselineInputs');
+    const normalizedPatch = normalizeStressReplayVariantPatch(patch, {
+        baselineStrategy: createStressReplayStrategySnapshot(baselineInputs, { whitelistVersion }),
+        whitelistVersion
+    });
+    if (whitelistVersion === STRESS_REPLAY_VARIANT_WHITELIST_VERSION_V2) {
+        validateStressReplayEffectiveNeeds({ baselineInputs, patch: normalizedPatch });
+    }
+    const applied = cloneValue(baselineInputs);
+    for (const descriptor of getStressReplayVariantContract(whitelistVersion).whitelist) {
+        const value = getPath(normalizedPatch, descriptor.contractPath);
+        if (value !== undefined) cloneAndSetPath(applied, descriptor.inputPath, value);
+    }
+    return deepFreeze(applied);
 }
 
 function validateFingerprint(value, path) {
@@ -692,14 +816,14 @@ export function validateStressReplayVariantV1(variant) {
         });
     }
     if (variant.schemaVersion !== STRESS_REPLAY_SCHEMA_VERSIONS.variant
-        || variant.contractVersion !== STRESS_REPLAY_CONTRACT_VERSION
-        || variant.whitelistVersion !== STRESS_REPLAY_VARIANT_WHITELIST_VERSION) {
+        || variant.contractVersion !== STRESS_REPLAY_CONTRACT_VERSION) {
         fail('STRESS_REPLAY_VERSION_UNSUPPORTED', 'Unsupported stress replay variant contract', {
             schemaVersion: variant.schemaVersion,
             contractVersion: variant.contractVersion,
             whitelistVersion: variant.whitelistVersion
         });
     }
+    getStressReplayVariantContract(variant.whitelistVersion);
     requireString(variant.id, 'variant.id');
     requireString(variant.label, 'variant.label');
     if (variant.role !== 'baseline' && variant.role !== 'alternative') {
@@ -721,7 +845,9 @@ export function validateStressReplayVariantV1(variant) {
     if (expectedVariantFingerprint.value !== variant.variantFingerprint.value) {
         fail('STRESS_REPLAY_VARIANT_FINGERPRINT_MISMATCH', 'Variant fingerprint does not match its contents');
     }
-    const normalizedPatch = normalizeStressReplayVariantPatch(variant.patch);
+    const normalizedPatch = normalizeStressReplayVariantPatch(variant.patch, {
+        whitelistVersion: variant.whitelistVersion
+    });
     if (canonicalizeHistoricalContractValue(normalizedPatch)
         !== canonicalizeHistoricalContractValue(variant.patch)) {
         fail('STRESS_REPLAY_CONTRACT_INVALID', 'Variant patch must already be canonically normalized', {
@@ -1136,6 +1262,19 @@ export function validateStressReplayWorkspaceV1(workspace) {
             fail('STRESS_REPLAY_CONTRACT_INVALID', 'Workspace variant identity or baseline binding is invalid', {
                 path: `workspace.variants[${index}]`
             });
+        }
+        const appliedInputs = applyStressReplayVariantPatch({
+            baselineInputs: workspace.baselineSnapshot,
+            patch: validated.patch,
+            whitelistVersion: validated.whitelistVersion
+        });
+        const appliedFingerprint = createStressReplayFingerprint(appliedInputs);
+        if (appliedFingerprint.value !== validated.normalizedInputFingerprint.value) {
+            fail(
+                'STRESS_REPLAY_VARIANT_FINGERPRINT_MISMATCH',
+                'Workspace variant normalized-input fingerprint does not match its baseline and patch',
+                { path: `workspace.variants[${index}].normalizedInputFingerprint` }
+            );
         }
         return validated;
     });

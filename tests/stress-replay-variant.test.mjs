@@ -3,6 +3,8 @@ import {
     STRESS_REPLAY_SCHEMA_VERSIONS,
     STRESS_REPLAY_SCOPE,
     STRESS_REPLAY_UNITS_V1,
+    STRESS_REPLAY_VARIANT_WHITELIST_VERSION_V1,
+    STRESS_REPLAY_VARIANT_WHITELIST_VERSION_V2,
     StressReplayContractError,
     createStressReplayFingerprint,
     createStressReplayVariantFingerprint,
@@ -75,6 +77,7 @@ const inputs = baselineInputs();
 const inputsBefore = JSON.stringify(inputs);
 const baseline = createStressReplayBaselineVariantV1({ baselineInputs: inputs });
 assertEqual(baseline.role, 'baseline', 'Baseline role must be explicit');
+assertEqual(baseline.whitelistVersion, STRESS_REPLAY_VARIANT_WHITELIST_VERSION_V2, 'New variants must use V2');
 assertJsonEqual(baseline.patch, {}, 'Baseline patch must be empty');
 assert(Object.isFrozen(baseline) && Object.isFrozen(baseline.patch), 'Baseline contract must be deeply immutable');
 
@@ -91,10 +94,9 @@ assertJsonEqual(applied.depotTranchesAktien, inputs.depotTranchesAktien, 'Real t
 assertEqual(JSON.stringify(inputs), inputsBefore, 'Variant creation and application must not mutate baseline inputs');
 assert(Object.isFrozen(applied), 'Applied inputs must be immutable at their root');
 
-console.log('Test 2: asset, need, person, tranche and unknown fields fail closed with exact paths');
+console.log('Test 2: legacy V1 remains exact while V2 allows only the three new need fields');
 for (const [field, patch] of [
     ['strategy.goldAktiv', { strategy: { goldAktiv: false } }],
-    ['strategy.minimumFlexAnnual', { strategy: { minimumFlexAnnual: 1 } }],
     ['strategy.startAlter', { strategy: { startAlter: 70 } }],
     ['strategy.tranchen', { strategy: { tranchen: [] } }],
     ['person.name', { person: { name: 'X' } }]
@@ -106,6 +108,54 @@ for (const [field, patch] of [
         field
     );
 }
+assertContractError(
+    () => createStressReplayVariantV1({
+        id: 'legacy-min-flex',
+        label: 'Legacy minimum flex',
+        baselineInputs: inputs,
+        patch: { strategy: { minimumFlexAnnual: 1 } },
+        whitelistVersion: STRESS_REPLAY_VARIANT_WHITELIST_VERSION_V1
+    }),
+    'STRESS_REPLAY_VARIANT_FIELD_FORBIDDEN',
+    'V1 minimum flex must remain forbidden',
+    'strategy.minimumFlexAnnual'
+);
+const needsVariant = createStressReplayVariantV1({
+    id: 'needs-zero',
+    label: 'Needs zero',
+    baselineInputs: inputs,
+    patch: { strategy: { startFloorBedarf: 0, startFlexBedarf: 0, minimumFlexAnnual: 0 } }
+});
+assertJsonEqual(
+    needsVariant.patch.strategy,
+    { startFloorBedarf: 0, startFlexBedarf: 0, minimumFlexAnnual: 0 },
+    'V2 must retain all explicit zero leaves against positive baselines'
+);
+const zeroApplied = applyStressReplayVariantV1({ baselineInputs: inputs, variant: needsVariant });
+assertEqual(zeroApplied.startFloorBedarf, 0, 'Applied floor zero must survive');
+assertEqual(zeroApplied.startFlexBedarf, 0, 'Applied flex zero must survive');
+assertEqual(zeroApplied.minimumFlexAnnual, 0, 'Applied minimum-flex zero must survive');
+assertContractError(
+    () => createStressReplayVariantV1({
+        id: 'invalid-relation',
+        label: 'Invalid relation',
+        baselineInputs: inputs,
+        patch: { strategy: { startFlexBedarf: 0 } }
+    }),
+    'STRESS_REPLAY_MINIMUM_FLEX_EXCEEDS_FLEX',
+    'Patch flex must be checked against baseline minimum flex'
+);
+assertContractError(
+    () => createStressReplayVariantV1({
+        id: 'future',
+        label: 'Future',
+        baselineInputs: inputs,
+        patch: {},
+        whitelistVersion: 'StressReplayVariantWhitelistV3'
+    }),
+    'STRESS_REPLAY_VERSION_UNSUPPORTED',
+    'Unknown whitelist version must fail closed'
+);
 
 console.log('Test 3: mode-bound fields retain their controller and count as one factor');
 const bucketVariant = createStressReplayVariantV1({
@@ -195,6 +245,16 @@ assertContractError(
     () => validateStressReplayVariantV1(persistedOutOfRange),
     'STRESS_REPLAY_CONTRACT_INVALID',
     'Recomputed variant fingerprint must not bypass percentage bounds'
+);
+assertContractError(
+    () => createStressReplayVariantV1({
+        id: 'zero-noop',
+        label: 'Zero no-op',
+        baselineInputs: baselineInputs({ startFloorBedarf: 0 }),
+        patch: { strategy: { startFloorBedarf: 0 } }
+    }),
+    'STRESS_REPLAY_VARIANT_NO_OP',
+    'Explicit zero against zero must be recognized before no-op rejection'
 );
 assertContractError(
     () => createStressReplayVariantV1({

@@ -3,12 +3,13 @@
 import {
     STRESS_REPLAY_CONTRACT_VERSION,
     STRESS_REPLAY_SCHEMA_VERSIONS,
-    STRESS_REPLAY_VARIANT_WHITELIST_V1,
     STRESS_REPLAY_VARIANT_WHITELIST_VERSION,
     StressReplayContractError,
+    applyStressReplayVariantPatch,
     createStressReplayFingerprint,
     createStressReplayStrategySnapshot,
     createStressReplayVariantFingerprint,
+    getStressReplayVariantContract,
     normalizeStressReplayVariantPatch,
     validateStressReplayVariantV1
 } from './stress-replay-contract.js';
@@ -53,9 +54,9 @@ function sameValue(left, right) {
     return JSON.stringify(left) === JSON.stringify(right);
 }
 
-function removeNoOpLeaves(normalizedPatch, baselineStrategy) {
+function removeNoOpLeaves(normalizedPatch, baselineStrategy, whitelistVersion) {
     const materialPatch = {};
-    for (const descriptor of STRESS_REPLAY_VARIANT_WHITELIST_V1) {
+    for (const descriptor of getStressReplayVariantContract(whitelistVersion).whitelist) {
         const value = getPath(normalizedPatch, descriptor.contractPath);
         if (value === undefined) continue;
         const strategyPath = descriptor.contractPath.replace(/^strategy\./, '');
@@ -86,9 +87,9 @@ function factorGroup(contractPath) {
     return contractPath.replace(/^strategy\./, '');
 }
 
-function materialGroups(patch) {
+function materialGroups(patch, whitelistVersion) {
     const groups = new Set();
-    for (const descriptor of STRESS_REPLAY_VARIANT_WHITELIST_V1) {
+    for (const descriptor of getStressReplayVariantContract(whitelistVersion).whitelist) {
         if (getPath(patch, descriptor.contractPath) !== undefined) {
             groups.add(factorGroup(descriptor.contractPath));
         }
@@ -96,27 +97,33 @@ function materialGroups(patch) {
     return [...groups].sort();
 }
 
-function applyNormalizedPatch(baselineInputs, patch) {
-    const applied = cloneValue(baselineInputs);
-    for (const descriptor of STRESS_REPLAY_VARIANT_WHITELIST_V1) {
-        const value = getPath(patch, descriptor.contractPath);
-        if (value !== undefined) setPath(applied, descriptor.inputPath, value);
-    }
-    return applied;
-}
-
-export function previewStressReplayVariantPatchV1({ baselineInputs, patch }) {
+export function previewStressReplayVariantPatchV1({
+    baselineInputs,
+    patch,
+    whitelistVersion = STRESS_REPLAY_VARIANT_WHITELIST_VERSION
+}) {
     const baselineFingerprintBefore = createStressReplayFingerprint(baselineInputs);
-    const baselineStrategy = createStressReplayStrategySnapshot(baselineInputs);
-    const normalized = normalizeStressReplayVariantPatch(patch, { baselineStrategy });
-    const materialPatch = removeNoOpLeaves(normalized, baselineStrategy);
-    const normalizedMaterialPatch = normalizeStressReplayVariantPatch(materialPatch, { baselineStrategy });
-    const normalizedInputs = applyNormalizedPatch(baselineInputs, normalizedMaterialPatch);
+    const patchFingerprintBefore = createStressReplayFingerprint(patch);
+    const baselineStrategy = createStressReplayStrategySnapshot(baselineInputs, { whitelistVersion });
+    const normalized = normalizeStressReplayVariantPatch(patch, { baselineStrategy, whitelistVersion });
+    const materialPatch = removeNoOpLeaves(normalized, baselineStrategy, whitelistVersion);
+    const normalizedMaterialPatch = normalizeStressReplayVariantPatch(
+        materialPatch,
+        { baselineStrategy, whitelistVersion }
+    );
+    const normalizedInputs = applyStressReplayVariantPatch({
+        baselineInputs,
+        patch: normalizedMaterialPatch,
+        whitelistVersion
+    });
     const baselineFingerprintAfter = createStressReplayFingerprint(baselineInputs);
     if (baselineFingerprintBefore.value !== baselineFingerprintAfter.value) {
         fail('STRESS_REPLAY_BASELINE_INPUT_MUTATED', 'Variant preview mutated the baseline inputs');
     }
-    const materialChangeGroups = materialGroups(normalizedMaterialPatch);
+    if (patchFingerprintBefore.value !== createStressReplayFingerprint(patch).value) {
+        fail('STRESS_REPLAY_VARIANT_PATCH_MUTATED', 'Variant preview mutated the requested patch');
+    }
+    const materialChangeGroups = materialGroups(normalizedMaterialPatch, whitelistVersion);
     const warnings = materialChangeGroups.length > 1
         ? [{
             code: STRESS_REPLAY_MULTI_FACTOR_WARNING,
@@ -139,7 +146,8 @@ export function createStressReplayVariantV1({
     role = 'alternative',
     label,
     baselineInputs,
-    patch = {}
+    patch = {},
+    whitelistVersion = STRESS_REPLAY_VARIANT_WHITELIST_VERSION
 }) {
     if (role !== 'baseline' && role !== 'alternative') {
         fail('STRESS_REPLAY_CONTRACT_INVALID', 'Variant role must be baseline or alternative', { role });
@@ -152,7 +160,8 @@ export function createStressReplayVariantV1({
     if (role === 'alternative' && resolvedId.trim() === STRESS_REPLAY_BASELINE_VARIANT_ID) {
         fail('STRESS_REPLAY_CONTRACT_INVALID', 'The baseline id is reserved for the baseline variant');
     }
-    const preview = previewStressReplayVariantPatchV1({ baselineInputs, patch });
+    getStressReplayVariantContract(whitelistVersion);
+    const preview = previewStressReplayVariantPatchV1({ baselineInputs, patch, whitelistVersion });
     if (role === 'baseline' && Object.keys(preview.patch).length > 0) {
         fail('STRESS_REPLAY_CONTRACT_INVALID', 'The baseline variant must have an empty patch');
     }
@@ -162,7 +171,7 @@ export function createStressReplayVariantV1({
     const variantWithoutFingerprint = {
         schemaVersion: STRESS_REPLAY_SCHEMA_VERSIONS.variant,
         contractVersion: STRESS_REPLAY_CONTRACT_VERSION,
-        whitelistVersion: STRESS_REPLAY_VARIANT_WHITELIST_VERSION,
+        whitelistVersion,
         id: resolvedId.trim(),
         role,
         label: resolvedLabel,
@@ -178,23 +187,34 @@ export function createStressReplayVariantV1({
     });
 }
 
-export function createStressReplayBaselineVariantV1({ baselineInputs, label = 'Baseline' }) {
+export function createStressReplayBaselineVariantV1({
+    baselineInputs,
+    label = 'Baseline',
+    whitelistVersion = STRESS_REPLAY_VARIANT_WHITELIST_VERSION
+}) {
     return createStressReplayVariantV1({
         role: 'baseline',
         id: STRESS_REPLAY_BASELINE_VARIANT_ID,
         label,
         baselineInputs,
-        patch: {}
+        patch: {},
+        whitelistVersion
     });
 }
 
 export function applyStressReplayVariantV1({ baselineInputs, variant }) {
+    const baselineFingerprintBefore = createStressReplayFingerprint(baselineInputs);
+    const variantFingerprintBefore = createStressReplayFingerprint(variant);
     const validated = validateStressReplayVariantV1(variant);
     const baselineScenarioFingerprint = createStressReplayFingerprint(baselineInputs);
     if (baselineScenarioFingerprint.value !== validated.baselineScenarioFingerprint.value) {
         fail('STRESS_REPLAY_BASELINE_FINGERPRINT_MISMATCH', 'Variant does not belong to these baseline inputs');
     }
-    const applied = applyNormalizedPatch(baselineInputs, validated.patch);
+    const applied = applyStressReplayVariantPatch({
+        baselineInputs,
+        patch: validated.patch,
+        whitelistVersion: validated.whitelistVersion
+    });
     const appliedFingerprint = createStressReplayFingerprint(applied);
     if (appliedFingerprint.value !== validated.normalizedInputFingerprint.value) {
         fail('STRESS_REPLAY_VARIANT_FINGERPRINT_MISMATCH', 'Variant normalized-input fingerprint does not match');
@@ -202,6 +222,12 @@ export function applyStressReplayVariantV1({ baselineInputs, variant }) {
     if (validated.role === 'alternative'
         && appliedFingerprint.value === baselineScenarioFingerprint.value) {
         fail('STRESS_REPLAY_VARIANT_NO_OP', 'An alternative variant must change normalized inputs');
+    }
+    if (baselineFingerprintBefore.value !== createStressReplayFingerprint(baselineInputs).value) {
+        fail('STRESS_REPLAY_BASELINE_INPUT_MUTATED', 'Variant application mutated the baseline inputs');
+    }
+    if (variantFingerprintBefore.value !== createStressReplayFingerprint(variant).value) {
+        fail('STRESS_REPLAY_VARIANT_PATCH_MUTATED', 'Variant application mutated the variant contract');
     }
     return deepFreeze(applied);
 }

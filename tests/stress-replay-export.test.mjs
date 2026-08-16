@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import {
     STRESS_REPLAY_CONTRACT_VERSION,
     STRESS_REPLAY_SCHEMA_VERSIONS,
@@ -211,5 +213,84 @@ assertEqual(
     document.workspace.baselineScenarioFingerprint.value,
     createStressReplayFingerprint(workspace.baselineSnapshot).value,
     'Export retains the baseline fingerprint oracle'
+);
+
+console.log('Test 6: checked-in V1 golden export roundtrips byte- and fingerprint-identically');
+const legacyGoldenJson = readFileSync(
+    new URL('./fixtures/stress-replay-comparison-export-v1.json', import.meta.url),
+    'utf8'
+);
+const legacyGolden = parseStressReplayComparisonExportV1(legacyGoldenJson);
+assertEqual(
+    legacyGolden.workspace.variants.every(variant => variant.whitelistVersion === 'StressReplayVariantWhitelistV1'),
+    true,
+    'Golden export must retain only historical V1 whitelist variants'
+);
+assertEqual(
+    serializeStressReplayComparisonExportV1(legacyGolden),
+    legacyGoldenJson.trimEnd(),
+    'V1 golden export must serialize byte-identically'
+);
+assertEqual(
+    validateStressReplayComparisonExportV1(legacyGolden).exportFingerprint.value,
+    legacyGolden.exportFingerprint.value,
+    'V1 golden export fingerprint must remain unchanged'
+);
+
+const mixedWorkspace = structuredClone(legacyGolden.workspace);
+const v2Alternative = createStressReplayVariantV1({
+    id: 'v2-floor-zero',
+    label: 'V2 floor zero',
+    baselineInputs: mixedWorkspace.baselineSnapshot,
+    patch: { strategy: { startFloorBedarf: 0 } }
+});
+mixedWorkspace.variantOrder.push(v2Alternative.id);
+mixedWorkspace.variants.push(v2Alternative);
+mixedWorkspace.workspaceFingerprint = createStressReplayWorkspaceFingerprint(mixedWorkspace);
+const mixedExport = buildStressReplayComparisonExportV1({
+    workspace: mixedWorkspace,
+    exportedAt: legacyGolden.exportedAtUtc
+});
+assertEqual(mixedExport.workspace.variants[0].whitelistVersion, 'StressReplayVariantWhitelistV1', 'Mixed export retains V1 baseline');
+assertEqual(mixedExport.workspace.variants[2].whitelistVersion, 'StressReplayVariantWhitelistV2', 'Mixed export accepts known V2 alternative');
+assertEqual(mixedExport.workspace.variants[2].patch.strategy.startFloorBedarf, 0, 'Mixed export retains explicit V2 zero');
+
+const invalidEffectiveNeeds = structuredClone(mixedExport);
+invalidEffectiveNeeds.workspace.variants[2].patch.strategy.startFlexBedarf = 0;
+invalidEffectiveNeeds.workspace.variants[2].materialChangeGroups = ['startFlexBedarf', 'startFloorBedarf'];
+invalidEffectiveNeeds.workspace.variants[2].warnings = [{
+    code: 'STRESS_REPLAY_MULTI_FACTOR_VARIANT',
+    factorCount: 2,
+    factorGroups: ['startFlexBedarf', 'startFloorBedarf']
+}];
+invalidEffectiveNeeds.workspace.variants[2].normalizedInputFingerprint = createStressReplayFingerprint({
+    ...invalidEffectiveNeeds.workspace.baselineSnapshot,
+    startFloorBedarf: 0,
+    startFlexBedarf: 0
+});
+invalidEffectiveNeeds.workspace.variants[2].variantFingerprint = createStressReplayVariantFingerprint(
+    invalidEffectiveNeeds.workspace.variants[2]
+);
+invalidEffectiveNeeds.workspace.workspaceFingerprint = createStressReplayWorkspaceFingerprint(
+    invalidEffectiveNeeds.workspace
+);
+invalidEffectiveNeeds.exportFingerprint = createStressReplayComparisonExportFingerprint(invalidEffectiveNeeds);
+assertContractError(
+    () => validateStressReplayComparisonExportV1(invalidEffectiveNeeds),
+    'STRESS_REPLAY_MINIMUM_FLEX_EXCEEDS_FLEX',
+    'Recomputed nested and outer fingerprints must not bypass the effective need relation'
+);
+
+const futureWhitelist = structuredClone(legacyGolden);
+futureWhitelist.workspace.variants[1].whitelistVersion = 'StressReplayVariantWhitelistV3';
+futureWhitelist.workspace.variants[1].variantFingerprint = createStressReplayVariantFingerprint(
+    futureWhitelist.workspace.variants[1]
+);
+futureWhitelist.workspace.workspaceFingerprint = createStressReplayWorkspaceFingerprint(futureWhitelist.workspace);
+futureWhitelist.exportFingerprint = createStressReplayComparisonExportFingerprint(futureWhitelist);
+assertContractError(
+    () => validateStressReplayComparisonExportV1(futureWhitelist),
+    'STRESS_REPLAY_VERSION_UNSUPPORTED',
+    'Unknown nested whitelist version must fail closed before import'
 );
 console.log('Stress replay export tests passed.');
