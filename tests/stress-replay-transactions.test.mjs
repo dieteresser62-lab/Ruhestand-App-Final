@@ -3,9 +3,15 @@ import {
     STRESS_REPLAY_TRANSACTION_CLASSES,
     STRESS_REPLAY_TRANSACTION_EVENT_VERSION,
     buildStressReplayTransactionsForYear,
-    collectStressReplayTransactions
+    collectStressReplayTransactions,
+    summarizeStressReplayTransactionsV1
 } from '../app/simulator/stress-replay-transactions.js';
-import { applyPayoutFallbackSale } from '../app/simulator/simulator-forced-sale.js';
+import {
+    applyForcedSaleLiquidityCoverage,
+    applyPayoutFallbackSale
+} from '../app/simulator/simulator-forced-sale.js';
+import { applyBondRefillPostprocessing } from '../app/simulator/simulator-bond-refill.js';
+import { buildTaxRawAggregate } from '../app/simulator/simulator-tax-recompute.js';
 import { simulateOneYear } from '../app/simulator/simulator-engine-wrapper.js';
 import { EngineAPI } from '../engine/index.mjs';
 import { settleTaxYear } from '../engine/tax-settlement.mjs';
@@ -99,6 +105,8 @@ const payoutEvents = buildStressReplayTransactionsForYear({
 });
 assertEqual(payoutEvents[0].taxEur, null, 'Explicit tax missingness must survive projection');
 assertEqual(payoutEvents[0].missingness[0].field, 'taxEur', 'Missingness must identify the missing field');
+assertEqual(payoutEvents[0].missingness[1].breakdownIndex, 0, 'Breakdown missingness must identify its index');
+assertEqual(payoutEvents[0].missingness[1].assetClass, 'mixed_equity_gold', 'Breakdown missingness must identify its asset class');
 
 console.log('Test 4: absent or malformed monetary observations fail closed');
 assertFails(
@@ -122,6 +130,120 @@ assertFails(
     }),
     'Unknown or text-derived transaction classes must fail closed'
 );
+for (const [overrides, message] of [
+    [{ breakdown: [{ assetClass: 'equity', grossEur: 100, netEur: null, taxEur: 10 }] }, 'A silent breakdown null must fail closed'],
+    [{ breakdown: [{ assetClass: 'equity', grossEur: 100, netEur: -1, taxEur: 10 }] }, 'A negative breakdown amount must fail closed'],
+    [{ breakdown: [{ assetClass: 'equity', grossEur: 100, netEur: 90, taxEur: Infinity }] }, 'A non-finite breakdown amount must fail closed'],
+    [{ breakdown: [{ assetClass: 'equity', grossEur: 101, netEur: 90, taxEur: 10 }] }, 'A breakdown aggregate contradiction must fail closed'],
+    [{
+        breakdown: [{ assetClass: 'equity', grossEur: 100, netEur: null, taxEur: 10 }],
+        missingness: [{ scope: 'breakdown', breakdownIndex: 0, assetClass: 'equity', field: 'netEur', reason: '' }]
+    }, 'An empty breakdown missingness reason must fail closed'],
+    [{
+        breakdown: [{ assetClass: 'equity', grossEur: 100, netEur: null, taxEur: 10 }],
+        missingness: [{ scope: 'breakdown', breakdownIndex: 0, assetClass: 'equity', field: 'requestedNetEur', reason: 'unsupported' }]
+    }, 'An unknown breakdown missingness field must fail closed']
+]) {
+    assertFails(
+        () => buildStressReplayTransactionsForYear({
+            yearIndex: 0,
+            logData: {
+                stressReplayTransactionDiagnostics: [diagnostic(
+                    STRESS_REPLAY_TRANSACTION_CLASSES.LIQUIDITY_SHORTFALL_FORCED_SALE,
+                    overrides
+                )]
+            }
+        }),
+        message
+    );
+}
+
+console.log('Test 4b: forced sale and bond refill expose complete breakdown contracts');
+const forcedPortfolio = {
+    depotTranchesAktien: [{
+        marketValue: 100000,
+        costBasis: 50000,
+        type: 'aktien_alt',
+        category: 'equity',
+        purchaseDate: '2000-01-01',
+        tqf: 0.3
+    }],
+    depotTranchesGold: [],
+    liquiditaet: 0
+};
+const forcedCoverage = applyForcedSaleLiquidityCoverage({
+    forcedShortfall: 10000,
+    portfolio: forcedPortfolio,
+    engineInput: {
+        sparerPauschbetrag: 0,
+        kirchensteuerSatz: 0,
+        goldAktiv: false,
+        depotwertAlt: 100000,
+        depotwertNeu: 0,
+        goldWert: 0
+    },
+    market: { sKey: 'bear_deep' },
+    is3Bucket: false,
+    isBadYear: false,
+    depotTranchesAktien: forcedPortfolio.depotTranchesAktien,
+    depotTranchesGold: forcedPortfolio.depotTranchesGold,
+    equityBeforeForced: 100000,
+    goldBeforeForced: 0,
+    combinedTaxRawAggregate: buildTaxRawAggregate(),
+    captureTransactions: true
+});
+const forcedEvent = buildStressReplayTransactionsForYear({
+    yearIndex: 0,
+    logData: { stressReplayTransactionDiagnostics: [forcedCoverage.transactionDiagnostic] }
+})[0];
+assert(forcedEvent.breakdown.every(item => item.netEur === null && item.taxEur === null), 'Unallocatable forced-sale values must remain null');
+assertEqual(forcedEvent.missingness.filter(item => item.scope === 'breakdown').length, 2, 'Each forced-sale breakdown null needs its own reason');
+
+const bondPortfolio = {
+    depotTranchesAktien: [{
+        type: 'aktien_neu',
+        category: 'equity',
+        marketValue: 150000,
+        costBasis: 100000,
+        tqf: 0.3
+    }],
+    depotTranchesGold: [],
+    depotTranchesGeldmarkt: [],
+    liquiditaet: 0
+};
+const bondRefill = applyBondRefillPostprocessing({
+    is3Bucket: true,
+    isBadYear: false,
+    threeBucketInput: { bondTargetFactor: 5, bondRefillThresholdPct: null },
+    jahresEntnahmeTarget: 12000,
+    netFloorYear: 12000,
+    portfolio: bondPortfolio,
+    depotTranchesAktien: bondPortfolio.depotTranchesAktien,
+    engineInput: {
+        sparerPauschbetrag: 0,
+        kirchensteuerSatz: 0,
+        goldAktiv: false,
+        depotwertAlt: 0,
+        depotwertNeu: 150000,
+        goldWert: 0
+    },
+    market: { sKey: 'hot_neutral' },
+    combinedTaxRawAggregate: buildTaxRawAggregate(),
+    captureTransactions: true
+});
+const bondEvent = buildStressReplayTransactionsForYear({
+    yearIndex: 1,
+    logData: { stressReplayTransactionDiagnostics: [bondRefill.transactionDiagnostic] }
+})[0];
+assert(bondEvent.breakdown.every(item => Number.isFinite(item.netEur) && Number.isFinite(item.taxEur)), 'Known bond-refill breakdown values must remain numeric');
+assertEqual(bondEvent.missingness.length, 0, 'Known bond-refill breakdown values need no missingness');
+
+const forcedSummary = summarizeStressReplayTransactionsV1([forcedEvent])[0];
+assert(
+    forcedSummary.missingness.some(item => item.scope === 'breakdown'
+        && item.reasons.includes('forced_sale_net_not_allocatable_by_asset_class')),
+    'Comparison aggregation must preserve breakdown missingness reasons'
+);
 
 console.log('Test 5: collection is deterministic and opt-in capture is explicit');
 assertEqual(STRESS_REPLAY_TRANSACTION_CAPTURE_INPUT, 'stressReplayTransactionCapture', 'Replay capture input name must stay stable');
@@ -141,7 +263,12 @@ const collected = collectStressReplayTransactions([
         logData: {
             stressReplayTransactionDiagnostics: [diagnostic(
                 STRESS_REPLAY_TRANSACTION_CLASSES.LIQUIDITY_SHORTFALL_FORCED_SALE,
-                { grossEur: 50, netEur: 47, taxEur: 3 }
+                {
+                    grossEur: 50,
+                    netEur: 47,
+                    taxEur: 3,
+                    breakdown: [{ assetClass: 'equity', grossEur: 50, netEur: 47, taxEur: 3 }]
+                }
             )]
         }
     }

@@ -98,8 +98,24 @@ function transaction(variantId, grossEur) {
         netEur: grossEur,
         taxEur: null,
         requestedNetEur: null,
-        breakdown: [],
-        missingness: [{ field: 'taxEur', reason: 'fixture_tax_unobserved' }]
+        breakdown: [{ assetClass: 'equity', grossEur, netEur: null, taxEur: null }],
+        missingness: [
+            { scope: 'event', field: 'taxEur', reason: 'fixture_tax_unobserved' },
+            {
+                scope: 'breakdown',
+                breakdownIndex: 0,
+                assetClass: 'equity',
+                field: 'netEur',
+                reason: 'fixture_net_not_allocatable'
+            },
+            {
+                scope: 'breakdown',
+                breakdownIndex: 0,
+                assetClass: 'equity',
+                field: 'taxEur',
+                reason: 'fixture_tax_not_allocatable'
+            }
+        ]
     };
 }
 
@@ -267,6 +283,12 @@ assertEqual(singlePair.kpiDeltas.totalHealthBucketUsedEur.absoluteDelta, null, '
 assert(singlePair.missingness.some(entry => entry.field === 'totalHealthBucketUsedEur'), 'Unobserved KPI must have structured missingness');
 assertEqual(singlePair.kpiDeltas.ruinYear.applicability, 'not_applicable_neither_ruined', 'Jointly absent ruin years must be marked not applicable');
 assertEqual(first.variants.find(entry => entry.variantId === 'single').transactionSummary[0].taxEur, null, 'Transaction tax missingness must survive aggregation');
+assert(
+    first.variants.find(entry => entry.variantId === 'single').transactionSummary[0].missingness.some(
+        entry => entry.scope === 'breakdown' && entry.reasons.includes('fixture_net_not_allocatable')
+    ),
+    'Transaction breakdown missingness reasons must survive comparison aggregation'
+);
 
 console.log('Test 5: a technical result blocks the aggregate and its financial pair');
 const technicalResult = resultFor(single, {

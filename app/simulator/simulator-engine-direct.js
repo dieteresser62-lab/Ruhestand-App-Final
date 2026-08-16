@@ -799,6 +799,34 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         combinedTaxRawAggregate = buildTaxRawAggregate();
         addTaxRawAggregate(combinedTaxRawAggregate, actionResult?.taxRawAggregate, regularSaleScale);
     }
+    const regularSaleBreakdown = stressReplayTransactionCapture && hasSales && regularSaleScale > 0
+        ? saleQuellen.map(source => ({
+            assetClass: source?.category || source?.kind || 'unknown',
+            grossEur: (Number(source?.brutto) || 0) * regularSaleScale,
+            netEur: typeof source?.netto === 'number' && Number.isFinite(source.netto) && source.netto >= 0
+                ? source.netto * regularSaleScale
+                : null,
+            taxEur: typeof source?.steuer === 'number' && Number.isFinite(source.steuer) && source.steuer >= 0
+                ? source.steuer * regularSaleScale
+                : null
+        }))
+        : [];
+    const regularSaleMissingness = regularSaleBreakdown.flatMap((item, breakdownIndex) => [
+        ...(item.netEur === null ? [{
+            scope: 'breakdown',
+            breakdownIndex,
+            assetClass: item.assetClass,
+            field: 'netEur',
+            reason: 'policy_sale_breakdown_net_not_reported'
+        }] : []),
+        ...(item.taxEur === null ? [{
+            scope: 'breakdown',
+            breakdownIndex,
+            assetClass: item.assetClass,
+            field: 'taxEur',
+            reason: 'policy_sale_breakdown_tax_not_reported'
+        }] : [])
+    ]);
     const regularSaleDiagnostic = stressReplayTransactionCapture && hasSales && regularSaleScale > 0
         ? {
             class: 'policy_rebalancing_sale',
@@ -808,17 +836,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             grossEur: plannedSaleBrutto * regularSaleScale,
             netEur: (Number(actionResult.nettoErlös) || 0) * regularSaleScale,
             taxEur: (Number(actionResult.steuer) || 0) * regularSaleScale,
-            breakdown: saleQuellen.map(source => ({
-                assetClass: source?.category || source?.kind || 'unknown',
-                grossEur: (Number(source?.brutto) || 0) * regularSaleScale,
-                netEur: Number.isFinite(Number(source?.netto))
-                    ? Number(source.netto) * regularSaleScale
-                    : null,
-                taxEur: Number.isFinite(Number(source?.steuer))
-                    ? Number(source.steuer) * regularSaleScale
-                    : null
-            })),
-            missingness: []
+            breakdown: regularSaleBreakdown,
+            missingness: regularSaleMissingness
         }
         : null;
 

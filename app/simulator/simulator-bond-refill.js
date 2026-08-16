@@ -160,6 +160,33 @@ export function applyBondRefillPostprocessing({
     bondTranche.costBasis += refillNet;
     addTaxRawAggregate(combinedTaxRawAggregate, refillSale.taxRawAggregate);
 
+    const transactionBreakdown = refillBreakdown.map(item => ({
+        assetClass: item?.category || item?.kind || 'equity',
+        grossEur: Number(item?.brutto) || 0,
+        netEur: typeof item?.netto === 'number' && Number.isFinite(item.netto) && item.netto >= 0
+            ? item.netto
+            : null,
+        taxEur: typeof item?.steuer === 'number' && Number.isFinite(item.steuer) && item.steuer >= 0
+            ? item.steuer
+            : null
+    }));
+    const transactionMissingness = transactionBreakdown.flatMap((item, breakdownIndex) => [
+        ...(item.netEur === null ? [{
+            scope: 'breakdown',
+            breakdownIndex,
+            assetClass: item.assetClass,
+            field: 'netEur',
+            reason: 'bond_refill_breakdown_net_not_reported'
+        }] : []),
+        ...(item.taxEur === null ? [{
+            scope: 'breakdown',
+            breakdownIndex,
+            assetClass: item.assetClass,
+            field: 'taxEur',
+            reason: 'bond_refill_breakdown_tax_not_reported'
+        }] : [])
+    ]);
+
     return {
         bondRefillGrossDelta: Number(refillSale.bruttoVerkaufGesamt) || 0,
         bondRefillNetDelta: refillNet,
@@ -175,13 +202,8 @@ export function applyBondRefillPostprocessing({
             grossEur: Number(refillSale.bruttoVerkaufGesamt) || 0,
             netEur: refillNet,
             taxEur: Number(refillSale.steuerGesamt) || 0,
-            breakdown: refillBreakdown.map(item => ({
-                assetClass: item?.category || item?.kind || 'equity',
-                grossEur: Number(item?.brutto) || 0,
-                netEur: Number.isFinite(Number(item?.netto)) ? Number(item.netto) : null,
-                taxEur: Number.isFinite(Number(item?.steuer)) ? Number(item.steuer) : null
-            })),
-            missingness: []
+            breakdown: transactionBreakdown,
+            missingness: transactionMissingness
         } } : {})
     };
 }

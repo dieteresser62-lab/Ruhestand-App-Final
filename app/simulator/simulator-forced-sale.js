@@ -210,7 +210,40 @@ export function applyForcedSaleLiquidityCoverage({
                         taxEur: null
                     }] : [])
                 ],
-                missingness: []
+                missingness: [
+                    ...(forcedExecutedEq > 0 ? [
+                        {
+                            scope: 'breakdown',
+                            breakdownIndex: 0,
+                            assetClass: (is3Bucket && isBadYear) ? 'bonds' : 'equity',
+                            field: 'netEur',
+                            reason: 'forced_sale_net_not_allocatable_by_asset_class'
+                        },
+                        {
+                            scope: 'breakdown',
+                            breakdownIndex: 0,
+                            assetClass: (is3Bucket && isBadYear) ? 'bonds' : 'equity',
+                            field: 'taxEur',
+                            reason: 'forced_sale_tax_not_allocatable_by_asset_class'
+                        }
+                    ] : []),
+                    ...(forcedExecutedGld > 0 ? [
+                        {
+                            scope: 'breakdown',
+                            breakdownIndex: forcedExecutedEq > 0 ? 1 : 0,
+                            assetClass: 'gold',
+                            field: 'netEur',
+                            reason: 'forced_sale_net_not_allocatable_by_asset_class'
+                        },
+                        {
+                            scope: 'breakdown',
+                            breakdownIndex: forcedExecutedEq > 0 ? 1 : 0,
+                            assetClass: 'gold',
+                            field: 'taxEur',
+                            reason: 'forced_sale_tax_not_allocatable_by_asset_class'
+                        }
+                    ] : [])
+                ]
             }
             : null } : {})
     };
@@ -296,8 +329,15 @@ export function applyPayoutFallbackSale({
                     taxEur: null
                 }],
                 missingness: [{
+                    scope: 'event',
                     field: 'taxEur',
                     reason: 'payout_fallback_tax_not_calculated'
+                }, {
+                    scope: 'breakdown',
+                    breakdownIndex: 0,
+                    assetClass: (is3Bucket && isBadYear) ? 'bonds' : 'mixed_equity_gold',
+                    field: 'taxEur',
+                    reason: 'payout_fallback_breakdown_tax_not_calculated'
                 }]
             }
             : null } : {})
