@@ -289,7 +289,8 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
         scenarioContainer.style.display = 'none';
     }
 
-    // 6. Gesamten Ergebnis-Container sichtbar machen
+    // 6. Ergebnisinhalt bereitstellen. Die Sichtbarkeit der übergeordneten
+    // Unteransicht wird ausschließlich vom MC-Cockpit gesteuert.
     document.getElementById('monteCarloResults').style.display = 'block';
 }
 

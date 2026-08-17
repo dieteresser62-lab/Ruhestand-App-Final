@@ -1,8 +1,10 @@
 import fs from 'node:fs';
 import {
+    activateMonteCarloResultView,
     completeMonteCarloCockpitRun,
     initMonteCarloResultCockpit,
     syncMonteCarloCockpitStartState,
+    updateMonteCarloReplayVariantBadge,
     updateMonteCarloSetupSummary
 } from '../app/simulator/mc-result-cockpit.js';
 
@@ -13,6 +15,9 @@ class FakeElement {
         this.textContent = '';
         this.disabled = false;
         this.open = false;
+        this.hidden = false;
+        this.focusCount = 0;
+        this.containedElements = new Set();
         this.listeners = new Map();
         this.attributes = new Map();
         this.clickCount = 0;
@@ -25,8 +30,8 @@ class FakeElement {
         this.listeners.set(type, handlers);
     }
 
-    dispatch(type) {
-        for (const handler of this.listeners.get(type) || []) handler({ preventDefault() {} });
+    dispatch(type, event = {}) {
+        for (const handler of this.listeners.get(type) || []) handler({ preventDefault() {}, ...event });
     }
 
     click() {
@@ -37,6 +42,11 @@ class FakeElement {
     setAttribute(name, value) { this.attributes.set(name, String(value)); }
     getAttribute(name) { return this.attributes.get(name) ?? null; }
     removeAttribute(name) { this.attributes.delete(name); }
+    contains(element) { return this.containedElements.has(element); }
+    focus() { this.focusCount += 1; }
+    querySelectorAll(selector) {
+        return selector === 'li[data-variant-id]' ? Array.from({ length: this.variantItems || 0 }, () => ({})) : [];
+    }
 }
 
 function createDocument() {
@@ -60,7 +70,21 @@ function createDocument() {
     for (const id of ['mcSetupSummaryRuns', 'mcSetupSummaryDuration', 'mcSetupSummaryMethod', 'mcSetupSummarySeed']) {
         register(id);
     }
-    return { elements, getElementById: id => elements.get(id) || null };
+    const selectorElements = new Map();
+    for (const viewId of ['overview', 'risk', 'care', 'logs', 'replay']) {
+        const capitalized = viewId[0].toUpperCase() + viewId.slice(1);
+        const tab = register(`mcViewTab${capitalized}`);
+        const panel = register(`mcViewPanel${capitalized}`, { hidden: viewId !== 'overview' });
+        selectorElements.set(`[role="tab"][data-mc-view="${viewId}"]`, tab);
+        selectorElements.set(`[role="tabpanel"][data-mc-view-panel="${viewId}"]`, panel);
+    }
+    register('mcReplayVariantBadge', { hidden: true });
+    register('stressReplayVariantList', { variantItems: 0 });
+    return {
+        elements,
+        getElementById: id => elements.get(id) || null,
+        querySelector: selector => selectorElements.get(selector) || null
+    };
 }
 
 console.log('Test 1: cockpit initialization is idempotent and projects raw setup values');
@@ -131,6 +155,42 @@ console.log('Test 4: Simulator DOM keeps cockpit contracts and ordering');
     assert(!setup.includes('max-height'), 'setup disclosure has no fixed clipping height');
     assert(html.indexOf('id="monteCarloResults"') < html.indexOf('id="stressReplayWorkspace"'), 'results precede replay deep-dive');
     assertEqual((html.match(/class="[^"]*\btab-btn\b[^"]*"/g) || []).length, 4, 'Simulator keeps exactly four main tabs');
+    assertEqual((html.match(/class="mc-view-tab"/g) || []).length, 5, 'cockpit exposes exactly five dedicated result tabs');
+    assertEqual((html.match(/class="mc-view-panel"/g) || []).length, 5, 'cockpit exposes exactly five dedicated result panels');
+}
+
+console.log('Test 5: result tabs use one activation path for view ids and contained targets');
+{
+    const documentRef = createDocument();
+    const overviewTarget = new FakeElement('overviewTarget');
+    documentRef.getElementById('mcViewPanelOverview').containedElements.add(overviewTarget);
+    initMonteCarloResultCockpit({ documentRef, MutationObserverCtor: null });
+
+    assertEqual(activateMonteCarloResultView('replay', { documentRef }), 'replay', 'view id activates replay');
+    assertEqual(documentRef.getElementById('mcViewTabReplay').getAttribute('aria-selected'), 'true', 'active tab is selected');
+    assertEqual(documentRef.getElementById('mcViewTabReplay').getAttribute('tabindex'), '0', 'active tab owns the roving tabindex');
+    assert(!documentRef.getElementById('mcViewPanelReplay').hidden, 'active panel is exposed');
+    assert(documentRef.getElementById('mcViewPanelOverview').hidden, 'inactive panel is hidden');
+
+    assertEqual(activateMonteCarloResultView(overviewTarget, { documentRef }), 'overview', 'contained target resolves its panel');
+    documentRef.getElementById('mcViewTabOverview').dispatch('keydown', { key: 'End' });
+    assertEqual(documentRef.getElementById('mcViewTabReplay').focusCount, 1, 'End activates and focuses the final result tab');
+    documentRef.getElementById('mcViewTabReplay').dispatch('keydown', { key: 'ArrowRight' });
+    assertEqual(documentRef.getElementById('mcViewTabOverview').focusCount, 1, 'ArrowRight wraps and focuses the first result tab');
+}
+
+console.log('Test 6: replay variant badge reports alternatives only');
+{
+    const documentRef = createDocument();
+    const list = documentRef.getElementById('stressReplayVariantList');
+    const badge = documentRef.getElementById('mcReplayVariantBadge');
+    list.variantItems = 1;
+    assertEqual(updateMonteCarloReplayVariantBadge({ documentRef }), 0, 'baseline alone is not counted as a variant');
+    assert(badge.hidden, 'zero alternatives keep the badge hidden');
+    list.variantItems = 3;
+    assertEqual(updateMonteCarloReplayVariantBadge({ documentRef }), 2, 'alternatives are derived from the rendered workspace list');
+    assert(!badge.hidden, 'positive alternative count exposes the badge');
+    assertEqual(badge.textContent, '2', 'badge displays the alternative count');
 }
 
 updateMonteCarloSetupSummary({ documentRef: null });

@@ -8,6 +8,7 @@ import {
     normalizeMonteCarloResourceConfigV1
 } from './monte-carlo-parameters.js';
 import {
+    activateMonteCarloResultView,
     completeMonteCarloCockpitRun,
     syncMonteCarloCockpitStartState
 } from './mc-result-cockpit.js';
@@ -183,6 +184,7 @@ export function createMonteCarloUI() {
         showCompleted() {
             setRunStatus('Monte-Carlo-Lauf abgeschlossen. Ergebnisse sind verfügbar.');
             completeMonteCarloCockpitRun();
+            activateMonteCarloResultView(resultRegion || 'overview');
             terminalFocusTarget = resultRegion || mcButton;
         },
         /**

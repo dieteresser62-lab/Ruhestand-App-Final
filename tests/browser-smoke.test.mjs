@@ -953,6 +953,29 @@ async function runSimulatorSmoke(browser, baseUrl) {
     await page.locator('#tab-montecarlo').waitFor({ state: 'visible' });
     assert(await page.locator('.tab-buttons').count() === 1,
         'Monte-Carlo cockpit must not introduce a second main-tab strip');
+    const mcViewTabs = page.locator('.mc-view-tab');
+    assert(await mcViewTabs.count() === 5, 'Monte-Carlo cockpit exposes five result views');
+    assert(await page.locator('.mc-view-panel').count() === 5, 'each Monte-Carlo result view owns one panel');
+    assert(await page.locator('#mcViewTabOverview').getAttribute('aria-selected') === 'true',
+        'overview is the initial Monte-Carlo result view');
+    await page.locator('#mcViewTabOverview').press('End');
+    assert(await page.locator('#mcViewTabReplay').getAttribute('aria-selected') === 'true'
+        && await page.locator('#mcViewTabReplay').getAttribute('tabindex') === '0',
+    'End activates replay and moves the roving tabindex');
+    assert(await page.locator('#mcViewPanelReplay').isVisible()
+        && await page.locator('#mcViewPanelOverview').isHidden(),
+    'only the activated Monte-Carlo result panel is visible');
+    assert(await page.evaluate(() => document.activeElement?.id) === 'mcViewTabReplay',
+        'End moves focus with activation');
+    await page.locator('#mcViewTabReplay').press('ArrowRight');
+    assert(await page.locator('#mcViewTabOverview').getAttribute('aria-selected') === 'true',
+        'ArrowRight wraps from replay to overview');
+    await page.locator('#mcViewTabOverview').press('ArrowLeft');
+    assert(await page.locator('#mcViewTabReplay').getAttribute('aria-selected') === 'true',
+        'ArrowLeft wraps from overview to replay');
+    await page.locator('#mcViewTabReplay').press('Home');
+    assert(await page.locator('#mcViewTabOverview').getAttribute('aria-selected') === 'true',
+        'Home activates and focuses overview');
     const setupDisclosure = page.locator('#mcSetupDisclosure');
     const setupSummary = setupDisclosure.locator('summary');
     assert(await setupDisclosure.evaluate(details => details.open), 'Monte-Carlo setup starts expanded');
@@ -982,12 +1005,15 @@ async function runSimulatorSmoke(browser, baseUrl) {
         setup.open = true;
         ui.showCompleted();
         const afterCompleted = setup.open;
+        const activeAfterCompleted = document.querySelector('.mc-view-tab[aria-selected="true"]')?.dataset.mcView;
         setup.open = true;
-        return { afterCancel, afterError, afterCompleted };
+        return { afterCancel, afterError, afterCompleted, activeAfterCompleted };
     });
     assert(lifecycleDisclosureStates.afterCancel, 'cancel leaves the Monte-Carlo setup open');
     assert(lifecycleDisclosureStates.afterError, 'technical error leaves the Monte-Carlo setup open');
     assert(!lifecycleDisclosureStates.afterCompleted, 'successful completion closes the Monte-Carlo setup');
+    assert(lifecycleDisclosureStates.activeAfterCompleted === 'overview',
+        'successful completion activates overview before terminal focus');
 
     const delegatedStarts = await page.evaluate(async () => {
         const primary = document.getElementById('mcButton');
@@ -1013,6 +1039,9 @@ async function runSimulatorSmoke(browser, baseUrl) {
     assert(delegatedStarts.starts === 1, 'Neu rechnen delegates exactly one start to the canonical button');
     assert(delegatedStarts.mirroredBusy, 'Neu rechnen mirrors disabled and busy state during a run');
     assert(delegatedStarts.restored, 'Neu rechnen returns to idle with the canonical button');
+    await page.locator('#mcViewTabReplay').click();
+    assert(await page.locator('#mcViewPanelReplay').isVisible(),
+        'replay remains reachable through the result navigation before a Monte-Carlo run');
     assert(await mcRuns.inputValue() === '10000', 'new Simulator profile uses the 10,000-run Monte-Carlo default');
     await mcEstimate.filter({ hasText: 'Run-Jahre' }).waitFor({ state: 'visible' });
     assert((await mcEstimate.textContent()).includes('Speicherklasse'), 'Monte-Carlo resource estimate names its memory class');

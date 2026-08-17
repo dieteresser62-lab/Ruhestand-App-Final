@@ -1147,18 +1147,50 @@
                         <span id="mcRunExportStatus" role="status" aria-live="polite"></span>
                     </div>
                     </section>
-                    <div id="monteCarloResults" tabindex="-1" aria-label="Ergebnisse der Monte-Carlo-Analyse"
-                        style="display:none; margin-top: 25px;">
-                        <h3>Ergebnisse der Monte-Carlo-Analyse</h3>
-                        <div id="monteCarloSummary"></div>
-                        <div id="unifiedKpiDashboard" style="display:none;"></div>
+                    <nav class="mc-view-nav" aria-label="Monte-Carlo-Ergebnisansichten">
+                        <div role="tablist" aria-label="Monte-Carlo-Ergebnisansichten">
+                            <button type="button" id="mcViewTabOverview" class="mc-view-tab" role="tab"
+                                aria-selected="true" aria-controls="mcViewPanelOverview" tabindex="0"
+                                data-mc-view="overview">Überblick</button>
+                            <button type="button" id="mcViewTabRisk" class="mc-view-tab" role="tab"
+                                aria-selected="false" aria-controls="mcViewPanelRisk" tabindex="-1"
+                                data-mc-view="risk">Risiko und Verteilung</button>
+                            <button type="button" id="mcViewTabCare" class="mc-view-tab" role="tab"
+                                aria-selected="false" aria-controls="mcViewPanelCare" tabindex="-1"
+                                data-mc-view="care">Pflege</button>
+                            <button type="button" id="mcViewTabLogs" class="mc-view-tab" role="tab"
+                                aria-selected="false" aria-controls="mcViewPanelLogs" tabindex="-1"
+                                data-mc-view="logs">Szenario-Logs</button>
+                            <button type="button" id="mcViewTabReplay" class="mc-view-tab" role="tab"
+                                aria-selected="false" aria-controls="mcViewPanelReplay" tabindex="-1"
+                                data-mc-view="replay">Stresspfad-Replay <span id="mcReplayVariantBadge"
+                                    class="mc-view-badge" hidden aria-label="0 Varianten">0</span></button>
+                        </div>
+                    </nav>
+                    <section id="mcViewPanelOverview" class="mc-view-panel" role="tabpanel"
+                        aria-labelledby="mcViewTabOverview" data-mc-view-panel="overview">
+                        <div id="monteCarloResults" tabindex="-1" aria-label="Ergebnisse der Monte-Carlo-Analyse"
+                            style="display:none; margin-top: 25px;">
+                            <h3>Ergebnisse der Monte-Carlo-Analyse</h3>
+                            <div id="monteCarloSummary"></div>
+                            <div id="unifiedKpiDashboard" style="display:none;"></div>
+                        </div>
+                    </section>
+                    <section id="mcViewPanelRisk" class="mc-view-panel" role="tabpanel"
+                        aria-labelledby="mcViewTabRisk" data-mc-view-panel="risk" hidden>
                         <div id="advancedKpiDashboard" style="display:none;"></div>
                         <div id="withdrawalRateChartContainer"></div>
+                    </section>
+                    <section id="mcViewPanelCare" class="mc-view-panel" role="tabpanel"
+                        aria-labelledby="mcViewTabCare" data-mc-view-panel="care" hidden>
                         <div id="pflegeKpiResults" style="display:none;">
                             <h3 style="border-top: 1px solid var(--border-color); padding-top: 25px;">Analyse des
                                 Pflegerisikos</h3>
                             <div id="pflegeKpiSummary" class="summary-grid"></div>
                         </div>
+                    </section>
+                    <section id="mcViewPanelLogs" class="mc-view-panel" role="tabpanel"
+                        aria-labelledby="mcViewTabLogs" data-mc-view-panel="logs" hidden>
                         <!-- Szenario-Log Auswahl -->
                         <div id="scenarioLogContainer" style="display:none; margin-top: 25px;">
                             <h4 style="text-align:center;">Szenario-Logs analysieren</h4>
@@ -1180,7 +1212,9 @@
                                     type="button" id="exportScenarioLogJson">JSON</button><button type="button"
                                     id="exportScenarioLogCsv">CSV</button></div>
                         </div>
-                    </div>
+                    </section>
+                    <section id="mcViewPanelReplay" class="mc-view-panel" role="tabpanel"
+                        aria-labelledby="mcViewTabReplay" data-mc-view-panel="replay" hidden>
                     <section id="stressReplayWorkspace" aria-labelledby="stressReplayHeading"
                         style="margin-top: 18px; text-align: left;">
                         <h4 id="stressReplayHeading">Stresspfad-Replay</h4>
@@ -1298,6 +1332,7 @@
                             </section>
                             <section id="stressReplayComparison" tabindex="-1" aria-label="Stresspfad-Variantenvergleich"></section>
                         </section>
+                    </section>
                     </section>
                     <div id="print-footer" class="print-footer"></div>
                 </div>
