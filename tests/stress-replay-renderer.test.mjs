@@ -220,6 +220,26 @@ const escaped = renderStressReplayVariantListV1({
 assert(!escaped.includes('<script>'), 'Variant labels cannot inject markup');
 assert(escaped.includes('&lt;script&gt;'), 'Escaped label remains inspectable');
 
+console.log('Test 5a: explicit comparison errors replace the idle state and escape diagnostics');
+const comparisonErrorHtml = renderStressReplayComparisonV1({
+    comparisonState: {
+        status: 'error',
+        error: {
+            code: 'STRESS_REPLAY_<BROKEN>',
+            message: '<img src=x onerror=alert(1)> konnte nicht berechnet werden'
+        }
+    }
+});
+assert(/role="alert"/.test(comparisonErrorHtml), 'Comparison failure is exposed with alert semantics');
+assert(/Fehlercode/.test(comparisonErrorHtml) && /STRESS_REPLAY_&lt;BROKEN&gt;/.test(comparisonErrorHtml),
+    'Escaped comparison error code remains inspectable');
+assert(!comparisonErrorHtml.includes('<img'), 'Comparison error messages cannot inject markup');
+assert(!/Noch kein Variantenvergleich berechnet/.test(comparisonErrorHtml),
+    'A failed comparison is never rendered as the neutral idle state');
+assert(/Noch kein Variantenvergleich berechnet/.test(renderStressReplayComparisonV1({
+    comparisonState: { status: 'idle', error: null }
+})), 'Only the explicit idle state renders the neutral empty message');
+
 console.log('Test 6: controller persists add/remove and recomputes without touching profile state');
 {
     const baselineVariant = variant('baseline', 'baseline', []);

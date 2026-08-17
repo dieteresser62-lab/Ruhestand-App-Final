@@ -1140,6 +1140,75 @@ async function runSimulatorSmoke(browser, baseUrl) {
         && replayKpiSemantics.drawdown.includes('Δ 2,5 Prozentpunkte'),
     'Browser KPI row maps absolute drawdown percent and delta percentage points semantically');
 
+    const replayComparisonFailure = await page.evaluate(async () => {
+        const { createStressReplayController } = await import('./app/simulator/stress-replay-ui.js');
+        const { renderStressReplayViewsV1 } = await import('./app/simulator/stress-replay-renderer.js');
+        const workspace = {
+            path: {},
+            sourceIdentity: null,
+            baselineSnapshot: {},
+            variants: [
+                { id: 'baseline', variantId: 'baseline', role: 'baseline', label: 'Baseline', summary: {} },
+                {
+                    id: 'browser-failure', variantId: 'browser-failure', role: 'alternative',
+                    label: 'Browserfehler', materialChangeGroups: ['dynamicFlex'], summary: {}
+                }
+            ]
+        };
+        let comparisonCalls = 0;
+        const documentRef = {
+            getElementById(id) {
+                return id === 'stressReplayBanner' ? null : document.getElementById(id);
+            },
+            querySelectorAll(selector) {
+                return selector === '[data-stress-replay-baseline]' ? [] : document.querySelectorAll(selector);
+            }
+        };
+        const controller = createStressReplayController({
+            documentRef,
+            loadWorkspace: () => ({
+                status: 'executable', workspace, compatibility: { readOnly: false }, error: null
+            }),
+            runComparison: () => {
+                comparisonCalls += 1;
+                if (comparisonCalls > 1) {
+                    throw Object.assign(new Error('<browser failure>'), {
+                        code: 'STRESS_REPLAY_BROWSER_FAILURE'
+                    });
+                }
+                return {
+                    comparison: { variants: workspace.variants, pairwise: [] },
+                    results: []
+                };
+            },
+            renderViews: options => renderStressReplayViewsV1(options)
+        });
+        controller.initialize();
+        document.querySelector('[data-stress-replay-action="recompute"][data-variant-id="browser-failure"]').click();
+        const comparison = document.getElementById('stressReplayComparison');
+        const status = document.getElementById('stressReplayStatus');
+        return {
+            comparisonText: comparison.textContent.replace(/\s+/g, ' ').trim(),
+            alertCount: comparison.querySelectorAll('[role="alert"]').length,
+            statusText: status.textContent,
+            statusKind: status.dataset.status,
+            activeElementId: document.activeElement?.id || null,
+            comparisonHtml: comparison.innerHTML
+        };
+    });
+    assert(replayComparisonFailure.alertCount === 1
+        && replayComparisonFailure.comparisonText.includes('STRESS_REPLAY_BROWSER_FAILURE')
+        && replayComparisonFailure.comparisonText.includes('<browser failure>'),
+    `Real recompute click must render the controlled failure as an alert: ${JSON.stringify(replayComparisonFailure)}`);
+    assert(replayComparisonFailure.statusKind === 'error'
+        && replayComparisonFailure.statusText.includes('Variantenvergleich fehlgeschlagen')
+        && !replayComparisonFailure.statusText.includes('neu berechnet'),
+    'Real recompute click must not overwrite a calculation failure with success');
+    assert(replayComparisonFailure.activeElementId === 'stressReplayComparison',
+        'Real recompute click focuses the failed comparison region');
+    assert(!replayComparisonFailure.comparisonHtml.includes('<browser failure>'),
+        'Real comparison diagnostics remain HTML-escaped in the browser DOM');
+
     await mcRuns.fill('100001');
     await mcRuns.dispatchEvent('input');
     await mcConfirmationRow.waitFor({ state: 'visible' });

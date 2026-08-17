@@ -149,9 +149,9 @@ function controllerFixture(overrides = {}) {
         createBaselineVariant: () => ({ id: 'baseline', role: 'baseline' }),
         createSourceIdentity: ({ sourceRows }) => ({ ...workspace.sourceIdentity, rows: structuredClone(sourceRows) }),
         createWorkspace: input => { calls.workspaceInputs.push(input); return workspace; },
-        runComparison: ({ sourceIdentity }) => {
+        runComparison: ({ workspace: activeWorkspace, sourceIdentity }) => {
             calls.sourceIdentities.push(sourceIdentity);
-            return { comparison: null, results: [] };
+            return { comparison: { variants: activeWorkspace.variants, pairwise: [] }, results: [] };
         },
         saveWorkspace: async () => { calls.saves += 1; },
         discardWorkspace: async () => { calls.discards += 1; },
@@ -535,6 +535,171 @@ console.log('Test 13: preview status tracks transitions between different errors
     assertEqual(region.textContent, 'Die Patchvorschau ist zulässig.', 'Recovery is announced after the actual last error');
     assertEqual(announcements.filter(message => message === 'Die Patchvorschau ist zulässig.').length, 1,
         'Recovery is announced exactly once across the error transition');
+}
+
+console.log('Test 14: direct recompute and the registered DOM action retain the same durable error semantics');
+{
+    const workspace = workspaceFixture();
+    const compatibility = { status: 'executable', executable: true, readOnly: false, mismatchReasons: [] };
+    let failComparison = false;
+    let renderedComparisonState = null;
+    const { controller, documentRef } = controllerFixture({
+        loadWorkspace: () => ({ status: 'executable', workspace, compatibility, error: null }),
+        runComparison: ({ workspace: activeWorkspace }) => {
+            if (failComparison) {
+                throw Object.assign(new Error('<unsafe> comparison backend'), {
+                    code: 'STRESS_REPLAY_<INVALID>'
+                });
+            }
+            return { comparison: { variants: activeWorkspace.variants, pairwise: [] }, results: [] };
+        },
+        renderViews: ({ comparisonState }) => { renderedComparisonState = structuredClone(comparisonState); }
+    });
+    controller.initialize();
+    failComparison = true;
+
+    assertEqual(controller.recomputeComparison(), null, 'Direct recompute returns null on a controlled comparison throw');
+    assertEqual(renderedComparisonState.status, 'error', 'Direct recompute persists an explicit comparison error');
+    assertEqual(renderedComparisonState.error.code, 'STRESS_REPLAY_COMPARISON_FAILED',
+        'Unsafe external error codes are replaced by the stable fallback code');
+    assert(!/[\u0000-\u001f]/.test(renderedComparisonState.error.message), 'Persisted diagnostics contain no control characters');
+    assertEqual(documentRef.getElementById('stressReplayStatus').dataset.status, 'error',
+        'Direct recompute marks the live status as failed');
+    assertEqual(documentRef.getElementById('stressReplayStatus').focused, true,
+        'Direct recompute without comparison focus focuses the failed live status');
+
+    documentRef.getElementById('stressReplayStatus').focused = false;
+    const listListener = documentRef.getElementById('stressReplayVariantList').listeners.get('click');
+    listListener({
+        target: {
+            closest: () => ({
+                dataset: { stressReplayAction: 'recompute', variantId: 'alternative-1' }
+            })
+        }
+    });
+    assertEqual(renderedComparisonState.status, 'error', 'Registered recompute action retains the same explicit error state');
+    assertEqual(documentRef.getElementById('stressReplayStatus').dataset.status, 'error',
+        'Registered recompute action does not overwrite failure with success');
+    assert(/Variantenvergleich fehlgeschlagen/.test(documentRef.getElementById('stressReplayStatus').textContent),
+        'Registered recompute action keeps the failure announcement');
+    assertEqual(documentRef.getElementById('stressReplayComparison').focused, true,
+        'The registered action focuses the comparison region containing the alert');
+}
+
+console.log('Test 15: empty results fail closed and a later successful recompute clears the error');
+{
+    const workspace = workspaceFixture();
+    const compatibility = { status: 'executable', executable: true, readOnly: false, mismatchReasons: [] };
+    const outcomes = [
+        { comparison: null, results: [] },
+        { comparison: { variants: [] }, results: [] }
+    ];
+    let renderedComparisonState = null;
+    const { controller, documentRef } = controllerFixture({
+        loadWorkspace: () => ({ status: 'executable', workspace, compatibility, error: null }),
+        runComparison: ({ workspace: activeWorkspace }) => outcomes.shift()
+            || { comparison: { variants: activeWorkspace.variants, pairwise: [] }, results: [] },
+        renderViews: ({ comparisonState }) => { renderedComparisonState = structuredClone(comparisonState); }
+    });
+    controller.initialize();
+    assertEqual(renderedComparisonState.status, 'error', 'Empty initialization result becomes a durable error');
+    assertEqual(renderedComparisonState.error.code, 'STRESS_REPLAY_COMPARISON_EMPTY',
+        'Empty result has a distinct stable diagnostic code');
+    assert(/Variantenvergleich fehlgeschlagen/.test(documentRef.getElementById('stressReplayStatus').textContent),
+        'Initialization does not overwrite an empty-result failure with a loaded-success message');
+    assertEqual(controller.recomputeComparison(), null, 'A comparison with an empty variant set also fails closed');
+    assertEqual(renderedComparisonState.error.code, 'STRESS_REPLAY_COMPARISON_EMPTY',
+        'Structurally empty comparison retains the distinct empty-result code');
+    assert(controller.recomputeComparison(), 'A later non-empty comparison succeeds');
+    assertEqual(renderedComparisonState.status, 'success', 'Successful recompute replaces the durable error');
+}
+
+console.log('Test 16: fixation and import report mutation success separately from comparison failure');
+{
+    let renderedComparisonState = null;
+    const fixation = controllerFixture({
+        runComparison: () => { throw Object.assign(new Error('calculator offline'), { code: 'STRESS_REPLAY_CALCULATOR_OFFLINE' }); },
+        renderViews: ({ comparisonState }) => { renderedComparisonState = structuredClone(comparisonState); }
+    });
+    fixation.controller.initialize();
+    fixation.controller.setMonteCarloContext({ inputs: { widowOptions: {} }, scenarioLogs: { characteristic: [] } });
+    fixation.controller.selectScenario(scenarioFixture());
+    assertEqual(await fixation.controller.fixSelectedScenario(), fixation.workspace,
+        'Fixation still returns the successfully persisted workspace when comparison fails');
+    assertEqual(fixation.calls.saves, 1, 'Fixation mutation remains persisted despite comparison failure');
+    assertEqual(renderedComparisonState.status, 'error', 'Fixation retains comparison failure in its region');
+    assert(/Stresspfad fixiert.*Variantenvergleich ist fehlgeschlagen/.test(
+        fixation.documentRef.getElementById('stressReplayStatus').textContent),
+    'Fixation live status states both mutation success and comparison failure');
+
+    const importedWorkspace = workspaceFixture();
+    const compatibility = { status: 'executable', executable: true, readOnly: false, mismatchReasons: [] };
+    const imported = controllerFixture({
+        replaceFromImport: async () => ({ workspace: importedWorkspace, compatibility }),
+        runComparison: () => { throw new Error('import comparison failed'); },
+        renderViews: ({ comparisonState }) => { renderedComparisonState = structuredClone(comparisonState); }
+    });
+    imported.controller.initialize();
+    assert(await imported.controller.importSerialized('{"workspace":true}'),
+        'Import returns the successfully installed workspace state when comparison fails');
+    assertEqual(renderedComparisonState.status, 'error', 'Import retains comparison failure in its region');
+    assert(/Stresspfad importiert.*Variantenvergleich ist fehlgeschlagen/.test(
+        imported.documentRef.getElementById('stressReplayStatus').textContent),
+    'Import live status states both import success and comparison failure');
+}
+
+console.log('Test 17: add and remove retain successful persistence while reporting failed recomputation');
+{
+    const compatibility = { status: 'executable', executable: true, readOnly: false, mismatchReasons: [] };
+    let currentWorkspace = {
+        ...workspaceFixture(),
+        baselineSnapshot: editorBaselineFixture(),
+        variants: [{ id: 'baseline', role: 'baseline', label: 'Baseline' }]
+    };
+    let comparisonCalls = 0;
+    let saves = 0;
+    let renderedComparisonState = null;
+    const documentRef = createDocument();
+    const form = new FakeElement('stressReplayVariantEditor');
+    form.queryResults.set('[data-stress-replay-path]', [{
+        value: 'true',
+        dataset: { valueType: 'boolean', stressReplayPath: 'strategy.dynamicFlex' }
+    }]);
+    documentRef.elements.set(form.id, form);
+    documentRef.elements.set('stressReplayVariantLabel', new FakeElement('stressReplayVariantLabel'));
+    documentRef.getElementById('stressReplayVariantLabel').value = 'Dynamisch';
+    const controller = createStressReplayController({
+        documentRef,
+        resolveCompatibility: () => compatibility,
+        loadWorkspace: () => ({ status: 'executable', workspace: currentWorkspace, compatibility, error: null }),
+        previewVariantPatch: () => ({ materialChangeGroups: ['dynamicFlex'], warnings: [] }),
+        createVariant: ({ id, label }) => ({ id, label, role: 'alternative', materialChangeGroups: ['dynamicFlex'] }),
+        createWorkspace: input => ({ ...input, baselineScenarioFingerprint: currentWorkspace.baselineScenarioFingerprint }),
+        saveWorkspace: async workspace => { saves += 1; currentWorkspace = workspace; },
+        runComparison: ({ workspace }) => {
+            comparisonCalls += 1;
+            if (comparisonCalls > 1) throw new Error('variant comparison failed');
+            return { comparison: { variants: workspace.variants, pairwise: [] }, results: [] };
+        },
+        renderViews: ({ comparisonState }) => { renderedComparisonState = structuredClone(comparisonState); }
+    });
+    controller.initialize();
+    controller.previewEditorPatch();
+    const added = await controller.addVariant();
+    assert(added?.role === 'alternative', 'Add returns the successfully persisted variant when comparison fails');
+    assertEqual(saves, 1, 'Add persists exactly once before failed comparison');
+    assertEqual(renderedComparisonState.status, 'error', 'Add retains the failed comparison state');
+    assert(/wurde gespeichert.*Variantenvergleich ist fehlgeschlagen/.test(
+        documentRef.getElementById('stressReplayStatus').textContent),
+    'Add status distinguishes saved variant from failed comparison');
+
+    assertEqual(await controller.removeVariant(added.id), true,
+        'Remove returns true for successful persistence despite failed comparison');
+    assertEqual(saves, 2, 'Remove persists exactly once after add');
+    assertEqual(renderedComparisonState.status, 'error', 'Remove retains the failed comparison state');
+    assert(/Variante entfernt.*Variantenvergleich ist fehlgeschlagen/.test(
+        documentRef.getElementById('stressReplayStatus').textContent),
+    'Remove status distinguishes removal from failed comparison');
 }
 
 console.log('Stress replay UI tests passed.');

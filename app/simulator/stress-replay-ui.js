@@ -34,6 +34,7 @@ import {
 import { EngineAPI } from '../../engine/index.mjs';
 
 const EMPTY_STATE = Object.freeze({ status: 'empty', workspace: null, compatibility: null, error: null });
+const IDLE_COMPARISON_STATE = Object.freeze({ status: 'idle', error: null });
 
 function cloneValue(value) {
     if (typeof structuredClone === 'function') return structuredClone(value);
@@ -112,6 +113,29 @@ function formatNeedCurrency(value) {
             style: 'currency', currency: 'EUR', maximumFractionDigits: 0
         }).format(value)
         : 'unbekannt';
+}
+
+function comparisonErrorDiagnostic(error) {
+    const rawCode = typeof error?.code === 'string' ? error.code.trim() : '';
+    const code = /^[A-Z0-9_:-]{1,80}$/.test(rawCode)
+        ? rawCode
+        : 'STRESS_REPLAY_COMPARISON_FAILED';
+    const rawMessage = formatStressReplayUiError(error);
+    const message = String(rawMessage || 'Der Variantenvergleich konnte nicht berechnet werden.')
+        .replace(/[\u0000-\u001f\u007f]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 500) || 'Der Variantenvergleich konnte nicht berechnet werden.';
+    return Object.freeze({ code, message });
+}
+
+function comparisonResultIsUsable(computed) {
+    return computed
+        && typeof computed === 'object'
+        && computed.comparison
+        && typeof computed.comparison === 'object'
+        && Array.isArray(computed.comparison.variants)
+        && computed.comparison.variants.length > 0;
 }
 
 function defaultRunComparison({ workspace }) {
@@ -245,6 +269,7 @@ export function createStressReplayController({
     let sourceScenarioLog = null;
     let comparison = null;
     let comparisonResults = [];
+    let comparisonState = IDLE_COMPARISON_STATE;
     let patchPreview = null;
     let patchPreviewError = null;
     let busy = false;
@@ -304,6 +329,7 @@ export function createStressReplayController({
             workspace: workspaceState.workspace,
             comparison,
             results: comparisonResults,
+            comparisonState,
             preview: patchPreview,
             previewError: patchPreviewError,
             busy,
@@ -395,6 +421,7 @@ export function createStressReplayController({
         comparison = null;
         comparisonResults = [];
         if (!workspaceState.workspace || workspaceState.compatibility?.readOnly === true) {
+            comparisonState = IDLE_COMPARISON_STATE;
             render();
             return null;
         }
@@ -404,14 +431,23 @@ export function createStressReplayController({
                 sourceIdentity: workspaceState.workspace.sourceIdentity,
                 sourceScenarioLog
             });
+            if (!comparisonResultIsUsable(computed)) {
+                throw Object.assign(new Error('Die Vergleichsberechnung lieferte kein verwendbares Ergebnis.'), {
+                    code: 'STRESS_REPLAY_COMPARISON_EMPTY'
+                });
+            }
             comparison = computed.comparison;
             comparisonResults = computed.results || [];
+            comparisonState = { status: 'success', error: null };
             render();
             if (focusComparison) focusElement(element('stressReplayComparison'));
             return comparison;
         } catch (error) {
-            status(`Variantenvergleich fehlgeschlagen: ${formatStressReplayUiError(error)}`, { error: true, focus: true });
+            const diagnostic = comparisonErrorDiagnostic(error);
+            comparisonState = { status: 'error', error: diagnostic };
+            status(`Variantenvergleich fehlgeschlagen [${diagnostic.code}]: ${diagnostic.message}`, { error: true });
             render();
+            focusElement(element(focusComparison ? 'stressReplayComparison' : 'stressReplayStatus'));
             return null;
         }
     };
@@ -474,14 +510,19 @@ export function createStressReplayController({
             await persistVariants([...workspaceState.workspace.variants, variant]);
             comparison = null;
             comparisonResults = [];
-            computeComparison({ focusComparison: true });
+            comparisonState = IDLE_COMPARISON_STATE;
+            const computedComparison = computeComparison({ focusComparison: true });
             element('stressReplayVariantEditor')?.reset?.();
             updateConditionalFields();
             patchPreview = null;
             patchPreviewError = null;
             renderBaselineValues();
             render();
-            status(`Variante „${variant.label}“ wurde auf dem fixierten Pfad berechnet.`);
+            status(computedComparison
+                ? `Variante „${variant.label}“ wurde auf dem fixierten Pfad berechnet.`
+                : `Variante „${variant.label}“ wurde gespeichert; der Variantenvergleich ist fehlgeschlagen.`, {
+                error: !computedComparison
+            });
             return variant;
         } catch (error) {
             status(`Variante konnte nicht berechnet werden: ${formatStressReplayUiError(error)}`, { error: true, focus: true });
@@ -498,8 +539,13 @@ export function createStressReplayController({
             const variants = workspaceState.workspace.variants.filter(variant => variant.id !== variantId);
             if (variants.length === workspaceState.workspace.variants.length) return false;
             await persistVariants(variants);
-            computeComparison();
-            status('Variante entfernt; der Vergleich wurde neu berechnet.');
+            const computedComparison = computeComparison();
+            status(computedComparison
+                ? 'Variante entfernt; der Vergleich wurde neu berechnet.'
+                : 'Variante entfernt; der Variantenvergleich ist fehlgeschlagen.', {
+                error: !computedComparison,
+                focus: !computedComparison
+            });
             return true;
         } catch (error) {
             status(`Variante konnte nicht entfernt werden: ${formatStressReplayUiError(error)}`, { error: true, focus: true });
@@ -618,13 +664,19 @@ export function createStressReplayController({
             sourceScenarioLog = cloneValue(sourceRows);
             comparison = null;
             comparisonResults = [];
+            comparisonState = IDLE_COMPARISON_STATE;
             patchPreview = null;
             patchPreviewError = null;
             renderBaselineValues();
             updateConditionalFields();
-            computeComparison();
+            const computedComparison = computeComparison();
             render({ focusBanner: true });
-            status('Stresspfad fixiert. Baseline und Fingerprints wurden abgeglichen.');
+            status(computedComparison
+                ? 'Stresspfad fixiert. Baseline und Fingerprints wurden abgeglichen.'
+                : 'Stresspfad fixiert und abgeglichen; der Variantenvergleich ist fehlgeschlagen.', {
+                error: !computedComparison,
+                focus: !computedComparison
+            });
             return workspace;
         } catch (error) {
             status(formatStressReplayUiError(error), { error: true, focus: true });
@@ -678,15 +730,25 @@ export function createStressReplayController({
                 ? imported.document?.comparison || null
                 : null;
             comparisonResults = [];
+            comparisonState = comparison
+                ? { status: 'success', error: null }
+                : IDLE_COMPARISON_STATE;
             patchPreview = null;
             patchPreviewError = null;
             renderBaselineValues();
             updateConditionalFields();
-            if (imported.compatibility.readOnly !== true) computeComparison();
+            const computedComparison = imported.compatibility.readOnly !== true
+                ? computeComparison()
+                : comparison;
             render({ focusBanner: true });
             status(imported.compatibility.readOnly
                 ? 'Stresspfad importiert und wegen abweichender Laufzeit nur zur Inspektion geöffnet.'
-                : 'Stresspfad importiert und als aktiver Arbeitsstand geladen.');
+                : computedComparison
+                    ? 'Stresspfad importiert und als aktiver Arbeitsstand geladen.'
+                    : 'Stresspfad importiert; der Variantenvergleich ist fehlgeschlagen.', {
+                error: imported.compatibility.readOnly !== true && !computedComparison,
+                focus: imported.compatibility.readOnly !== true && !computedComparison
+            });
             return workspaceState;
         } catch (error) {
             status(`Import fehlgeschlagen: ${formatStressReplayUiError(error)}`, { error: true, focus: true });
@@ -716,6 +778,7 @@ export function createStressReplayController({
             sourceScenarioLog = null;
             comparison = null;
             comparisonResults = [];
+            comparisonState = IDLE_COMPARISON_STATE;
             patchPreview = null;
             patchPreviewError = null;
             renderBaselineValues();
@@ -745,9 +808,11 @@ export function createStressReplayController({
         if (workspaceState.status === 'corrupt') {
             status(`Der gespeicherte Stresspfad ist beschädigt und wurde nicht automatisch gelöscht: ${workspaceState.error?.message || 'unbekannter Fehler'}`, { error: true });
         } else if (workspaceState.workspace) {
-            status(workspaceState.compatibility?.readOnly
-                ? 'Gespeicherter Stresspfad wurde nur zur Inspektion geladen.'
-                : 'Gespeicherter Stresspfad wurde geladen.');
+            if (comparisonState.status !== 'error') {
+                status(workspaceState.compatibility?.readOnly
+                    ? 'Gespeicherter Stresspfad wurde nur zur Inspektion geladen.'
+                    : 'Gespeicherter Stresspfad wurde geladen.');
+            }
         } else {
             status('Starten Sie Monte Carlo und wählen Sie ein Szenario aus.');
         }
@@ -771,8 +836,8 @@ export function createStressReplayController({
             const variantId = action.dataset.variantId;
             if (action.dataset.stressReplayAction === 'remove') void removeVariant(variantId);
             if (action.dataset.stressReplayAction === 'recompute') {
-                recomputeComparison({ focusComparison: true });
-                status('Vergleich auf dem unveränderten fixierten Pfad neu berechnet.');
+                const computedComparison = recomputeComparison({ focusComparison: true });
+                if (computedComparison) status('Vergleich auf dem unveränderten fixierten Pfad neu berechnet.');
             }
         });
         element('stressReplayImportFile')?.addEventListener?.('change', async event => {

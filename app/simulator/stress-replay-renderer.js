@@ -187,8 +187,22 @@ function renderYearTable(comparison, results) {
     </div>`;
 }
 
-export function renderStressReplayComparisonV1({ comparison = null, results = [] } = {}) {
-    if (!comparison) return '<p>Noch kein Variantenvergleich berechnet.</p>';
+export function renderStressReplayComparisonV1({ comparison = null, results = [], comparisonState = null } = {}) {
+    const effectiveState = comparisonState || (comparison
+        ? { status: 'success', error: null }
+        : { status: 'idle', error: null });
+    if (effectiveState.status === 'error') {
+        const code = effectiveState.error?.code || 'STRESS_REPLAY_COMPARISON_FAILED';
+        const message = effectiveState.error?.message || 'Der Variantenvergleich konnte nicht berechnet werden.';
+        return `<div class="stress-replay-message stress-replay-message-error" role="alert">
+            <p><strong>Variantenvergleich fehlgeschlagen</strong></p>
+            <p>Fehlercode: <code>${escapeHtml(code)}</code></p>
+            <p>${escapeHtml(message)}</p>
+        </div>`;
+    }
+    if (effectiveState.status !== 'success' || !comparison) {
+        return '<p>Noch kein Variantenvergleich berechnet.</p>';
+    }
     const blocked = comparison.overallStatus === 'blocked_technical_error'
         ? '<p class="stress-replay-message stress-replay-message-error" role="alert">Mindestens eine Berechnung endete mit einem technischen Fehler. Finanzielle Paarvergleiche sind für die betroffene Variante gesperrt.</p>'
         : '';
@@ -199,11 +213,11 @@ export function renderStressReplayComparisonV1({ comparison = null, results = []
         <section aria-labelledby="stressReplayYearHeading"><h5 id="stressReplayYearHeading">Jahrestabelle</h5>${renderYearTable(comparison, results)}</section>`;
 }
 
-export function renderStressReplayViewsV1({ documentRef = globalThis.document, workspace, comparison, results, preview, previewError, busy = false, readOnly = false } = {}) {
+export function renderStressReplayViewsV1({ documentRef = globalThis.document, workspace, comparison, results, comparisonState, preview, previewError, busy = false, readOnly = false } = {}) {
     const previewTarget = documentRef?.getElementById?.('stressReplayPatchPreview');
     const listTarget = documentRef?.getElementById?.('stressReplayVariantList');
     const comparisonTarget = documentRef?.getElementById?.('stressReplayComparison');
     if (previewTarget) previewTarget.innerHTML = renderStressReplayPatchPreviewV1({ preview, error: previewError });
     if (listTarget) listTarget.innerHTML = renderStressReplayVariantListV1({ workspace, busy, readOnly });
-    if (comparisonTarget) comparisonTarget.innerHTML = renderStressReplayComparisonV1({ comparison, results });
+    if (comparisonTarget) comparisonTarget.innerHTML = renderStressReplayComparisonV1({ comparison, results, comparisonState });
 }
