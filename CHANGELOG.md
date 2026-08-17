@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-08-17
+
+### Geaendert
+- Der Monte-Carlo-Bereich ist als Ergebnis-Cockpit neu geordnet: kompaktes Setup, sichtbarer Laufkopf, fuenf tastaturbedienbare Ergebnisansichten und ein dreistufiges Stresspfad-Replay.
+- Szenarioauswahl und Replay liegen in einem gemeinsamen, eindeutigen Arbeitsbereich; programmatische Fokuswechsel aktivieren zuerst die sichtbare Zielansicht.
+- Der Replay-Vergleich bietet umschaltbare Kennzahlen-, Delta- und Jahresansichten sowie je Alternative hoechstens eine priorisierte Kernaussage. Diese Darstellung ist weder Variantenranking noch Finanzempfehlung.
+- Responsive Layouts und die Druckansicht zeigen Setup, Ergebnisbereiche und Replay-Vergleich ohne fachliche Aenderung an Monte-Carlo-, Engine-, Persistenz- oder Exportvertraegen.
+
+### Tests
+- Fokussierte Cockpit-Contracttests und erweiterte Browser-Smokes decken ARIA-Tabs, Tastatur/Fokus, asynchrone Replay-Wechsel, responsive Viewports und Print-Emulation ab.
+
 ## 2026-02-15
 
 ### Neu

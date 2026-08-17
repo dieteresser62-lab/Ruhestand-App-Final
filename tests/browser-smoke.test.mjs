@@ -1292,12 +1292,105 @@ async function runSimulatorSmoke(browser, baseUrl) {
     `Delegated comparison controls must survive renderer replacement: ${JSON.stringify(rerenderedComparisonState)}`);
     assert(rerenderedComparisonState.tablists === 1 && rerenderedComparisonState.headings === 3,
         'A rerender keeps one comparison tablist and all three established headings');
+
+    const cockpitViewportResults = [];
+    for (const width of [320, 768, 900, 1280, 1600]) {
+        await page.setViewportSize({ width, height: 900 });
+        cockpitViewportResults.push(await page.evaluate(viewportWidth => {
+            const withinViewport = element => {
+                const rect = element.getBoundingClientRect();
+                return rect.left >= -1 && rect.right <= document.documentElement.clientWidth + 1;
+            };
+            const localScrollers = [
+                ...document.querySelectorAll('.mc-view-nav > [role="tablist"], .stress-replay-table-scroll')
+            ];
+            const cockpitCards = [
+                ...document.querySelectorAll('.mc-setup-disclosure, .mc-run-head, .mc-view-panel, .stress-replay-step')
+            ].filter(element => getComputedStyle(element).display !== 'none');
+            return {
+                viewportWidth,
+                clientWidth: document.documentElement.clientWidth,
+                scrollWidth: document.documentElement.scrollWidth,
+                cardsWithinViewport: cockpitCards.every(withinViewport),
+                localScrollersWithinViewport: localScrollers.every(withinViewport),
+                localOverflowModes: localScrollers.map(element => getComputedStyle(element).overflowX)
+            };
+        }, width));
+    }
+    assert(cockpitViewportResults.every(result => result.scrollWidth <= result.clientWidth + 1),
+        `Cockpit must not create page-level horizontal overflow: ${JSON.stringify(cockpitViewportResults)}`);
+    assert(cockpitViewportResults.every(result => result.cardsWithinViewport && result.localScrollersWithinViewport),
+        `Cockpit cards, navigation and table scrollers must stay inside every target viewport: ${JSON.stringify(cockpitViewportResults)}`);
+    assert(cockpitViewportResults.every(result => result.localOverflowModes.every(mode => mode === 'auto')),
+        `Wide navigation and tables must keep overflow local on screen: ${JSON.stringify(cockpitViewportResults)}`);
+    await page.setViewportSize({ width: 1366, height: 900 });
+
+    const printStateBefore = await page.evaluate(() => {
+        const setup = document.getElementById('mcSetupDisclosure');
+        const banner = document.getElementById('stressReplayBanner');
+        const diagnostics = banner.querySelector('.stress-replay-diagnostics');
+        const scenarioLog = document.getElementById('scenarioLogOutput');
+        const probeTable = document.createElement('table');
+        probeTable.dataset.printProbe = 'sticky-header';
+        probeTable.innerHTML = '<thead><tr><th>Druckkopf</th></tr></thead>';
+        scenarioLog.appendChild(probeTable);
+        const state = {
+            setupOpen: setup.open,
+            bannerHidden: banner.hidden,
+            diagnosticsOpen: diagnostics.open
+        };
+        setup.open = false;
+        banner.hidden = false;
+        diagnostics.open = false;
+        return state;
+    });
     await page.emulateMedia({ media: 'print' });
-    const printedComparisonDisplays = await page.locator('[data-stress-replay-comparison-panel]').evaluateAll(panels =>
-        panels.map(panel => getComputedStyle(panel).display));
-    assert(printedComparisonDisplays.length === 3 && printedComparisonDisplays.every(display => display !== 'none'),
-        `Print exposes all comparison sections in DOM order: ${JSON.stringify(printedComparisonDisplays)}`);
+    const printedCockpitState = await page.evaluate(() => ({
+        setupContentDisplay: getComputedStyle(document.querySelector('#mcSetupDisclosure > .mc-setup-content')).display,
+        mcPanelDisplays: [...document.querySelectorAll('.mc-view-panel')]
+            .map(panel => getComputedStyle(panel).display),
+        comparisonPanelDisplays: [...document.querySelectorAll('[data-stress-replay-comparison-panel]')]
+            .map(panel => getComputedStyle(panel).display),
+        diagnosticsDisplay: getComputedStyle(document.querySelector('.stress-replay-diagnostics > dl')).display,
+        mainNavigationDisplay: getComputedStyle(document.querySelector('.tab-buttons')).display,
+        mcNavigationDisplay: getComputedStyle(document.querySelector('.mc-view-nav')).display,
+        comparisonNavigationDisplay: getComputedStyle(document.querySelector('.stress-replay-comparison-tabs')).display,
+        expertToggleDisplay: getComputedStyle(document.querySelector('.stress-replay-expert-toggle')).display,
+        replayLinkDisplay: getComputedStyle(document.getElementById('mcShowReplayButton')).display,
+        scenarioHeaderPosition: getComputedStyle(document.querySelector('[data-print-probe="sticky-header"] th')).position,
+        scenarioLogOverflow: getComputedStyle(document.getElementById('scenarioLogOutput')).overflow,
+        comparisonTableOverflow: getComputedStyle(document.querySelector('.stress-replay-table-scroll')).overflow
+    }));
+    assert(printedCockpitState.setupContentDisplay !== 'none',
+        `Print exposes a closed Monte-Carlo setup: ${JSON.stringify(printedCockpitState)}`);
+    assert(printedCockpitState.mcPanelDisplays.length === 5
+        && printedCockpitState.mcPanelDisplays.every(display => display !== 'none'),
+    `Print exposes all Monte-Carlo result panels in DOM order: ${JSON.stringify(printedCockpitState)}`);
+    assert(printedCockpitState.comparisonPanelDisplays.length === 3
+        && printedCockpitState.comparisonPanelDisplays.every(display => display !== 'none'),
+    `Print exposes all comparison sections in DOM order: ${JSON.stringify(printedCockpitState)}`);
+    assert(printedCockpitState.diagnosticsDisplay !== 'none',
+        `Print exposes closed native replay diagnostics: ${JSON.stringify(printedCockpitState)}`);
+    assert(printedCockpitState.mainNavigationDisplay === 'none'
+        && printedCockpitState.mcNavigationDisplay === 'none'
+        && printedCockpitState.comparisonNavigationDisplay === 'none'
+        && printedCockpitState.expertToggleDisplay === 'none'
+        && printedCockpitState.replayLinkDisplay === 'none',
+    `Print removes navigation and pure toggle controls: ${JSON.stringify(printedCockpitState)}`);
+    assert(printedCockpitState.scenarioHeaderPosition === 'static'
+        && printedCockpitState.scenarioLogOverflow === 'visible'
+        && printedCockpitState.comparisonTableOverflow === 'visible',
+    `Print disables sticky positioning and clipping overflow: ${JSON.stringify(printedCockpitState)}`);
     await page.emulateMedia({ media: 'screen' });
+    await page.evaluate(state => {
+        const setup = document.getElementById('mcSetupDisclosure');
+        const banner = document.getElementById('stressReplayBanner');
+        const diagnostics = banner.querySelector('.stress-replay-diagnostics');
+        setup.open = state.setupOpen;
+        banner.hidden = state.bannerHidden;
+        diagnostics.open = state.diagnosticsOpen;
+        document.querySelector('[data-print-probe="sticky-header"]')?.remove();
+    }, printStateBefore);
 
     const replayComparisonFailure = await page.evaluate(async () => {
         const { createStressReplayController } = await import('./app/simulator/stress-replay-ui.js');

@@ -2,14 +2,14 @@
 
 Die Simulator-App ist inzwischen in mehrere spezialisierte ES6-Module zerlegt. Die zentralen Abläufe (Monte-Carlo, Sweep, Backtests, Pflege-UI) leben nicht mehr als Monolith in `simulator-main.js`, sondern wurden in klar abgegrenzte Dateien ausgelagert. Dieses Dokument beschreibt Zweck, Haupt-Exports, Einbindungspunkte und die gewünschte Aufteilung neuer Features.
 
-**Stand:** 2026-08-07 (einschliesslich offener globaler
+**Stand:** 2026-08-17 (einschliesslich offener globaler
 Aktien-Forschungsproxykette, Langlebigkeit, Stationary Bootstrap,
 Tail-Risk-Overlay, Realentnahmevertrag, getrennter Pflege-KPI-Semantik,
 vollstaendigem historischen Backtest-Contract, SimulationDataInventoryV1
 sowie verlustfreier Profilasset-/Goldzielaggregation und technisch
 nachgebesserter, extern noch nicht freigegebener Slice-17-Runway-Semantik
 sowie intern validierter, extern noch nicht freigegebener wahrheitsgetreuer
-Risikoanzeigen)
+Risikoanzeigen und des Monte-Carlo-Ergebnis-Cockpits)
 
 **Pfadkonvention:** Simulator-Module liegen unter `app/simulator/`, Profilmodule unter `app/profile/`, Shared-Utilities unter `app/shared/`, Tranchen-Status unter `app/tranches/`. Im Dokument werden Dateinamen aus Lesbarkeit meist ohne Präfix genannt.
 
@@ -239,6 +239,51 @@ Kapselt DOM-Zugriffe für Monte-Carlo (semantische Progressbar, Live-Status, Fok
 
 ---
 
+## 4a. `mc-result-cockpit.js`
+
+Zentrale, rein darstellungsbezogene Zustandsgrenze fuer das Monte-Carlo-
+Ergebnis-Cockpit. Sie gruppiert Setup, Laufkopf und Ergebnisnavigation, ohne
+Monte-Carlo-, Replay-, Persistenz- oder Exportdaten zu veraendern.
+
+**Hauptfunktionen / Exporte:**
+
+- `initMonteCarloResultCockpit()` – initialisiert je Dokument genau einmal die
+  Setup-Zusammenfassung, Recalculate-Delegation, fuenf ARIA-Tabs, Replay-
+  Rueckverweis und die delegierten Vergleichstabs.
+- `activateMonteCarloResultView()` – aktiviert eine Ergebnisansicht anhand
+  ihrer View-ID oder eines enthaltenen Zielknotens. Alle programmatischen
+  Cockpit-Fokuspfade verwenden diese Grenze vor `focus()`.
+- `completeMonteCarloCockpitRun()` – aktualisiert nach Erfolg die
+  Setup-Zusammenfassung und schliesst das Setup. Der aufrufende UI-Lifecycle
+  aktiviert danach ueber `activateMonteCarloResultView()` den Ueberblick;
+  Fehler und Abbruch schliessen das Setup nicht automatisch.
+- `updateMonteCarloSetupSummary()` und
+  `updateMonteCarloReplayVariantBadge()` – projizieren vorhandene Eingaben
+  beziehungsweise die sichtbare Variantenliste rein visuell; sie sind keine
+  zweite Validierungs- oder Persistenzquelle. Die drei Replay-Schrittzustaende
+  leitet `updateStressReplayStepStates()` in `stress-replay-ui.js` aus
+  Workspace, Banner und Fieldset ab.
+
+**DOM- und Fokusvertrag:** Die Cockpit-Navigation verwendet ausschließlich
+`.mc-view-*` und kollidiert nicht mit den vier Haupttabs. Inaktive Panels sind
+am Bildschirm `hidden`; der Roving-Tabindex unterstuetzt Links/Rechts sowie
+Home/End. `#scenarioSelector` bleibt ein einziger stabiler Knoten im ersten
+Replay-Schritt. `displayMonteCarloResults()` darf nur dessen dynamischen
+`#scenarioSelect`-Inhalt erneuern. Der Rueckverweis aus den Szenario-Logs und
+asynchrone Replay-Abschluesse aktivieren vor dem Fokus die sichtbare
+Replay-Ansicht. Der eingeklappte kanonische `#mcButton` ist kein Erfolgs-
+Fokusziel; „Neu rechnen“ delegiert lediglich seinen Klick.
+
+**Responsive-/Druckvertrag:** Bis 899 CSS-Pixel stapeln Variantenliste und
+Editor; lokale Tabellen duerfen horizontal scrollen, die Seite selbst nicht.
+Im Druck macht `simulator.css` Setup, alle fuenf MC-Panels, Replay-Details und
+alle drei Vergleichssektionen sichtbar, entfernt Navigation und Sticky-
+Verhalten und hebt abschneidende Hoehen-/Overflow-Grenzen auf. Der einzige
+`#print-footer` steht am Ende des MC-Bereichs; JavaScript fuehrt keinen
+separaten Druckzustand.
+
+---
+
 ## 5. `scenario-analyzer.js`
 Sammelt und sortiert Szenarien (Worst, Perzentile, Pflege, Zufalls-Samples) während der Simulation.
 
@@ -320,7 +365,13 @@ Vergleich. Ein
 controllerweiter Busy-Zustand sperrt Fixieren, Variantenmutationen,
 Neuberechnung, Import, Export und Verwerfen gegen Parallelaufrufe. KPI-Deltas
 verwenden eigene Einheiten fuer Jahre und Prozentpunkte statt der Formatter
-der absoluten KPI-Werte.
+der absoluten KPI-Werte. Die drei Vergleichssektionen werden bei jedem
+Rendererlauf neu erzeugt und ueber delegierte Kennzahlen-/Delta-/Jahres-Tabs
+umgeschaltet. Eine vorangestellte Kernaussage waehlt je vergleichbarer
+Alternative hoechstens die erste endliche, materielle Abweichung nach der
+festen Prioritaet Mindest-Flex-Luecke, Ruinjahr, reales Endvermoegen,
+nominales Endvermoegen. Sie sortiert nicht, empfiehlt keine Strategie und
+berechnet keine neue Metrik.
 
 **Performancevertrag:** Der End-to-End-Test misst Baseline plus eine
 Alternative auf einem materialisierten 60-Jahres-Pfad. Die eingecheckte
@@ -1335,7 +1386,8 @@ app/simulator/simulator-main.js
 13. `scenario-analyzer.js`: Zeichnet Worst/Perzentil-/Pflege-/Zufalls-Szenarien waehrend der Runs auf; fruehe Pflege wird fuer P1 und P2 separat ermittelt.
 14. `monte-carlo-contracts.js` und `monte-carlo-export.js`: Bauen den tief eingefrorenen Request-/Result-/Provenienzvertrag aus genau diesem Lauf; der Reader prueft Versionen, Pflichtfelder und Fingerprints fail-closed.
 15. `monte-carlo-ui.js`: Haelt Start waehrend `running`/`cancelling` gesperrt, fuehrt ARIA-/Fokuszustaende und schaltet nach erfolgreichem Abschluss den V1-JSON-Download fuer die explizite Nutzeraktion frei.
-16. `simulator-results.js`: `displayMonteCarloResults()` zeigt Aggregationen und Szenario-Logs an.
+16. `simulator-results.js`: `displayMonteCarloResults()` zeigt Aggregationen und Szenario-Logs an, erneuert nur den dynamischen Inhalt des stabilen `#scenarioSelector` und aktiviert anschliessend ueber `mc-result-cockpit.js` den Ueberblick.
+17. `mc-result-cockpit.js`: schliesst das Setup nach Erfolg, synchronisiert den Laufkopf und stellt vor dem Ergebnisfokus die sichtbare Cockpit-Ansicht her.
 
 ### Parameter-Sweep
 1. `simulator-main.js`: Sweep-Button bindet `runParameterSweep()` aus `simulator-sweep.js`.

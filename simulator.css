@@ -1584,11 +1584,59 @@ fieldset.collapsible legend .legend-text {
 }
 
 @media print {
-    .stress-replay-comparison-tabs {
-        display: none;
-    }
-
+    #mcSetupDisclosure,
+    #mcSetupDisclosure > .mc-setup-content,
+    .mc-view-panel[hidden],
     [data-stress-replay-comparison-panel][hidden] {
         display: block !important;
+    }
+
+    .stress-replay-diagnostics > dl {
+        display: grid !important;
+    }
+
+    .mc-view-nav,
+    .tab-buttons,
+    .stress-replay-comparison-tabs,
+    .stress-replay-expert-toggle,
+    #mcShowReplayButton {
+        display: none !important;
+    }
+
+    #mcSetupDisclosure,
+    #mcSetupDisclosure > .mc-setup-content,
+    .mc-view-panel,
+    #monteCarloResults,
+    #simulationLog,
+    #scenarioLogOutput,
+    .stress-replay-table-scroll {
+        width: auto !important;
+        max-width: 100% !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+    }
+
+    #tab-montecarlo th {
+        position: static !important;
+    }
+
+    #simulationLog table,
+    #scenarioLogOutput table,
+    .stress-replay-table-scroll table {
+        width: 100% !important;
+        min-width: 0 !important;
+        table-layout: auto;
+    }
+
+    #simulationLog th,
+    #simulationLog td,
+    #scenarioLogOutput th,
+    #scenarioLogOutput td,
+    .stress-replay-table-scroll th,
+    .stress-replay-table-scroll td {
+        min-width: 0 !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere;
     }
 }

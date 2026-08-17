@@ -1021,8 +1021,11 @@
                     </div>
                     <div class="detail-block" id="simulator-start">
                         <h3>Simulation starten</h3>
-                        <p>Prüfen Sie „Anzahl Simulationen“, Dauer, Blockgröße, Seed, Simulationsmethode und RNG-Modus
-                            und klicken Sie auf <strong>„Monte-Carlo-Simulation starten“</strong>. Der Standard sind
+                        <p>Das Monte-Carlo-Ergebnis-Cockpit führt in der Reihenfolge <strong>Setup → Laufstatus →
+                                Ergebnisansichten → Stresspfad-Replay</strong> durch die Auswertung. Öffnen Sie im
+                            Setup die Parameter, prüfen Sie „Anzahl Simulationen“, Dauer, Blockgröße, Seed,
+                            Simulationsmethode und RNG-Modus und klicken Sie auf
+                            <strong>„Monte-Carlo-Simulation starten“</strong>. Der Standard sind
                             10.000 Pfade. 1 bis 100.000 Läufe liegen im empfohlenen interaktiven Bereich; mehr als
                             100.000 bis höchstens 1.000.000 erfordern nach jeder Parameteränderung eine ausdrückliche
                             Großlastbestätigung.</p>
@@ -1061,6 +1064,15 @@
                             <li><strong>Abbruch:</strong> „Monte-Carlo-Lauf abbrechen“ beendet die aktive
                                 Worker-Generation. Ein Nutzerabbruch startet keinen seriellen Ersatzlauf; ein neuer
                                 Worker-Pool entsteht erst beim nächsten ausdrücklichen Start.</li>
+                            <li><strong>Nach dem Lauf:</strong> Bei Erfolg klappt das Setup ein und „Überblick“ wird
+                                sichtbar fokussiert. Der Laufstatus und die Exportaktionen bleiben im Laufkopf
+                                erreichbar. „Neu rechnen“ startet keinen zweiten Rechenweg, sondern verwendet den
+                                vorhandenen Start-Button; öffnen Sie das Setup, um Parameter zu ändern.</li>
+                            <li><strong>Ergebnisansichten:</strong> Wechseln Sie per Klick oder Tastatur zwischen
+                                „Überblick“, „Risiko und Verteilung“, „Pflege“, „Szenario-Logs“ und
+                                „Stresspfad-Replay“. In der Tab-Leiste funktionieren Links/Rechts sowie Pos1/Ende.
+                                Inaktive Ansichten werden am Bildschirm ausgeblendet, beim Drucken aber vollständig
+                                in ihrer Dokumentreihenfolge ausgegeben.</li>
                         </ol>
                     </div>
                     <div class="detail-block" id="simulator-stress-replay">
@@ -1071,7 +1083,10 @@
                             weder ein allgemeines Strategieranking noch eine Finanzempfehlung.</p>
                         <ol style="margin-left: 20px; color: var(--text-light); margin-top: 10px;">
                             <li><strong>Pfad fixieren:</strong> Wählen Sie ein Szenario eines Per-Run-Seed-Laufs und
-                                prüfen Sie nach dem Fixieren Baseline-Abgleich und Fingerprints.</li>
+                                öffnen Sie aus „Szenario-Logs“ über „Im Stresspfad-Replay anzeigen“ den einzigen
+                                Szenario-Selektor. Das Replay führt anschließend durch „Lauf wählen“, „Fixierter
+                                Pfad“ und „Varianten“. Prüfen Sie nach dem Fixieren Baseline-Abgleich und
+                                Fingerprints.</li>
                             <li><strong>Bedarfe variieren:</strong> Standardmäßig sehen Sie Variantenname,
                                 Floor-Bedarf p. a., Flex-Bedarf p. a. und Mindest-Flex p. a. Der jeweils getrennt
                                 angezeigte Baselinebetrag bleibt wirksam, wenn das Eingabefeld leer ist.</li>
@@ -1093,6 +1108,12 @@
                                 oder entfernt sein, obwohl die anschließende Vergleichsrechnung fehlschlägt. In
                                 diesem Fall bleiben Fehlercode und Meldung im Status und in der Vergleichsregion
                                 sichtbar; erst ein tatsächlich erzeugter Vergleich wird als Erfolg gemeldet.</li>
+                            <li><strong>Kernaussage zuerst lesen:</strong> Vor den vollständigen Vergleichstabellen
+                                zeigt das Cockpit je vergleichbarer Alternative höchstens eine materielle Abweichung.
+                                Die feste Priorität lautet Mindest-Flex-Lücke, Jahr des Vermögensaufbrauchs, reales
+                                Endvermögen, nominales Endvermögen. Danach können Sie „Kennzahlen“,
+                                „Delta-Timeline“ und „Jahresverlauf“ einzeln öffnen. Die Kernaussage sortiert keine
+                                Varianten, berechnet keine neue Kennzahl und ist keine Strategieempfehlung.</li>
                             <li><strong>Export vertraulich behandeln:</strong> Neue Arbeitsstände speichern in der
                                 V2-Herkunftsidentität für den gebundenen Quellabschnitt die tatsächlichen
                                 Reconciliation-Werte je Zeile statt nur Hashes. Dazu gehören unter anderem
