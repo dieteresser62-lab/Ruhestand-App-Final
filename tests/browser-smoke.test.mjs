@@ -951,6 +951,68 @@ async function runSimulatorSmoke(browser, baseUrl) {
     const mcConfirmation = page.locator('#mcLargeRunConfirm');
     await page.locator('.tab-btn[data-tab="montecarlo"]').click();
     await page.locator('#tab-montecarlo').waitFor({ state: 'visible' });
+    assert(await page.locator('.tab-buttons').count() === 1,
+        'Monte-Carlo cockpit must not introduce a second main-tab strip');
+    const setupDisclosure = page.locator('#mcSetupDisclosure');
+    const setupSummary = setupDisclosure.locator('summary');
+    assert(await setupDisclosure.evaluate(details => details.open), 'Monte-Carlo setup starts expanded');
+    assert((await page.locator('#mcSetupSummaryRuns').textContent()) === '10000',
+        'Monte-Carlo setup summary exposes the current run count');
+    assert((await page.locator('#mcSetupSummaryDuration').textContent()) === '35',
+        'Monte-Carlo setup summary exposes the current duration');
+    await setupSummary.click();
+    assert(!(await setupDisclosure.evaluate(details => details.open)), 'setup disclosure closes with the pointer');
+    await setupSummary.press('Enter');
+    assert(await setupDisclosure.evaluate(details => details.open), 'setup disclosure opens with Enter');
+    await setupSummary.press('Space');
+    assert(!(await setupDisclosure.evaluate(details => details.open)), 'setup disclosure closes with Space');
+    await setupSummary.press('Space');
+    assert(await setupDisclosure.evaluate(details => details.open), 'setup disclosure reopens with Space');
+
+    const lifecycleDisclosureStates = await page.evaluate(async () => {
+        const { createMonteCarloUI } = await import('./app/simulator/monte-carlo-ui.js');
+        const ui = createMonteCarloUI();
+        const setup = document.getElementById('mcSetupDisclosure');
+        setup.open = true;
+        ui.showCancelled();
+        const afterCancel = setup.open;
+        ui.showError('Cockpit-Smoke-Fehler');
+        const afterError = setup.open;
+        document.getElementById('mc-error-container').style.display = 'none';
+        setup.open = true;
+        ui.showCompleted();
+        const afterCompleted = setup.open;
+        setup.open = true;
+        return { afterCancel, afterError, afterCompleted };
+    });
+    assert(lifecycleDisclosureStates.afterCancel, 'cancel leaves the Monte-Carlo setup open');
+    assert(lifecycleDisclosureStates.afterError, 'technical error leaves the Monte-Carlo setup open');
+    assert(!lifecycleDisclosureStates.afterCompleted, 'successful completion closes the Monte-Carlo setup');
+
+    const delegatedStarts = await page.evaluate(async () => {
+        const primary = document.getElementById('mcButton');
+        const secondary = document.getElementById('mcRecalculateButton');
+        let starts = 0;
+        primary.addEventListener('click', event => {
+            starts += 1;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+        }, { capture: true, once: true });
+        secondary.click();
+        await Promise.resolve();
+        primary.disabled = true;
+        primary.setAttribute('aria-busy', 'true');
+        await new Promise(resolve => setTimeout(resolve, 0));
+        const mirroredBusy = secondary.disabled && secondary.getAttribute('aria-busy') === 'true';
+        secondary.click();
+        primary.disabled = false;
+        primary.removeAttribute('aria-busy');
+        await new Promise(resolve => setTimeout(resolve, 0));
+        return { starts, mirroredBusy, restored: !secondary.disabled && !secondary.hasAttribute('aria-busy') };
+    });
+    assert(delegatedStarts.starts === 1, 'Neu rechnen delegates exactly one start to the canonical button');
+    assert(delegatedStarts.mirroredBusy, 'Neu rechnen mirrors disabled and busy state during a run');
+    assert(delegatedStarts.restored, 'Neu rechnen returns to idle with the canonical button');
     assert(await mcRuns.inputValue() === '10000', 'new Simulator profile uses the 10,000-run Monte-Carlo default');
     await mcEstimate.filter({ hasText: 'Run-Jahre' }).waitFor({ state: 'visible' });
     assert((await mcEstimate.textContent()).includes('Speicherklasse'), 'Monte-Carlo resource estimate names its memory class');

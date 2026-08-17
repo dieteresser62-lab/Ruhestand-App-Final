@@ -645,6 +645,80 @@ button:disabled {
     margin: 0 5px 0 2px;
 }
 
+.mc-setup-disclosure {
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--background-color, #fff);
+}
+
+.mc-setup-disclosure > summary {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    cursor: pointer;
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.mc-setup-disclosure > summary:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--secondary-color) 55%, white);
+    outline-offset: 3px;
+}
+
+.mc-setup-title {
+    flex: 0 0 auto;
+}
+
+.mc-setup-summary {
+    display: flex;
+    flex: 1 1 auto;
+    justify-content: flex-end;
+    gap: 8px 16px;
+    flex-wrap: wrap;
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+    font-weight: 400;
+}
+
+.mc-setup-summary output {
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+.mc-setup-content {
+    padding: 0 14px 16px;
+}
+
+.mc-setup-content > fieldset:first-child {
+    margin-top: 0;
+}
+
+.mc-run-head {
+    margin-top: 14px;
+    padding: 12px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--background-color, #fff) 94%, var(--secondary-color));
+    text-align: center;
+}
+
+.mc-run-head > button {
+    width: auto;
+    margin: 4px;
+}
+
+@media (max-width: 700px) {
+    .mc-setup-disclosure > summary {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .mc-setup-summary {
+        justify-content: flex-start;
+    }
+}
+
 #mc-progress-bar-container {
     width: 100%;
     background-color: #e0e0e0;

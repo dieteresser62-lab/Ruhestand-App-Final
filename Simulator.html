@@ -958,6 +958,17 @@
                     </div>
                 </div>
                 <div id="tab-montecarlo" class="tab-panel">
+                    <details id="mcSetupDisclosure" class="mc-setup-disclosure" open>
+                        <summary>
+                            <span class="mc-setup-title">Monte-Carlo-Setup</span>
+                            <span class="mc-setup-summary" aria-label="Aktuelle Monte-Carlo-Parameter">
+                                <span><output id="mcSetupSummaryRuns">10000</output> Runs</span>
+                                <span><output id="mcSetupSummaryDuration">35</output> Jahre</span>
+                                <span>Methode: <output id="mcSetupSummaryMethod">Regime-Sampling (Markov-Chain)</output></span>
+                                <span>Seed: <output id="mcSetupSummarySeed">12345</output></span>
+                            </span>
+                        </summary>
+                        <div class="mc-setup-content">
                     <fieldset>
                         <legend><span class="section-icon">🎲</span>Simulationsparameter</legend>
                         <div class="form-grid-four-col">
@@ -1108,8 +1119,14 @@
                         style="display:none; margin-top: 10px; font-size: 0.95rem; color: var(--text-secondary);"></div>
                     <button type="button" id="mcButton" aria-controls="monteCarloResults mcRunStatus"
                         onclick="runMonteCarlo()">Monte-Carlo-Simulation starten</button>
+                        </div>
+                    </details>
+                    <section id="mcRunHead" class="mc-run-head" aria-label="Monte-Carlo-Laufstatus">
                     <button type="button" id="mcCancelButton" hidden disabled
                         aria-controls="mcRunStatus" style="display:none; margin-top: 8px;">Monte-Carlo-Lauf abbrechen</button>
+                    <button type="button" id="mcRecalculateButton" aria-controls="mcRunStatus monteCarloResults">
+                        Neu rechnen
+                    </button>
                     <span id="mcProgressLabel" class="visually-hidden">Fortschritt des Monte-Carlo-Laufs</span>
                     <div id="mc-progress-bar-container" role="progressbar" aria-labelledby="mcProgressLabel"
                         aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="-1">
@@ -1128,6 +1145,41 @@
                     <div class="log-export-buttons" id="mcRunExportActions" hidden style="display:none;">
                         <button type="button" id="exportMonteCarloRunJson" disabled>Vollständiges MC-Ergebnis (JSON)</button>
                         <span id="mcRunExportStatus" role="status" aria-live="polite"></span>
+                    </div>
+                    </section>
+                    <div id="monteCarloResults" tabindex="-1" aria-label="Ergebnisse der Monte-Carlo-Analyse"
+                        style="display:none; margin-top: 25px;">
+                        <h3>Ergebnisse der Monte-Carlo-Analyse</h3>
+                        <div id="monteCarloSummary"></div>
+                        <div id="unifiedKpiDashboard" style="display:none;"></div>
+                        <div id="advancedKpiDashboard" style="display:none;"></div>
+                        <div id="withdrawalRateChartContainer"></div>
+                        <div id="pflegeKpiResults" style="display:none;">
+                            <h3 style="border-top: 1px solid var(--border-color); padding-top: 25px;">Analyse des
+                                Pflegerisikos</h3>
+                            <div id="pflegeKpiSummary" class="summary-grid"></div>
+                        </div>
+                        <!-- Szenario-Log Auswahl -->
+                        <div id="scenarioLogContainer" style="display:none; margin-top: 25px;">
+                            <h4 style="text-align:center;">Szenario-Logs analysieren</h4>
+                            <div id="scenario-controls"
+                                style="text-align: center; margin-bottom: 10px; font-size: 0.9rem; display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+                                <label style="user-select:none; cursor:pointer;"
+                                    title="Zeige vollständige Pflege-Aufschlüsselung (Anker, Cap, Deltas, Flex-Faktor)."><input
+                                        type="checkbox" id="toggle-care-details"
+                                        style="width:auto; vertical-align: middle; margin-right: 4px;">Pflege-Details
+                                    anzeigen </label><label style="user-select:none; cursor:pointer;"
+                                    title="Umschalten zwischen normalem (kompakt) und detailliertem (alle Spalten) Log."><input
+                                        type="checkbox" id="toggle-log-detail"
+                                        style="width:auto; vertical-align: middle; margin-right: 4px;">Detailliertes
+                                    Log anzeigen </label>
+                            </div>
+                            <div id="scenarioSelector"></div>
+                            <div id="scenarioLogOutput"></div>
+                            <div class="log-export-buttons" id="scenarioExportButtons" style="display:none;"><button
+                                    type="button" id="exportScenarioLogJson">JSON</button><button type="button"
+                                    id="exportScenarioLogCsv">CSV</button></div>
+                        </div>
                     </div>
                     <section id="stressReplayWorkspace" aria-labelledby="stressReplayHeading"
                         style="margin-top: 18px; text-align: left;">
@@ -1248,40 +1300,6 @@
                         </section>
                     </section>
                     <div id="print-footer" class="print-footer"></div>
-                    <div id="monteCarloResults" tabindex="-1" aria-label="Ergebnisse der Monte-Carlo-Analyse"
-                        style="display:none; margin-top: 25px;">
-                        <h3>Ergebnisse der Monte-Carlo-Analyse</h3>
-                        <div id="monteCarloSummary"></div>
-                        <div id="unifiedKpiDashboard" style="display:none;"></div>
-                        <div id="advancedKpiDashboard" style="display:none;"></div>
-                        <div id="withdrawalRateChartContainer"></div>
-                        <div id="pflegeKpiResults" style="display:none;">
-                            <h3 style="border-top: 1px solid var(--border-color); padding-top: 25px;">Analyse des
-                                Pflegerisikos</h3>
-                            <div id="pflegeKpiSummary" class="summary-grid"></div>
-                        </div>
-                        <!-- Szenario-Log Auswahl -->
-                        <div id="scenarioLogContainer" style="display:none; margin-top: 25px;">
-                            <h4 style="text-align:center;">Szenario-Logs analysieren</h4>
-                            <div id="scenario-controls"
-                                style="text-align: center; margin-bottom: 10px; font-size: 0.9rem; display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
-                                <label style="user-select:none; cursor:pointer;"
-                                    title="Zeige vollständige Pflege-Aufschlüsselung (Anker, Cap, Deltas, Flex-Faktor)."><input
-                                        type="checkbox" id="toggle-care-details"
-                                        style="width:auto; vertical-align: middle; margin-right: 4px;">Pflege-Details
-                                    anzeigen </label><label style="user-select:none; cursor:pointer;"
-                                    title="Umschalten zwischen normalem (kompakt) und detailliertem (alle Spalten) Log."><input
-                                        type="checkbox" id="toggle-log-detail"
-                                        style="width:auto; vertical-align: middle; margin-right: 4px;">Detailliertes
-                                    Log anzeigen </label>
-                            </div>
-                            <div id="scenarioSelector"></div>
-                            <div id="scenarioLogOutput"></div>
-                            <div class="log-export-buttons" id="scenarioExportButtons" style="display:none;"><button
-                                    type="button" id="exportScenarioLogJson">JSON</button><button type="button"
-                                    id="exportScenarioLogCsv">CSV</button></div>
-                        </div>
-                    </div>
                 </div>
                 <div id="tab-backtesting" class="tab-panel">
                     <fieldset>

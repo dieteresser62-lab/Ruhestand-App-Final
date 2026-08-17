@@ -7,6 +7,10 @@ import {
     normalizeMonteCarloParametersV1,
     normalizeMonteCarloResourceConfigV1
 } from './monte-carlo-parameters.js';
+import {
+    completeMonteCarloCockpitRun,
+    syncMonteCarloCockpitStartState
+} from './mc-result-cockpit.js';
 
 function focusElement(element) {
     if (typeof element?.focus !== 'function') return false;
@@ -108,11 +112,17 @@ export function createMonteCarloUI() {
         /**
          * Deaktiviert den Start-Button, um Doppelstarts zu verhindern.
          */
-        disableStart() { mcButton.disabled = true; },
+        disableStart() {
+            mcButton.disabled = true;
+            syncMonteCarloCockpitStartState();
+        },
         /**
          * Aktiviert den Start-Button wieder.
          */
-        enableStart() { mcButton.disabled = false; },
+        enableStart() {
+            mcButton.disabled = false;
+            syncMonteCarloCockpitStartState();
+        },
         bindCancel(handler) {
             if (!cancelButton || typeof handler !== 'function') return false;
             this.unbindCancel();
@@ -133,6 +143,7 @@ export function createMonteCarloUI() {
             terminalFocusTarget = null;
             mcButton.disabled = true;
             mcButton.setAttribute?.('aria-busy', 'true');
+            syncMonteCarloCockpitStartState();
             setRunStatus('Monte-Carlo-Lauf gestartet.');
             if (cancelButton) {
                 cancelButton.hidden = false;
@@ -143,6 +154,7 @@ export function createMonteCarloUI() {
         },
         beginCancelling() {
             mcButton.disabled = true;
+            syncMonteCarloCockpitStartState();
             setRunStatus('Monte-Carlo-Lauf wird abgebrochen.');
             if (cancelButton) {
                 cancelButton.disabled = true;
@@ -152,6 +164,7 @@ export function createMonteCarloUI() {
         finishRun() {
             mcButton.disabled = false;
             mcButton.removeAttribute?.('aria-busy');
+            syncMonteCarloCockpitStartState();
             if (cancelButton) {
                 cancelButton.disabled = true;
                 cancelButton.hidden = true;
@@ -169,6 +182,7 @@ export function createMonteCarloUI() {
         },
         showCompleted() {
             setRunStatus('Monte-Carlo-Lauf abgeschlossen. Ergebnisse sind verfügbar.');
+            completeMonteCarloCockpitRun();
             terminalFocusTarget = resultRegion || mcButton;
         },
         /**
