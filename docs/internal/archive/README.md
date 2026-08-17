@@ -4,6 +4,7 @@ Namenskonvention: `YYYY-feature`.
 
 ## Verfuegbare Archive
 
+- `2026-stress-pfad-replay/`
 - `2026-Refactoring/`
 - `2026-architektur-review/`
 - `2026-architektur-revision/`
