@@ -3,13 +3,23 @@ import {
     STRESS_REPLAY_SCHEMA_VERSIONS,
     STRESS_REPLAY_SCOPE,
     STRESS_REPLAY_UNITS_V1,
-    createStressReplayFingerprint
+    createStressReplaySourceIdentityV2,
+    createStressReplayFingerprint,
+    createStressReplayWorkspaceV1
 } from '../app/simulator/stress-replay-contract.js';
 import {
     StressReplayRunnerError,
     runStressReplayPathV1
 } from '../app/simulator/stress-replay-runner.js';
-import { createStressReplayVariantV1 } from '../app/simulator/stress-replay-variant.js';
+import {
+    createStressReplayBaselineVariantV1,
+    createStressReplayVariantV1
+} from '../app/simulator/stress-replay-variant.js';
+import {
+    buildStressReplayComparisonExportV1,
+    parseStressReplayComparisonExportV1,
+    serializeStressReplayComparisonExportV1
+} from '../app/simulator/stress-replay-export.js';
 import {
     STRESS_REPLAY_TRANSACTION_CAPTURE_INPUT,
     STRESS_REPLAY_TRANSACTION_CLASSES
@@ -247,6 +257,90 @@ assertEqual(first.reconciliation.matched, true, 'Baseline must reconcile against
 assertEqual(first.summary.financiallyEvaluatedYears, 2, 'Both years must be financially evaluated');
 assertEqual(JSON.stringify(inputs), inputBefore, 'Baseline inputs must remain immutable');
 assertEqual(first.scenarioLog.schemaVersion, 'ScenarioLogExportV2', 'Runner must expose the existing scenario export contract');
+
+console.log('Test 1b: direct and persisted source evidence use identical path tolerances');
+const withinToleranceRows = structuredClone(sourceRows);
+withinToleranceRows[0].wertAktien += 0.005;
+withinToleranceRows[0].inflation += 0.5e-9;
+const directToleranceResult = runStressReplayPathV1({
+    path: baselinePath,
+    baselineInputs: inputs,
+    sourceScenarioLog: withinToleranceRows,
+    dependencies
+});
+assertEqual(directToleranceResult.reconciliation.matched, true,
+    'Direct source rows accept monetary and ratio differences within path tolerances');
+const toleranceIdentity = createStressReplaySourceIdentityV2({
+    path: baselinePath,
+    sourceRows: withinToleranceRows
+});
+const exportCompatibleInputs = { ...inputs, horizonMethod: 'mean' };
+const toleranceWorkspace = createStressReplayWorkspaceV1({
+    path: baselinePath,
+    sourceIdentity: toleranceIdentity,
+    baselineSnapshot: exportCompatibleInputs,
+    variants: [createStressReplayBaselineVariantV1({ baselineInputs: exportCompatibleInputs })],
+    createdAtUtc: '2026-08-17T08:00:00.000Z'
+});
+const persistedIdentity = parseStressReplayComparisonExportV1(
+    serializeStressReplayComparisonExportV1(buildStressReplayComparisonExportV1({
+        workspace: toleranceWorkspace,
+        exportedAt: '2026-08-17T09:00:00.000Z'
+    }))
+).workspace.sourceIdentity;
+const persistedToleranceResult = runStressReplayPathV1({
+    path: baselinePath,
+    baselineInputs: inputs,
+    sourceIdentity: persistedIdentity,
+    dependencies
+});
+assertEqual(persistedToleranceResult.reconciliation.matched, true,
+    'Persisted source evidence must accept the same within-tolerance differences');
+
+const missingOptionalRows = structuredClone(withinToleranceRows);
+delete missingOptionalRows[0].inflation;
+const missingOptionalIdentity = JSON.parse(JSON.stringify(createStressReplaySourceIdentityV2({
+    path: baselinePath,
+    sourceRows: missingOptionalRows
+})));
+assertEqual(JSON.parse(missingOptionalIdentity.rows[0].r).p.includes('j'), false,
+    'V2 preserves absence of an optional reconciliation value');
+assert(persistedIdentity.identityFingerprint.value !== missingOptionalIdentity.identityFingerprint.value,
+    'V2 canonical identity distinguishes present and absent optional values');
+for (const source of [
+    { sourceScenarioLog: missingOptionalRows },
+    { sourceIdentity: missingOptionalIdentity }
+]) {
+    assertEqual(runStressReplayPathV1({
+        path: baselinePath,
+        baselineInputs: inputs,
+        ...source,
+        dependencies
+    }).reconciliation.matched, true,
+    'Direct and persisted evidence make the same decision for an absent optional value');
+}
+
+const outsideToleranceRows = structuredClone(sourceRows);
+outsideToleranceRows[0].wertAktien += 0.0100001;
+outsideToleranceRows[0].inflation += 1.0001e-9;
+const outsideToleranceIdentity = createStressReplaySourceIdentityV2({
+    path: baselinePath,
+    sourceRows: outsideToleranceRows
+});
+for (const source of [
+    { sourceScenarioLog: outsideToleranceRows },
+    { sourceIdentity: outsideToleranceIdentity }
+]) {
+    try {
+        runStressReplayPathV1({ path: baselinePath, baselineInputs: inputs, ...source, dependencies });
+        assert(false, 'Evidence outside path tolerances must fail');
+    } catch (error) {
+        assertEqual(error.code, 'STRESS_REPLAY_BASELINE_RECONCILIATION_FAILED',
+            'Direct and persisted evidence fail closed outside path tolerances');
+        assert(error.details.mismatches.some(mismatch => mismatch.index === 0),
+            'Tolerance failure retains its row index diagnosis');
+    }
+}
 
 console.log('Test 2: accumulation and materialized care/partner/widow state reach the year engine');
 const observed = [];

@@ -15,12 +15,16 @@ import {
     createStressReplayFingerprint,
     createStressReplaySourceIdentityFingerprint,
     createStressReplaySourceIdentityV1,
+    createStressReplaySourceIdentityV2,
     createStressReplayStrategySnapshot,
+    expandStressReplaySourceIdentityV2Row,
     getStressReplayVariantContract,
     normalizeStressReplayVariantPatch,
     validateStressReplayEffectiveNeeds,
     validateStressReplayPathV1,
-    validateStressReplaySourceIdentityV1
+    validateStressReplaySourceIdentity,
+    validateStressReplaySourceIdentityV1,
+    validateStressReplaySourceIdentityV2
 } from '../app/simulator/stress-replay-contract.js';
 
 function assertJsonEqual(actual, expected, message) {
@@ -460,5 +464,81 @@ assertContractError(
     'STRESS_REPLAY_SOURCE_IDENTITY_MISMATCH',
     'Identity cannot be rebound to another source run'
 );
+
+console.log('Test 10: V2 source identity preserves bounded reconciliation values and dispatches fail-closed');
+const v2Identity = createStressReplaySourceIdentityV2({
+    path: identityPath,
+    sourceRows: [{
+        recordType: 'financial_year', jahr: 1, histJahr: 2001,
+        wertAktien: 1234.005, inflation: 2.5000000005,
+        entscheidung: { jahresEntnahme: 500 },
+        unrelatedFullLogField: 'excluded'
+    }]
+});
+assertEqual(v2Identity.schemaVersion, 'StressReplaySourceIdentityV2', 'New source identities use V2');
+assertJsonEqual(JSON.parse(v2Identity.rows[0].r), {
+    p: 'ajo',
+    v: [1234.005, 2.5000000005, 500]
+}, 'V2 retains only present reconciliation values in its compact field map');
+assertJsonEqual(expandStressReplaySourceIdentityV2Row(v2Identity.rows[0]), {
+    recordType: 'financial_year', jahr: 1, histJahr: 2001,
+    wertAktien: 1234.005,
+    inflation: 2.5000000005,
+    entscheidung: { jahresEntnahme: 500 }
+}, 'V2 compact fields expand without losing names, values or field presence');
+assertEqual(validateStressReplaySourceIdentity(v2Identity, identityPath).identityFingerprint.value,
+    v2Identity.identityFingerprint.value, 'Version dispatcher accepts V2');
+assertEqual(validateStressReplaySourceIdentity(identity, identityPath).identityFingerprint.value,
+    identity.identityFingerprint.value, 'Version dispatcher keeps V1 readable');
+for (const [mutate, code] of [
+    [candidate => {
+        const values = JSON.parse(candidate.rows[0].r);
+        values.v[0] += 1;
+        candidate.rows[0].r = JSON.stringify(values);
+    },
+        'STRESS_REPLAY_SOURCE_IDENTITY_FINGERPRINT_MISMATCH'],
+    [candidate => {
+        const values = JSON.parse(candidate.rows[0].r);
+        values.p += 'z';
+        values.v.push(1);
+        candidate.rows[0].r = JSON.stringify(values);
+    },
+        'STRESS_REPLAY_SOURCE_IDENTITY_INVALID'],
+    [candidate => { candidate.rows[0].r = '{"p":"a","v":[null]}'; },
+        'STRESS_REPLAY_CONTRACT_INVALID']
+]) {
+    const candidate = structuredClone(v2Identity);
+    mutate(candidate);
+    assertContractError(() => validateStressReplaySourceIdentityV2(candidate, identityPath), code,
+        'V2 reconciliation projection mutation must fail closed');
+}
+assertContractError(
+    () => validateStressReplaySourceIdentity({ ...v2Identity, schemaVersion: 'StressReplaySourceIdentityV9' }, identityPath),
+    'STRESS_REPLAY_VERSION_UNSUPPORTED',
+    'Unknown source identity revisions fail closed'
+);
+
+const maximumYears = Array.from({ length: STRESS_REPLAY_LIMITS.maximumSourceIdentityRows }, (_, index) => ({
+    ...annualRecord(index),
+    historicalYear: 2000 + index
+}));
+const maximumPath = validPath({
+    horizonYears: maximumYears.length,
+    effectiveLength: maximumYears.length,
+    years: maximumYears,
+    reconciliation: { sourcePrefixMatched: true, sourcePrefixLength: maximumYears.length }
+});
+const maximumRows = maximumYears.map((_, index) => ({
+    recordType: 'financial_year', jahr: index + 1, histJahr: 2000 + index,
+    wertAktien: 100000 + index, wertGold: 20000 + index, liquiditaet: 30000 + index,
+    floor_brutto: 24000, rente1: 10000, rente2: 9000, renteSum: 19000,
+    flex_erfuellt_nominal: 12000, jahresentnahme_real: 36000,
+    inflation: 2, FlexRatePct: 100, QuoteEndPct: 60,
+    RealReturnEquityPct: 5, RealReturnGoldPct: 2,
+    entscheidung: { jahresEntnahme: 36000 }
+}));
+const maximumIdentity = createStressReplaySourceIdentityV2({ path: maximumPath, sourceRows: maximumRows });
+assert(new TextEncoder().encode(JSON.stringify(maximumIdentity)).byteLength < STRESS_REPLAY_LIMITS.maximumEnvelopeBytes,
+    'Maximum 60-row V2 identity remains within the unchanged envelope limit');
 
 console.log('Stress replay contract tests passed.');

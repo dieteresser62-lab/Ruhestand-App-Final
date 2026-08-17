@@ -9,6 +9,7 @@ import {
 import {
     STRESS_REPLAY_CONTRACT_VERSION,
     STRESS_REPLAY_LIMITS,
+    STRESS_REPLAY_SOURCE_IDENTITY_SCHEMA_VERSION_V1,
     StressReplayContractError,
     validateStressReplayWorkspaceV1
 } from './stress-replay-contract.js';
@@ -87,6 +88,8 @@ export function classifyStressReplayWorkspaceCompatibility(workspace, current = 
     const mismatchReasons = [];
     if (!validated.sourceIdentity) {
         mismatchReasons.push('source_identity_unavailable');
+    } else if (validated.sourceIdentity.schemaVersion === STRESS_REPLAY_SOURCE_IDENTITY_SCHEMA_VERSION_V1) {
+        mismatchReasons.push('source_identity_refix_required');
     }
     if (current.contractVersion !== undefined && current.contractVersion !== STRESS_REPLAY_CONTRACT_VERSION) {
         mismatchReasons.push('contract_version_mismatch');

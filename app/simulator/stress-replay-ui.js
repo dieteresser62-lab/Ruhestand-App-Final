@@ -4,7 +4,7 @@ import {
     STRESS_REPLAY_CONTRACT_VERSION,
     STRESS_REPLAY_LIMITS,
     createStressReplayFingerprint,
-    createStressReplaySourceIdentityV1,
+    createStressReplaySourceIdentityV2,
     createStressReplayStrategySnapshot,
     createStressReplayWorkspaceV1
 } from './stress-replay-contract.js';
@@ -169,6 +169,10 @@ export function formatStressReplayUiError(error) {
     if (code === 'STRESS_REPLAY_REPLACE_CONFIRMATION_REQUIRED') {
         return 'Der vorhandene Stresspfad wurde nicht ersetzt.';
     }
+    if (code === 'STRESS_REPLAY_VERSION_UNSUPPORTED'
+        && error?.details?.schemaVersion === 'StressReplaySourceIdentityV1') {
+        return 'Dieser Arbeitsstand ist nur zur Inspektion verfügbar. Bitte den Stresspfad neu fixieren.';
+    }
     if (code === 'STRESS_REPLAY_BASELINE_RECONCILIATION_FAILED'
         || code === 'STRESS_REPLAY_RECONCILIATION_FAILED') {
         return 'Der Pfad stimmt nicht vollständig mit dem Ursprungslauf überein und wurde nicht gespeichert.';
@@ -203,9 +207,11 @@ export function renderStressReplayWorkspaceBanner(workspaceState, {
     const mismatch = documentRef.getElementById?.('stressReplayCompatibilityReasons');
     if (mismatch) {
         mismatch.hidden = !readOnly;
-        mismatch.textContent = readOnly
-            ? `Ausführung blockiert: ${(workspaceState.compatibility?.mismatchReasons || []).join(', ')}.`
-            : '';
+        const reasons = workspaceState.compatibility?.mismatchReasons || [];
+        mismatch.textContent = !readOnly ? ''
+            : reasons.includes('source_identity_refix_required')
+                ? 'Ausführung blockiert: Die gespeicherte Source Identity ist nur zur Inspektion verfügbar. Bitte den Stresspfad neu fixieren.'
+                : `Ausführung blockiert: ${reasons.join(', ')}.`;
     }
 }
 
@@ -218,7 +224,7 @@ export function createStressReplayController({
     materializePath = materializeStressReplayPathV1,
     runBaseline = runStressReplayBaselineV1,
     createBaselineVariant = createStressReplayBaselineVariantV1,
-    createSourceIdentity = createStressReplaySourceIdentityV1,
+    createSourceIdentity = createStressReplaySourceIdentityV2,
     createVariant = createStressReplayVariantV1,
     previewVariantPatch = previewStressReplayVariantPatchV1,
     createWorkspace = createStressReplayWorkspaceV1,

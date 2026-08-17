@@ -5,9 +5,9 @@ import {
     StressReplayContractError,
     createStressReplayFingerprint,
     createStressReplayPathFingerprint,
-    createStressReplaySourceIdentityRowFingerprint,
+    expandStressReplaySourceIdentityV2Row,
     validateStressReplayPathV1,
-    validateStressReplaySourceIdentityV1,
+    validateStressReplaySourceIdentityV2,
     validateStressReplayVariantResultV1
 } from './stress-replay-contract.js';
 import {
@@ -67,7 +67,8 @@ function portfolioTotal(portfolio = {}) {
 
 function normalizeSourceRows(sourceScenarioLog, sourceIdentity, path) {
     if (sourceIdentity !== undefined && sourceIdentity !== null) {
-        return validateStressReplaySourceIdentityV1(sourceIdentity, path).rows;
+        return validateStressReplaySourceIdentityV2(sourceIdentity, path).rows
+            .map(expandStressReplaySourceIdentityV2Row);
     }
     const rows = Array.isArray(sourceScenarioLog)
         ? sourceScenarioLog
@@ -118,21 +119,14 @@ function reconcileRows(generatedRows, sourceRows, path) {
     for (let index = 0; index < prefixLength; index++) {
         const actual = generatedRows[index];
         const expected = sourceRows[index];
-        if (expected?.reconciliationFingerprint) {
-            const actualFingerprint = createStressReplaySourceIdentityRowFingerprint(actual);
-            if (actualFingerprint.value !== expected.reconciliationFingerprint.value) {
+        for (const field of ['recordType', 'jahr', 'histJahr']) {
+            if (actual?.[field] !== expected?.[field]) {
                 mismatches.push({
                     index,
-                    field: 'reconciliationFingerprint',
-                    actual: actualFingerprint.value,
-                    expected: expected.reconciliationFingerprint.value
+                    field,
+                    actual: actual?.[field] ?? null,
+                    expected: expected?.[field] ?? null
                 });
-            }
-            continue;
-        }
-        for (const field of ['recordType', 'jahr', 'histJahr']) {
-            if (expected?.[field] !== undefined && actual?.[field] !== expected[field]) {
-                mismatches.push({ index, field, actual: actual?.[field] ?? null, expected: expected[field] });
             }
         }
         for (const field of MONEY_RECONCILIATION_FIELDS) {

@@ -251,6 +251,12 @@ console.log('Test 5: banner distinguishes source, horizon, terminal state, conti
     assert(/Restpfad/.test(documentRef.getElementById('stressReplayBannerContinuation').textContent), 'Banner exposes continuation policy');
     assertEqual(documentRef.getElementById('stressReplayBannerMode').textContent, 'Nur-Lesen-Inspektion', 'Banner labels read-only mode');
     assert(/engine_fingerprint_mismatch/.test(documentRef.getElementById('stressReplayCompatibilityReasons').textContent), 'Banner names mismatch reasons');
+    renderStressReplayWorkspaceBanner({
+        workspace: workspaceFixture(),
+        compatibility: { readOnly: true, mismatchReasons: ['source_identity_refix_required'] }
+    }, { documentRef });
+    assert(/Stresspfad neu fixieren/.test(documentRef.getElementById('stressReplayCompatibilityReasons').textContent),
+        'V1 source evidence receives an understandable refix instruction');
 }
 
 console.log('Test 6: reload, export, import and explicit discard retain session boundaries');

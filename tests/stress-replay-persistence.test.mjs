@@ -6,6 +6,7 @@ import {
     STRESS_REPLAY_SCOPE,
     STRESS_REPLAY_UNITS_V1,
     StressReplayContractError,
+    createStressReplaySourceIdentityV1,
     createStressReplayWorkspaceFingerprint,
     createStressReplayWorkspaceV1
 } from '../app/simulator/stress-replay-contract.js';
@@ -180,6 +181,8 @@ const loaded = loadStressReplayWorkspaceV1({
 });
 assertEqual(saved.replaced, false, 'First save does not replace data');
 assertEqual(loaded.status, 'executable', 'Matching workspace remains executable');
+assertEqual(loaded.workspace.sourceIdentity.schemaVersion, 'StressReplaySourceIdentityV2',
+    'New persisted workspaces carry executable V2 source evidence');
 assertEqual(loaded.workspace.workspaceFingerprint.value, workspace.workspaceFingerprint.value, 'Stored workspace roundtrips');
 assert(memory.mutations.every(([, key]) => key === STRESS_REPLAY_ACTIVE_STORAGE_KEY), 'Only the dedicated replay key is mutated');
 
@@ -398,6 +401,32 @@ console.log('Test 11: checked-in V1 import remains non-mutating and fingerprint-
         false,
         'V1 import must not synthesize a minimum-flex patch'
     );
+}
+
+console.log('Test 12: V1 source evidence stays readable but requires explicit refix');
+{
+    const v1Workspace = structuredClone(workspaceFixture(32));
+    v1Workspace.sourceIdentity = createStressReplaySourceIdentityV1({
+        path: v1Workspace.path,
+        sourceRows: [{ recordType: 'financial_year', jahr: 1, histJahr: null, wertAktien: 100 }]
+    });
+    v1Workspace.workspaceFingerprint = createStressReplayWorkspaceFingerprint(v1Workspace);
+    const v1Backend = createBackend(JSON.stringify(v1Workspace));
+    const v1Loaded = loadStressReplayWorkspaceV1({
+        backend: v1Backend.backend,
+        currentCompatibility: {
+            contractVersion: STRESS_REPLAY_CONTRACT_VERSION,
+            dataFingerprint: fingerprint('a'),
+            engineFingerprint: fingerprint('b')
+        }
+    });
+    assertEqual(v1Loaded.workspace.sourceIdentity.schemaVersion, 'StressReplaySourceIdentityV1',
+        'V1 identity is preserved without migration');
+    assertEqual(v1Loaded.status, 'read_only', 'V1 identity is never treated as executable');
+    assertEqual(v1Loaded.compatibility.mismatchReasons.join(','), 'source_identity_refix_required',
+        'V1 identity exposes the stable refix reason');
+    assertEqual(v1Backend.store.get(STRESS_REPLAY_ACTIVE_STORAGE_KEY), JSON.stringify(v1Workspace),
+        'Reading V1 does not rewrite persisted bytes');
 }
 
 console.log('Stress replay persistence tests passed.');

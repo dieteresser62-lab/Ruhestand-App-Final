@@ -107,6 +107,8 @@ const serialized = serializeStressReplayComparisonExportV1(document);
 const parsed = parseStressReplayComparisonExportV1(serialized);
 assertEqual(parsed.schemaVersion, 'StressReplayComparisonExportV1', 'Export schema is explicit');
 assertEqual(parsed.workspace.workspaceFingerprint.value, workspace.workspaceFingerprint.value, 'Workspace roundtrip is exact');
+assertEqual(parsed.workspace.sourceIdentity.schemaVersion, 'StressReplaySourceIdentityV2',
+    'Export roundtrip retains executable V2 source evidence');
 assertEqual(parsed.workspace.path.years[0].recordType, 'terminal_death', 'Export roundtrip preserves the terminal death path row');
 assertEqual(parsed.comparison, null, 'Reproducible comparison result is optional and no yearly result logs are persisted');
 assertEqual(parsed.privacy.excludes.length, 4, 'Privacy exclusions are explicit');
@@ -165,7 +167,7 @@ assertContractError(
 );
 
 const identityTamper = structuredClone(document);
-identityTamper.workspace.sourceIdentity.rows[0].reconciliationFingerprint.value = 'f'.repeat(64);
+identityTamper.workspace.sourceIdentity.rows[0].r = '{"p":"a","v":[1]}';
 identityTamper.exportFingerprint = createStressReplayComparisonExportFingerprint(identityTamper);
 assertContractError(
     () => validateStressReplayComparisonExportV1(identityTamper),
