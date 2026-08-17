@@ -111,6 +111,7 @@ export function initMonteCarloResultCockpit({
     const setupDisclosure = documentRef.getElementById?.('mcSetupDisclosure');
     const primaryButton = documentRef.getElementById?.('mcButton');
     const recalculateButton = documentRef.getElementById?.('mcRecalculateButton');
+    const showReplayButton = documentRef.getElementById?.('mcShowReplayButton');
     const viewTabs = getResultViewElements(documentRef).map(view => view.tab).filter(Boolean);
     if (!setupDisclosure || !primaryButton || !recalculateButton || viewTabs.length !== RESULT_VIEW_IDS.length) return null;
 
@@ -127,6 +128,14 @@ export function initMonteCarloResultCockpit({
         event?.preventDefault?.();
         syncStartState();
         if (!recalculateButton.disabled) primaryButton.click();
+    });
+
+    showReplayButton?.addEventListener?.('click', () => {
+        const target = documentRef.getElementById?.('scenarioSelect')
+            || documentRef.getElementById?.('stressReplayStatus');
+        if (!target) return;
+        activateMonteCarloResultView(target, { documentRef });
+        target.focus?.();
     });
 
     for (const [index, tab] of viewTabs.entries()) {

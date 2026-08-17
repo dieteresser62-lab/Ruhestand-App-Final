@@ -1042,6 +1042,20 @@ async function runSimulatorSmoke(browser, baseUrl) {
     await page.locator('#mcViewTabReplay').click();
     assert(await page.locator('#mcViewPanelReplay').isVisible(),
         'replay remains reachable through the result navigation before a Monte-Carlo run');
+    assert(await page.locator('#mcViewPanelReplay #scenarioSelector').count() === 1,
+        'the stable scenario selector container lives exactly once in replay');
+    assert(await page.locator('.stress-replay-step').count() === 3,
+        'replay exposes three derived workflow cards');
+    assert(await page.locator('#stressReplayStepSelect').getAttribute('data-step-state') === 'active',
+        'run selection is the active step without a workspace');
+    assert(await page.locator('#stressReplayBanner dt').count() === 7,
+        'banner retains all seven source and diagnostic values');
+    await page.locator('#mcViewTabLogs').click();
+    await page.locator('#mcShowReplayButton').click();
+    assert(await page.locator('#mcViewPanelReplay').isVisible(),
+        'scenario-log backlink activates replay without a completed run');
+    assert(await page.evaluate(() => document.activeElement?.id) === 'stressReplayStatus',
+        'scenario-log backlink focuses the replay prerequisite without a scenario select');
     assert(await mcRuns.inputValue() === '10000', 'new Simulator profile uses the 10,000-run Monte-Carlo default');
     await mcEstimate.filter({ hasText: 'Run-Jahre' }).waitFor({ state: 'visible' });
     assert((await mcEstimate.textContent()).includes('Speicherklasse'), 'Monte-Carlo resource estimate names its memory class');

@@ -1206,7 +1206,10 @@
                                         style="width:auto; vertical-align: middle; margin-right: 4px;">Detailliertes
                                     Log anzeigen </label>
                             </div>
-                            <div id="scenarioSelector"></div>
+                            <div class="scenario-replay-link">
+                                <p>Die Auswahl zum Fixieren eines Laufs befindet sich im Stresspfad-Replay.</p>
+                                <button type="button" id="mcShowReplayButton">In Replay anzeigen</button>
+                            </div>
                             <div id="scenarioLogOutput"></div>
                             <div class="log-export-buttons" id="scenarioExportButtons" style="display:none;"><button
                                     type="button" id="exportScenarioLogJson">JSON</button><button type="button"
@@ -1220,32 +1223,49 @@
                         <h4 id="stressReplayHeading">Stresspfad-Replay</h4>
                         <p>Fixiert genau einen ausgewählten Monte-Carlo-Lauf. Varianten werden nur auf diesem
                             Pfad verglichen und sind keine allgemeine Strategieempfehlung.</p>
-                        <div class="log-export-buttons" aria-label="Stresspfad-Aktionen">
-                            <button type="button" id="stressReplayFixButton" disabled>Diesen Lauf als Stresspfad fixieren</button>
-                            <button type="button" id="stressReplayExportButton" disabled>Stresspfad exportieren</button>
-                            <button type="button" id="stressReplayImportButton">Stresspfad importieren</button>
-                            <button type="button" id="stressReplayDiscardButton" disabled>Stresspfad verwerfen</button>
-                            <input type="file" id="stressReplayImportFile" accept="application/json,.json"
-                                class="visually-hidden" tabindex="-1" aria-hidden="true">
-                        </div>
                         <div id="stressReplayStatus" role="status" aria-live="polite" tabindex="-1"></div>
-                        <aside id="stressReplayBanner" hidden tabindex="-1" aria-labelledby="stressReplayBannerTitle">
-                            <h5 id="stressReplayBannerTitle">Auf diesem fixierten Stresspfad</h5>
-                            <dl>
-                                <div><dt>Modus</dt><dd id="stressReplayBannerMode"></dd></div>
+                        <section id="stressReplayStepSelect" class="stress-replay-step" data-step-state="active"
+                            aria-labelledby="stressReplayStepSelectHeading">
+                            <h5 id="stressReplayStepSelectHeading"><span aria-hidden="true">1</span> Lauf wählen</h5>
+                            <div class="stress-replay-selection-row">
+                                <div id="scenarioSelector"></div>
+                                <button type="button" id="stressReplayFixButton" disabled>Diesen Lauf als Stresspfad fixieren</button>
+                            </div>
+                        </section>
+                        <section id="stressReplayStepPath" class="stress-replay-step" data-step-state="upcoming"
+                            aria-labelledby="stressReplayBannerTitle">
+                            <h5 id="stressReplayBannerTitle"><span aria-hidden="true">2</span> Fixierter Pfad</h5>
+                            <aside id="stressReplayBanner" hidden tabindex="-1" aria-labelledby="stressReplayBannerTitle">
+                            <dl class="stress-replay-key-facts">
                                 <div><dt>Quelle</dt><dd id="stressReplayBannerSource"></dd></div>
                                 <div><dt>Horizont</dt><dd id="stressReplayBannerHorizon"></dd></div>
                                 <div><dt>Terminalstatus</dt><dd id="stressReplayBannerTerminal"></dd></div>
-                                <div><dt>Fortsetzung</dt><dd id="stressReplayBannerContinuation"></dd></div>
-                                <div><dt>Pfad-Fingerprint</dt><dd id="stressReplayBannerPathFingerprint"></dd></div>
-                                <div><dt>Baseline-Fingerprint</dt><dd id="stressReplayBannerBaselineFingerprint"></dd></div>
                             </dl>
+                            <details class="stress-replay-diagnostics">
+                                <summary>Technische Details</summary>
+                                <dl>
+                                    <div><dt>Modus</dt><dd id="stressReplayBannerMode"></dd></div>
+                                    <div><dt>Fortsetzung</dt><dd id="stressReplayBannerContinuation"></dd></div>
+                                    <div><dt>Pfad-Fingerprint</dt><dd id="stressReplayBannerPathFingerprint"></dd></div>
+                                    <div><dt>Baseline-Fingerprint</dt><dd id="stressReplayBannerBaselineFingerprint"></dd></div>
+                                </dl>
+                            </details>
                             <p id="stressReplayCompatibilityReasons" hidden></p>
-                        </aside>
-                        <section id="stressReplayVariantWorkspace" aria-labelledby="stressReplayVariantHeading">
-                            <h5 id="stressReplayVariantHeading">Strategievarianten auf dem fixierten Pfad</h5>
+                            </aside>
+                            <div class="log-export-buttons" aria-label="Stresspfad-Arbeitsstand">
+                                <button type="button" id="stressReplayExportButton" disabled>Stresspfad exportieren</button>
+                                <button type="button" id="stressReplayImportButton">Stresspfad importieren</button>
+                                <button type="button" id="stressReplayDiscardButton" disabled>Stresspfad verwerfen</button>
+                                <input type="file" id="stressReplayImportFile" accept="application/json,.json"
+                                    class="visually-hidden" tabindex="-1" aria-hidden="true">
+                            </div>
+                        </section>
+                        <section id="stressReplayVariantWorkspace" class="stress-replay-step" data-step-state="upcoming"
+                            aria-labelledby="stressReplayVariantHeading">
+                            <h5 id="stressReplayVariantHeading"><span aria-hidden="true">3</span> Varianten</h5>
                             <p>Die angezeigte Baseline ist der eingefrorene Wert aus dem Ursprungslauf. Leere
                                 Felder übernehmen ihn; Änderungen schreiben weder Profil- noch Tranchenwerte.</p>
+                            <div class="stress-replay-variant-layout">
                             <form id="stressReplayVariantEditor">
                                 <fieldset id="stressReplayVariantFields" disabled>
                                     <legend>Strategie-Patch erstellen</legend>
@@ -1330,6 +1350,7 @@
                                 <h5 id="stressReplayVariantListHeading">Variantenliste</h5>
                                 <div id="stressReplayVariantList"></div>
                             </section>
+                            </div>
                             <section id="stressReplayComparison" tabindex="-1" aria-label="Stresspfad-Variantenvergleich"></section>
                         </section>
                     </section>

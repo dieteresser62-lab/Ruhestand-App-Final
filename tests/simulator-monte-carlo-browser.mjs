@@ -468,6 +468,27 @@ async function runWorkerSuccessCase(browser, baseUrl) {
         assert(await page.locator('#mcButton').getAttribute('aria-busy') === 'true', 'running button exposes busy state');
         await waitForCompletedRun(page);
 
+        assert(await page.locator('#scenarioSelector').count() === 1,
+            'completed run keeps one stable scenario selector container');
+        assert(await page.locator('#mcViewPanelReplay #scenarioSelect').count() === 1,
+            'completed run renders the single current scenario select inside replay');
+        await page.locator('#mcViewTabLogs').click();
+        await page.locator('#mcShowReplayButton').click();
+        assert(await page.locator('#mcViewPanelReplay').isVisible(),
+            'scenario-log backlink activates replay after a run');
+        assert(await page.evaluate(() => document.activeElement?.id) === 'scenarioSelect',
+            'scenario-log backlink focuses the current scenario select');
+        await page.locator('#mcViewTabOverview').click();
+
+        await page.locator('#mcRecalculateButton').click();
+        await page.locator('#mcCancelButton').waitFor({ state: 'visible' });
+        await waitForCompletedRun(page);
+        assert(await page.locator('#scenarioSelector').count() === 1
+            && await page.locator('#scenarioSelect').count() === 1,
+        'a second run rerenders one current select in the stable container');
+        assert(!(await page.locator('#stressReplayFixButton').isDisabled()),
+            'the current worst-run selection remains connected to fixation after rerender');
+
         const visibleResult = await page.locator('#monteCarloResults').textContent();
         for (const label of [
             'Floor-Deckung im gewählten Horizont',

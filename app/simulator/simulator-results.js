@@ -122,9 +122,9 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
         // Dropdown erstellen im scenarioSelector
         const selectorDiv = document.getElementById('scenarioSelector');
         let dropdownHtml = `
-            <div class="scenario-selector" style="margin-bottom: 15px; text-align: center;">
+            <div class="scenario-selector">
                 <label for="scenarioSelect" style="font-weight: 600; margin-right: 10px;">Szenario-Log anzeigen:</label>
-                <select id="scenarioSelect" style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); min-width: 300px; font-size: 0.9rem;">
+                <select id="scenarioSelect">
                     <option value="">— Szenario auswählen —</option>
                     <optgroup label="📊 Charakteristische Szenarien">`;
 
@@ -286,6 +286,8 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
     } else if (scenarioContainer) {
         publishStressReplayMonteCarloContext(null);
         selectStressReplayScenario(null);
+        const selectorDiv = document.getElementById('scenarioSelector');
+        if (selectorDiv) selectorDiv.innerHTML = '';
         scenarioContainer.style.display = 'none';
     }
 

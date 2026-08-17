@@ -18,13 +18,16 @@ class FakeElement {
         this.focused = false;
         this.clicks = 0;
         this.queryResults = new Map();
+        this.containedElements = new Set();
     }
 
     addEventListener(type, handler) { this.listeners.set(type, handler); }
     setAttribute(name, value) { this.attributes.set(name, String(value)); }
+    removeAttribute(name) { this.attributes.delete(name); }
     focus() { this.focused = true; }
     click() { this.clicks += 1; this.listeners.get('click')?.({ preventDefault() {} }); }
     querySelectorAll(selector) { return this.queryResults.get(selector) || []; }
+    contains(element) { return this.containedElements.has(element); }
     checkValidity() { return true; }
     reset() {}
 }
@@ -38,14 +41,29 @@ function createDocument() {
         'stressReplayBannerContinuation', 'stressReplayBannerPathFingerprint',
         'stressReplayBannerBaselineFingerprint', 'stressReplayCompatibilityReasons',
         'stressReplayVariantFields', 'stressReplayAddVariantButton', 'stressReplayVariantList', 'stressReplayDynamicAction',
-        'stressReplayPatchPreview', 'stressReplayComparison', 'useCapeSampling'
+        'stressReplayPatchPreview', 'stressReplayComparison', 'useCapeSampling',
+        'stressReplayStepSelect', 'stressReplayStepPath', 'stressReplayVariantWorkspace'
     ];
     const elements = new Map(ids.map(id => [id, new FakeElement(id)]));
+    const selectorElements = new Map();
+    for (const viewId of ['overview', 'risk', 'care', 'logs', 'replay']) {
+        const suffix = viewId[0].toUpperCase() + viewId.slice(1);
+        const tab = new FakeElement(`mcViewTab${suffix}`);
+        const panel = new FakeElement(`mcViewPanel${suffix}`);
+        panel.hidden = viewId !== 'overview';
+        elements.set(tab.id, tab);
+        elements.set(panel.id, panel);
+        selectorElements.set(`[role="tab"][data-mc-view="${viewId}"]`, tab);
+        selectorElements.set(`[role="tabpanel"][data-mc-view-panel="${viewId}"]`, panel);
+    }
+    const replayPanel = elements.get('mcViewPanelReplay');
+    for (const id of ids) replayPanel.containedElements.add(elements.get(id));
     const baselineOutputs = [];
     return {
         elements,
         baselineOutputs,
         getElementById(id) { return elements.get(id) || null; },
+        querySelector(selector) { return selectorElements.get(selector) || null; },
         querySelectorAll(selector) {
             return selector === '[data-stress-replay-baseline]' ? baselineOutputs : [];
         }
@@ -320,12 +338,28 @@ console.log('Test 8: deferred import owns the shared busy contract and rejects c
     assertEqual(controller.recomputeComparison(), null, 'Competing recompute is rejected while workspace mutation is pending');
     assertEqual(calls.discards, 0, 'Rejected discard never reaches persistence');
     assertEqual(calls.saves, 0, 'Rejected variant never reaches persistence');
+    documentRef.getElementById('mcViewPanelOverview').hidden = false;
+    documentRef.getElementById('mcViewPanelReplay').hidden = true;
     pendingImport.resolve();
     assert(await importPromise, 'Winning import completes');
     assertEqual(controller.getState().workspace, importedWorkspace, 'Winning import determines the active workspace');
     assertEqual(documentRef.getElementById('stressReplayWorkspace').attributes.get('aria-busy'), 'false', 'Workspace clears busy after import success');
     assertEqual(documentRef.getElementById('stressReplayVariantFields').disabled, false, 'Editor unlocks after import success');
     assertEqual(documentRef.getElementById('stressReplayDynamicAction').disabled, false, 'Dynamic actions unlock after import success');
+    assertEqual(documentRef.getElementById('mcViewPanelReplay').hidden, false,
+        'asynchronous import completion reactivates replay before focusing its banner');
+    assertEqual(documentRef.getElementById('mcViewPanelOverview').hidden, true,
+        'asynchronous replay focus hides the view selected while import was pending');
+    assertEqual(documentRef.getElementById('stressReplayBanner').focused, true,
+        'asynchronous import completion focuses the now-visible banner');
+    assertEqual(documentRef.getElementById('stressReplayVariantWorkspace').dataset.stepState, 'active',
+        'executable workspace derives the active variants step');
+    assertEqual(documentRef.getElementById('stressReplayStepPath').dataset.stepState, 'active',
+        'visible fixed-path banner keeps the path step active');
+    assertEqual(documentRef.getElementById('stressReplayVariantWorkspace').attributes.get('aria-current'), 'step',
+        'the most advanced available step is the single current step');
+    assertEqual(documentRef.getElementById('stressReplayStepPath').attributes.get('aria-current'), undefined,
+        'earlier active context is not exposed as a second current step');
 }
 
 console.log('Test 9: deferred discard rejects a second discard and fixation, then unlocks after success');

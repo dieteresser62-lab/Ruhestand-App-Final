@@ -63,6 +63,7 @@ function createDocument() {
     register('mcSetupDisclosure', { open: true });
     register('mcButton');
     register('mcRecalculateButton');
+    register('mcShowReplayButton');
     register('mcAnzahl', { value: '10000' });
     register('mcDauer', { value: '35' });
     register('mcSeed', { value: '12345' });
@@ -80,6 +81,7 @@ function createDocument() {
     }
     register('mcReplayVariantBadge', { hidden: true });
     register('stressReplayVariantList', { variantItems: 0 });
+    register('stressReplayStatus');
     return {
         elements,
         getElementById: id => elements.get(id) || null,
@@ -93,6 +95,10 @@ console.log('Test 1: cockpit initialization is idempotent and projects raw setup
     const first = initMonteCarloResultCockpit({ documentRef, MutationObserverCtor: null });
     const second = initMonteCarloResultCockpit({ documentRef, MutationObserverCtor: null });
     assert(first === second, 'cockpit is initialized exactly once per document');
+    assertEqual(documentRef.getElementById('mcViewTabOverview').listeners.get('click').length, 1,
+        'repeated initialization does not duplicate result-tab listeners');
+    assertEqual(documentRef.getElementById('mcShowReplayButton').listeners.get('click').length, 1,
+        'repeated initialization does not duplicate the replay-link listener');
     assertEqual(documentRef.getElementById('mcSetupSummaryRuns').textContent, '10000', 'run count is projected without normalization');
     assertEqual(documentRef.getElementById('mcSetupSummaryDuration').textContent, '35', 'duration is projected without normalization');
     assertEqual(documentRef.getElementById('mcSetupSummaryMethod').textContent, 'Regime-Sampling (Markov-Chain)', 'selected method label is projected');
@@ -157,6 +163,13 @@ console.log('Test 4: Simulator DOM keeps cockpit contracts and ordering');
     assertEqual((html.match(/class="[^"]*\btab-btn\b[^"]*"/g) || []).length, 4, 'Simulator keeps exactly four main tabs');
     assertEqual((html.match(/class="mc-view-tab"/g) || []).length, 5, 'cockpit exposes exactly five dedicated result tabs');
     assertEqual((html.match(/class="mc-view-panel"/g) || []).length, 5, 'cockpit exposes exactly five dedicated result panels');
+    assertEqual((html.match(/id="scenarioSelector"/g) || []).length, 1, 'scenario selector container remains unique');
+    assert(html.indexOf('id="scenarioSelector"') > html.indexOf('id="mcViewPanelReplay"'),
+        'scenario selector lives in the replay panel');
+    assert(html.includes('id="mcShowReplayButton"'), 'scenario logs expose the replay navigation action');
+    assertEqual((html.match(/<dt>/g) || []).length >= 7, true, 'replay banner retains all diagnostic terms');
+    assert(/id="stressReplayVariantFields"[\s\S]*?<div class="stress-replay-editor-grid">/.test(html),
+        'focused replay editor grid remains a direct fieldset child');
 }
 
 console.log('Test 5: result tabs use one activation path for view ids and contained targets');
@@ -191,6 +204,28 @@ console.log('Test 6: replay variant badge reports alternatives only');
     assertEqual(updateMonteCarloReplayVariantBadge({ documentRef }), 2, 'alternatives are derived from the rendered workspace list');
     assert(!badge.hidden, 'positive alternative count exposes the badge');
     assertEqual(badge.textContent, '2', 'badge displays the alternative count');
+}
+
+console.log('Test 7: scenario-log backlink resolves the current dynamic select and focuses replay');
+{
+    const documentRef = createDocument();
+    const replayPanel = documentRef.getElementById('mcViewPanelReplay');
+    const select = new FakeElement('scenarioSelect');
+    documentRef.elements.set('scenarioSelect', select);
+    replayPanel.containedElements.add(select);
+    initMonteCarloResultCockpit({ documentRef, MutationObserverCtor: null });
+    activateMonteCarloResultView('logs', { documentRef });
+    documentRef.getElementById('mcShowReplayButton').click();
+    assert(!replayPanel.hidden, 'backlink exposes replay before focusing its selection');
+    assertEqual(select.focusCount, 1, 'backlink focuses the current dynamically rendered select');
+
+    documentRef.elements.delete('scenarioSelect');
+    replayPanel.containedElements.add(documentRef.getElementById('stressReplayStatus'));
+    activateMonteCarloResultView('logs', { documentRef });
+    documentRef.getElementById('mcShowReplayButton').click();
+    assert(!replayPanel.hidden, 'backlink also exposes replay when no run exists');
+    assertEqual(documentRef.getElementById('stressReplayStatus').focusCount, 1,
+        'backlink focuses the replay prerequisite when no select exists');
 }
 
 updateMonteCarloSetupSummary({ documentRef: null });

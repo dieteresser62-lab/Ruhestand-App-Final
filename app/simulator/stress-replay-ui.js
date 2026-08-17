@@ -32,6 +32,7 @@ import {
     serializeStressReplayComparisonExportV1
 } from './stress-replay-export.js';
 import { EngineAPI } from '../../engine/index.mjs';
+import { activateMonteCarloResultView } from './mc-result-cockpit.js';
 
 const EMPTY_STATE = Object.freeze({ status: 'empty', workspace: null, compatibility: null, error: null });
 const IDLE_COMPARISON_STATE = Object.freeze({ status: 'idle', error: null });
@@ -239,6 +240,29 @@ export function renderStressReplayWorkspaceBanner(workspaceState, {
     }
 }
 
+export function updateStressReplayStepStates({ documentRef = globalThis.document } = {}) {
+    const banner = documentRef?.getElementById?.('stressReplayBanner');
+    const variantFields = documentRef?.getElementById?.('stressReplayVariantFields');
+    const hasWorkspace = banner?.hidden === false;
+    const variantsAvailable = hasWorkspace && variantFields?.disabled === false;
+    const states = {
+        stressReplayStepSelect: hasWorkspace ? 'completed' : 'active',
+        stressReplayStepPath: hasWorkspace ? 'active' : 'upcoming',
+        stressReplayVariantWorkspace: variantsAvailable ? 'active' : 'upcoming'
+    };
+    const currentStepId = variantsAvailable
+        ? 'stressReplayVariantWorkspace'
+        : hasWorkspace ? 'stressReplayStepPath' : 'stressReplayStepSelect';
+    for (const [id, state] of Object.entries(states)) {
+        const step = documentRef?.getElementById?.(id);
+        if (!step) continue;
+        step.dataset.stepState = state;
+        if (id === currentStepId) step.setAttribute?.('aria-current', 'step');
+        else step.removeAttribute?.('aria-current');
+    }
+    return states;
+}
+
 export function createStressReplayController({
     documentRef = globalThis.document,
     windowRef = globalThis.window,
@@ -275,12 +299,17 @@ export function createStressReplayController({
     let busy = false;
 
     const element = id => documentRef?.getElementById?.(id) || null;
+    const focusReplayTarget = target => {
+        if (!target) return;
+        activateMonteCarloResultView(target, { documentRef });
+        focusElement(target);
+    };
     const status = (message, { error = false, focus = false } = {}) => {
         const region = element('stressReplayStatus');
         if (!region) return;
         region.textContent = message;
         region.dataset.status = error ? 'error' : 'ok';
-        if (focus) focusElement(region);
+        if (focus) focusReplayTarget(region);
     };
     const setExpertFieldsExpanded = expanded => {
         const toggle = element('stressReplayExpertToggle');
@@ -335,7 +364,8 @@ export function createStressReplayController({
             busy,
             readOnly
         });
-        if (focusBanner && hasWorkspace) focusElement(element('stressReplayBanner'));
+        updateStressReplayStepStates({ documentRef });
+        if (focusBanner && hasWorkspace) focusReplayTarget(element('stressReplayBanner'));
     };
     const beginBusyAction = () => {
         if (busy) return false;
@@ -440,14 +470,14 @@ export function createStressReplayController({
             comparisonResults = computed.results || [];
             comparisonState = { status: 'success', error: null };
             render();
-            if (focusComparison) focusElement(element('stressReplayComparison'));
+            if (focusComparison) focusReplayTarget(element('stressReplayComparison'));
             return comparison;
         } catch (error) {
             const diagnostic = comparisonErrorDiagnostic(error);
             comparisonState = { status: 'error', error: diagnostic };
             status(`Variantenvergleich fehlgeschlagen [${diagnostic.code}]: ${diagnostic.message}`, { error: true });
             render();
-            focusElement(element(focusComparison ? 'stressReplayComparison' : 'stressReplayStatus'));
+            focusReplayTarget(element(focusComparison ? 'stressReplayComparison' : 'stressReplayStatus'));
             return null;
         }
     };
@@ -785,7 +815,7 @@ export function createStressReplayController({
             updateConditionalFields();
             render();
             status('Der aktive Stresspfad wurde verworfen.', { focus: true });
-            focusElement(element('stressReplayFixButton'));
+            focusReplayTarget(element('stressReplayFixButton'));
             return true;
         } catch (error) {
             status(`Verwerfen fehlgeschlagen: ${formatStressReplayUiError(error)}`, { error: true, focus: true });
