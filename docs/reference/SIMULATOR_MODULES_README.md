@@ -266,7 +266,13 @@ fuer denselben absoluten Index identische Log- und Capture-Daten.
   effektive Relation `minimumFlexAnnual <= startFlexBedarf` wird mit Baseline-
   Fallback fail-closed validiert und niemals geklemmt.
   `maxSkimPctOfEq` gilt nur von 0 bis 50, `maxBearRefillPctOfEq` nur von 0 bis
-  70; nicht endliche und ausserhalb liegende Werte werden nicht geklemmt.
+  70; nicht endliche und ausserhalb liegende Werte werden nicht geklemmt. Neue
+  Workspaces verwenden `StressReplaySourceIdentityV2`: Struktur und
+  Feldpraesenz bleiben exakt, Geld- und Verhaeltniswerte werden nach Reload mit
+  denselben Pfadtoleranzen wie die Originalzeilen abgeglichen. Die je Quellzeile
+  vorhandenen Reconciliation-Werte sind als kanonische Praesenz-/Werteliste
+  kompakt kodiert und durch Descriptor-, Identity- und Workspace-Fingerprints
+  gebunden.
 - `stress-replay-path-materializer.js` – Quellidentitaet, ScenarioLog-Abgleich,
   vollstaendiger Markt-/Household-Pfad und unabhaengiger Post-Ruin-Shadow-Seed.
   Vor dem ersten Shadow-Jahr ist der kanonische Marktstatus des Ruinjahres
@@ -289,16 +295,28 @@ fuer denselben absoluten Index identische Log- und Capture-Daten.
   bestaetigtes Ersetzen/Verwerfen, versionierter JSON-Roundtrip und Nur-Lesen-
   Modus bei Kompatibilitaetsabweichung. Die unabhaengig aus den originalen
   ScenarioLog-Zeilen gebildete Herkunftsidentitaet bleibt bei Reload und Import
-  erhalten. Der aktive Key `sim.stressReplay.active.v1` wird nicht in
-  allgemeine Snapshots aufgenommen.
+  erhalten. V1-Herkunftsidentitaeten bleiben byte- und fingerprintstabil
+  lesbar, liefern aber `source_identity_refix_required` und werden nicht
+  automatisch migriert oder ausgefuehrt. V2 speichert und exportiert fuer den
+  gebundenen Source-Praefix die tatsaechlich vorhandenen Reconciliation-Werte
+  je Zeile (unter anderem Vermoegen, Renten, Flex-Erfuellung und
+  Jahresentnahme), nicht nur einen Hash. Die Privacy-Ausschlussliste bleibt
+  konsistent: vollstaendige Source-Scenario-Logs, lokale Dateipfade, Secrets
+  und unbeteiligte Speicherrecords werden nicht exportiert. Der Export enthaelt
+  dennoch Finanzdaten und ist vertraulich zu behandeln. Der aktive Key
+  `sim.stressReplay.active.v1` wird nicht in allgemeine Snapshots aufgenommen.
 
 **UI-Module:** `stress-replay-ui.js` steuert Sitzung, Fixieren, Varianten und
 Import/Export; `stress-replay-renderer.js` rendert Patchvorschau, KPIs,
 Delta-Timeline und Jahrestabelle. Der fokussierte Editor zeigt Name, Floor,
 Flex und Mindest-Flex; die 17 bisherigen Felder liegen in einem initial
 geschlossenen, nativen Experten-Disclosure. Leere Bedarfsfelder bedeuten
-Baselineuebernahme, `0` bedeutet explizite Null. Statuscopy, Fokus und Live-Regionen machen
-deutlich, dass alle Aussagen nur fuer den fixierten Pfad gelten. Ein
+Baselineuebernahme, `0` bedeutet explizite Null. Statuscopy, Fokus und
+Live-Regionen machen deutlich, dass alle Aussagen nur fuer den fixierten Pfad
+gelten. Der Zustand `idle | success | error` trennt den neutralen Leerzustand
+vom dauerhaften, alert-semantischen Vergleichsfehler. Mutationsmeldungen
+behaupten einen Vergleichserfolg nur bei einem tatsaechlich erzeugten
+Vergleich. Ein
 controllerweiter Busy-Zustand sperrt Fixieren, Variantenmutationen,
 Neuberechnung, Import, Export und Verwerfen gegen Parallelaufrufe. KPI-Deltas
 verwenden eigene Einheiten fuer Jahre und Prozentpunkte statt der Formatter
@@ -307,8 +325,14 @@ der absoluten KPI-Werte.
 **Performancevertrag:** Der End-to-End-Test misst Baseline plus eine
 Alternative auf einem materialisierten 60-Jahres-Pfad. Die eingecheckte
 Referenzmessung unter WSL2/Node 22 auf einem Ryzen 7 3700X betraegt 435,858 ms
-Median bei fuenf Messungen nach zwei Warmups; der JSON-Export umfasst 88.524
-Byte. Das Regressionsbudget ist relativ (Faktor 4, mindestens 250 ms) und
+Median bei fuenf Messungen nach zwei Warmups. Die historische Exportbaseline
+umfasst 88.524 Byte; der aktuelle 60-Zeilen-V2-Referenzexport misst 109.472
+Byte. Sein relatives Budget liegt bei 110.655 Byte (Faktor 1,25), also bleiben
+1.183 Byte beziehungsweise rund 1,1 Prozent Reserve. Die Kompaktkodierung ist
+deshalb Teil des Groessenvertrags. Jede Erweiterung von
+`SOURCE_IDENTITY_V2_RECONCILIATION_FIELDS` muss den maximalen 60-Zeilen-Export
+neu messen; verbleibende Reserve darf nicht vorausgesetzt werden. Das
+Laufzeit-Regressionsbudget ist relativ (Faktor 4, mindestens 250 ms) und
 priorisiert deterministische fachliche Paritaet vor einer unbelegten absoluten
 Durchsatzforderung.
 

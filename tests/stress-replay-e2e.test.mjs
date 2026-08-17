@@ -17,7 +17,9 @@ import { runStressReplayComparisonV1 } from '../app/simulator/stress-replay-comp
 import { runStressReplayPathV1 } from '../app/simulator/stress-replay-runner.js';
 import {
     createStressReplayBaselineVariantV1,
-    createStressReplayVariantV1
+    createStressReplayVariantV1,
+    previewStressReplayVariantPatchV1,
+    applyStressReplayVariantV1
 } from '../app/simulator/stress-replay-variant.js';
 import {
     buildStressReplayComparisonExportV1,
@@ -25,6 +27,7 @@ import {
     serializeStressReplayComparisonExportV1
 } from '../app/simulator/stress-replay-export.js';
 import { formatStressReplayUiError } from '../app/simulator/stress-replay-ui.js';
+import { inspectStressReplayImportV1 } from '../app/simulator/stress-replay-persistence.js';
 
 console.log('--- Stress Replay End-to-End Tests ---');
 
@@ -263,6 +266,153 @@ const importedBaselineReplay = runStressReplayPathV1({
 assertEqual(importedBaselineReplay.reconciliation.matched, true,
     'Imported baseline must reconcile from persisted source identity without original logs');
 
+const exactFlexBaselineInputs = {
+    ...inputs,
+    startFlexBedarf: 90000,
+    minimumFlexAnnual: 30000,
+    horizonYears: 35
+};
+const exactFlexMonteCarloParams = { ...monteCarloParams, maxDauer: 35, seed: 20260817 };
+const exactFlexSourceRequest = {
+    ...sourceRequest,
+    inputs: exactFlexBaselineInputs,
+    monteCarloParams: exactFlexMonteCarloParams
+};
+const exactFlexSource = await runMonteCarloChunk({
+    inputs: exactFlexBaselineInputs,
+    widowOptions,
+    monteCarloParams: exactFlexMonteCarloParams,
+    useCapeSampling: false,
+    runRange: { start: 0, count: 1 },
+    logIndices: [0],
+    stressReplayCapture: createStressReplayCaptureRequest([0]),
+    engine: EngineAPI
+});
+const exactFlexSourceMeta = exactFlexSource.runMeta.find(entry => entry.index === 0);
+assert(exactFlexSourceMeta?.stressReplayCapture,
+    'The synthetic exact-flex run must publish its replay capture');
+assertEqual(exactFlexSourceMeta.logDataRows.length, 35,
+    'The synthetic exact-flex source log must contain all 35 years');
+const exactFlexPath = materializeStressReplayPathV1({
+    capture: exactFlexSourceMeta.stressReplayCapture,
+    sourceLogRows: exactFlexSourceMeta.logDataRows,
+    sourceRequest: exactFlexSourceRequest,
+    dataFingerprint: createStressReplayFingerprint({ dataVersion: getDataVersion() }),
+    engineFingerprint: createStressReplayFingerprint({ engineVersion: EngineAPI.version || 'EngineAPI' }),
+    scenarioKey: 'synthetic-exact-flex-35-year-path',
+    selectionMetric: 'nominal_terminal_wealth_eur'
+});
+assertEqual(exactFlexPath.effectiveLength, 35,
+    'The synthetic exact-flex regression path must retain its complete 35-year horizon');
+
+const exactFlexPatch = { strategy: { startFlexBedarf: 28000, minimumFlexAnnual: 12000 } };
+const exactFlexPreview = previewStressReplayVariantPatchV1({
+    baselineInputs: exactFlexBaselineInputs,
+    patch: exactFlexPatch
+});
+assertEqual(exactFlexPreview.patch.strategy.startFlexBedarf, 28000,
+    'Preview must preserve the requested 28,000 EUR flex need exactly');
+assertEqual(exactFlexPreview.patch.strategy.minimumFlexAnnual, 12000,
+    'Preview must preserve the requested 12,000 EUR minimum flex exactly');
+const exactFlexVariant = createStressReplayVariantV1({
+    id: 'exact-flex-reduction',
+    label: 'Flex 28.000 / Mindest-Flex 12.000',
+    baselineInputs: exactFlexBaselineInputs,
+    patch: exactFlexPatch
+});
+const exactFlexAppliedInputs = applyStressReplayVariantV1({
+    baselineInputs: exactFlexBaselineInputs,
+    variant: exactFlexVariant
+});
+assertEqual(exactFlexAppliedInputs.startFlexBedarf, 28000,
+    'Variant application must pass 28,000 EUR flex need through unchanged');
+assertEqual(exactFlexAppliedInputs.minimumFlexAnnual, 12000,
+    'Variant application must pass 12,000 EUR minimum flex through unchanged');
+
+const exactFlexBaselineBefore = JSON.stringify(exactFlexBaselineInputs);
+const exactFlexPathBefore = exactFlexPath.pathFingerprint.value;
+const exactFlexSourceBefore = createStressReplayFingerprint(exactFlexSourceMeta.logDataRows).value;
+const exactFlexBaselineReplay = runStressReplayPathV1({
+    path: exactFlexPath,
+    baselineInputs: exactFlexBaselineInputs,
+    sourceScenarioLog: exactFlexSourceMeta.logDataRows,
+    engine: EngineAPI
+});
+const exactFlexVariantReplay = runStressReplayPathV1({
+    path: exactFlexPath,
+    baselineInputs: exactFlexBaselineInputs,
+    variant: exactFlexVariant,
+    engine: EngineAPI
+});
+const exactFlexComparison = runStressReplayComparisonV1({
+    path: exactFlexPath,
+    baselineInputs: exactFlexBaselineInputs,
+    sourceScenarioLog: exactFlexSourceMeta.logDataRows,
+    alternatives: [exactFlexVariant],
+    engine: EngineAPI
+});
+assertEqual(exactFlexComparison.overallStatus, 'complete',
+    'The exact flex reduction must produce a complete fixed-path comparison');
+assert(exactFlexComparison.variants.every(entry => entry.terminalStatus !== 'technical_error'),
+    'Neither exact-flex comparison arm may contain a technical error');
+assertEqual(exactFlexBaselineReplay.pathFingerprint.value, exactFlexVariantReplay.pathFingerprint.value,
+    'Baseline and reduced-flex replay must use the same fixed path');
+assert(exactFlexComparison.variants[0].variantFingerprint.value
+    !== exactFlexComparison.variants[1].variantFingerprint.value,
+'Baseline and reduced-flex alternative must retain distinct variant identities');
+const exactBaselineFirstYear = exactFlexBaselineReplay.scenarioLog.records
+    .find(record => record.recordType === 'financial_year');
+const exactVariantFirstYear = exactFlexVariantReplay.scenarioLog.records
+    .find(record => record.recordType === 'financial_year');
+assertEqual(exactBaselineFirstYear.minimumFlexConfiguredAnnualEur, 30000,
+    'The real baseline engine year must receive 30,000 EUR minimum flex unchanged');
+assertEqual(exactVariantFirstYear.minimumFlexConfiguredAnnualEur, 12000,
+    'The real variant engine year must receive 12,000 EUR minimum flex unchanged');
+assertEqual(JSON.stringify(exactFlexBaselineInputs), exactFlexBaselineBefore,
+    'Preview, creation, application and both replays must not mutate the exact-flex baseline');
+assertEqual(exactFlexPath.pathFingerprint.value, exactFlexPathBefore,
+    'The complete exact-flex workflow must not mutate the fixed path');
+assertEqual(createStressReplayFingerprint(exactFlexSourceMeta.logDataRows).value, exactFlexSourceBefore,
+    'The complete exact-flex workflow must not mutate the original source rows');
+
+const exactFlexWorkspace = createStressReplayWorkspaceV1({
+    path: exactFlexPath,
+    sourceScenarioLog: exactFlexSourceMeta.logDataRows,
+    baselineSnapshot: exactFlexBaselineInputs,
+    variants: [
+        createStressReplayBaselineVariantV1({ baselineInputs: exactFlexBaselineInputs }),
+        exactFlexVariant
+    ],
+    createdAtUtc: '2026-08-17T10:00:00.000Z'
+});
+const exactFlexWorkspaceBefore = exactFlexWorkspace.workspaceFingerprint.value;
+const exactFlexSerialized = serializeStressReplayComparisonExportV1(buildStressReplayComparisonExportV1({
+    workspace: exactFlexWorkspace,
+    comparison: exactFlexComparison,
+    exportedAt: '2026-08-17T10:30:00.000Z'
+}));
+const exactFlexImported = parseStressReplayComparisonExportV1(exactFlexSerialized);
+assertEqual(exactFlexImported.workspace.sourceIdentity.schemaVersion, 'StressReplaySourceIdentityV2',
+    'Exact-flex export/import must retain executable V2 source evidence');
+assertEqual(exactFlexImported.workspace.sourceIdentity.identityFingerprint.value,
+    exactFlexWorkspace.sourceIdentity.identityFingerprint.value,
+    'Exact-flex export/import must retain the V2 source identity fingerprint');
+assertEqual(exactFlexImported.workspace.workspaceFingerprint.value, exactFlexWorkspaceBefore,
+    'Exact-flex export/import must retain the unchanged workspace fingerprint');
+assertEqual(exactFlexImported.comparison.comparisonFingerprint.value,
+    exactFlexComparison.comparisonFingerprint.value,
+    'Exact-flex export/import must retain the complete comparison fingerprint');
+const exactFlexReloadedBaseline = runStressReplayPathV1({
+    path: exactFlexImported.workspace.path,
+    baselineInputs: exactFlexImported.workspace.baselineSnapshot,
+    sourceIdentity: exactFlexImported.workspace.sourceIdentity,
+    engine: EngineAPI
+});
+assertEqual(exactFlexReloadedBaseline.reconciliation.matched, true,
+    'Reloaded exact-flex baseline must reconcile from persisted V2 values');
+assertEqual(exactFlexReloadedBaseline.resultFingerprint.value, exactFlexBaselineReplay.resultFingerprint.value,
+    'Direct and V2-reloaded exact-flex baseline runs must be identical');
+
 const zeroBaselineInputs = { ...inputs, minimumFlexAnnual: 6000 };
 const zeroAlternative = createStressReplayVariantV1({
     id: 'zero-needs-v2',
@@ -312,6 +462,17 @@ const legacyImported = parseStressReplayComparisonExportV1(legacyExportFixture);
 assert(legacyImported.workspace.variants.every(variant => (
     variant.whitelistVersion === 'StressReplayVariantWhitelistV1'
 )), 'The golden legacy export fixture must retain V1 whitelist dispatch');
+const legacyInspection = inspectStressReplayImportV1(legacyExportFixture, {
+    currentCompatibility: {
+        contractVersion: legacyImported.workspace.contractVersion,
+        dataFingerprint: legacyImported.workspace.path.dataFingerprint,
+        engineFingerprint: legacyImported.workspace.path.engineFingerprint
+    }
+});
+assertEqual(legacyInspection.compatibility.status, 'read_only',
+    'A legacy V1 source identity must remain inspectable but not executable');
+assertEqual(legacyInspection.compatibility.mismatchReasons.join(','), 'source_identity_refix_required',
+    'Legacy source evidence must expose the stable refix reason without migration');
 const legacyBaselineVariant = createStressReplayBaselineVariantV1({
     baselineInputs: inputs,
     whitelistVersion: 'StressReplayVariantWhitelistV1'

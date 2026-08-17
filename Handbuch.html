@@ -1084,8 +1084,22 @@
                                 Strategieparameter. Ein- und Ausblenden verändert keine eingegebenen Werte und wird
                                 nicht im Workspace gespeichert.</li>
                             <li><strong>Altbestände:</strong> Importierte V1-Varianten bleiben nach ihren damaligen
-                                Regeln ausführbar. Fehlen die neuen Bedarfsblätter, gelten die eingefrorenen
-                                Baselinewerte.</li>
+                                Regeln und Fingerprints erhalten. Enthält der gesamte alte Arbeitsstand jedoch nur
+                                eine hashbasierte V1-Herkunftsidentität, ist er ausschließlich zur Inspektion
+                                verfügbar. Starten Sie dann einen neuen Monte-Carlo-Lauf und fixieren Sie den
+                                Stresspfad erneut; die App migriert oder ergänzt die fehlenden Quellwerte nicht
+                                automatisch.</li>
+                            <li><strong>Status getrennt lesen:</strong> Eine Variante kann erfolgreich gespeichert
+                                oder entfernt sein, obwohl die anschließende Vergleichsrechnung fehlschlägt. In
+                                diesem Fall bleiben Fehlercode und Meldung im Status und in der Vergleichsregion
+                                sichtbar; erst ein tatsächlich erzeugter Vergleich wird als Erfolg gemeldet.</li>
+                            <li><strong>Export vertraulich behandeln:</strong> Neue Arbeitsstände speichern in der
+                                V2-Herkunftsidentität für den gebundenen Quellabschnitt die tatsächlichen
+                                Reconciliation-Werte je Zeile statt nur Hashes. Dazu gehören unter anderem
+                                Vermögen, Renten, Flex-Erfüllung und Jahresentnahme. Der JSON-Export enthält diese
+                                Werte ebenfalls. Vollständige Source-Scenario-Logs, lokale Dateipfade,
+                                Zugangsdaten und andere Speicherrecords bleiben ausgeschlossen; der Export enthält
+                                dennoch persönliche Finanzannahmen und sollte entsprechend geschützt werden.</li>
                         </ol>
                     </div>
                     <div class="detail-block" id="simulator-backtest">
