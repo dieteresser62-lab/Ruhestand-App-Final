@@ -41,6 +41,13 @@ const MARKER_LABELS = Object.freeze({
     terminal_status: 'Terminalstatus'
 });
 
+const HIGHLIGHT_KPI_PRIORITY = Object.freeze([
+    'totalMinimumFlexShortfallEur',
+    'ruinYear',
+    'finalValueRealEur',
+    'finalValueNominalEur'
+]);
+
 function escapeHtml(value) {
     return String(value ?? '')
         .replaceAll('&', '&amp;')
@@ -187,6 +194,46 @@ function renderYearTable(comparison, results) {
     </div>`;
 }
 
+function renderPrioritizedHighlights(comparison) {
+    if (!comparison) return '';
+    const highlights = comparison.variants.slice(1).flatMap(variant => {
+        const pair = comparison.pairwise.find(candidate => candidate.variantId === variant.variantId);
+        if (!pair?.comparable) return [];
+        const selected = HIGHLIGHT_KPI_PRIORITY.map(field => ({
+            field,
+            delta: pair.kpiDeltas?.[field]
+        })).find(({ delta }) => delta?.applicability === 'applicable'
+            && Number.isFinite(delta.baselineValue)
+            && Number.isFinite(delta.variantValue)
+            && Number.isFinite(delta.absoluteDelta)
+            && delta.absoluteDelta !== 0);
+        if (!selected) return [];
+        return [`<li class="stress-replay-highlight" data-variant-id="${escapeHtml(variant.variantId)}">
+            <h5>${escapeHtml(variant.label)}</h5>
+            <p><strong>${escapeHtml(KPI_LABELS[selected.field])}</strong></p>
+            <dl>
+                <div><dt>Baselinewert</dt><dd>${formatKpi(selected.field, selected.delta.baselineValue)}</dd></div>
+                <div><dt>Variantenwert</dt><dd>${formatKpi(selected.field, selected.delta.variantValue)}</dd></div>
+                <div><dt>Berechnetes Delta</dt><dd>${escapeHtml(formatKpiDelta(selected.delta))}</dd></div>
+            </dl>
+        </li>`];
+    });
+    if (highlights.length === 0) return '';
+    return `<section class="stress-replay-highlights" aria-labelledby="stressReplayHighlightsHeading">
+        <h5 id="stressReplayHighlightsHeading">Kernaussage je Variante</h5>
+        <p>Priorisierte materielle Abweichung auf diesem fixierten Pfad; keine Rangfolge oder Empfehlung.</p>
+        <ul>${highlights.join('')}</ul>
+    </section>`;
+}
+
+function renderComparisonTabs() {
+    return `<div class="stress-replay-comparison-tabs" role="tablist" aria-label="Replay-Vergleichsansichten">
+        <button type="button" role="tab" id="stressReplayKpiTab" aria-controls="stressReplayKpiPanel" aria-selected="true" tabindex="0" data-stress-replay-comparison-view="kpi">Kennzahlen</button>
+        <button type="button" role="tab" id="stressReplayDeltaTab" aria-controls="stressReplayDeltaPanel" aria-selected="false" tabindex="-1" data-stress-replay-comparison-view="delta">Delta-Timeline</button>
+        <button type="button" role="tab" id="stressReplayYearTab" aria-controls="stressReplayYearPanel" aria-selected="false" tabindex="-1" data-stress-replay-comparison-view="year">Jahresverlauf</button>
+    </div>`;
+}
+
 export function renderStressReplayComparisonV1({ comparison = null, results = [], comparisonState = null } = {}) {
     const effectiveState = comparisonState || (comparison
         ? { status: 'success', error: null }
@@ -208,9 +255,11 @@ export function renderStressReplayComparisonV1({ comparison = null, results = []
         : '';
     return `${blocked}
         <p class="stress-replay-interpretation">Vergleich auf genau diesem fixierten Stresspfad; keine allgemeine Rangfolge oder Strategieempfehlung.</p>
-        <section aria-labelledby="stressReplayKpiHeading"><h5 id="stressReplayKpiHeading">KPI-Tabelle</h5>${renderKpiTable(comparison)}</section>
-        <section aria-labelledby="stressReplayDeltaHeading"><h5 id="stressReplayDeltaHeading">Delta-Timeline</h5>${renderDeltaTimeline(comparison)}</section>
-        <section aria-labelledby="stressReplayYearHeading"><h5 id="stressReplayYearHeading">Jahrestabelle</h5>${renderYearTable(comparison, results)}</section>`;
+        ${renderPrioritizedHighlights(comparison)}
+        ${renderComparisonTabs()}
+        <section role="tabpanel" id="stressReplayKpiPanel" aria-labelledby="stressReplayKpiTab stressReplayKpiHeading" data-stress-replay-comparison-panel="kpi"><h5 id="stressReplayKpiHeading">KPI-Tabelle</h5>${renderKpiTable(comparison)}</section>
+        <section role="tabpanel" id="stressReplayDeltaPanel" aria-labelledby="stressReplayDeltaTab stressReplayDeltaHeading" data-stress-replay-comparison-panel="delta" hidden><h5 id="stressReplayDeltaHeading">Delta-Timeline</h5>${renderDeltaTimeline(comparison)}</section>
+        <section role="tabpanel" id="stressReplayYearPanel" aria-labelledby="stressReplayYearTab stressReplayYearHeading" data-stress-replay-comparison-panel="year" hidden><h5 id="stressReplayYearHeading">Jahrestabelle</h5>${renderYearTable(comparison, results)}</section>`;
 }
 
 export function renderStressReplayViewsV1({ documentRef = globalThis.document, workspace, comparison, results, comparisonState, preview, previewError, busy = false, readOnly = false } = {}) {

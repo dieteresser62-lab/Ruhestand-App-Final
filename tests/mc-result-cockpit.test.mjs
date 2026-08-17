@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import {
     activateMonteCarloResultView,
+    activateStressReplayComparisonView,
     completeMonteCarloCockpitRun,
     initMonteCarloResultCockpit,
     syncMonteCarloCockpitStartState,
@@ -45,6 +46,7 @@ class FakeElement {
     contains(element) { return this.containedElements.has(element); }
     focus() { this.focusCount += 1; }
     querySelectorAll(selector) {
+        if (this.queryResults?.has(selector)) return this.queryResults.get(selector);
         return selector === 'li[data-variant-id]' ? Array.from({ length: this.variantItems || 0 }, () => ({})) : [];
     }
 }
@@ -81,6 +83,7 @@ function createDocument() {
     }
     register('mcReplayVariantBadge', { hidden: true });
     register('stressReplayVariantList', { variantItems: 0 });
+    register('stressReplayComparison', { queryResults: new Map() });
     register('stressReplayStatus');
     return {
         elements,
@@ -226,6 +229,47 @@ console.log('Test 7: scenario-log backlink resolves the current dynamic select a
     assert(!replayPanel.hidden, 'backlink also exposes replay when no run exists');
     assertEqual(documentRef.getElementById('stressReplayStatus').focusCount, 1,
         'backlink focuses the replay prerequisite when no select exists');
+}
+
+console.log('Test 8: delegated comparison tabs survive rerender and keep an independent roving focus');
+{
+    const documentRef = createDocument();
+    const root = documentRef.getElementById('stressReplayComparison');
+    const tabSelector = '[role="tab"][data-stress-replay-comparison-view]';
+    const panelSelector = '[role="tabpanel"][data-stress-replay-comparison-panel]';
+    const renderComparison = suffix => {
+        const tabs = ['kpi', 'delta', 'year'].map(viewId => new FakeElement(`${viewId}-${suffix}`, {
+            dataset: { stressReplayComparisonView: viewId }
+        }));
+        const panels = ['kpi', 'delta', 'year'].map((viewId, index) => new FakeElement(`${viewId}-panel-${suffix}`, {
+            dataset: { stressReplayComparisonPanel: viewId }, hidden: index !== 0
+        }));
+        for (const tab of tabs) tab.closest = selector => selector === tabSelector ? tab : null;
+        root.queryResults.set(tabSelector, tabs);
+        root.queryResults.set(panelSelector, panels);
+        return { tabs, panels };
+    };
+
+    const firstRender = renderComparison('first');
+    const first = initMonteCarloResultCockpit({ documentRef, MutationObserverCtor: null });
+    const second = initMonteCarloResultCockpit({ documentRef, MutationObserverCtor: null });
+    assert(first === second, 'comparison delegation shares the cockpit document initialization guard');
+    assertEqual(root.listeners.get('click').length, 1, 'comparison click delegation is registered exactly once');
+    assertEqual(root.listeners.get('keydown').length, 1, 'comparison keyboard delegation is registered exactly once');
+    root.dispatch('click', { target: firstRender.tabs[1] });
+    assert(!firstRender.panels[1].hidden && firstRender.panels[0].hidden, 'pointer activation exposes only Delta');
+
+    const secondRender = renderComparison('second');
+    root.dispatch('keydown', { target: secondRender.tabs[0], key: 'End' });
+    assert(!secondRender.panels[2].hidden && secondRender.panels[0].hidden, 'delegated End resolves the current rerendered panels');
+    assertEqual(secondRender.tabs[2].focusCount, 1, 'keyboard activation focuses the current rerendered tab');
+    root.dispatch('keydown', { target: secondRender.tabs[2], key: 'ArrowRight' });
+    assert(!secondRender.panels[0].hidden, 'comparison ArrowRight wraps independently to Kennzahlen');
+    assertEqual(secondRender.tabs[0].focusCount, 1, 'wrapped comparison tab receives focus');
+    assertEqual(documentRef.getElementById('mcViewTabOverview').getAttribute('aria-selected'), 'true',
+        'comparison keyboard handling does not change the Monte-Carlo view tabs');
+    assertEqual(activateStressReplayComparisonView('unknown', { documentRef }), null,
+        'unknown comparison views fail closed');
 }
 
 updateMonteCarloSetupSummary({ documentRef: null });

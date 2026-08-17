@@ -1245,6 +1245,60 @@ async function runSimulatorSmoke(browser, baseUrl) {
         && replayKpiSemantics.drawdown.includes('Δ 2,5 Prozentpunkte'),
     'Browser KPI row maps absolute drawdown percent and delta percentage points semantically');
 
+    assert(await page.locator('#stressReplayKpiTab').getAttribute('aria-selected') === 'true',
+        'Replay comparison rerender starts on Kennzahlen');
+    await page.locator('#stressReplayKpiTab').press('End');
+    assert(await page.locator('#stressReplayYearTab').getAttribute('aria-selected') === 'true'
+        && await page.locator('#stressReplayYearPanel').isVisible(),
+    'Replay comparison End activates and focuses Jahresverlauf');
+    await page.locator('#stressReplayYearTab').press('ArrowRight');
+    assert(await page.locator('#stressReplayKpiTab').getAttribute('aria-selected') === 'true'
+        && await page.locator('#stressReplayKpiPanel').isVisible(),
+    'Replay comparison ArrowRight wraps independently to Kennzahlen');
+    await page.locator('#stressReplayDeltaTab').click();
+    assert(await page.locator('#stressReplayDeltaPanel').isVisible()
+        && await page.locator('#stressReplayKpiPanel').isHidden(),
+    'Replay comparison pointer activation exposes only its selected panel');
+    const rerenderedComparisonState = await page.evaluate(async () => {
+        const { renderStressReplayComparisonV1 } = await import('./app/simulator/stress-replay-renderer.js');
+        const target = document.getElementById('stressReplayComparison');
+        target.innerHTML = renderStressReplayComparisonV1({
+            comparison: {
+                overallStatus: 'complete',
+                variants: [
+                    { variantId: 'baseline', label: 'Baseline', summary: {} },
+                    { variantId: 'alternative-rerender', label: 'Rerender', summary: {} }
+                ],
+                pairwise: [{
+                    variantId: 'alternative-rerender', comparable: true,
+                    factorMode: 'single_factor', firstDeltaMarkers: [], kpiDeltas: {}
+                }]
+            }
+        });
+        const selected = target.querySelector('[data-stress-replay-comparison-view][aria-selected="true"]');
+        selected.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+        return {
+            selectedAfterRender: selected.dataset.stressReplayComparisonView,
+            selectedAfterDelegatedKey: target.querySelector('[data-stress-replay-comparison-view][aria-selected="true"]')?.dataset.stressReplayComparisonView,
+            focusedAfterDelegatedKey: document.activeElement?.dataset.stressReplayComparisonView || null,
+            tablists: target.querySelectorAll('[role="tablist"]').length,
+            headings: ['stressReplayKpiHeading', 'stressReplayDeltaHeading', 'stressReplayYearHeading']
+                .filter(id => document.getElementById(id)).length
+        };
+    });
+    assert(rerenderedComparisonState.selectedAfterRender === 'kpi'
+        && rerenderedComparisonState.selectedAfterDelegatedKey === 'year'
+        && rerenderedComparisonState.focusedAfterDelegatedKey === 'year',
+    `Delegated comparison controls must survive renderer replacement: ${JSON.stringify(rerenderedComparisonState)}`);
+    assert(rerenderedComparisonState.tablists === 1 && rerenderedComparisonState.headings === 3,
+        'A rerender keeps one comparison tablist and all three established headings');
+    await page.emulateMedia({ media: 'print' });
+    const printedComparisonDisplays = await page.locator('[data-stress-replay-comparison-panel]').evaluateAll(panels =>
+        panels.map(panel => getComputedStyle(panel).display));
+    assert(printedComparisonDisplays.length === 3 && printedComparisonDisplays.every(display => display !== 'none'),
+        `Print exposes all comparison sections in DOM order: ${JSON.stringify(printedComparisonDisplays)}`);
+    await page.emulateMedia({ media: 'screen' });
+
     const replayComparisonFailure = await page.evaluate(async () => {
         const { createStressReplayController } = await import('./app/simulator/stress-replay-ui.js');
         const { renderStressReplayViewsV1 } = await import('./app/simulator/stress-replay-renderer.js');

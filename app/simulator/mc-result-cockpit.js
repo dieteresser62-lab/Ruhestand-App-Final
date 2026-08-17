@@ -2,6 +2,9 @@
 
 const cockpitInstances = new WeakMap();
 const RESULT_VIEW_IDS = Object.freeze(['overview', 'risk', 'care', 'logs', 'replay']);
+const COMPARISON_VIEW_IDS = Object.freeze(['kpi', 'delta', 'year']);
+const COMPARISON_TAB_SELECTOR = '[role="tab"][data-stress-replay-comparison-view]';
+const COMPARISON_PANEL_SELECTOR = '[role="tabpanel"][data-stress-replay-comparison-panel]';
 
 function getResultViewElements(documentRef) {
     return RESULT_VIEW_IDS.map(viewId => ({
@@ -42,6 +45,35 @@ export function activateMonteCarloResultView(viewOrTarget, {
     }
     if (focusTab && typeof selected.tab.focus === 'function') selected.tab.focus();
     return selected.viewId;
+}
+
+/**
+ * Schaltet die dynamisch gerenderten Replay-Vergleichsansichten um. Tabs und
+ * Panels werden bei jedem Aufruf neu aus dem stabilen Vergleichscontainer
+ * gelesen, damit ein Renderer-Rerender keine verwaisten Referenzen erzeugt.
+ */
+export function activateStressReplayComparisonView(viewId, {
+    documentRef = globalThis.document,
+    focusTab = false
+} = {}) {
+    if (!COMPARISON_VIEW_IDS.includes(viewId)) return null;
+    const root = documentRef?.getElementById?.('stressReplayComparison');
+    const tabs = Array.from(root?.querySelectorAll?.(COMPARISON_TAB_SELECTOR) || []);
+    const panels = Array.from(root?.querySelectorAll?.(COMPARISON_PANEL_SELECTOR) || []);
+    if (tabs.length !== COMPARISON_VIEW_IDS.length || panels.length !== COMPARISON_VIEW_IDS.length) return null;
+
+    const selectedTab = tabs.find(tab => tab.dataset?.stressReplayComparisonView === viewId);
+    const selectedPanel = panels.find(panel => panel.dataset?.stressReplayComparisonPanel === viewId);
+    if (!selectedTab || !selectedPanel) return null;
+
+    for (const tab of tabs) {
+        const active = tab === selectedTab;
+        tab.setAttribute?.('aria-selected', String(active));
+        tab.setAttribute?.('tabindex', active ? '0' : '-1');
+    }
+    for (const panel of panels) panel.hidden = panel !== selectedPanel;
+    if (focusTab && typeof selectedTab.focus === 'function') selectedTab.focus();
+    return viewId;
 }
 
 export function updateMonteCarloReplayVariantBadge({ documentRef = globalThis.document } = {}) {
@@ -112,6 +144,7 @@ export function initMonteCarloResultCockpit({
     const primaryButton = documentRef.getElementById?.('mcButton');
     const recalculateButton = documentRef.getElementById?.('mcRecalculateButton');
     const showReplayButton = documentRef.getElementById?.('mcShowReplayButton');
+    const comparisonRoot = documentRef.getElementById?.('stressReplayComparison');
     const viewTabs = getResultViewElements(documentRef).map(view => view.tab).filter(Boolean);
     if (!setupDisclosure || !primaryButton || !recalculateButton || viewTabs.length !== RESULT_VIEW_IDS.length) return null;
 
@@ -154,6 +187,30 @@ export function initMonteCarloResultCockpit({
         });
     }
 
+    comparisonRoot?.addEventListener?.('click', event => {
+        const tab = event?.target?.closest?.(COMPARISON_TAB_SELECTOR);
+        const viewId = tab?.dataset?.stressReplayComparisonView;
+        if (viewId) activateStressReplayComparisonView(viewId, { documentRef });
+    });
+    comparisonRoot?.addEventListener?.('keydown', event => {
+        const tab = event?.target?.closest?.(COMPARISON_TAB_SELECTOR);
+        if (!tab) return;
+        const tabs = Array.from(comparisonRoot.querySelectorAll?.(COMPARISON_TAB_SELECTOR) || []);
+        const index = tabs.indexOf(tab);
+        if (index < 0) return;
+        let nextIndex = null;
+        if (event.key === 'ArrowRight') nextIndex = (index + 1) % tabs.length;
+        else if (event.key === 'ArrowLeft') nextIndex = (index - 1 + tabs.length) % tabs.length;
+        else if (event.key === 'Home') nextIndex = 0;
+        else if (event.key === 'End') nextIndex = tabs.length - 1;
+        if (nextIndex === null) return;
+        event.preventDefault?.();
+        activateStressReplayComparisonView(tabs[nextIndex]?.dataset?.stressReplayComparisonView, {
+            documentRef,
+            focusTab: true
+        });
+    });
+
     let observer = null;
     let variantObserver = null;
     if (typeof MutationObserverCtor === 'function') {
@@ -170,7 +227,7 @@ export function initMonteCarloResultCockpit({
     syncStartState();
     activateMonteCarloResultView('overview', { documentRef });
     updateMonteCarloReplayVariantBadge({ documentRef });
-    const instance = { setupDisclosure, updateSummary, syncStartState, observer, variantObserver };
+    const instance = { setupDisclosure, updateSummary, syncStartState, observer, variantObserver, comparisonRoot };
     cockpitInstances.set(documentRef, instance);
     return instance;
 }

@@ -354,6 +354,8 @@ console.log('Test 8: deferred import owns the shared busy contract and rejects c
         'asynchronous import completion focuses the now-visible banner');
     assertEqual(documentRef.getElementById('stressReplayVariantWorkspace').dataset.stepState, 'active',
         'executable workspace derives the active variants step');
+    assertEqual(documentRef.getElementById('stressReplayStepSelect').dataset.stepState, 'completed',
+        'a resolved workspace marks scenario selection as completed');
     assertEqual(documentRef.getElementById('stressReplayStepPath').dataset.stepState, 'active',
         'visible fixed-path banner keeps the path step active');
     assertEqual(documentRef.getElementById('stressReplayVariantWorkspace').attributes.get('aria-current'), 'step',

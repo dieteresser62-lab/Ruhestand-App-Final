@@ -148,6 +148,55 @@ assert(/Jahrestabelle/.test(comparisonHtml) && /2001/.test(comparisonHtml), 'Ann
 assert(/keine Kausalitätsaussage/.test(comparisonHtml), 'First delta is not presented as causality');
 assert(/keine allgemeine Rangfolge/.test(comparisonHtml), 'Fixed-path results are not presented as general ranking');
 assertEqual((comparisonHtml.match(/stress-replay-table-scroll/g) || []).length, 2, 'Both wide tables use local scroll containers');
+assertEqual((comparisonHtml.match(/data-stress-replay-comparison-view=/g) || []).length, 3,
+    'Comparison renders exactly three namespaced tabs');
+assertEqual((comparisonHtml.match(/data-stress-replay-comparison-panel=/g) || []).length, 3,
+    'All complete comparison sections remain rendered as tab panels');
+assert(/aria-selected="true"[^>]*data-stress-replay-comparison-view="kpi"/.test(comparisonHtml),
+    'Every render restores Kennzahlen as the selected comparison view');
+assert(/data-stress-replay-comparison-panel="delta" hidden/.test(comparisonHtml)
+    && /data-stress-replay-comparison-panel="year" hidden/.test(comparisonHtml),
+    'Non-default comparison panels start hidden only for screen presentation');
+assertEqual((comparisonHtml.match(/class="stress-replay-highlight"/g) || []).length, 1,
+    'A comparable alternative receives at most one prioritized highlight');
+const defaultHighlight = comparisonHtml.match(/class="stress-replay-highlight"[\s\S]*?<\/li>/)?.[0] || '';
+assert(/Endvermögen nominal/.test(defaultHighlight) && !/Endvermögen real/.test(defaultHighlight),
+    'Priority falls through zero and non-applicable KPIs to the first material delta');
+assert(/Baselinewert/.test(defaultHighlight) && /Variantenwert/.test(defaultHighlight) && /Berechnetes Delta/.test(defaultHighlight),
+    'The highlight exposes the two existing values and the already calculated delta');
+
+const prioritizedAlternative = {
+    ...alternativeEntry,
+    variantId: 'alternative-2',
+    label: 'Weniger Mindest-Flex-Lücke',
+    summary: {
+        ...alternativeEntry.summary,
+        totalMinimumFlexShortfallEur: 500,
+        ruinYear: 8,
+        finalValueRealEur: 120000
+    }
+};
+const priorityHtml = renderStressReplayComparisonV1({
+    comparison: {
+        ...comparison,
+        variants: [baselineEntry, alternativeEntry, prioritizedAlternative],
+        pairwise: [
+            comparison.pairwise[0],
+            {
+                ...comparison.pairwise[0],
+                variantId: 'alternative-2',
+                kpiDeltas: deltas(baselineEntry, prioritizedAlternative)
+            }
+        ]
+    }
+});
+const highlightLabels = [...priorityHtml.matchAll(/class="stress-replay-highlight"[\s\S]*?<h5>(.*?)<\/h5>/g)]
+    .map(match => match[1]);
+assertEqual(highlightLabels.join('|'), 'Mehr Flex|Weniger Mindest-Flex-Lücke',
+    'Highlights retain the existing alternative order without ranking');
+const secondHighlight = priorityHtml.match(/data-variant-id="alternative-2"[\s\S]*?<\/li>/)?.[0] || '';
+assert(/Mindest-Flex-Lücke/.test(secondHighlight) && !/Jahr des Vermögensaufbrauchs/.test(secondHighlight),
+    'The fixed KPI priority selects minimum-flex shortfall before later material deltas');
 
 const ruinBaseline = { ...baselineEntry, summary: { ...baselineEntry.summary, ruinYear: 3 } };
 const ruinAlternative = {
@@ -212,6 +261,25 @@ const blockedHtml = renderStressReplayComparisonV1({
 assert(/technischen Fehler/.test(blockedHtml), 'Aggregate technical error is visible');
 assert(/Finanzielle Deltas werden nicht angezeigt/.test(blockedHtml), 'Affected financial deltas are explicitly suppressed');
 assert(!/Δ 0/.test(blockedHtml), 'Technical errors are never rendered as zero deltas');
+assert(!/stress-replay-highlight/.test(blockedHtml), 'Technical errors never produce a highlight');
+
+const missingHighlightHtml = renderStressReplayComparisonV1({
+    comparison: {
+        ...comparison,
+        pairwise: [{
+            ...comparison.pairwise[0],
+            kpiDeltas: Object.fromEntries(Object.entries(deltas()).map(([field, delta]) => [field, {
+                ...delta,
+                baselineValue: field === 'finalValueNominalEur' ? null : delta.baselineValue,
+                variantValue: field === 'finalValueNominalEur' ? null : delta.variantValue,
+                absoluteDelta: field === 'finalValueNominalEur' ? 10000 : 0,
+                applicability: field === 'ruinYear' ? 'not_applicable_neither_ruined' : delta.applicability
+            }]))
+        }]
+    }
+});
+assert(!/stress-replay-highlight/.test(missingHighlightHtml),
+    'Zero deltas, not-applicable ruin and missing values do not become material highlights');
 
 console.log('Test 5: user labels are escaped');
 const escaped = renderStressReplayVariantListV1({
@@ -236,6 +304,11 @@ assert(/Fehlercode/.test(comparisonErrorHtml) && /STRESS_REPLAY_&lt;BROKEN&gt;/.
 assert(!comparisonErrorHtml.includes('<img'), 'Comparison error messages cannot inject markup');
 assert(!/Noch kein Variantenvergleich berechnet/.test(comparisonErrorHtml),
     'A failed comparison is never rendered as the neutral idle state');
+const defaultComparisonHtml = renderStressReplayComparisonV1();
+assert(/Noch kein Variantenvergleich berechnet/.test(defaultComparisonHtml),
+    'The default null comparison degrades to the neutral idle message without rendering highlights');
+assert(!/stress-replay-highlight/.test(defaultComparisonHtml),
+    'The default null comparison never enters the prioritized-highlight renderer');
 assert(/Noch kein Variantenvergleich berechnet/.test(renderStressReplayComparisonV1({
     comparisonState: { status: 'idle', error: null }
 })), 'Only the explicit idle state renders the neutral empty message');
