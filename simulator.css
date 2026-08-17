@@ -690,6 +690,43 @@ button:disabled {
     padding: 0 14px 16px;
 }
 
+@media screen {
+    /*
+     * Der kanonische Startbutton bleibt auch bei geschlossenem Setup ein gueltiges
+     * Fokusziel fuer terminale Abbruchpfade. Wie ein Skip-Link wird er erst dann
+     * sichtbar, wenn der Fokus tatsaechlich auf ihn zurueckgegeben wird.
+     */
+    .mc-setup-disclosure:not([open]) > .mc-setup-content {
+        display: block;
+        padding: 0 14px;
+    }
+
+    .mc-setup-disclosure:not([open])::details-content {
+        content-visibility: visible;
+    }
+
+    .mc-setup-disclosure:not([open]) > .mc-setup-content > :not(#mcButton) {
+        display: none !important;
+    }
+
+    .mc-setup-disclosure:not([open]) #mcButton:not(:focus) {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    .mc-setup-disclosure:not([open]) #mcButton:focus {
+        width: calc(100% - 28px);
+        margin: 0 14px 14px;
+    }
+}
+
 .mc-setup-content > fieldset:first-child {
     margin-top: 0;
 }

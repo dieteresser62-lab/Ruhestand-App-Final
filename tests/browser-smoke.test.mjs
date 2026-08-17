@@ -1015,6 +1015,33 @@ async function runSimulatorSmoke(browser, baseUrl) {
     assert(lifecycleDisclosureStates.activeAfterCompleted === 'overview',
         'successful completion activates overview before terminal focus');
 
+    const cancelledRerunFocus = await page.evaluate(async () => {
+        const { createMonteCarloUI } = await import('./app/simulator/monte-carlo-ui.js');
+        const ui = createMonteCarloUI();
+        const setup = document.getElementById('mcSetupDisclosure');
+        const primary = document.getElementById('mcButton');
+        ui.showCompleted();
+        ui.beginRun();
+        ui.showCancelled();
+        ui.finishRun();
+        const result = {
+            setupOpen: setup.open,
+            activeElementId: document.activeElement?.id || null,
+            primaryDisplay: getComputedStyle(primary).display,
+            primaryRectCount: primary.getClientRects().length,
+            primaryRectWidth: primary.getBoundingClientRect().width
+        };
+        setup.open = true;
+        return result;
+    });
+    assert(!cancelledRerunFocus.setupOpen,
+        'cancelled recalculation keeps the setup collapsed after a successful run');
+    assert(cancelledRerunFocus.activeElementId === 'mcButton'
+        && cancelledRerunFocus.primaryDisplay !== 'none'
+        && cancelledRerunFocus.primaryRectCount > 0
+        && cancelledRerunFocus.primaryRectWidth > 1,
+    `cancelled recalculation restores focus to a visible canonical start button: ${JSON.stringify(cancelledRerunFocus)}`);
+
     const delegatedStarts = await page.evaluate(async () => {
         const primary = document.getElementById('mcButton');
         const secondary = document.getElementById('mcRecalculateButton');
@@ -1347,6 +1374,7 @@ async function runSimulatorSmoke(browser, baseUrl) {
     await page.emulateMedia({ media: 'print' });
     const printedCockpitState = await page.evaluate(() => ({
         setupContentDisplay: getComputedStyle(document.querySelector('#mcSetupDisclosure > .mc-setup-content')).display,
+        setupFieldsetDisplay: getComputedStyle(document.querySelector('#mcSetupDisclosure > .mc-setup-content > fieldset')).display,
         mcPanelDisplays: [...document.querySelectorAll('.mc-view-panel')]
             .map(panel => getComputedStyle(panel).display),
         comparisonPanelDisplays: [...document.querySelectorAll('[data-stress-replay-comparison-panel]')]
@@ -1361,7 +1389,8 @@ async function runSimulatorSmoke(browser, baseUrl) {
         scenarioLogOverflow: getComputedStyle(document.getElementById('scenarioLogOutput')).overflow,
         comparisonTableOverflow: getComputedStyle(document.querySelector('.stress-replay-table-scroll')).overflow
     }));
-    assert(printedCockpitState.setupContentDisplay !== 'none',
+    assert(printedCockpitState.setupContentDisplay !== 'none'
+        && printedCockpitState.setupFieldsetDisplay !== 'none',
         `Print exposes a closed Monte-Carlo setup: ${JSON.stringify(printedCockpitState)}`);
     assert(printedCockpitState.mcPanelDisplays.length === 5
         && printedCockpitState.mcPanelDisplays.every(display => display !== 'none'),
