@@ -626,6 +626,37 @@ async function runForcedFallbackCase(browser, baseUrl) {
     }
 }
 
+async function runFailedReplayProjectionCase(browser, baseUrl) {
+    const test = await createMonteCarloPage(browser, baseUrl);
+    try {
+        const { page } = test;
+        await configureMonteCarloRun(page, { runs: 1, duration: 2, workers: 1, seed: 818181 });
+        await page.locator('#startFloorBedarf').fill('2000000');
+        await page.locator('#mcButton').click();
+        await waitForCompletedRun(page);
+        await page.locator('#mcViewTabLogs').click();
+
+        const failedScenarioValue = await page.evaluate(() => {
+            const scenario = window.globalScenarioLogs?.characteristic?.find(entry =>
+                entry?.failed === true && Array.isArray(entry.logDataRows) && entry.logDataRows.length > 0);
+            return scenario ? `char_${scenario.key}` : null;
+        });
+        assert(failedScenarioValue, 'failing withdrawal profile produces a failed characteristic scenario');
+        await page.locator('#scenarioSelect').selectOption(failedScenarioValue);
+        assert(await page.locator('#stressReplaySelectedScenarioWealth').textContent() === 'FAILED',
+            'selecting a failed characteristic scenario projects FAILED before fixation');
+
+        await page.locator('#mcShowReplayButton').click();
+        await page.locator('#stressReplayFixButton').click();
+        await page.locator('#stressReplayStatus').filter({ hasText: 'Stresspfad fixiert' }).waitFor({ timeout: 30000 });
+        assert(await page.locator('#stressReplaySelectedScenarioWealth').textContent() === 'FAILED',
+            'the failed scenario projection remains FAILED after fixation');
+        test.assertNoUnexpectedErrors();
+    } finally {
+        await test.context.close();
+    }
+}
+
 async function runTechnicalErrorCase(browser, baseUrl) {
     const test = await createMonteCarloPage(browser, baseUrl, { workerMode: 'throw' });
     try {
@@ -686,6 +717,7 @@ async function runCancelRestartCase(browser, baseUrl) {
 export async function runMonteCarloBrowserRegression(browser, baseUrl) {
     await runWorkerSuccessCase(browser, baseUrl);
     await runForcedFallbackCase(browser, baseUrl);
+    await runFailedReplayProjectionCase(browser, baseUrl);
     await runTechnicalErrorCase(browser, baseUrl);
     await runCancelRestartCase(browser, baseUrl);
 }
