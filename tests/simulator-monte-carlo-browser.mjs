@@ -242,6 +242,9 @@ async function downloadRunExport(page) {
 }
 
 async function downloadSelectedScenarioJson(page) {
+    await page.locator('#mcViewTabLogs').click();
+    assert(await page.locator('#mcViewPanelLogs').isVisible(),
+        'Scenario export activates the dedicated log result view');
     const button = page.locator('#exportScenarioLogJson');
     await button.waitFor({ state: 'visible' });
     const downloadPromise = page.waitForEvent('download');

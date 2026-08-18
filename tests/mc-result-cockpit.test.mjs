@@ -154,6 +154,7 @@ console.log('Test 3: only successful completion closes setup and refreshes its s
 console.log('Test 4: Simulator DOM keeps cockpit contracts and ordering');
 {
     const html = fs.readFileSync(new URL('../Simulator.html', import.meta.url), 'utf8');
+    const css = fs.readFileSync(new URL('../simulator.css', import.meta.url), 'utf8');
     for (const id of ['mcButton', 'mcCancelButton', 'mcRunStatus', 'monteCarloResults', 'stressReplayWorkspace', 'scenarioSelector', 'print-footer']) {
         assertEqual((html.match(new RegExp(`id="${id}"`, 'g')) || []).length, 1, `${id} remains unique`);
     }
@@ -170,9 +171,14 @@ console.log('Test 4: Simulator DOM keeps cockpit contracts and ordering');
     assert(html.indexOf('id="scenarioSelector"') > html.indexOf('id="mcViewPanelReplay"'),
         'scenario selector lives in the replay panel');
     assert(html.includes('id="mcShowReplayButton"'), 'scenario logs expose the replay navigation action');
+    const logsPanel = html.match(/id="mcViewPanelLogs"[\s\S]*?<\/section>\s*<section id="mcViewPanelReplay"/)?.[0] || '';
+    assert(logsPanel.indexOf('id="mcShowReplayButton"') < logsPanel.indexOf('id="scenarioLogContainer"'),
+        'replay navigation remains visible before the legacy scenario-log container is populated');
     assertEqual((html.match(/<dt>/g) || []).length >= 7, true, 'replay banner retains all diagnostic terms');
     assert(/id="stressReplayVariantFields"[\s\S]*?<div class="stress-replay-editor-grid">/.test(html),
         'focused replay editor grid remains a direct fieldset child');
+    assert(/\.stress-replay-editor-grid\s+\[data-active-when\]\[hidden\]\s*\{[^}]*display:\s*none;/s.test(css),
+        'conditional replay fields keep their hidden state against the editor label layout');
 }
 
 console.log('Test 5: result tabs use one activation path for view ids and contained targets');

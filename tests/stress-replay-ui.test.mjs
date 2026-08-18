@@ -199,6 +199,8 @@ console.log('Test 1: no scenario keeps fixation blocked and reports the prerequi
 {
     const { controller, documentRef } = controllerFixture();
     controller.initialize();
+    assert(/Starten Sie zuerst einen Monte-Carlo-Lauf\./.test(documentRef.getElementById('stressReplayStatus').textContent),
+        'Empty replay state explains the Monte-Carlo prerequisite before a run context exists');
     controller.setMonteCarloContext({ inputs: { widowOptions: {} }, scenarioLogs: { characteristic: [] } });
     assertEqual(documentRef.getElementById('stressReplayFixButton').disabled, true, 'Fixation starts disabled');
     assert(/Wählen Sie ein Szenario/.test(documentRef.getElementById('stressReplayStatus').textContent), 'Live region explains the missing selection');

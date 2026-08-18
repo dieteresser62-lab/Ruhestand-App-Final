@@ -1455,6 +1455,10 @@ fieldset.collapsible legend .legend-text {
     min-width: 0;
 }
 
+.stress-replay-editor-grid [data-active-when][hidden] {
+    display: none;
+}
+
 .stress-replay-editor-grid small,
 .stress-replay-variant-list small {
     color: var(--text-light);

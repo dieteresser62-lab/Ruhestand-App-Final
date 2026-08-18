@@ -1151,21 +1151,37 @@ async function runSimulatorSmoke(browser, baseUrl) {
     await expertToggle.press('Enter');
     assert(await expertFields.isVisible() && await expertToggle.getAttribute('aria-expanded') === 'true',
         'Enter opens the native expert disclosure and synchronizes ARIA');
-    const retainedExpert = expertFields.locator('[data-stress-replay-path="strategy.liquidityRunwayYears"]');
-    await retainedExpert.fill('7');
     await expertToggle.press('Space');
     assert(await expertFields.isHidden() && await expertToggle.getAttribute('aria-expanded') === 'false',
         'Space closes the native expert disclosure and synchronizes ARIA');
     await expertToggle.press('Enter');
-    assert(await retainedExpert.inputValue() === '7', 'Closing and reopening preserves an entered expert value');
+    assert(await expertFields.isVisible() && await expertToggle.getAttribute('aria-expanded') === 'true',
+        'Enter reopens the native expert disclosure after the keyboard-only toggle cycle');
     assert(await page.locator('#stressReplayPatchPreview').innerHTML() === previewBeforeToggle,
         'Opening and closing alone does not change patch preview');
     assert(await page.locator('#stressReplayAddVariantButton').isDisabled() === addDisabledBeforeToggle,
         'Opening and closing alone does not change add-button materiality');
+    const retainedExpert = expertFields.locator('[data-stress-replay-path="strategy.liquidityRunwayYears"]');
+    await retainedExpert.fill('7');
+    assert(await retainedExpert.inputValue() === '7', 'Pre-run rerender preserves the entered expert value');
+    const preRunRelockState = await page.locator('#stressReplayVariantFields').evaluate(fieldset => ({
+        fieldsetDisabled: fieldset.disabled === true,
+        expertToggleDisabled: fieldset.querySelector('#stressReplayExpertToggle')?.matches(':disabled') === true
+    }));
+    assert(preRunRelockState.fieldsetDisabled
+        && preRunRelockState.expertToggleDisabled,
+    `A real pre-run editor input rerenders and relocks the unavailable variant workflow: ${JSON.stringify(preRunRelockState)}`);
     assert(await page.locator('#stressReplayVariantEditor [data-active-when="decumulation:3_bucket_jilge"]').first().isHidden(),
         'Three-bucket-only controls start hidden when their strategy mode is inactive');
     const realNeedsError = await page.evaluate(async () => {
         const { createStressReplayController } = await import('./app/simulator/stress-replay-ui.js');
+        const { getCommonInputs } = await import('./app/simulator/simulator-portfolio.js');
+        const baselineSnapshot = {
+            ...getCommonInputs(),
+            startFloorBedarf: 24000,
+            startFlexBedarf: 12000,
+            minimumFlexAnnual: 0
+        };
         const documentRef = {
             getElementById(id) {
                 return id === 'stressReplayBanner' ? null : document.getElementById(id);
@@ -1179,11 +1195,7 @@ async function runSimulatorSmoke(browser, baseUrl) {
             loadWorkspace: () => ({
                 status: 'executable',
                 workspace: {
-                    baselineSnapshot: {
-                        startFloorBedarf: 24000,
-                        startFlexBedarf: 12000,
-                        minimumFlexAnnual: 0
-                    },
+                    baselineSnapshot,
                     variants: [{ id: 'baseline', role: 'baseline' }]
                 },
                 compatibility: { readOnly: false },
@@ -1204,11 +1216,14 @@ async function runSimulatorSmoke(browser, baseUrl) {
         && realNeedsError.text.includes('6.000')
         && realNeedsError.text.includes('5.000'),
     `The real contract error must render both effective amounts in the live status region: ${JSON.stringify(realNeedsError)}`);
-    assert((await page.locator('#stressReplayWorkspace').textContent()).includes('Auf diesem fixierten Stresspfad'),
-        'The browser workflow must explain the paired fixed-path interpretation');
-    assert(!(await page.locator('#stressReplayWorkspace').textContent()).toLowerCase().includes('optimale strategie'),
+    const replayWorkspaceText = (await page.locator('#stressReplayWorkspace').textContent()).replace(/\s+/g, ' ').trim();
+    assert(replayWorkspaceText.includes('Fixiert genau einen ausgewählten Monte-Carlo-Lauf')
+        && replayWorkspaceText.includes('Varianten werden nur auf diesem Pfad verglichen')
+        && replayWorkspaceText.includes('keine allgemeine Strategieempfehlung'),
+    'The browser workflow must explain the paired fixed-path interpretation');
+    assert(!replayWorkspaceText.toLowerCase().includes('optimale strategie'),
         'The browser workflow must not present replay variants as a general optimum');
-    assertEqual(await readIndexedDb(page, 'kv', 'sim.stressReplay.active.v1'), null,
+    assert(await readIndexedDb(page, 'kv', 'sim.stressReplay.active.v1') === null,
         'Opening the Simulator with replay inactive must not create a persisted replay workspace');
     const replayScrollStyle = await page.evaluate(() => {
         const probe = document.createElement('div');
@@ -1424,10 +1439,11 @@ async function runSimulatorSmoke(browser, baseUrl) {
     const replayComparisonFailure = await page.evaluate(async () => {
         const { createStressReplayController } = await import('./app/simulator/stress-replay-ui.js');
         const { renderStressReplayViewsV1 } = await import('./app/simulator/stress-replay-renderer.js');
+        const { getCommonInputs } = await import('./app/simulator/simulator-portfolio.js');
         const workspace = {
             path: {},
             sourceIdentity: null,
-            baselineSnapshot: {},
+            baselineSnapshot: getCommonInputs(),
             variants: [
                 { id: 'baseline', variantId: 'baseline', role: 'baseline', label: 'Baseline', summary: {} },
                 {

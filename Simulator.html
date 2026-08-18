@@ -1191,6 +1191,10 @@
                     </section>
                     <section id="mcViewPanelLogs" class="mc-view-panel" role="tabpanel"
                         aria-labelledby="mcViewTabLogs" data-mc-view-panel="logs" hidden>
+                        <div class="scenario-replay-link">
+                            <p>Die Auswahl zum Fixieren eines Laufs befindet sich im Stresspfad-Replay.</p>
+                            <button type="button" id="mcShowReplayButton">In Replay anzeigen</button>
+                        </div>
                         <!-- Szenario-Log Auswahl -->
                         <div id="scenarioLogContainer" style="display:none; margin-top: 25px;">
                             <h4 style="text-align:center;">Szenario-Logs analysieren</h4>
@@ -1205,10 +1209,6 @@
                                         type="checkbox" id="toggle-log-detail"
                                         style="width:auto; vertical-align: middle; margin-right: 4px;">Detailliertes
                                     Log anzeigen </label>
-                            </div>
-                            <div class="scenario-replay-link">
-                                <p>Die Auswahl zum Fixieren eines Laufs befindet sich im Stresspfad-Replay.</p>
-                                <button type="button" id="mcShowReplayButton">In Replay anzeigen</button>
                             </div>
                             <div id="scenarioLogOutput"></div>
                             <div class="log-export-buttons" id="scenarioExportButtons" style="display:none;"><button

@@ -844,7 +844,7 @@ export function createStressReplayController({
                     : 'Gespeicherter Stresspfad wurde geladen.');
             }
         } else {
-            status('Starten Sie Monte Carlo und wählen Sie ein Szenario aus.');
+            status('Starten Sie zuerst einen Monte-Carlo-Lauf.');
         }
         element('stressReplayFixButton')?.addEventListener?.('click', () => void fixSelectedScenario());
         element('stressReplayExportButton')?.addEventListener?.('click', exportActiveWorkspace);
