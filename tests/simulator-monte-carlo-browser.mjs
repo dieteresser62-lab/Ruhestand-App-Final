@@ -473,14 +473,35 @@ async function runWorkerSuccessCase(browser, baseUrl) {
 
         assert(await page.locator('#scenarioSelector').count() === 1,
             'completed run keeps one stable scenario selector container');
-        assert(await page.locator('#mcViewPanelReplay #scenarioSelect').count() === 1,
-            'completed run renders the single current scenario select inside replay');
+        assert(await page.locator('#mcViewPanelLogs #scenarioSelect').count() === 1,
+            'completed run renders the single current scenario select beside its log');
         await page.locator('#mcViewTabLogs').click();
+        const scenarioValues = await page.locator('#scenarioSelect option').evaluateAll(options =>
+            options.map(option => option.value).filter(Boolean));
+        assert(scenarioValues.length > 1, 'completed run offers multiple characteristic or random scenarios');
+        await page.locator('#scenarioSelect').selectOption(scenarioValues[1]);
+        assert(await page.locator('#scenarioLogOutput table').isVisible(),
+            'changing the scenario updates a visible log without leaving the logs panel');
         await page.locator('#mcShowReplayButton').click();
         assert(await page.locator('#mcViewPanelReplay').isVisible(),
             'scenario-log backlink activates replay after a run');
-        assert(await page.evaluate(() => document.activeElement?.id) === 'scenarioSelect',
-            'scenario-log backlink focuses the current scenario select');
+        assert(await page.evaluate(() => document.activeElement?.id) === 'stressReplayFixButton',
+            'scenario-log backlink focuses the enabled fixation action in replay');
+        const replayProjection = await page.locator('#stressReplaySelectedScenarioDetails').evaluate(details => ({
+            hidden: details.hidden,
+            label: details.querySelector('#stressReplaySelectedScenarioLabel')?.textContent,
+            wealth: details.querySelector('#stressReplaySelectedScenarioWealth')?.textContent,
+            care: details.querySelector('#stressReplaySelectedScenarioCare')?.textContent
+        }));
+        assert(!replayProjection.hidden && replayProjection.label
+            && replayProjection.wealth !== '—' && replayProjection.care !== '—',
+        `replay projects label, terminal wealth and care marker from the selected log: ${JSON.stringify(replayProjection)}`);
+        await page.locator('#stressReplayFixButton').click();
+        await page.locator('#stressReplayStatus').filter({ hasText: 'Stresspfad fixiert' }).waitFor({ timeout: 30000 });
+        await page.locator('#mcShowScenarioLogsButton').click();
+        assert(await page.locator('#mcViewPanelLogs').isVisible()
+            && await page.evaluate(() => document.activeElement?.id) === 'scenarioSelect',
+        'replay return action exposes logs and focuses the current scenario selector');
         await page.locator('#mcViewTabOverview').click();
 
         await page.locator('#mcRecalculateButton').click();
@@ -489,6 +510,8 @@ async function runWorkerSuccessCase(browser, baseUrl) {
         assert(await page.locator('#scenarioSelector').count() === 1
             && await page.locator('#scenarioSelect').count() === 1,
         'a second run rerenders one current select in the stable container');
+        assert(await page.locator('#stressReplaySelectedScenarioDetails').evaluate(details => !details.hidden),
+            'a second run refreshes the read-only replay projection');
         assert(!(await page.locator('#stressReplayFixButton').isDisabled()),
             'the current worst-run selection remains connected to fixation after rerender');
 

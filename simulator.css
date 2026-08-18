@@ -661,6 +661,38 @@ button:disabled {
     font-weight: 600;
 }
 
+.mc-setup-toggle {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 7px;
+    white-space: nowrap;
+}
+
+.mc-setup-toggle::after {
+    content: '';
+    width: 8px;
+    height: 8px;
+    flex: 0 0 auto;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(45deg);
+    transition: transform 0.2s ease;
+}
+
+.mc-setup-disclosure[open] .mc-setup-toggle::after {
+    transform: rotate(225deg);
+}
+
+.mc-setup-state-closed,
+.mc-setup-disclosure:not([open]) .mc-setup-state-open {
+    display: none;
+}
+
+.mc-setup-disclosure:not([open]) .mc-setup-state-closed {
+    display: inline;
+}
+
 .mc-setup-disclosure > summary:focus-visible {
     outline: 3px solid color-mix(in srgb, var(--secondary-color) 55%, white);
     outline-offset: 3px;
@@ -815,6 +847,12 @@ button:disabled {
 
     .mc-setup-summary {
         justify-content: flex-start;
+    }
+
+    .mc-setup-toggle {
+        align-self: stretch;
+        justify-content: flex-end;
+        white-space: normal;
     }
 
     .mc-view-tab {
@@ -1378,9 +1416,47 @@ fieldset.collapsible legend .legend-text {
 
 .stress-replay-selection-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto auto;
     gap: 12px;
     align-items: end;
+}
+
+.stress-replay-selected-scenario {
+    min-width: 0;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--background-color);
+}
+
+.stress-replay-selected-scenario > p {
+    margin: 0;
+    color: var(--text-secondary);
+}
+
+.stress-replay-selected-scenario dl {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 8px 12px;
+    margin: 0;
+}
+
+.stress-replay-selected-scenario dl[hidden] {
+    display: none;
+}
+
+.stress-replay-selected-scenario dl > div {
+    min-width: 0;
+}
+
+.stress-replay-selected-scenario dt {
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+}
+
+.stress-replay-selected-scenario dd {
+    margin: 2px 0 0;
+    overflow-wrap: anywhere;
+    font-weight: 600;
 }
 
 .stress-replay-selection-row > button {
@@ -1638,9 +1714,11 @@ fieldset.collapsible legend .legend-text {
 
     .mc-view-nav,
     .tab-buttons,
+    .mc-setup-toggle,
     .stress-replay-comparison-tabs,
     .stress-replay-expert-toggle,
-    #mcShowReplayButton {
+    #mcShowReplayButton,
+    #mcShowScenarioLogsButton {
         display: none !important;
     }
 

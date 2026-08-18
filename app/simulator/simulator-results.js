@@ -27,6 +27,30 @@ import {
 const formatPercent = (value, digits = 1) => formatPercentValue(Number(value) || 0, { fractionDigits: digits, invalid: '0.0%' });
 const formatPercentFromRatio = (value, digits = 1) => formatPercentRatio(Number(value) || 0, { fractionDigits: digits, invalid: '0.0%' });
 
+function projectStressReplayScenario(scenario) {
+    const empty = document.getElementById('stressReplaySelectedScenarioEmpty');
+    const details = document.getElementById('stressReplaySelectedScenarioDetails');
+    const label = document.getElementById('stressReplaySelectedScenarioLabel');
+    const wealth = document.getElementById('stressReplaySelectedScenarioWealth');
+    const care = document.getElementById('stressReplaySelectedScenarioCare');
+    if (!empty || !details || !label || !wealth || !care) return;
+
+    if (!scenario) {
+        empty.hidden = false;
+        details.hidden = true;
+        label.textContent = '—';
+        wealth.textContent = '—';
+        care.textContent = '—';
+        return;
+    }
+
+    label.textContent = scenario.label || 'Unbenannter Lauf';
+    wealth.textContent = scenario.failed ? 'FAILED' : formatCurrency(scenario.endVermoegen);
+    care.textContent = scenario.careEverActive ? '🏥 Pflegefall enthalten' : 'Nicht als Pflegefall markiert';
+    empty.hidden = true;
+    details.hidden = false;
+}
+
 /**
  * Storage keys for log detail preferences.
  * Separate keys prevent the backtest log checkbox from leaking into the
@@ -93,6 +117,7 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
 
     // A newly rendered result set invalidates any selection from the previous
     // batch before a new characteristic scenario is chosen.
+    projectStressReplayScenario(null);
     selectStressReplayScenario(null);
 
     const viewModel = prepareMonteCarloViewModel({ results, totalRuns: anzahl, failCount, inputs });
@@ -165,6 +190,7 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
             const val = select.value;
             if (!val) {
                 output.style.display = 'none';
+                projectStressReplayScenario(null);
                 selectStressReplayScenario(null);
                 return;
             }
@@ -179,6 +205,7 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
             }
 
             if (scenario && scenario.logDataRows && scenario.logDataRows.length > 0) {
+                projectStressReplayScenario(scenario);
                 selectStressReplayScenario(scenario);
                 // Respect persisted detail toggles for care and log verbosity.
                 const showCareDetails = (persistenceStorage.getItem('showCareDetails') === '1');
@@ -196,6 +223,7 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
                 };
                 exportButtons.style.display = 'flex';
             } else {
+                projectStressReplayScenario(null);
                 selectStressReplayScenario(null);
                 output.innerHTML = '<p style="color: var(--text-muted); padding: 10px;">Keine Log-Daten für dieses Szenario verfügbar.</p>';
                 output.style.display = 'block';
@@ -285,6 +313,7 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
 
     } else if (scenarioContainer) {
         publishStressReplayMonteCarloContext(null);
+        projectStressReplayScenario(null);
         selectStressReplayScenario(null);
         const selectorDiv = document.getElementById('scenarioSelector');
         if (selectorDiv) selectorDiv.innerHTML = '';

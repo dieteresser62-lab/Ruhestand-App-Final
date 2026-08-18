@@ -967,6 +967,10 @@
                                 <span>Methode: <output id="mcSetupSummaryMethod">Regime-Sampling (Markov-Chain)</output></span>
                                 <span>Seed: <output id="mcSetupSummarySeed">12345</output></span>
                             </span>
+                            <span class="mc-setup-toggle" aria-hidden="true">
+                                <span class="mc-setup-state-open">Setup ausblenden</span>
+                                <span class="mc-setup-state-closed">Setup bearbeiten</span>
+                            </span>
                         </summary>
                         <div class="mc-setup-content">
                     <fieldset>
@@ -1192,7 +1196,7 @@
                     <section id="mcViewPanelLogs" class="mc-view-panel" role="tabpanel"
                         aria-labelledby="mcViewTabLogs" data-mc-view-panel="logs" hidden>
                         <div class="scenario-replay-link">
-                            <p>Die Auswahl zum Fixieren eines Laufs befindet sich im Stresspfad-Replay.</p>
+                            <p>Den hier gewählten Lauf können Sie anschließend im Stresspfad-Replay fixieren.</p>
                             <button type="button" id="mcShowReplayButton">In Replay anzeigen</button>
                         </div>
                         <!-- Szenario-Log Auswahl -->
@@ -1210,6 +1214,7 @@
                                         style="width:auto; vertical-align: middle; margin-right: 4px;">Detailliertes
                                     Log anzeigen </label>
                             </div>
+                            <div id="scenarioSelector"></div>
                             <div id="scenarioLogOutput"></div>
                             <div class="log-export-buttons" id="scenarioExportButtons" style="display:none;"><button
                                     type="button" id="exportScenarioLogJson">JSON</button><button type="button"
@@ -1228,8 +1233,17 @@
                             aria-labelledby="stressReplayStepSelectHeading">
                             <h5 id="stressReplayStepSelectHeading"><span aria-hidden="true">1</span> Lauf wählen</h5>
                             <div class="stress-replay-selection-row">
-                                <div id="scenarioSelector"></div>
+                                <div id="stressReplaySelectedScenario" class="stress-replay-selected-scenario"
+                                    role="status" aria-live="polite" tabindex="-1">
+                                    <p id="stressReplaySelectedScenarioEmpty">Kein Lauf ausgewählt.</p>
+                                    <dl id="stressReplaySelectedScenarioDetails" hidden>
+                                        <div><dt>Lauf</dt><dd id="stressReplaySelectedScenarioLabel">—</dd></div>
+                                        <div><dt>Endvermögen</dt><dd id="stressReplaySelectedScenarioWealth">—</dd></div>
+                                        <div><dt>Pflege</dt><dd id="stressReplaySelectedScenarioCare">—</dd></div>
+                                    </dl>
+                                </div>
                                 <button type="button" id="stressReplayFixButton" disabled>Diesen Lauf als Stresspfad fixieren</button>
+                                <button type="button" id="mcShowScenarioLogsButton">Auswahl in Szenario-Logs ändern</button>
                             </div>
                         </section>
                         <section id="stressReplayStepPath" class="stress-replay-step" data-step-state="upcoming"

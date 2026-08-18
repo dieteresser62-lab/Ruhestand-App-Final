@@ -983,10 +983,23 @@ async function runSimulatorSmoke(browser, baseUrl) {
         'Monte-Carlo setup summary exposes the current run count');
     assert((await page.locator('#mcSetupSummaryDuration').textContent()) === '35',
         'Monte-Carlo setup summary exposes the current duration');
+    const openChevronTransform = await page.locator('.mc-setup-toggle').evaluate(toggle =>
+        getComputedStyle(toggle, '::after').transform);
+    assert(await page.locator('.mc-setup-state-open').isVisible()
+        && await page.locator('.mc-setup-state-closed').isHidden(),
+    'expanded setup shows only the Setup ausblenden state');
+    await page.locator('#mcSeed').fill('24680');
     await setupSummary.click();
     assert(!(await setupDisclosure.evaluate(details => details.open)), 'setup disclosure closes with the pointer');
+    const closedChevronTransform = await page.locator('.mc-setup-toggle').evaluate(toggle =>
+        getComputedStyle(toggle, '::after').transform);
+    assert(await page.locator('.mc-setup-state-open').isHidden()
+        && await page.locator('.mc-setup-state-closed').isVisible(),
+    'collapsed setup shows only the Setup bearbeiten state');
+    assert(closedChevronTransform !== openChevronTransform, 'setup chevron rotation follows the native open state');
     await setupSummary.press('Enter');
     assert(await setupDisclosure.evaluate(details => details.open), 'setup disclosure opens with Enter');
+    assert(await page.locator('#mcSeed').inputValue() === '24680', 'opening setup preserves the configured values');
     await setupSummary.press('Space');
     assert(!(await setupDisclosure.evaluate(details => details.open)), 'setup disclosure closes with Space');
     await setupSummary.press('Space');
@@ -1069,8 +1082,11 @@ async function runSimulatorSmoke(browser, baseUrl) {
     await page.locator('#mcViewTabReplay').click();
     assert(await page.locator('#mcViewPanelReplay').isVisible(),
         'replay remains reachable through the result navigation before a Monte-Carlo run');
-    assert(await page.locator('#mcViewPanelReplay #scenarioSelector').count() === 1,
-        'the stable scenario selector container lives exactly once in replay');
+    assert(await page.locator('#mcViewPanelLogs #scenarioSelector').count() === 1,
+        'the stable scenario selector container lives exactly once in scenario logs');
+    assert(await page.locator('#stressReplaySelectedScenario').count() === 1
+        && (await page.locator('#stressReplaySelectedScenario').textContent()).includes('Kein Lauf ausgewählt.'),
+    'replay exposes one empty read-only selection projection before a run');
     assert(await page.locator('.stress-replay-step').count() === 3,
         'replay exposes three derived workflow cards');
     assert(await page.locator('#stressReplayStepSelect').getAttribute('data-step-state') === 'active',
@@ -1081,8 +1097,12 @@ async function runSimulatorSmoke(browser, baseUrl) {
     await page.locator('#mcShowReplayButton').click();
     assert(await page.locator('#mcViewPanelReplay').isVisible(),
         'scenario-log backlink activates replay without a completed run');
-    assert(await page.evaluate(() => document.activeElement?.id) === 'stressReplayStatus',
-        'scenario-log backlink focuses the replay prerequisite without a scenario select');
+    assert(await page.evaluate(() => document.activeElement?.id) === 'stressReplaySelectedScenario',
+        'scenario-log backlink focuses the visible replay projection without a scenario select');
+    await page.locator('#mcShowScenarioLogsButton').click();
+    assert(await page.locator('#mcViewPanelLogs').isVisible()
+        && await page.evaluate(() => document.activeElement?.id) === 'mcShowReplayButton',
+    'replay return action exposes logs and focuses its visible fallback before a run');
     assert(await mcRuns.inputValue() === '10000', 'new Simulator profile uses the 10,000-run Monte-Carlo default');
     await mcEstimate.filter({ hasText: 'Run-Jahre' }).waitFor({ state: 'visible' });
     assert((await mcEstimate.textContent()).includes('Speicherklasse'), 'Monte-Carlo resource estimate names its memory class');
@@ -1336,7 +1356,7 @@ async function runSimulatorSmoke(browser, baseUrl) {
         'A rerender keeps one comparison tablist and all three established headings');
 
     const cockpitViewportResults = [];
-    for (const width of [320, 768, 900, 1280, 1600]) {
+    for (const width of [320, 700, 768, 899, 900, 1280, 1600]) {
         await page.setViewportSize({ width, height: 900 });
         cockpitViewportResults.push(await page.evaluate(viewportWidth => {
             const withinViewport = element => {
@@ -1398,8 +1418,10 @@ async function runSimulatorSmoke(browser, baseUrl) {
         mainNavigationDisplay: getComputedStyle(document.querySelector('.tab-buttons')).display,
         mcNavigationDisplay: getComputedStyle(document.querySelector('.mc-view-nav')).display,
         comparisonNavigationDisplay: getComputedStyle(document.querySelector('.stress-replay-comparison-tabs')).display,
+        setupToggleDisplay: getComputedStyle(document.querySelector('.mc-setup-toggle')).display,
         expertToggleDisplay: getComputedStyle(document.querySelector('.stress-replay-expert-toggle')).display,
         replayLinkDisplay: getComputedStyle(document.getElementById('mcShowReplayButton')).display,
+        scenarioReturnDisplay: getComputedStyle(document.getElementById('mcShowScenarioLogsButton')).display,
         scenarioHeaderPosition: getComputedStyle(document.querySelector('[data-print-probe="sticky-header"] th')).position,
         scenarioLogOverflow: getComputedStyle(document.getElementById('scenarioLogOutput')).overflow,
         comparisonTableOverflow: getComputedStyle(document.querySelector('.stress-replay-table-scroll')).overflow
@@ -1418,8 +1440,10 @@ async function runSimulatorSmoke(browser, baseUrl) {
     assert(printedCockpitState.mainNavigationDisplay === 'none'
         && printedCockpitState.mcNavigationDisplay === 'none'
         && printedCockpitState.comparisonNavigationDisplay === 'none'
+        && printedCockpitState.setupToggleDisplay === 'none'
         && printedCockpitState.expertToggleDisplay === 'none'
-        && printedCockpitState.replayLinkDisplay === 'none',
+        && printedCockpitState.replayLinkDisplay === 'none'
+        && printedCockpitState.scenarioReturnDisplay === 'none',
     `Print removes navigation and pure toggle controls: ${JSON.stringify(printedCockpitState)}`);
     assert(printedCockpitState.scenarioHeaderPosition === 'static'
         && printedCockpitState.scenarioLogOverflow === 'visible'

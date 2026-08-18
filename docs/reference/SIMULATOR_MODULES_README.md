@@ -249,7 +249,7 @@ Monte-Carlo-, Replay-, Persistenz- oder Exportdaten zu veraendern.
 
 - `initMonteCarloResultCockpit()` – initialisiert je Dokument genau einmal die
   Setup-Zusammenfassung, Recalculate-Delegation, fuenf ARIA-Tabs, Replay-
-  Rueckverweis und die delegierten Vergleichstabs.
+  Rueckverweise in beide Richtungen und die delegierten Vergleichstabs.
 - `activateMonteCarloResultView()` – aktiviert eine Ergebnisansicht anhand
   ihrer View-ID oder eines enthaltenen Zielknotens. Alle programmatischen
   Cockpit-Fokuspfade verwenden diese Grenze vor `focus()`.
@@ -267,11 +267,14 @@ Monte-Carlo-, Replay-, Persistenz- oder Exportdaten zu veraendern.
 **DOM- und Fokusvertrag:** Die Cockpit-Navigation verwendet ausschließlich
 `.mc-view-*` und kollidiert nicht mit den vier Haupttabs. Inaktive Panels sind
 am Bildschirm `hidden`; der Roving-Tabindex unterstuetzt Links/Rechts sowie
-Home/End. `#scenarioSelector` bleibt ein einziger stabiler Knoten im ersten
-Replay-Schritt. `displayMonteCarloResults()` darf nur dessen dynamischen
-`#scenarioSelect`-Inhalt erneuern. Der Rueckverweis aus den Szenario-Logs und
-asynchrone Replay-Abschluesse aktivieren vor dem Fokus die sichtbare
-Replay-Ansicht. Der eingeklappte kanonische `#mcButton` ist kein Erfolgs-
+Home/End. `#scenarioSelector` bleibt ein einziger stabiler Knoten in der
+Ansicht „Szenario-Logs“ direkt vor `#scenarioLogOutput`.
+`displayMonteCarloResults()` darf nur dessen dynamischen `#scenarioSelect`-
+Inhalt erneuern und projiziert dieselbe Auswahl lesend in Replay-Schritt 1.
+Die Rueckverweise zwischen Logs und Replay sowie asynchrone Replay-Abschluesse
+aktivieren vor dem Fokus die jeweilige sichtbare Ansicht. Das native Setup-
+Disclosure zeigt abhaengig von `[open]` „Setup bearbeiten“ oder „Setup
+ausblenden“ samt Chevron. Der eingeklappte kanonische `#mcButton` ist kein Erfolgs-
 Fokusziel; „Neu rechnen“ delegiert lediglich seinen Klick.
 
 **Responsive-/Druckvertrag:** Bis 899 CSS-Pixel stapeln Variantenliste und

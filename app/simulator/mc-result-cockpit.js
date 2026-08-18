@@ -144,6 +144,7 @@ export function initMonteCarloResultCockpit({
     const primaryButton = documentRef.getElementById?.('mcButton');
     const recalculateButton = documentRef.getElementById?.('mcRecalculateButton');
     const showReplayButton = documentRef.getElementById?.('mcShowReplayButton');
+    const showScenarioLogsButton = documentRef.getElementById?.('mcShowScenarioLogsButton');
     const comparisonRoot = documentRef.getElementById?.('stressReplayComparison');
     const viewTabs = getResultViewElements(documentRef).map(view => view.tab).filter(Boolean);
     if (!setupDisclosure || !primaryButton || !recalculateButton || viewTabs.length !== RESULT_VIEW_IDS.length) return null;
@@ -164,11 +165,20 @@ export function initMonteCarloResultCockpit({
     });
 
     showReplayButton?.addEventListener?.('click', () => {
-        const target = documentRef.getElementById?.('scenarioSelect')
-            || documentRef.getElementById?.('stressReplayStatus');
+        if (activateMonteCarloResultView('replay', { documentRef }) !== 'replay') return;
+        const fixButton = documentRef.getElementById?.('stressReplayFixButton');
+        const target = (fixButton && !fixButton.disabled ? fixButton : null)
+            || documentRef.getElementById?.('stressReplaySelectedScenario')
+            || documentRef.getElementById?.('stressReplayStatus')
+            || documentRef.getElementById?.('mcShowScenarioLogsButton');
         if (!target) return;
-        activateMonteCarloResultView(target, { documentRef });
         target.focus?.();
+    });
+
+    showScenarioLogsButton?.addEventListener?.('click', () => {
+        if (activateMonteCarloResultView('logs', { documentRef }) !== 'logs') return;
+        const target = documentRef.getElementById?.('scenarioSelect') || showReplayButton;
+        target?.focus?.();
     });
 
     for (const [index, tab] of viewTabs.entries()) {

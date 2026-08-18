@@ -1067,7 +1067,8 @@
                             <li><strong>Nach dem Lauf:</strong> Bei Erfolg klappt das Setup ein und „Überblick“ wird
                                 sichtbar fokussiert. Der Laufstatus und die Exportaktionen bleiben im Laufkopf
                                 erreichbar. „Neu rechnen“ startet keinen zweiten Rechenweg, sondern verwendet den
-                                vorhandenen Start-Button; öffnen Sie das Setup, um Parameter zu ändern.</li>
+                                vorhandenen Start-Button. „Setup bearbeiten“ öffnet die unveränderten Parameter;
+                                im geöffneten Zustand schließt „Setup ausblenden“ sie wieder.</li>
                             <li><strong>Ergebnisansichten:</strong> Wechseln Sie per Klick oder Tastatur zwischen
                                 „Überblick“, „Risiko und Verteilung“, „Pflege“, „Szenario-Logs“ und
                                 „Stresspfad-Replay“. In der Tab-Leiste funktionieren Links/Rechts sowie Pos1/Ende.
@@ -1082,11 +1083,13 @@
                             Ereignispfad bleiben identisch. Der Vergleich gilt deshalb nur für diesen Pfad und ist
                             weder ein allgemeines Strategieranking noch eine Finanzempfehlung.</p>
                         <ol style="margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Pfad fixieren:</strong> Wählen Sie ein Szenario eines Per-Run-Seed-Laufs und
-                                öffnen Sie aus „Szenario-Logs“ über „Im Stresspfad-Replay anzeigen“ den einzigen
-                                Szenario-Selektor. Das Replay führt anschließend durch „Lauf wählen“, „Fixierter
-                                Pfad“ und „Varianten“. Prüfen Sie nach dem Fixieren Baseline-Abgleich und
-                                Fingerprints.</li>
+                            <li><strong>Pfad fixieren:</strong> Wählen Sie ein Szenario eines Per-Run-Seed-Laufs
+                                direkt in „Szenario-Logs“; das Log darunter folgt der Auswahl. „In Replay anzeigen“
+                                öffnet Replay-Schritt 1 mit der lesenden Anzeige von Lauf, Endvermögen und
+                                Pflegemarkierung. Dort können Sie den Lauf fixieren oder über „Auswahl in
+                                Szenario-Logs ändern“ zurückkehren. Das Replay führt anschließend durch „Lauf
+                                wählen“, „Fixierter Pfad“ und „Varianten“. Prüfen Sie nach dem Fixieren
+                                Baseline-Abgleich und Fingerprints.</li>
                             <li><strong>Bedarfe variieren:</strong> Standardmäßig sehen Sie Variantenname,
                                 Floor-Bedarf p. a., Flex-Bedarf p. a. und Mindest-Flex p. a. Der jeweils getrennt
                                 angezeigte Baselinebetrag bleibt wirksam, wenn das Eingabefeld leer ist.</li>
