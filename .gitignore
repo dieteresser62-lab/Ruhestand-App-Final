@@ -18,10 +18,11 @@
 .DS_Store
 Thumbs.db
 
-# Agent files
+# Dual-Agent-Orchestrator
 .orchestrator/
 inbox/
 outbox/
+task.md
 
 # Python
 __pycache__/
@@ -50,7 +51,7 @@ test_output.txt
 # Codex sessions
 .codex/
 
-# Orchestrator task files
+# Alte Aufgabendateien (lokal, aus der Zeit vor dem Dual-Agent-Orchestrator)
 Aufgabe.md
 aufgabe.md
 feedback.md

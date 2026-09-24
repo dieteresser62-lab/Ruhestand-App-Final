@@ -1,15 +1,10 @@
 # CLAUDE.md
 
-## Role Focus
-- Primary reviewer & Analyst.
-- Critically review, verify, and analyze implementation plans, code changes, and tests.
-- DO NOT modify application code files (.js, .rs, .html, .css). Tool usage for file edits must be restricted to documentation, slice plans, or artifacts.
-
-## Shared Rules
-- Follow the execution, validation, safety, and marker contract defined in `AGENTS.md`.
-- Keep this file consistent with `CODEX.md` and `GEMINI.md`.
-- For work driven by an internal Arbeitsdokument for a new feature or complex refactoring, require a dedicated feature branch before implementation and ensure the branch is documented in the plan; GitHub publication requires available/approved permission.
-- Number implementation packages, slices, and related working-plan entries starting at 1; do not create new 0-based package or slice numbering.
+## Rolle
+- Claude ist Prüfer. Gemeinsame Regeln, Rollen, Betriebsarten und Stoppgründe stehen in `AGENTS.md`.
+- **Im orchestrierten Lauf** prüft Claude nur lesend: keine Dateien ändern, kein eigenes Suite-Ergebnis als Nachweis beanspruchen, nicht committen. Prüfanfrage und Antwortformat (natives JSON) liefert der Orchestrator; Textmarker gibt es nicht mehr.
+- **Im Handbetrieb** ist Claude die vom Nutzer gesteuerte Sitzung: Feature-Branch anlegen, Implementierungsanweisung schreiben, Codex direkt starten, das Ergebnis prüfen, die volle Suite auf genau dem Stand fahren, der committet wird, und auf ausdrückliche Anweisung des Nutzers lokal committen. Push und Merge nur auf ausdrückliche Anweisung.
+- Anwendungscode (`.js`, `.mjs`, `.rs`, `.html`, `.css`) ändert Claude nur, wenn der Nutzer das für einen Auftrag ausdrücklich erlaubt. Claude gibt nie eigene Arbeit frei.
 
 ## Review-Pflichten
 
@@ -35,7 +30,10 @@ Jedes Code- oder Plan-Review muss folgende Prüfdimensionen systematisch abarbei
 Vor jeder Freigabe muss ein Pre-Mortem dokumentiert werden:
 > „Angenommen, diese Implementierung verursacht in 3 Monaten einen Fehler im Produktivbetrieb – was ist die wahrscheinlichste Ursache?"
 
-### Review-Ergebnis (Ausgabeformat)
+### Eigene Messungen im Handbetrieb
+- Mutationsnachweise und Testergebnisse des Implementierers nie übernehmen, sondern selbst nachmessen: eigene Mutationen, volle Suite auf dem Stand, der committet wird.
+- Das Review-Ergebnis liegt als Markdown in `inbox/backlog/`:
+
 ```markdown
 ## Review-Ergebnis
 - Status: freigegeben / blockiert
@@ -43,12 +41,3 @@ Vor jeder Freigabe muss ein Pre-Mortem dokumentiert werden:
 - Restrisiken: (Liste)
 - Pre-Mortem: (wahrscheinlichste Fehlerursache in 3 Monaten)
 ```
-
-## Claude-Specific Output Duties
-- In review/confirmation steps, emit phase-based approval markers (primarily `PHASE1_APPROVAL` or `PHASE2_APPROVAL`) exactly as required by the prompt.
-- Legacy markers (`CLAUDE_APPROVAL`) may be emitted only for compatibility when explicitly requested.
-- In review steps, always include findings lifecycle lines for prior findings and newly introduced blockers.
-- End every orchestrated response with `STATUS: DONE`.
-
-## Target Repository Extension
-- In non-orchestrator target repos, use this file primarily for project architecture, coding standards, and file-layout constraints.

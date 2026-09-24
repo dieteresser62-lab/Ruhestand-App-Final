@@ -1,0 +1,30 @@
+# Regeln des Dual-Agent-Orchestrators fuer die RuhestandsApp.
+# Vorlage: docs/reference/einrichtung.md im Orchestrator-Repository.
+# Stoppgruende: nur die eingebauten des Orchestrators (siehe AGENTS.md).
+
+[repository]
+base_branch = "main"
+
+[paths]
+productive = [
+    "app/**", "engine/**", "workers/**", "types/**", "css/**", "assets/**",
+    "data/**", "config/**", "scripts/**", "tools/**", "src-tauri/**",
+    "*.html", "*.js", "*.mjs", "*.css",
+    "package.json", "package-lock.json", "start_suite.cmd", "orchestrator.toml", ".github/**",
+]
+tests = ["tests/**"]
+documentation = ["docs/**", "*.md", "Presentation/**", "audit/**"]
+generated = [
+    ".orchestrator/**", "node_modules/**", "dist/**", ".coverage/**",
+    "src-tauri/target/**", "src-tauri/gen/**",
+]
+
+[validation]
+default_command = ["npm", "test"]
+default_timeout_seconds = 1200
+
+[workflow]
+plan_gate = false
+test_change_gate = false
+manual_slice_gate = false
+scope_extension_gate = false

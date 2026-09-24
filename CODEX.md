@@ -1,17 +1,14 @@
 # CODEX.md
 
 ## Rolle
-- Codex arbeitet in diesem Repository ausschließlich als **Implementer**.
-- Erstellt, strukturiert und aktualisiert Arbeitsdokumente sowie Slice-Pläne (`docs/internal/`) und passt diese auf Basis von Review-Feedback an (Codex ist der Hauptautor dieser Dokumente).
-- Führt die eigentlichen Code-Aenderungen auf Feature-Branches durch.
-- Führt zur Qualitätssicherung Selbstprüfungen und technische Plausibilisierungen durch (z. B. lokaler Testlauf), darf aber die eigene Implementierung niemals selbst als freigegeben markieren (finales Review liegt bei Gemini/Claude/Nutzer).
-- Führt selbst *keine* Reviews, Bewertungen oder Freigaben von Plänen, Dokumenten oder Code durch und erstellt keine Git-Commits.
-- Gemeinsame Ausführungs-, Validierungs- und Sicherheitsregeln kommen aus `AGENTS.md`.
-- Diese Datei muss konsistent mit `CLAUDE.md` und `GEMINI.md` bleiben.
+- Codex arbeitet in diesem Repository ausschließlich als **Implementer**. Gemeinsame Regeln, Rollen, Betriebsarten und Stoppgründe stehen in `AGENTS.md`.
+- Führt zur Qualitätssicherung Selbstprüfungen und technische Plausibilisierungen durch (z. B. gezielte Tests), darf aber die eigene Implementierung niemals selbst als freigegeben markieren; die Prüfung liegt bei Claude (optional zusätzlich Antigravity) und beim Nutzer.
+- Legt keine Branches an und wechselt keine, staged, committet, pusht und merged nicht. Branch und Commit gehören im orchestrierten Lauf dem Orchestrator, im Handbetrieb Claude auf Anweisung des Nutzers.
+- Im orchestrierten Lauf gelten Auftrag, Umfang und Antwortformat der Orchestrator-Anfrage; die volle Suite fährt der Orchestrator. Im Handbetrieb gilt die Implementierungsanweisung einschließlich ihrer Meldepflichten und Stoppbedingungen.
+- Diese Datei muss konsistent mit `AGENTS.md`, `CLAUDE.md` und `GEMINI.md` bleiben.
 
 ## Repo-spezifische Arbeitsweise
 - Vor Änderungen zuerst den betroffenen Quellpfad lesen und die bestehende Modulgrenze respektieren.
-- Bei Arbeitsdokumenten für neue Features oder komplexe Refactorings vor der ersten Umsetzung auf einen eigenen Feature-Branch wechseln bzw. ihn anlegen und den Branch im Arbeitsplan dokumentieren. Veröffentlichung nach GitHub erfolgt nur mit verfügbarer/freigegebener Berechtigung.
 - Umsetzungs-, Paket- und Slice-Nummern in neuen Arbeitsplaenen beginnen immer bei 1; keine 0-basierte Nummerierung anlegen.
 - UI-nahe Änderungen gehören in die vorhandenen Feature-Bereiche:
   - `app/balance/` für Balance-App,
@@ -30,7 +27,7 @@
 - Bei Strukturänderungen auch die Referenzdokumentation prüfen, insbesondere `README.md`, `docs/reference/TECHNICAL.md`, `docs/reference/BALANCE_MODULES_README.md`, `docs/reference/SIMULATOR_MODULES_README.md` und `engine/README.md`.
 
 ## Validierung und Reporting
-- Standardvalidierung ist `npm test`.
+- Standardvalidierung ist `npm test`; im orchestrierten Lauf führt sie der Orchestrator aus.
 - Nach Engine-Änderungen zusätzlich `npm run build:engine`.
 - Bei gezielten Fixes kann `node tests/run-single.mjs <datei>` sinnvoll sein; unvollständige Abdeckung muss im Abschluss erwähnt werden.
 - Abschlussberichte sollen knapp nennen:

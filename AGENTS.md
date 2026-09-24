@@ -1,22 +1,15 @@
 ## Zweck
 - Projektweite Arbeitsregeln für Agenten in diesem Repository.
-- Beschreibt den tatsächlichen Stand der Ruhestands-App als lokale Browser-/Tauri-Anwendung.
-- Ist die gemeinsame Referenz für Ausführung, Validierung, Sicherheitsgrenzen und Doku-Sync.
+- Beschreibt den tatsächlichen Stand der Ruhestands-App als lokale Browser-/Tauri-Anwendung und die beiden Betriebsarten, in denen an ihr gearbeitet wird.
+- Ist die gemeinsame Referenz für Rollen, Stoppgründe, Ausführung, Validierung, Sicherheitsgrenzen und Doku-Sync.
 - Projekt- und architekturspezifische Details müssen mit `README.md` und den Referenzdokumenten konsistent bleiben.
 
 ## Projektstand
 - Die Suite hat mehrere Einstiegspunkte: `Balance.html`, `Simulator.html`, `index.html`, `depot-tranchen-manager.html` und `Handbuch.html`.
 - Die fachliche Logik liegt in nativen ES-Modulen unter `app/`, `engine/`, `workers/` und `types/`.
-- Desktop-Paketierung läuft über Tauri in `src-tauri/`.
+- Desktop-Paketierung läuft über Tauri in `src-tauri/`. `npm run build:desktop` baut `dist/` mit `scripts/sync-dist.mjs` und danach die EXE.
+- Die Browser-Variante startet mit `npm run serve` bzw. `start_suite.cmd` (`scripts/serve.mjs`).
 - Generierte Artefakte sind insbesondere `engine.js` und `dist/`; diese sind nicht der primäre Bearbeitungsort. Die Desktop-EXE wird lokal gebaut und gehört nicht ins Repository.
-
-## Arbeitsdokumente und Branches
-- Ein Arbeitsdokument ist ein zu implementierendes neues Feature oder ein komplexes Refactoring unter `docs/internal/`.
-- Arbeiten aus einem Arbeitsdokument müssen vor der ersten Umsetzung auf einem eigenen Feature-Branch beginnen.
-- Der Feature-Branch ist im Arbeitsdokument bzw. Arbeitsplan zu dokumentieren.
-- Wenn GitHub-Zugriff verfügbar und freigegeben ist, wird der Feature-Branch zu Beginn auf GitHub veröffentlicht; andernfalls wird dokumentiert, dass der Branch nur lokal angelegt wurde bzw. die Veröffentlichung noch aussteht.
-- Empfohlene Branch-Namen sind sprechend und präfixiert, z. B. `feature/<kurzname>` oder bei Codex-Branches `codex/<kurzname>`.
-- Umsetzungs-, Paket- und Slice-Nummern beginnen immer bei 1. Keine neuen Arbeitsplaene, Paketlisten oder Slice-Dateien mit 0-basierter Nummerierung anlegen.
 
 ## Source of Truth
 - Laufzeit- und Build-Kommandos: `package.json`
@@ -28,29 +21,48 @@
   - `engine/README.md`
 - Test-Infrastruktur: `tests/README.md`
 - Desktop-Konfiguration: `src-tauri/tauri.conf.json`
+- Regeln für orchestrierte Läufe: `orchestrator.toml`
 - Keep instruction files synchronized and non-contradictory:
   - `AGENTS.md`
   - `CLAUDE.md`
   - `CODEX.md`
   - `GEMINI.md`
 
-## Rollenverteilung
-- **Antigravity (Gemini):** Agiert ausschliesslich als **superkritischer Reviewer & Analyst**. Hat Lesezugriff auf Applikationscode, darf diesen aber niemals modifizieren. Erstellt/aktualisiert Reviews, Dokumentationen und führt lokale Commits nach erfolgreicher Abnahme durch. Bewertet und gibt Arbeitsdokumente und Slices frei. Gemini modifiziert vor dem Commit keine Code-Dateien und MUSS vor jedem Commit `git status --short` ausführen, die geänderten Dateien dokumentieren und gegen den Slice-Scope prüfen (unerwartete Dateien blockieren den Commit).
-- **Codex:** Agiert ausschliesslich als **Implementer**. Nimmt die eigentlichen Code-Aenderungen auf Feature-Branches vor. Codex ist der Hauptautor von Arbeitsdokumenten und Slices und passt diese gemäß dem Review-Feedback an. Codex führt zur Qualitätssicherung Selbstprüfungen und technische Plausibilisierungen durch, darf aber seine eigene Implementierung niemals selbst als freigegeben markieren (finales Review liegt bei Gemini/Claude/Nutzer). Führt selbst *keine* Reviews, Bewertungen oder Freigaben von Plänen oder Code-Änderungen durch.
+## Rollen
+- **Codex – Implementierer.** Plant und implementiert. Gibt die eigene Arbeit nie selbst frei.
+- **Claude – Prüfer.** Prüft jeden Plan und jede Umsetzung gegenläufig. Im orchestrierten Lauf nur lesend; im Handbetrieb zusätzlich die vom Nutzer gesteuerte Sitzung (siehe unten).
+- **Antigravity (Gemini) – optionaler zusätzlicher Prüfer und Analyst.** Nur lesend für Anwendungscode; staged, committet, pusht und merged nicht.
+- Niemand gibt eigene Arbeit frei. Niemand pusht, merged, schreibt Historie um oder löscht destruktiv ohne ausdrückliche Freigabe des Nutzers.
 
-## Review-Grundsätze (für alle Reviewer-Agenten)
-- **Adversariale Haltung:** Bei jedem Code- oder Plan-Review ist die primäre Aufgabe des Reviewers nicht zu bestätigen, dass etwas funktioniert, sondern aktiv Szenarien zu konstruieren, in denen es versagt. Der Reviewer agiert als Gegenspieler der Implementierung, nicht als deren Verteidiger.
-- **Keine Freigabe ohne Findings:** Ein Review-Ergebnis ohne dokumentierte Findings ist unzulässig. Wenn nach gründlicher Prüfung keine Schwachstellen gefunden werden, muss der Reviewer dokumentieren: (a) welche konkreten Prüfdimensionen untersucht wurden, (b) wo das größte Restrisiko liegt, und (c) unter welchen realistischen Bedingungen die Implementierung brechen würde.
-- **Bewertung erst nach Analyse:** Zusammenfassende Bewertungen (positiv oder negativ) dürfen erst NACH der vollständigen Finding-Dokumentation ausgesprochen werden. Formulierungen wie „insgesamt solide", „gute Arbeit" oder „überzeugende Lösung" vor Abschluss der Analyse sind unzulässig. Die Bewertung folgt aus den Findings, nicht umgekehrt.
-- **Pre-Mortem-Pflicht:** Vor jeder Freigabe muss der Reviewer ein Pre-Mortem dokumentieren: „Angenommen, diese Implementierung verursacht in 3 Monaten einen Fehler im Produktivbetrieb – was ist die wahrscheinlichste Ursache?"
+## Betriebsarten
+
+### Orchestrierter Lauf (Dual-Agent-Orchestrator)
+- Der Nutzer legt eine Idee in `inbox/`. Der Orchestrator plant, schneidet Arbeitspakete, legt Zielbranch, Arbeitsplan und Prüfberichte unter `docs/internal/` an, führt `npm test` aus und committet. Er pusht und merged nie.
+- Codex bearbeitet nur den zugewiesenen Auftrag innerhalb seines Umfangs. Keine Branches anlegen oder wechseln, nicht stagen, nicht committen, nicht pushen oder mergen, keine eigenen Slice-Dokumente neben dem Arbeitsplan des Orchestrators.
+- Die volle Suite führt nur der Orchestrator aus; gezielte Läufe mit `node tests/run-single.mjs <datei>` sind erlaubt. Ein in der Agenten-Sandbox gescheiterter Port- oder Browserstart ist kein Grund zum Anhalten.
+- Antwortformat und Ablauf gibt die Anfrage des Orchestrators vor.
+
+### Handbetrieb (Claude an der Front)
+- Claude arbeitet als vom Nutzer gesteuerte Sitzung: legt vor der Umsetzung einen Feature-Branch an, schreibt eine Implementierungsanweisung und startet Codex direkt.
+- Anweisungen und Reviews liegen unversioniert in `inbox/backlog/`; die Wache des Orchestrators liest nur `inbox/*.md`.
+- Codex setzt die Anweisung um, erfüllt ihre Meldepflichten vor dem Bauen, fährt gezielte Tests und berichtet. Keine Branchwechsel, keine Commits, kein Push.
+- Claude prüft das Ergebnis mit eigenen Messungen (eigene Mutationen, volle Suite auf genau dem Stand, der committet wird), gibt Befunde an Codex zurück und committet erst nach grüner Prüfung lokal, auf ausdrückliche Anweisung des Nutzers. Push und Merge nur auf ausdrückliche Anweisung.
+- Commit-Nachrichten: eine Zeile im Conventional-Commit-Stil (`<typ>: <imperativ>`), englisch, ohne Trailer.
+- Empfohlene Branch-Namen sind sprechend und präfixiert, z. B. `feature/<kurzname>`.
+- Umsetzungs-, Paket- und Slice-Nummern beginnen immer bei 1. Keine neuen Arbeitspläne, Paketlisten oder Slice-Dateien mit 0-basierter Nummerierung anlegen.
+
+## Stoppgründe
+Es gelten dieselben Stoppgründe wie im Orchestrator. Codex hält an und meldet, statt zu raten:
+- `CONTRACT-UNCLEAR` – ein Vertrag ist unklar, oder die Umsetzung würde einen bestehenden Vertrag still ändern. Dazu gehören, sofern der Auftrag es nicht ausdrücklich verlangt: geänderte Engine-Semantik, unerwartet abweichende Snapshot- oder Backtest-Ergebnisse, ein auffälliges FlowDelta, unterschiedliche Parameternamen in UI und Engine sowie ein `minimumFlexAnnual`, das still begrenzt statt validiert wird.
+- `OPERATOR-PREREQUISITE-MISSING` – eine Voraussetzung fehlt, die nur der Nutzer schaffen kann, etwa ein Werkzeug, ein Zugang oder eine Datei.
+- `SCOPE-EXTENSION-REQUESTED` – die Umsetzung braucht Dateien außerhalb des zugewiesenen Umfangs.
+
+Im Handbetrieb gelten zusätzlich die Stoppbedingungen der jeweiligen Anweisung.
 
 ## Ausführung
 - Start implementation/review immediately for actionable tasks.
-- Ask clarifying questions only when:
-  - Anforderungen technisch mehrdeutig sind,
-  - mehrere Richtungen mit klar unterschiedlichen Trade-offs offenstehen,
-  - Berechtigungen, Secrets oder externe Freigaben fehlen,
-  - eine destruktive Aktion im Raum steht.
+- Rückfragen nur bei wesentlicher Mehrdeutigkeit, fehlender Berechtigung, Secrets oder destruktiven Aktionen; im Lauf über die Stoppgründe oben.
+- Fremde, nicht zum Auftrag gehörende Änderungen im Arbeitsbaum gelten als vorhanden und werden nie überschrieben.
 - Arbeite in den Quellmodulen, nicht in generierten Artefakten.
 - Teile Logik so auf, wie das Repo bereits strukturiert ist:
   - `app/balance/` und `app/simulator/` für UI-nahe Feature-Logik,
@@ -60,20 +72,9 @@
   - `workers/` und DOM-freie Runner für parallele Rechenpfade.
 - `engine.js` nie manuell editieren; Änderungen an `engine/` laufen über `build-engine.mjs`.
 - `dist/` nur anfassen, wenn der Auftrag explizit Build-, Sync- oder Release-Artefakte umfasst; keine EXE oder andere Build-Binaries committen.
-- Für in Slices geplante Arbeiten gelten zusätzlich die Slice-Regeln in `docs/internal/SLICE_EXECUTION_RULES.md`: 1-basierte Nummerierung, eigener Feature-Branch, eigene Slice-MD, Branch- und Statuscheck sowie Diff-Risiko vor Coding, Stop-Regeln, Abschlussdokumentation, lokaler Git-Commit nach erfolgreichem Review, Freigabe vor Push und Rückdokumentation im Arbeitsplan.
-
-## Agent Stop Rules
-- Stoppe und frage nach, wenn mehr als 10 Programmdateien geändert werden müssten (die Begrenzung bezieht sich ausschließlich auf produktive Anwendungs-/Programmdateien und Konfigurationen wie z. B. `.js`, `.mjs`, `.html`, `.css`, `.rs`, `.json`; sie bezieht sich nicht auf reine Dokumentation wie `.md` oder Testdateien, z. B. im Ordner `tests/` und Test-Fixtures).
-- Stoppe und frage nach, wenn Tests nicht ausführbar sind oder die notwendige Validierung nicht sinnvoll ersetzbar ist.
-- Stoppe und frage nach, wenn ein Contract unklar ist.
-- Stoppe und frage nach, wenn bestehende Engine-Semantik verändert werden müsste.
-- Stoppe und frage nach, wenn Snapshot-/Backtest-Ergebnisse unerwartet abweichen.
-- Stoppe und frage nach, wenn FlowDelta auffällig wird.
-- Stoppe und frage nach, wenn UI und Engine unterschiedliche Parameternamen verwenden.
-- Stoppe und frage nach, wenn `minimumFlexAnnual` irgendwo still begrenzt statt validiert wird.
 
 ## Validierung
-- Default: `npm test`
+- Default: `npm test`. Der Browser-Smoke läuft separat mit `npm run test:browser`.
 - Mandatory after changes to:
   - `engine/`,
   - `workers/`,
