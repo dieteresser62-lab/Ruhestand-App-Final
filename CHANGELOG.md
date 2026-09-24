@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-09-24
+
+### Geaendert
+- Der Desktop-Build ist plattformneutral: `npm run build:desktop` fuehrt `npm run sync-dist` und `npm run tauri:build` aus. `scripts/sync-dist.mjs` (Node statt PowerShell) baut `dist/` ausschliesslich aus einem Git-Commit und kopiert nur Laufzeitdateien (`app/`, `engine/`, `workers/`, `types/`, `css/`, `assets/` sowie die HTML-, JS- und CSS-Dateien im Wurzelverzeichnis); `data/`, Dokumentation, Tests und Agentendateien gelangen nicht mehr in die EXE.
+- Die Browser-Variante startet ueber `scripts/serve.mjs` (`npm run serve`, unter Windows `start_suite.cmd`): Webserver und Yahoo-Proxy laufen in einem Node.js-Prozess und enden gemeinsam. Node.js ist fuer die Browser-Variante damit Pflicht.
+
+### Entfernt
+- `RuheStandSuite.exe` und die versionierten Teile von `node_modules/` liegen nicht mehr im Repository; die EXE wird lokal gebaut, aeltere Staende werden ausserhalb archiviert.
+- `build-tauri.bat`, `scripts/build-tauri.ps1`, `scripts/sync-dist.ps1`, `start_suite.ps1` und `stop_suite.cmd` sowie die ungenutzten Dateien `app_code.js` und `assets/images/retirement_hero_illustration.png`.
+
+### Tests
+- `runtime-build-provenance.test.mjs` prueft Dist-Sync und lokalen Server plattformunabhaengig in einem Git-Fixture; bisher lief der Test nur unter Windows.
+- Der neue `dist-runtime-inventory.test.mjs` verfolgt die statischen Verweise der HTML-Einstiege und schlaegt fehl, sobald eine referenzierte Datei nicht nach `dist/` kopiert wuerde.
+
 ## 2026-08-17
 
 ### Geaendert
