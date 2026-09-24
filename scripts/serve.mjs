@@ -145,7 +145,7 @@ function openBrowser(url) {
         ? ['cmd', ['/c', 'start', '""', url], { windowsVerbatimArguments: true }]
         : [process.platform === 'darwin' ? 'open' : 'xdg-open', [url], {}];
     try {
-        const child = spawn(command, args, { stdio: 'ignore', detached: true, ...extra });
+        const child = spawn(command, args, { stdio: 'ignore', detached: true, windowsHide: true, ...extra });
         child.on('error', () => console.log(`Browser bitte selbst oeffnen: ${url}`));
         child.unref();
     } catch {

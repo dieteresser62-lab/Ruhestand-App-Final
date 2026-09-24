@@ -203,7 +203,9 @@ try {
     assertEqual(revSync.status, 0, `dist sync with --rev ignores the working tree: ${revSync.output}`);
     assertEqual(fs.readFileSync(path.join(fixtureRoot, 'dist', 'index.html'), 'utf8'), 'fixture:index.html\n',
         'dist sync with --rev copies committed content, not the working tree edit');
-    git('checkout', '--', 'index.html');
+    // Direkt zurueckschreiben statt git checkout: Git fuer Windows wuerde mit
+    // core.autocrlf CRLF auschecken.
+    writeFixtureFile('index.html');
 
     // Fehlt eine Pflichtdatei im Commit, bleibt das vorhandene dist unberuehrt.
     git('rm', '-q', 'workers/mc-worker.js');
