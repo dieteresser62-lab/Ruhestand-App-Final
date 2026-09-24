@@ -134,7 +134,7 @@ Netzwerkpfade.
   vereinfachter Nutzer-Cashflow, keine gesetzliche Anspruchsberechnung.
   Build/Verify: `npm run build:german-demography-data` und
   `npm run verify:german-demography-data`.
-* **Reproduzierbarer Backtest-Export:** Die Backtest-Buttons erzeugen nur auf ausdrueckliche Nutzeraktion ein `HistoricalBacktestExportV2`-Raw-JSON oder eine technische `HistoricalBacktestCsvV2`-Rohdatenansicht mit 34 festen Spalten und fuehrender `run_id`. JSON enthaelt Request, Outcome, die inklusive Periode (2000-2025 sind 26 Jahre), Daten-/Zeitachsen-/Engine-/Source-Commit-Provenienz, nicht restartfaehige `HistoricalBacktestPortfolioBoundariesV2`, Jahresrecords/-zeilen, Quantisierungs- und Eingabesemantik sowie Metriken als echte Zahlen. Die Portfoliogrenzen nennen aktives Portfolio plus Pflegebucket; der separat angezeigte Pflegebucket ist bereits in Start-/Endvermoegen enthalten und darf nicht addiert werden. Interne Start-/End-Portfolioobjekte gehoeren weder zum kanonischen Resultat noch zum Export. Vor dem Browserlauf wird der unterpfadfaehige Same-Origin-Endpunkt `./__build-provenance.json` explizit abgewartet; eine globale Laufzeitueberschreibung existiert nicht. Ein fehlender Source-Commit oder dirty Quellbaum blockiert nur den Raw-JSON-Export mit sichtbarem stabilem Fehlercode, waehrend die eigenstaendige technische CSV-Projektion verfuegbar bleibt. JSON und CSV tragen dieselbe kanonische Run-ID; JSON-Dateinamen tragen ausserdem den Result-Fingerprint, CSV-Dateinamen ihren formatspezifischen Byte-Fingerprint. `sync-dist` verlangt einen sauberen Stand aller versionierten Quelldateien, blockiert normale wie auch per `.gitignore` ausgeblendete unversionierte Dateien in Runtime-Quellpfaden, kopiert ausschliesslich das von Git gelistete Dateiinventar und prueft Commit und Clean-Status nochmals vor dem Schreiben der Desktop-Provenienz; sonstige unversionierte Scratchdateien blockieren den Vorgang nicht und gelangen nicht nach `dist/`. Run-/Request-ID und der gepinnte SHA-256-Fingerprint identifizieren den kanonischen Lauf; der Exportzeitpunkt gehoert nicht zum Result-Fingerprint. Ein ungueltiger veraenderlicher Rundungsvertrag faellt auf den freigegebenen Default zurueck und meldet einmalig den stabilen Diagnosecode `SPENDING_ROUNDING_CONTRACT_FALLBACK`. Der Export enthaelt die vollstaendigen lokalen Finanzannahmen und sollte entsprechend vertraulich behandelt werden.
+* **Reproduzierbarer Backtest-Export:** Die Backtest-Buttons erzeugen nur auf ausdrueckliche Nutzeraktion ein `HistoricalBacktestExportV2`-Raw-JSON oder eine technische `HistoricalBacktestCsvV2`-Rohdatenansicht mit 34 festen Spalten und fuehrender `run_id`. JSON enthaelt Request, Outcome, die inklusive Periode (2000-2025 sind 26 Jahre), Daten-/Zeitachsen-/Engine-/Source-Commit-Provenienz, nicht restartfaehige `HistoricalBacktestPortfolioBoundariesV2`, Jahresrecords/-zeilen, Quantisierungs- und Eingabesemantik sowie Metriken als echte Zahlen. Die Portfoliogrenzen nennen aktives Portfolio plus Pflegebucket; der separat angezeigte Pflegebucket ist bereits in Start-/Endvermoegen enthalten und darf nicht addiert werden. Interne Start-/End-Portfolioobjekte gehoeren weder zum kanonischen Resultat noch zum Export. Vor dem Browserlauf wird der unterpfadfaehige Same-Origin-Endpunkt `./__build-provenance.json` explizit abgewartet; eine globale Laufzeitueberschreibung existiert nicht. Ein fehlender Source-Commit oder dirty Quellbaum blockiert nur den Raw-JSON-Export mit sichtbarem stabilem Fehlercode, waehrend die eigenstaendige technische CSV-Projektion verfuegbar bleibt. JSON und CSV tragen dieselbe kanonische Run-ID; JSON-Dateinamen tragen ausserdem den Result-Fingerprint, CSV-Dateinamen ihren formatspezifischen Byte-Fingerprint. `sync-dist` baut `dist/` ausschliesslich aus einem Git-Commit: ohne `--rev` verlangt es einen sauberen Stand aller versionierten Quelldateien und blockiert normale wie auch per `.gitignore` ausgeblendete unversionierte Dateien in Runtime-Quellpfaden; die Desktop-Provenienz ist damit per Konstruktion clean. Sonstige unversionierte Scratchdateien blockieren den Vorgang nicht und gelangen nicht nach `dist/`. Run-/Request-ID und der gepinnte SHA-256-Fingerprint identifizieren den kanonischen Lauf; der Exportzeitpunkt gehoert nicht zum Result-Fingerprint. Ein ungueltiger veraenderlicher Rundungsvertrag faellt auf den freigegebenen Default zurueck und meldet einmalig den stabilen Diagnosecode `SPENDING_ROUNDING_CONTRACT_FALLBACK`. Der Export enthaelt die vollstaendigen lokalen Finanzannahmen und sollte entsprechend vertraulich behandelt werden.
 * **Backtest-Status und Rolling Cohorts:** Die Zeitraumfelder zeigen manifestabgeleitete Grenzen und feldnahe Fehler. Ein fokussierbarer Live-Status trennt `completed`, `ruin`, `incomplete` und `technical_error`; Nutzertexte nennen einen stabilen Code, Ursache und naechsten Schritt ohne Stacktrace. Optional lassen sich feste, ueberlappende Rolling Cohorts fuer den gewaehlten Zeitraum auswerten. Das Inventar trennt Outcomes und Ausschluesse; historische Einzelpfade und Cohorts bleiben In-sample-Diagnosen, keine unabhaengigen Versuche und keine Erfolgswahrscheinlichkeit.
 * **Auto-Optimize Dynamic-Flex-Modus:** `inherit`, `force_on`, `force_off`; Dynamic-Flex-Parameter sind nur bei effektiv aktivem Dynamic-Flex optimierbar, inklusive Safety-Guards gegen zu aggressive Lösungen.
 * **Workflow-Transparenz:** Die Hauptabläufe (Balance, Monte-Carlo, Backtest) sind nun als Pseudo-Code dokumentiert: `docs/reference/WORKFLOW_PSEUDOCODE.md`.
@@ -328,26 +328,28 @@ Die Anwendung ist bewusst minimalistisch gehalten, hat aber für den vollen Funk
 
 ### Option 1: Standalone-Anwendung
 
-**RuhestandSuite.exe** – portables Windows-Artefakt auf Basis von Tauri:
+**RuhestandSuite.exe** – portables Windows-Artefakt auf Basis von Tauri. Die EXE liegt nicht im Repository, sondern wird lokal gebaut:
 * Keine Installation, kein Installer und keine Administratorrechte erforderlich
-* Dedizierter Buildpfad für Windows über `build-tauri.bat` beziehungsweise `npm run build-tauri-exe`
+* Plattformneutraler Buildpfad über `npm run build:desktop` (`npm run sync-dist` plus `npm run tauri:build`)
 * Beinhaltet beide Apps (Balance & Simulator) in einer nativen Desktop-Umgebung
 * Kernrechnung und lokale Datenhaltung sind offline nutzbar; Live-Kurse, Inflation, CAPE und Webfonts benötigen Netzwerkzugriff
 * Nutzt kein separates lokales Webserver-Setup; das Frontend wird direkt aus `dist/` in der Tauri-WebView geladen
 * Enthaelt einen integrierten Yahoo-Proxy fuer Kurs-Updates (lokaler Port 8787)
 
-Die Tauri-Konfiguration beschreibt zwar Bundleziele für weitere Plattformen,
-im aktuellen Repository ist aber nur der Windows-Releasepfad eigens
-orchestriert. Ein vorhandenes lokales EXE-Artefakt ist noch kein Nachweis für
+Die Tauri-Konfiguration beschreibt Bundleziele für weitere Plattformen, und
+`npm run build:desktop` läuft auf jedem Host mit Node.js, Git, Rust und den
+Tauri-Systemvoraussetzungen; validiert ist bisher nur der Windows-Build. Ein vorhandenes lokales EXE-Artefakt ist noch kein Nachweis für
 einen grünen Testlauf, einen manuellen Desktop-Smoke oder eine Veröffentlichung.
 macOS-/Linux-Desktop-Builds sind hier weder aktuell validiert noch als
 ausgeliefert dokumentiert.
 
-**So nutzen Sie die portable EXE:**
-1. `RuhestandSuite.exe` aus einem ausdrücklich freigegebenen Build oder Release in einen beliebigen Ordner kopieren.
-2. Per Doppelklick starten; die Tauri-App öffnet die Oberfläche direkt aus dem gebündelten `dist/`-Stand.
-3. Optionale Live-Datenzugriffe funktionieren bei Internetverbindung; ETF-Kurse laufen über den integrierten lokalen Proxy, Inflation und CAPE direkt über freigegebene externe Endpunkte. Ohne Internet bleiben lokale Planung und manuelle Werte nutzbar. Ein bereits bestätigter Jahresabschluss kann bei einem fehlgeschlagenen periodengebundenen Datenschritt jedoch bewusst in den Recovery-Zustand wechseln, statt mit einem falschen Stichtag fortzufahren.
-4. Eigene Szenarien werden im Benutzerprofil als Tauri-App-Daten gespeichert. Live-Daten liegen in `ruhestand_suite_data.json`, Jahresabschluss-Snapshots separat in `ruhestand_suite_snapshots.json`; der Wechsel zwischen Browser und EXE laeuft ueber das zentrale Komplettbackup auf der Startseite.
+**So bauen und nutzen Sie die portable EXE:**
+1. Voraussetzungen installieren: Node.js, Git und Rust, unter Windows mit MSVC-Toolchain und Visual Studio Build Tools (Desktop development with C++).
+2. Im Repository `npm ci` und danach `npm run build:desktop` ausführen. `sync-dist` baut `dist/` aus dem aktuellen Commit; der Tauri-Build legt die Binary unter `src-tauri/target/release/` ab (unter Windows `ruhestand_suite.exe`, Installer zusätzlich unter `src-tauri/target/release/bundle/`).
+3. Die Binary in einen beliebigen Ordner kopieren, unter Windows z. B. als `RuhestandSuite.exe`.
+4. Per Doppelklick starten; die Tauri-App öffnet die Oberfläche direkt aus dem gebündelten `dist/`-Stand.
+5. Optionale Live-Datenzugriffe funktionieren bei Internetverbindung; ETF-Kurse laufen über den integrierten lokalen Proxy, Inflation und CAPE direkt über freigegebene externe Endpunkte. Ohne Internet bleiben lokale Planung und manuelle Werte nutzbar. Ein bereits bestätigter Jahresabschluss kann bei einem fehlgeschlagenen periodengebundenen Datenschritt jedoch bewusst in den Recovery-Zustand wechseln, statt mit einem falschen Stichtag fortzufahren.
+6. Eigene Szenarien werden im Benutzerprofil als Tauri-App-Daten gespeichert. Live-Daten liegen in `ruhestand_suite_data.json`, Jahresabschluss-Snapshots separat in `ruhestand_suite_snapshots.json`; der Wechsel zwischen Browser und EXE laeuft ueber das zentrale Komplettbackup auf der Startseite.
 
 Bei optionalen Abrufen verlassen nur die jeweiligen Requestparameter den
 Rechner: etwa Yahoo-Symbol/Suchbegriff und Zeitfenster oder fest konfigurierte
@@ -358,21 +360,21 @@ IP-/Transportmetadaten fallen bei externen Providern dennoch an.
 ### Option 2: Browser-basierte Nutzung
 
 1. Repository klonen oder herunterladen.
-2. **Suite starten:** Doppelklick auf `start_suite.cmd` (Windows).
-   * Startet automatisch den lokalen Webserver (Port 8000) und den Yahoo-Proxy für Online-Kurse (Port 8787).
-   * Öffnet den Browser mit der Startseite.
-   * Beim Schließen (Ctrl+C oder Fenster schließen) werden beide Prozesse sauber beendet.
+2. **Suite starten:** Doppelklick auf `start_suite.cmd` (Windows) oder `npm run serve` (alle Plattformen, auch WSL).
+   * Startet den lokalen Webserver (Port 8000) und im selben Node.js-Prozess den Yahoo-Proxy für Online-Kurse (Port 8787); beide binden nur an `127.0.0.1`.
+   * `start_suite.cmd` öffnet den Browser mit `http://localhost:8000/index.html`. Unter WSL erreicht der Windows-Browser dieselbe Adresse.
+   * Ctrl+C oder das Schließen des Fensters beendet Webserver und Proxy gemeinsam.
 3. `Balance.html` bzw. `Simulator.html` im Browser aufrufen.
    * Das automatisierte Browser-Gate läuft mit Chromium; weitere Browser bleiben Teil der manuellen Kompatibilitätsprüfung.
    * Keine Build-Schritte nötig.
 4. Optional: `npm run build:engine` ausführen, wenn Änderungen in `engine/` vorgenommen wurden. Dadurch wird `engine.js` aktualisiert (esbuild-Bundle oder Modul-Fallback).
 5. Für CI/Release: `npm run build:engine:strict` nutzen. Der Build schlägt dann ohne `esbuild` bewusst fehl.
 
-**Weitere Skripte:**
-* `stop_suite.cmd` – Beendet eventuell noch laufende Server-Prozesse (Webserver und Proxy).
-* Manuell ohne Proxy: `python dev_server.py --port 8000` (Online-Kurse dann nicht verfügbar).
+**Optionen des Servers** (`node scripts/serve.mjs …` bzw. `npm run serve -- …`):
+* `--port <n>` und `--proxy-port <n>` ändern die Ports; `--no-proxy` startet nur den Webserver (Online-Kurse dann nicht verfügbar).
+* `--open` öffnet den Standardbrowser.
 
-> **Hinweis:** Dateiimporte und -exporte benötigen Browser mit passender Datei-/Download-Unterstützung. Jahresabschluss-Snapshots nutzen im Browser das interne IndexedDB-Archiv. In der Browser-Variante benötigt der Yahoo-Proxy Node.js; ohne Node.js läuft die Suite trotzdem, jedoch ohne Online-Kursabruf. Die Tauri-EXE bringt den Proxy selbst mit und benötigt dafür kein separates Node.js.
+> **Hinweis:** Dateiimporte und -exporte benötigen Browser mit passender Datei-/Download-Unterstützung. Jahresabschluss-Snapshots nutzen im Browser das interne IndexedDB-Archiv. Die Browser-Variante benötigt Node.js für Webserver und Yahoo-Proxy. Die Tauri-EXE bringt den Proxy selbst mit und benötigt zur Laufzeit kein Node.js.
 
 ---
 
@@ -380,7 +382,7 @@ IP-/Transportmetadaten fallen bei externen Providern dennoch an.
 
 * Die Balance- und Simulator-Module nutzen native ES6-Imports. Änderungen an einzelnen Modulen werden nach dem Speichern direkt beim nächsten Reload geladen.
 * Engine-Anpassungen erfolgen in den Modulen unter `engine/`. Nach Anpassungen `npm run build:engine` ausführen und die Größe der generierten `engine.js` kontrollieren.
-* Der Windows-Release-Build bleibt ein bewusst manueller Schritt über `build-tauri.bat` bzw. `scripts/build-tauri.ps1` nach grüner Suite. Das Skript prüft die Build-Voraussetzungen, erzeugt `dist/` frisch via `npm run sync-dist`, validiert zentrale Assets und führt `npm run tauri:build` aus. Vor dem abschließenden Kopieren einer plausibilisierten neuen `RuhestandSuite.exe` ins Repo-Root wird eine vorhandene Vorgängerversion unter `release-archive/RuhestandSuite_yyyy-MM-dd_HH-mm-ss-fff.exe` archiviert.
+* Der Desktop-Build bleibt ein bewusst manueller Schritt nach grüner Suite: `npm run build:desktop`. `scripts/sync-dist.mjs` baut `dist/` ausschließlich aus einem Git-Commit (ohne `--rev` aus `HEAD`, dann nur bei sauberem Stand ohne unversionierte Laufzeitdateien) und kopiert nur Laufzeitdateien: `app/`, `engine/`, `workers/`, `types/`, `css/`, `assets/` sowie die HTML-, JS- und CSS-Dateien im Wurzelverzeichnis. `__build-provenance.json` hält den Quell-Commit fest. Mit `--rev <commit> --out <ordner>` lässt sich ein Commit in einen externen Buildordner übertragen. Die EXE ist kein Repository-Artefakt; ältere Stände für Regressionsvergleiche werden außerhalb des Repositories archiviert.
 * Für schnelle QA bitte `npm test` einmal durchlaufen lassen. Kritische Browserabläufe werden zusätzlich mit `npm run test:browser` geprüft; `npm run test:coverage` aktualisiert die transparente V8-Coverage-Baseline. Wenn lokal `npm` defekt ist, kann die fachliche Suite direkt mit `node tests/run-tests.mjs` validiert werden; der Tauri-Release-Build selbst benötigt weiterhin ein funktionierendes `npm`.
 
 ## Abschluss-Checkliste
@@ -389,7 +391,7 @@ IP-/Transportmetadaten fallen bei externen Providern dennoch an.
 * **Snapshot-/Backup-Grenze beachten:** Komplettbackup/Import ist der Wechselpfad zwischen Browser und EXE. Jahresabschluss-Snapshots sind interne Sicherungspunkte; Standard-Restore erhaelt die Snapshot-Historie, prueft die Profilzuordnung und ersetzt keinen Profil-Merge.
 * **Konsole sauber halten:** Vor dem Release auskommentierten Code entfernen, damit Nutzer:innen keine unnötigen Meldungen im Browser-Log sehen.
 * **Tauri/Web-Worker:** Die Parallelisierung nutzt Web Worker mit Transferables (kein SharedArrayBuffer). Das funktioniert in Tauri als EXE, sofern die Worker-Skripte gebündelt und per `new URL(..., import.meta.url)` erreichbar sind. CSP/Asset-Bundling sollten Worker-Module erlauben.
-* **Desktop-Smoke nach EXE-Build:** Nach `build-tauri.bat` kurz Startseite/Profilverwaltung, Balance, Simulator, Tranchenmanager, Handbuch, Worker-Pfade sowie optionale Live-Daten und Offline-Fallbacks prüfen.
+* **Desktop-Smoke nach EXE-Build:** Nach `npm run build:desktop` kurz Startseite/Profilverwaltung, Balance, Simulator, Tranchenmanager, Handbuch, Worker-Pfade sowie optionale Live-Daten und Offline-Fallbacks prüfen.
 
 ---
 

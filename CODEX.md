@@ -26,7 +26,7 @@
 ## Implementierungsregeln
 - `engine.js` nie direkt editieren. Änderungen an der Engine immer in `engine/*.mjs` vornehmen und danach neu bauen.
 - Wenn Engine-Verträge, Worker-Payloads oder Persistenz-Schemas geändert werden, alle betroffenen Aufrufer in Balance, Simulator, Profilverbund und Tests mitziehen.
-- Generierte oder ausgelieferte Artefakte wie `dist/` und `RuheStandSuite.exe` nur ändern, wenn der Auftrag das ausdrücklich verlangt.
+- Generierte Artefakte wie `dist/` nur ändern, wenn der Auftrag das ausdrücklich verlangt; keine EXE oder andere Build-Binaries committen.
 - Bei Strukturänderungen auch die Referenzdokumentation prüfen, insbesondere `README.md`, `docs/reference/TECHNICAL.md`, `docs/reference/BALANCE_MODULES_README.md`, `docs/reference/SIMULATOR_MODULES_README.md` und `engine/README.md`.
 
 ## Validierung und Reporting

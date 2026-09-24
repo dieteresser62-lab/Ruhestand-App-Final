@@ -9,7 +9,7 @@ Schnelleinstieg für Einzelpersonen und Paare zur Entnahmeplanung im Ruhestand.
 
 *   **Betriebssystem:** Windows 10/11
 *   **Browser:** Ein aktueller Chrome, Edge oder Firefox
-*   **Optional:** [Node.js](https://nodejs.org/) (nur erforderlich für Online-Kursdaten via Yahoo-Proxy)
+*   **Für die Browser-Version:** [Node.js](https://nodejs.org/) (lokaler Webserver und Yahoo-Proxy)
 
 ---
 
@@ -18,9 +18,9 @@ Schnelleinstieg für Einzelpersonen und Paare zur Entnahmeplanung im Ruhestand.
 
 ### Option A: Windows-EXE
 
-1. `RuhestandSuite.exe` herunterladen
-2. Doppelklick → App startet automatisch im Browser
-3. Fertig.
+1. Einmalig bauen: im Repository `npm ci` und `npm run build:desktop` ausführen (benötigt Node.js, Git und Rust; Details im README)
+2. `src-tauri/target/release/ruhestand_suite.exe` z. B. als `RuhestandSuite.exe` ablegen
+3. Doppelklick → die Desktop-App startet
 
 ### Option B: Browser-Version
 
@@ -28,7 +28,7 @@ Schnelleinstieg für Einzelpersonen und Paare zur Entnahmeplanung im Ruhestand.
 2. Doppelklick auf `start_suite.cmd`
 3. Browser öffnet sich automatisch
 
-> **Voraussetzung:** Für Online-Kurse (optional) muss Node.js installiert sein.
+> **Voraussetzung:** Node.js muss installiert sein. Unter macOS, Linux oder WSL startet `npm run serve` dieselbe Suite; die Startseite liegt dann unter `http://localhost:8000/index.html`.
 
 ---
 

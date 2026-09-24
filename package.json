@@ -28,8 +28,9 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
-    "sync-dist": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/sync-dist.ps1",
-    "build-tauri-exe": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-tauri.ps1"
+    "serve": "node scripts/serve.mjs",
+    "sync-dist": "node scripts/sync-dist.mjs",
+    "build:desktop": "npm run sync-dist && npm run tauri:build"
   },
   "keywords": [],
   "author": "",

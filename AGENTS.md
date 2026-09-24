@@ -8,7 +8,7 @@
 - Die Suite hat mehrere Einstiegspunkte: `Balance.html`, `Simulator.html`, `index.html`, `depot-tranchen-manager.html` und `Handbuch.html`.
 - Die fachliche Logik liegt in nativen ES-Modulen unter `app/`, `engine/`, `workers/` und `types/`.
 - Desktop-Paketierung läuft über Tauri in `src-tauri/`.
-- Generierte Artefakte sind insbesondere `engine.js`, `dist/` und `RuheStandSuite.exe`; diese sind nicht der primäre Bearbeitungsort.
+- Generierte Artefakte sind insbesondere `engine.js` und `dist/`; diese sind nicht der primäre Bearbeitungsort. Die Desktop-EXE wird lokal gebaut und gehört nicht ins Repository.
 
 ## Arbeitsdokumente und Branches
 - Ein Arbeitsdokument ist ein zu implementierendes neues Feature oder ein komplexes Refactoring unter `docs/internal/`.
@@ -59,7 +59,7 @@
   - `engine/` für deterministische Kernlogik,
   - `workers/` und DOM-freie Runner für parallele Rechenpfade.
 - `engine.js` nie manuell editieren; Änderungen an `engine/` laufen über `build-engine.mjs`.
-- `dist/` und `RuheStandSuite.exe` nur anfassen, wenn der Auftrag explizit Build-, Sync- oder Release-Artefakte umfasst.
+- `dist/` nur anfassen, wenn der Auftrag explizit Build-, Sync- oder Release-Artefakte umfasst; keine EXE oder andere Build-Binaries committen.
 - Für in Slices geplante Arbeiten gelten zusätzlich die Slice-Regeln in `docs/internal/SLICE_EXECUTION_RULES.md`: 1-basierte Nummerierung, eigener Feature-Branch, eigene Slice-MD, Branch- und Statuscheck sowie Diff-Risiko vor Coding, Stop-Regeln, Abschlussdokumentation, lokaler Git-Commit nach erfolgreichem Review, Freigabe vor Push und Rückdokumentation im Arbeitsplan.
 
 ## Agent Stop Rules

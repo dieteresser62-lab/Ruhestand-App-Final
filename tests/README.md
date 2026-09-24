@@ -41,12 +41,12 @@ Der Runner sortiert alle Dateien deterministisch und meldet fuer jede Datei Modu
 
 - `in-process`: DOM-freie Standardtests teilen den schnellen Hauptprozess.
 - `isolated`: DOM-/Browser-Globals, Worker-Mocks oder legacy Assertion-Helper laufen in einem eigenen Kindprozess; dessen Assertionzahlen gehen in die Gesamtsumme ein.
-- `separate-gate`: Nicht zur aktuellen Laufzeit passende Gates werden nicht still importiert, sondern mit ihrer Pflichtumgebung und dem dort auszufuehrenden Befehl ausgewiesen. Dazu gehoeren der Browser-Smoke sowie unter WSL die echten Windows-PowerShell-/Poppler-Gates und bytegenaue Windows-x64-/Node-v25.2.1-Evidenzmessungen.
+- `separate-gate`: Nicht zur aktuellen Laufzeit passende Gates werden nicht still importiert, sondern mit ihrer Pflichtumgebung und dem dort auszufuehrenden Befehl ausgewiesen. Dazu gehoeren der Browser-Smoke sowie unter WSL das echte Windows-Poppler-Gate und bytegenaue Windows-x64-/Node-v25.2.1-Evidenzmessungen.
 
 Unter Windows x64 mit Node v25.2.1 fuehrt `npm test` die beiden bytegenauen
-Evidenzmessungen direkt aus. Das PowerShell-Provenienzgate und der mit Poppler
-25.07.0 gepinnte Cash-/Geldmarkt-PDF-Oracle laufen auf jeder Windows-Node-
-Version. Unter WSL/Linux erscheinen diese vier Dateien als separate Gates;
+Evidenzmessungen direkt aus. Der mit Poppler 25.07.0 gepinnte
+Cash-/Geldmarkt-PDF-Oracle laeuft auf jeder Windows-Node-Version. Unter
+WSL/Linux erscheinen diese drei Dateien als separate Gates;
 die uebrigen fachlichen, Engine-, FlowDelta- und Portabilitaetsvertraege der
 Standardsuite bleiben aktiv.
 
@@ -106,7 +106,7 @@ node tests/run-single.mjs tests/tauri-csp.test.mjs
 npm run tauri:build
 ```
 
-`tests/tauri-csp.test.mjs` ist Teil von `npm test` und prueft Tauri-Konfiguration, CSP, Icons, Package-Skripte und statische Rust-Command-Contracts. Sobald `src-tauri/` geaendert wird, muss zusaetzlich ein echter Tauri-/Rust-Build laufen (`npm run tauri:build` oder der manuelle Windows-Release-Pfad). Manuelle Desktop-Smokes nach EXE-Build bleiben manuelle Release-Verifikation und sind kein Ersatz fuer automatisierte Tests.
+`tests/tauri-csp.test.mjs` ist Teil von `npm test` und prueft Tauri-Konfiguration, CSP, Icons, Package-Skripte und statische Rust-Command-Contracts. Sobald `src-tauri/` geaendert wird, muss zusaetzlich ein echter Tauri-/Rust-Build laufen (`npm run build:desktop`). Manuelle Desktop-Smokes nach EXE-Build bleiben manuelle Release-Verifikation und sind kein Ersatz fuer automatisierte Tests.
 
 Persistenz-Hinweis: `persistence.test.mjs` simuliert IndexedDB-Upgrade-, Blocked-, Legacy-Cleanup- und Versionchange-Pfade ueber Fakes; `balance-storage-contract.test.mjs` prueft die Migration des historischen Verzeichnis-Handles in die dedizierte Handle-Datenbank. Ein echtes Chromium-Szenario mit Datenbank-Version N -> N+1 und realem Schemawechsel bleibt ein separates Browser-/Playwright-Backlog.
 

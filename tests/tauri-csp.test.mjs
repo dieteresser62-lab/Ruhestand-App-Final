@@ -10,13 +10,11 @@ const repoRoot = path.resolve(__dirname, '..');
 const tauriConfigPath = path.join(repoRoot, 'src-tauri', 'tauri.conf.json');
 const tauriLibPath = path.join(repoRoot, 'src-tauri', 'src', 'lib.rs');
 const packageJsonPath = path.join(repoRoot, 'package.json');
-const tauriBuildScriptPath = path.join(repoRoot, 'scripts', 'build-tauri.ps1');
 const yahooProxyPath = path.join(repoRoot, 'tools', 'yahoo-proxy.cjs');
 const priceServicePath = path.join(repoRoot, 'app', 'tranches', 'tranchen-price-service.js');
 const tauriConfig = JSON.parse(fs.readFileSync(tauriConfigPath, 'utf8'));
 const tauriLib = fs.readFileSync(tauriLibPath, 'utf8');
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-const tauriBuildScript = fs.readFileSync(tauriBuildScriptPath, 'utf8');
 const yahooProxy = fs.readFileSync(yahooProxyPath, 'utf8');
 const priceService = fs.readFileSync(priceServicePath, 'utf8');
 const security = tauriConfig?.app?.security || {};
@@ -59,18 +57,12 @@ assert(
 
 assert(packageJson?.scripts?.['tauri:build'] === 'tauri build', 'package.json should expose the raw Tauri build gate');
 assert(
-  packageJson?.scripts?.['build-tauri-exe']?.includes('scripts/build-tauri.ps1'),
-  'package.json should expose the checked Windows EXE release workflow'
+  packageJson?.scripts?.['sync-dist'] === 'node scripts/sync-dist.mjs',
+  'package.json should build dist with the cross-platform Node sync script'
 );
 assert(
-  tauriBuildScript.includes("$releaseArchiveDirName = 'release-archive'") &&
-    tauriBuildScript.includes('Backup-ExistingReleaseExecutable -Path $destExe'),
-  'Windows EXE release workflow should archive an existing root EXE before replacement'
-);
-assert(
-  tauriBuildScript.indexOf('Backup-ExistingReleaseExecutable -Path $destExe') <
-    tauriBuildScript.indexOf('Copy-Item -Path $sourceExe -Destination $destExe -Force'),
-  'Existing root EXE should be archived before the new release EXE is copied'
+  packageJson?.scripts?.['build:desktop'] === 'npm run sync-dist && npm run tauri:build',
+  'package.json should expose the portable desktop build that syncs dist first'
 );
 
 for (const commandName of [

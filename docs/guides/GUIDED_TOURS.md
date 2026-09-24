@@ -53,7 +53,7 @@
 
 ### Schritt 1: Suite starten
 
-1. Doppelklick auf `RuhestandSuite.exe` oder `start_suite.cmd`
+1. Doppelklick auf die selbst gebaute `RuhestandSuite.exe` oder auf `start_suite.cmd`
 2. Die Startseite (`index.html`) öffnet sich im Browser
 
 ### Schritt 2: Neues Profil anlegen

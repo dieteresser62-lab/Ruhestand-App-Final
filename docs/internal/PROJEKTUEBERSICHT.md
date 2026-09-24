@@ -13,7 +13,7 @@ Die Anwendung ist bewusst lokal-first:
 - Persistenz ueber die zentrale Facade: Browser-IndexedDB, Tauri-JSON-Dateien und Legacy-`localStorage` nur als Migration/Fallback,
 - optionale Live-Daten fuer Inflation, CAPE und ETF-Kurse,
 - deterministische Kernlogik in `engine/`, `app/simulator/` und `workers/`,
-- generierte Artefakte wie `engine.js`, `dist/` und `RuhestandSuite.exe` sind nicht der primaere Bearbeitungsort.
+- generierte Artefakte wie `engine.js` und `dist/` sind nicht der primaere Bearbeitungsort; die Desktop-EXE wird lokal gebaut und liegt nicht im Repository.
 
 ## Einstiegspunkte
 
@@ -24,7 +24,7 @@ Die Anwendung ist bewusst lokal-first:
 | `Simulator.html` | Simulator fuer Monte-Carlo, Backtests, Sweeps, Auto-Optimize, Pflege- und Stress-Szenarien |
 | `depot-tranchen-manager.html` | Tranchenverwaltung und Kurs-/Depotpflege |
 | `Handbuch.html` | Interaktive Hilfe fuer Nutzer |
-| `RuhestandSuite.exe` | Portable Windows-Desktop-App auf Basis von Tauri und `dist/` |
+| `RuhestandSuite.exe` (lokal gebaut, nicht im Repository) | Portable Windows-Desktop-App auf Basis von Tauri und `dist/` |
 
 ## Repository-Landkarte
 
@@ -257,15 +257,16 @@ Relevante Skripte aus `package.json`:
 | `npm run test:browser` | Playwright-Smoke-Gate fuer HTML-Einstiege mit lokalem Testserver |
 | `npm run build:engine` | Engine aus `engine/` nach `engine.js` bauen |
 | `npm run build:engine:strict` | Strict Engine-Build fuer CI/Release |
-| `npm run sync-dist` | Frontend nach `dist/` synchronisieren |
+| `npm run serve` | lokaler Webserver plus Yahoo-Proxy fuer die Browser-Variante |
+| `npm run sync-dist` | Laufzeitdateien eines Commits nach `dist/` (`scripts/sync-dist.mjs`) |
 | `npm run tauri:dev` | Tauri-Entwicklung |
 | `npm run tauri:build` | Tauri-Build |
-| `npm run build-tauri-exe` | Windows-Release-Pfad via PowerShell-Skript |
+| `npm run build:desktop` | `sync-dist` plus Tauri-Build |
 
 Browser-Variante:
 
-- `start_suite.cmd` oder `start_suite.ps1` startet lokalen Webserver und Yahoo-Proxy.
-- Manuell ist `python dev_server.py --port 8000` vorgesehen, falls vorhanden.
+- `start_suite.cmd` (Windows) oder `npm run serve` startet ueber `scripts/serve.mjs` lokalen Webserver und Yahoo-Proxy in einem Node.js-Prozess.
+- `npm run serve -- --no-proxy` startet nur den Webserver.
 - ETF-Kurse benoetigen in der Browser-Variante den lokalen Node/Yahoo-Proxy.
 
 Desktop-Variante:
@@ -337,7 +338,7 @@ Bei Aenderungen an Architektur, Modulzuschnitt, Build-/Startpfaden oder Nutzer-W
 
 1. In Quellmodulen arbeiten, nicht in generierten Artefakten.
 2. `engine.js` nur per `npm run build:engine` erzeugen.
-3. `dist/` und `RuhestandSuite.exe` nur anfassen, wenn Build-/Release-Artefakte explizit Teil des Auftrags sind.
+3. `dist/` nur anfassen, wenn Build-/Release-Artefakte explizit Teil des Auftrags sind; eine EXE gehoert nie ins Repository.
 4. DOM-freie Kernlogik bevorzugt in Runner-/Engine-/Helper-Module auslagern.
 5. UI-Bootstrap-Dateien schlank halten und neue Features an passende Fachmodule delegieren.
 6. Shared-Formatter und Feature-Flags in `app/shared/` zentral halten.
@@ -353,7 +354,7 @@ Bei Aenderungen an Architektur, Modulzuschnitt, Build-/Startpfaden oder Nutzer-W
 | Balance | Persistenz-/Jahreswechsel-Fehler, Diagnose-Missverstaendnisse | Storage-, Annual-, Diagnosis- und Smoke-Tests; Status: Workflow-Hardening umgesetzt 2026-05-12 |
 | Profilverbund | Falsche Aggregation, Profilgrenzen bei Transaktionen | Profilverbund-Tests, Tranchensummen, Verteilungsmodus; Status: Contract-Slice umgesetzt 2026-05-12 |
 | Tranchen/Steuern | FIFO-/TQF-/LossCarry-Fehler | `transaction-tax`, `tax-settlement`, `depot-tranches` |
-| Tauri | CSP, fehlende Assets, Proxy-/Live-Daten-Zugriff | `tauri.conf.json`, `sync-dist`, Tauri-Build |
+| Tauri | CSP, fehlende Assets, Proxy-/Live-Daten-Zugriff | `tauri.conf.json`, `sync-dist`, `dist-runtime-inventory`-Test, Tauri-Build |
 | Doku | Widersprueche zwischen README, Technical und Modul-READMEs | Doku-Sync bei Architektur-/Workflow-Aenderungen |
 
 ### Gewichtung der Risiken
@@ -408,12 +409,12 @@ Die Gewichtung kombiniert fachlichen Schaden, Eintrittswahrscheinlichkeit und Er
    - Verlustpositionen, Gold-/Geldmarkt-Tranchen und Notfallverkauf-Recompute als gezielte Contract-Faelle behandeln.
    - Umgesetzt durch Settlement-, FIFO/TQF-, Core-Settlement-, Simulator-Recompute- und Mehrprofil-Herkunfts-Golden-Cases; `sale-engine` bewahrt `sourceProfileId` in `breakdown[]`; Abschlussvalidierung mit 74 Testdateien / 1639 Assertions / 0 Fehlern; Detailprotokoll: `docs/internal/archive/2026-engine-tax-golden-cases/ENGINE_TAX_GOLDEN_CASES_PLAN.md`.
 
-7. **Tauri als Release-Gate behandeln - umgesetzt 2026-05-12 / Build-Validierung lokal blockiert**
+7. **Tauri als Release-Gate behandeln - umgesetzt 2026-05-12, Buildpfad ersetzt 2026-09-24**
    - Nach relevanten Asset-, CSP-, Proxy- oder Startpfad-Aenderungen `npm run sync-dist` und den Tauri-Build pruefen.
    - `src-tauri/tauri.conf.json` gegen die tatsaechlichen Einstiegspunkte und erlaubten Ressourcen abgleichen.
    - Desktop-spezifische Fehler getrennt von Browser-Fehlern dokumentieren, damit fachliche Regressionssuche nicht vermischt wird.
    - Umgesetzt durch `sync-dist`-Exitcode-/Asset-Validierung, Build-Orchestrator-Preflight, kanonischen Zielnamen `RuhestandSuite.exe`, erweiterten Tauri-CSP-Test, Rust-Unit-Tests fuer den Yahoo-Proxy, Doku-Sync und Desktop-Smoke-Checkliste; Detailprotokoll: `docs/internal/2026-tauri-release-gate/TAURI_RELEASE_GATE_PLAN.md`.
-   - Voller lokaler `build-tauri.bat`-Lauf bleibt bis zur Reparatur der lokalen npm-Installation blockiert (`npm-cli.js` fehlt).
+   - Am 2026-09-24 ersetzte der plattformneutrale `npm run build:desktop` den Windows-Buildpfad (`build-tauri.bat`, `scripts/build-tauri.ps1`, `scripts/sync-dist.ps1`); die EXE liegt seitdem nicht mehr im Repository.
 
 8. **Doku-Sync als Abschlusskriterium nutzen**
    - Jede Architektur-, Workflow-, Build- oder Contract-Aenderung gegen `README.md`, `docs/reference/TECHNICAL.md` und die Modul-READMEs spiegeln.

@@ -396,27 +396,23 @@ src-tauri/
 └── icons/
 ```
 
-### B.1.2a Windows-Releasepfad
+### B.1.2a Desktop-Releasepfad
 
-Der gepflegte Release-Orchestrator ist Windows-spezifisch:
+Der Buildpfad ist plattformneutral; die EXE ist kein Repository-Artefakt:
 
 ```text
 grüne, separat nachgewiesene Testgates
-   -> build-tauri.bat oder npm run build-tauri-exe
-   -> Preflight für npm, Rust/Cargo und MSVC
-   -> npm run sync-dist und Assetprüfung
-   -> npm run tauri:build
-   -> Quellartefakt src-tauri/target/release/ruhestand_suite.exe prüfen
-   -> vorhandene Root-EXE zeitgestempelt archivieren
-   -> geprüft nach RuhestandSuite.exe kopieren
+   -> npm run build:desktop
+      -> npm run sync-dist: dist/ aus einem Git-Commit, nur Laufzeitdateien, Provenienz
+      -> npm run tauri:build
+   -> Binary src-tauri/target/release/ruhestand_suite.exe (Windows)
    -> manueller Desktop-Smoke
 ```
 
-Der Build-Orchestrator startet die fachlichen Tests nicht automatisch. Eine
-vorhandene EXE beweist deshalb Artefakterzeugung und Kopie, aber weder einen
-grünen Testlauf noch einen manuellen Funktions-Smoke. In der lokalen
-Arbeitskopie vom 2026-07-15 waren Quell- und Root-Artefakt für Windows
-vorhanden. Ob genau dieses Artefakt extern veröffentlicht wurde, lässt sich aus
+Der Buildpfad startet die fachlichen Tests nicht automatisch. Eine
+vorhandene EXE beweist deshalb Artefakterzeugung, aber weder einen
+grünen Testlauf noch einen manuellen Funktions-Smoke. Am 2026-09-24 wurde
+die Windows-EXE aus Commit `0b651b1` außerhalb des Repositories gebaut. Ob genau dieses Artefakt extern veröffentlicht wurde, lässt sich aus
 dem Repositoryzustand nicht ableiten und wird hier nicht behauptet.
 
 Änderungen unter `engine/` müssen vor dem Release über `npm run build:engine`
@@ -466,7 +462,7 @@ weitergeschrieben, sondern in den Recovery-Pfad gewechselt (B.2.5).
 
 | Quelle | Laufzeitpfad | Contract-Grenze |
 | --- | --- | --- |
-| Yahoo Finance | Browser: Node-Proxy aus `start_suite.cmd`/`.ps1`; Tauri: Rust-Proxy in `src-tauri/src/lib.rs` | Loopback only; fachliche Quote- und Stichtagsvalidierung vor Write |
+| Yahoo Finance | Browser: Node-Proxy aus `scripts/serve.mjs` (`start_suite.cmd`, `npm run serve`); Tauri: Rust-Proxy in `src-tauri/src/lib.rs` | Loopback only; fachliche Quote- und Stichtagsvalidierung vor Write |
 | ECB, World Bank, OECD | direkter HTTPS-Fetch aus Browser/Tauri-WebView | feste Fallback-Reihenfolge, exaktes Zieljahr und gemeinsame Inflationsmetrik |
 | Yale/CAPE-Mirror | direkter HTTPS-Fetch über `r.jina.ai` | Quelle, Stichtag und Fetchstatus werden getrennt persistiert; lokaler Fallback möglich |
 
@@ -491,9 +487,9 @@ oder ausgelieferter Desktop-Build.
 
 | Laufzeit / Plattform | Build- oder Startfähigkeit | Validierungsstand in diesem Repository | Auslieferungsnachweis |
 | --- | --- | --- | --- |
-| **Browser unter Windows** | `start_suite.cmd` und `start_suite.ps1` starten lokalen Webserver und optionalen Yahoo-Proxy | HTML-Einstiege werden automatisiert mit Playwright/Chromium geprüft; Windows bleibt zusätzlich der gepflegte manuelle Nutzungspfad | Quellbetrieb, kein separates Binärartefakt |
-| **Browser unter macOS/Linux** | ES-Module können grundsätzlich über einen beliebigen lokalen HTTP-Server geladen werden; ein `start_suite.sh` gehört nicht zum Repository | keine vollständige OS-/Browser-Matrix nachgewiesen; das Browser-Gate deckt Chromium, nicht jede WebKit-/Firefox-/Datei-API-Variante ab | nicht separat paketiert |
-| **Tauri unter Windows** | dedizierter Releasepfad über `build-tauri.bat`/`npm run build-tauri-exe`; lokale Artefakte waren am 2026-07-15 vorhanden | CSP-, Rust- und Build-Contracts sind testbar; ein manueller Desktop-Smoke muss je Release gesondert dokumentiert werden | aus dem lokalen Git-Status allein nicht ableitbar |
+| **Browser unter Windows** | `start_suite.cmd` startet über `scripts/serve.mjs` lokalen Webserver und Yahoo-Proxy (Node.js erforderlich) | HTML-Einstiege werden automatisiert mit Playwright/Chromium geprüft; Windows bleibt zusätzlich der gepflegte manuelle Nutzungspfad | Quellbetrieb, kein separates Binärartefakt |
+| **Browser unter macOS/Linux** | `npm run serve` startet denselben Node.js-Server wie unter Windows; unter WSL erreicht der Windows-Browser ihn über `localhost` | keine vollständige OS-/Browser-Matrix nachgewiesen; das Browser-Gate deckt Chromium, nicht jede WebKit-/Firefox-/Datei-API-Variante ab | nicht separat paketiert |
+| **Tauri unter Windows** | `npm run build:desktop` auf einem Windows-Host mit Rust/MSVC; zuletzt belegt am 2026-09-24 (Commit `0b651b1`) | CSP-, Rust- und Build-Contracts sind testbar; ein manueller Desktop-Smoke muss je Release gesondert dokumentiert werden | aus dem lokalen Git-Status allein nicht ableitbar |
 | **Tauri unter macOS/Linux** | `bundle.targets: "all"` beschreibt Buildabsicht auf einem passenden Host | kein aktueller Build-, Smoke- oder Signierungsnachweis in der geprüften Arbeitskopie | kein in diesem Dokument belegtes `.app`-, `.dmg`-, AppImage- oder `.deb`-Release |
 
 Native Builds sind host- und toolchainabhängig. Die Windows-Orchestrierung ist
@@ -3622,8 +3618,9 @@ Ermittlungsweg sowie die jeweils zuständige Spezialreferenz.*
 | `src-tauri/tauri.conf.json` | JSON | App-Konfiguration (Fenster, Permissions) |
 | `src-tauri/Cargo.toml` | TOML | Rust-Abhängigkeiten |
 
-**Output unter Windows:** `RuhestandSuite.exe`; Dateigröße und ausgelieferter
-Buildstand sind releaseabhängig und keine Architekturkennzahl.
+**Output unter Windows:** `src-tauri/target/release/ruhestand_suite.exe`, üblicherweise
+als `RuhestandSuite.exe` abgelegt; die EXE ist kein Repository-Artefakt, Dateigröße
+und Buildstand sind releaseabhängig und keine Architekturkennzahl.
 
 ## Kernalgorithmen
 

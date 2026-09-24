@@ -524,9 +524,9 @@
                         <div class="step-number">1</div>
                         <div class="step-content">
                             <h3>Startart wählen</h3>
-                            <p><strong>Desktop:</strong> <code>RuhestandSuite.exe</code> starten.
-                                <strong>Browser:</strong> Repository entpacken und <code>start_suite.cmd</code> oder
-                                <code>start_suite.ps1</code> ausführen; die Startseite öffnet sich über den lokalen
+                            <p><strong>Desktop:</strong> die selbst gebaute <code>RuhestandSuite.exe</code> starten.
+                                <strong>Browser:</strong> Repository entpacken und <code>start_suite.cmd</code> (Windows) oder
+                                <code>npm run serve</code> ausführen; die Startseite öffnet sich über den lokalen
                                 HTTP-Server.</p>
                         </div>
                     </li>
@@ -800,14 +800,15 @@
                 <div class="manual-grid" style="margin-top: 1.25rem;">
                     <div class="detail-block">
                         <h3>Desktop-App (Tauri)</h3>
-                        <p>Starten Sie <code>RuhestandSuite.exe</code> per Doppelklick. Die Desktop-App benötigt für
+                        <p>Bauen Sie die EXE einmal mit <code>npm run build:desktop</code> (siehe README) und starten Sie
+                            <code>RuhestandSuite.exe</code> per Doppelklick. Die Desktop-App benötigt für
                             lokale Eingaben und Berechnungen keinen separat gestarteten Browser und kein Node.js. Sie
                             speichert ihre Daten in einer lokalen Datei im App-Datenverzeichnis.</p>
                     </div>
                     <div class="detail-block">
                         <h3>Browser über lokalen HTTP-Server</h3>
-                        <p>Entpacken Sie das Repository und starten Sie <code>start_suite.cmd</code> oder
-                            <code>start_suite.ps1</code>. Der Starter öffnet die Startseite über
+                        <p>Entpacken Sie das Repository und starten Sie <code>start_suite.cmd</code> (Windows) oder
+                            <code>npm run serve</code>. Der Windows-Starter öffnet die Startseite über
                             <code>http://localhost:…</code>. Ein direktes Öffnen der HTML-Dateien über
                             <code>file://</code> ist wegen ES-Modulen und Workern kein regulärer Startweg.</p>
                     </div>
@@ -818,12 +819,12 @@
                         <li>Kernrechnung, manuelle Eingaben und lokale Persistenz funktionieren ohne Internet.
                             Google Fonts sowie Live-Kurse und Inflations-/CAPE-Abrufe sind optionale externe
                             Netzwerkpfade.</li>
-                        <li>Online-ETF-Kurse benötigen in der Browser-Variante Node.js, da der lokale Yahoo-Proxy über
-                            den Starter gestartet wird; die Tauri-EXE bringt ihren Loopback-Proxy selbst mit. Ohne
-                            Node.js läuft die Browser-Suite weiter, Online-Kursabrufe stehen dort jedoch nicht zur
-                            Verfügung. Kurse können weiterhin manuell gepflegt werden.</li>
-                        <li>Beenden Sie die lokalen Dienste mit <code>stop_suite.cmd</code>, wenn der Browser
-                            geschlossen wird.</li>
+                        <li>Die Browser-Variante benötigt Node.js: Der Starter betreibt Webserver und Yahoo-Proxy in
+                            einem Node.js-Prozess; die Tauri-EXE bringt ihren Loopback-Proxy selbst mit. Ist der
+                            Proxy-Port belegt, läuft die Browser-Suite ohne Online-Kursabrufe weiter; Kurse können
+                            weiterhin manuell gepflegt werden.</li>
+                        <li>Beenden Sie die lokalen Dienste mit Strg+C oder durch Schließen des Starterfensters, wenn
+                            der Browser geschlossen wird.</li>
                     </ul>
                 </div>
             </div>

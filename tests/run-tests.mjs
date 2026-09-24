@@ -57,12 +57,6 @@ export const TEST_EXECUTION_POLICY = Object.freeze({
         command: 'node tests/run-single.mjs tests/german-cash-money-market-source-reconstruction.test.mjs',
         reason: 'The pinned Poppler 25.07.0 PDF oracle is a Windows development gate.'
     }),
-    'runtime-build-provenance.test.mjs': Object.freeze({
-        mode: 'in-process',
-        platforms: Object.freeze(['win32']),
-        command: 'node tests/run-single.mjs tests/runtime-build-provenance.test.mjs',
-        reason: 'Executes the real Windows PowerShell dist synchronization script.'
-    }),
     'simulator-backtest-characterization.test.mjs': Object.freeze({
         mode: 'in-process',
         referenceRuntime: Object.freeze({

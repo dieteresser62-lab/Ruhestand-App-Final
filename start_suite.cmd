@@ -1,21 +1,21 @@
 @echo off
-REM Startet die Ruhestand-Suite (Webserver + Yahoo-Proxy fuer Online-Kurse).
-REM Dieses Wrapper-Skript delegiert die eigentliche Logik an start_webserver.ps1.
-REM Aus Sicherheitsgründen nutzen wir ExecutionPolicy RemoteSigned statt Bypass.
+REM Startet die Ruhestand-Suite im Browser: lokaler Webserver (Port 8000) plus
+REM Yahoo-Proxy fuer Online-Kurse (Port 8787), beide in einem Node.js-Prozess.
+REM Beenden mit Strg+C oder durch Schliessen dieses Fensters.
 
 setlocal
-set "SCRIPT_DIR=%~dp0"
-set "PS_SCRIPT=%SCRIPT_DIR%start_suite.ps1"
+where node >nul 2>nul
+if errorlevel 1 (
+    echo Node.js wurde nicht gefunden. Bitte Node.js installieren: https://nodejs.org/
+    pause
+    exit /b 1
+)
 
-powershell.exe -NoLogo -NoProfile -ExecutionPolicy RemoteSigned -File "%PS_SCRIPT%"
+node "%~dp0scripts\serve.mjs" --open
 set "EXIT_CODE=%ERRORLEVEL%"
-if %ERRORLEVEL% NEQ 0 (
+if not "%EXIT_CODE%"=="0" (
     echo.
     echo Ein Fehler ist aufgetreten. Das Fenster bleibt offen, damit du die Meldung lesen kannst.
     pause
-) else (
-    echo.
-    echo Suite gestartet. Dieses Fenster kann geschlossen werden.
-    timeout /t 5
 )
 endlocal & exit /b %EXIT_CODE%
