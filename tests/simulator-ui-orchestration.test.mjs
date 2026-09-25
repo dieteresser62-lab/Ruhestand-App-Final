@@ -446,16 +446,66 @@ async function runSimulatorUiOrchestrationTests() {
             JSON.stringify(readRealSweepRangeIds().sort()),
             'Sweep Mock-DOM bleibt exakt mit Simulator.html synchron'
         );
+        registerElement(documentRef, 'dynamicFlex', { type: 'checkbox' });
+        registerElement(documentRef, 'horizonMethod', { tagName: 'select', value: 'survival_quantile' });
+        registerElement(documentRef, 'goGoActive', { type: 'checkbox' });
+        registerElement(documentRef, 'dynamicFlexPreset', { tagName: 'select', value: 'off' });
+        documentRef.getElementById('sweepLiquidityRunwayYears').value = '3:1:7';
+        documentRef.getElementById('sweepGoldRebalancingBand').value = '10:5:30';
+        documentRef.getElementById('sweepGoldTargetPct').value = '5,7.5';
+        documentRef.getElementById('sweepSurvivalQuantile').value = 'bad:range';
+        documentRef.getElementById('sweepGoGoMultiplier').value = '1,1.1';
         persistenceStorage.setItem('sim.sweep.horizonYears', '30');
+        persistenceStorage.setItem('sim.sweep.goldTarget', '2:2:10');
         sweepModule.initSweepDefaultsWithLocalStorageFallback();
-        assertEqual(
-            persistenceStorage.getItem('sim.sweep.horizonYears'),
-            null,
-            'Entferntes Direkt-Horizon-Feld laesst keinen verwaisten Persistenzwert zurueck'
-        );
+        assertEqual(persistenceStorage.getItem('sim.sweep.horizonYears'), null,
+            'Entferntes Direkt-Horizon-Feld laesst keinen verwaisten Persistenzwert zurueck');
         sweepUiModule.initSweepUIControls();
         const gridSize = documentRef.getElementById('sweepGridSize');
-        assertEqual(gridSize.textContent, 'Grid: 1 Kombis', 'Sweep-Grid zeigt gueltige Kombinationszahl');
+        assertEqual(gridSize.textContent, 'Grid: 125 Kombis',
+            'Initialer Zaehler erfasst den vor seiner Initialisierung geladenen Gold-Bereich');
+        persistenceStorage.removeItem('sim.sweep.goldTarget');
+        documentRef.getElementById('sweepGoldTargetPct').value = '5,7.5';
+        documentRef.getElementById('sweepGoldTargetPct').dispatchEvent({ type: 'input' });
+        assertEqual(gridSize.textContent, 'Grid: 50 Kombis', 'HTML-Vorgaben ergeben 50 Kombinationen');
+        assertEqual(Object.keys(sweepModule.readInteractiveSweepRanges().ranges).length, 5,
+            'Inaktive VPW-Felder werden nicht an den Runner uebergeben');
+
+        const goldInput = documentRef.getElementById('sweepGoldTargetPct');
+        goldInput.value = '2:2:10';
+        goldInput.dispatchEvent({ type: 'input' });
+        assertEqual(gridSize.textContent, 'Grid: 125 Kombis', 'Gold-Target-Range wird gezaehlt');
+        persistenceStorage.setItem('sim.sweep.goldTarget', '5,7.5');
+        goldInput.value = '0';
+        sweepModule.initSweepDefaultsWithLocalStorageFallback();
+        assertEqual(goldInput.value, '5,7.5', 'Persistierter Bereich wird geladen');
+        // In der Hauptinitialisierung erfolgt die erste Zaehlerberechnung erst nach dem Laden.
+        goldInput.dispatchEvent({ type: 'change' });
+        assertEqual(gridSize.textContent, 'Grid: 50 Kombis', 'Persistierter Bereich wird gezaehlt');
+
+        const dynamicFlex = documentRef.getElementById('dynamicFlex');
+        const quantile = documentRef.getElementById('sweepSurvivalQuantile');
+        quantile.value = '0.8,0.85';
+        dynamicFlex.checked = true;
+        dynamicFlex.dispatchEvent({ type: 'change' });
+        assertEqual(gridSize.textContent, 'Grid: 100 Kombis', 'Aktives Quantil verdoppelt die Matrix');
+        quantile.value = 'bad:range';
+        quantile.dispatchEvent({ type: 'input' });
+        assertEqual(gridSize.textContent, 'Grid: ? Kombis', 'Ungueltige aktive VPW-Range wird blockiert');
+        quantile.value = '0.8,0.85';
+        quantile.dispatchEvent({ type: 'input' });
+        const goGo = documentRef.getElementById('goGoActive');
+        goGo.checked = true;
+        goGo.dispatchEvent({ type: 'change' });
+        assertEqual(gridSize.textContent, 'Grid: 200 Kombis', 'Aktives Go-Go verdoppelt die Matrix');
+        assertEqual(Object.keys(sweepModule.readInteractiveSweepRanges().ranges).length, 7,
+            'Aktive VPW-Felder werden an den Runner uebergeben');
+        documentRef.getElementById('horizonMethod').value = 'mean';
+        documentRef.getElementById('horizonMethod').dispatchEvent({ type: 'change' });
+        assertEqual(gridSize.textContent, 'Grid: 100 Kombis', 'Andere Horizontmethode entfernt Quantil');
+        dynamicFlex.checked = false;
+        documentRef.getElementById('dynamicFlexPreset').dispatchEvent({ type: 'change' });
+        assertEqual(gridSize.textContent, 'Grid: 50 Kombis', 'Presetwechsel aktualisiert den Zaehler');
 
         const invalidInput = documentRef.getElementById('sweepLiquidityRunwayYears');
         invalidInput.value = '18:6';
@@ -466,6 +516,24 @@ async function runSimulatorUiOrchestrationTests() {
         invalidInput.dispatchEvent({ type: 'input' });
         assert(gridSize.textContent.includes('Max: 300'), 'Zu grosse Sweep-Kombination zeigt Max-Hinweis');
         assertEqual(gridSize.style.color, '#d32f2f', 'Zu grosse Sweep-Kombination wird als Fehler markiert');
+
+        const heatmap = registerElement(documentRef, 'sweepHeatmap', { tagName: 'div' });
+        window.sweepParamRanges = { liquidityRunwayYears: [3], goldRebalancingBand: [25] };
+        const result = {
+            params: { liquidityRunwayYears: 3, goldRebalancingBand: 25 },
+            metrics: { schemaVersion: 'SweepMetricsV4', successProbFloor: 75 }
+        };
+        window.sweepResults = [result];
+        sweepModule.displaySweepResults();
+        assert(heatmap.innerHTML.includes('<svg') && heatmap.innerHTML.includes('75.0%'),
+            'Lesbarer kanonischer Metrikwert erzeugt SVG-Zelle');
+        result.metrics.invalidCombination = true;
+        result.metrics.invalidReason = 'Dynamic-Flex-Parameter gesetzt, aber Dynamic Flex ist deaktiviert';
+        sweepModule.displaySweepResults();
+        assert(heatmap.innerHTML.includes('Keine gültigen Sweep-Ergebnisse'),
+            'Explizit ungueltige Kombination erzeugt die Leermeldung');
+        delete window.sweepResults;
+        delete window.sweepParamRanges;
     }
 
     console.log('Test 6: optimizer applies selected parameters without running Monte-Carlo jobs');

@@ -65,11 +65,11 @@ export function initializeSimulatorApp() {
     initMonteCarloResultCockpit();
     initStressReplayUI();
 
-    initSweepUIControls();
     initTabSwitching();
 
     // Sweep defaults with localStorage persistence
     initSweepDefaultsWithLocalStorageFallback();
+    initSweepUIControls();
 
     // Auto-Optimize UI initialization
     setAutoOptimizeDefaults();

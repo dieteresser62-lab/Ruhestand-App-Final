@@ -406,9 +406,9 @@ Sweep-spezifische Logik mit Guardrails für Partner:innen-Felder und Heatmap-Aus
 
 **Interaktiver Parametervertrag:** Die Browseroberflaeche bietet genau sieben
 Dimensionen mit geprueftem kanonischem Datenpfad
-`sweepLiquidityRunwayYears`, `sweepRebalancingBand`, `sweepMaxSkimPct`,
+`sweepLiquidityRunwayYears`, `sweepGoldRebalancingBand`, `sweepMaxSkimPct`,
 `sweepMaxBearRefillPct`, `sweepGoldTargetPct`, `sweepSurvivalQuantile` und
-`sweepGoGoMultiplier`. Nur `horizonYears` bleibt fuer explizite
+`sweepGoGoMultiplier`. Die ersten fuenf Felder zaehlen immer; `sweepSurvivalQuantile` zaehlt nur bei Dynamic Flex mit Horizontmethode `survival_quantile`, `sweepGoGoMultiplier` nur bei Dynamic Flex und Go-Go. Inaktive VPW-Ranges bleiben gespeichert, werden aber nicht als Override an den Runner gegeben. Lauf und Grid-Zaehler lesen dieselben aktiven Ranges; der Zaehler wird nach dem Persistenzladen und bei Strategie-/Presetwechsel aktualisiert und zeigt das 300er-Limit. Nur `horizonYears` bleibt fuer explizite
 programmatische `SweepRequestV1`-Aufrufe verfuegbar, ist aber keine
 interaktive Sweepdimension, weil die UI aktuarielle Horizonte verwendet.
 Die Matrix prueft Zuordnung, Consumer und Provenienz; sie ist kein

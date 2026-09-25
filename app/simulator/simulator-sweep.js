@@ -33,6 +33,31 @@ import { SWEEP_METRICS_VERSION } from './sweep-metrics-contract.js';
 
 export const SWEEP_EXECUTION_VERSION = 'SweepExecutionV2';
 
+const SWEEP_FIELDS = [
+    ['liquidityRunwayYears', 'sweepLiquidityRunwayYears', 'Liquiditäts-Runway'],
+    ['goldRebalancingBand', 'sweepGoldRebalancingBand', 'Gold-Rebal Band'],
+    ['maxSkimPct', 'sweepMaxSkimPct', 'Max Skim %'],
+    ['maxBearRefillPct', 'sweepMaxBearRefillPct', 'Max Bear Refill %'],
+    ['goldTargetPct', 'sweepGoldTargetPct', 'Gold Target %'],
+    ['survivalQuantile', 'sweepSurvivalQuantile', 'VPW Survival-Quantile'],
+    ['goGoMultiplier', 'sweepGoGoMultiplier', 'VPW Go-Go Multiplikator']
+];
+
+export function readInteractiveSweepRanges() {
+    const dynamicFlex = document.getElementById('dynamicFlex')?.checked === true;
+    const quantileActive = dynamicFlex && document.getElementById('horizonMethod')?.value === 'survival_quantile';
+    const goGoActive = dynamicFlex && document.getElementById('goGoActive')?.checked === true;
+    const ranges = {};
+    for (const [key, id, label] of SWEEP_FIELDS) {
+        if (key === 'survivalQuantile' && !quantileActive) continue;
+        if (key === 'goGoMultiplier' && !goGoActive) continue;
+        const values = parseRangeInput(document.getElementById(id)?.value ?? '');
+        if (values.length === 0) return { ranges, emptyLabel: label };
+        ranges[key] = values;
+    }
+    return { ranges, emptyLabel: null };
+}
+
 /**
  * Initialisiert Sweep-Inputfelder und synchronisiert sie mit der Persistenz-Facade.
  *
@@ -248,37 +273,14 @@ export async function runParameterSweep() {
         prepareHistoricalDataOnce();
 
         // ========= Parameter-Parsing (mit frühzeitigen, konkreten Alerts) =========
-        const rangeInputs = {
-            liquidityRunwayYears: document.getElementById('sweepLiquidityRunwayYears').value,
-            goldRebalancingBand: document.getElementById('sweepGoldRebalancingBand').value,
-            maxSkimPct: document.getElementById('sweepMaxSkimPct').value,
-            maxBearRefillPct: document.getElementById('sweepMaxBearRefillPct').value,
-            goldTargetPct: document.getElementById('sweepGoldTargetPct').value,
-            survivalQuantile: document.getElementById('sweepSurvivalQuantile').value,
-            goGoMultiplier: document.getElementById('sweepGoGoMultiplier').value
-        };
-
-        const paramLabels = {
-            liquidityRunwayYears: 'Liquiditäts-Runway',
-            goldRebalancingBand: 'Gold-Rebal Band',
-            maxSkimPct: 'Max Skim %',
-            maxBearRefillPct: 'Max Bear Refill %',
-            goldTargetPct: 'Gold Target %',
-            survivalQuantile: 'VPW Survival-Quantile',
-            goGoMultiplier: 'VPW Go-Go Multiplikator'
-        };
-
-        const paramRanges = {};
+        let paramRanges;
         try {
-            for (const [key, rangeStr] of Object.entries(rangeInputs)) {
-                const values = parseRangeInput(rangeStr);
-                if (values.length === 0) {
-                    // Frühzeitiger Abbruch mit explizitem Hinweis pro Feld.
-                    alert(`Leeres Range-Input für ${paramLabels[key] || key}.\n\nBitte geben Sie einen Wert ein:\n- Einzelwert: 24\n- Liste: 24,36,48\n- Range: 24:12:48`);
-                    return;
-                }
-                paramRanges[key] = values;
+            const selection = readInteractiveSweepRanges();
+            if (selection.emptyLabel) {
+                alert(`Leeres Range-Input für ${selection.emptyLabel}.\n\nBitte geben Sie einen Wert ein:\n- Einzelwert: 24\n- Liste: 24,36,48\n- Range: 24:12:48`);
+                return;
             }
+            paramRanges = selection.ranges;
         } catch (error) {
             // Fehlformate klar melden, bestehender Alert-Text beibehalten.
             alert(`Fehler beim Parsen der Range-Eingaben:\n\n${error.message}\n\nErlaubte Formate:\n- Einzelwert: 24\n- Kommaliste: 50,60,70\n- Range: start:step:end (z.B. 18:6:36)`);

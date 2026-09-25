@@ -1,7 +1,6 @@
 "use strict";
 
-import { parseRangeInput } from './simulator-utils.js';
-import { displaySweepResults } from './simulator-sweep.js';
+import { displaySweepResults, readInteractiveSweepRanges } from './simulator-sweep.js';
 
 export function initSweepUIControls() {
     const sweepMetricSelect = document.getElementById('sweepMetric');
@@ -32,35 +31,21 @@ export function initSweepUIControls() {
         });
     }
 
-    // Grid-Size-Counter für Parameter-Sweep
+    // Der Zähler verwendet dieselbe Auswahl und denselben Parser wie der Lauf.
     function updateSweepGridSize() {
-        const rangeInputs = {
-            liquidityRunwayYears: document.getElementById('sweepLiquidityRunwayYears').value,
-            goldRebalancingBand: document.getElementById('sweepGoldRebalancingBand').value,
-            maxSkimPct: document.getElementById('sweepMaxSkimPct').value,
-            maxBearRefillPct: document.getElementById('sweepMaxBearRefillPct').value,
-            goldTargetPct: document.getElementById('sweepGoldTargetPct').value,
-            survivalQuantile: document.getElementById('sweepSurvivalQuantile').value,
-            goGoMultiplier: document.getElementById('sweepGoGoMultiplier').value
-        };
-
+        const dynamicFlex = document.getElementById('dynamicFlex')?.checked === true;
+        const quantileActive = dynamicFlex && document.getElementById('horizonMethod')?.value === 'survival_quantile';
+        const goGoActive = dynamicFlex && document.getElementById('goGoActive')?.checked === true;
+        const quantileState = document.getElementById('sweepQuantileState');
+        const goGoState = document.getElementById('sweepGoGoState');
+        if (quantileState) quantileState.textContent = quantileActive ? '– aktiv' : '– nicht aktiv';
+        if (goGoState) goGoState.textContent = goGoActive ? '– aktiv' : '– nicht aktiv';
         let totalSize = 1;
         let hasError = false;
-
         try {
-            for (const rangeStr of Object.values(rangeInputs)) {
-                if (!rangeStr || !rangeStr.trim()) {
-                    hasError = true;
-                    break;
-                }
-                // Reuse the same parser as the sweep runner to stay consistent.
-                const values = parseRangeInput(rangeStr);
-                if (values.length === 0) {
-                    hasError = true;
-                    break;
-                }
-                totalSize *= values.length;
-            }
+            const { ranges, emptyLabel } = readInteractiveSweepRanges();
+            hasError = Boolean(emptyLabel);
+            for (const values of Object.values(ranges)) totalSize *= values.length;
         } catch (error) {
             hasError = true;
         }
@@ -91,9 +76,17 @@ export function initSweepUIControls() {
         const el = document.getElementById(id);
         if (el) {
             el.addEventListener('input', updateSweepGridSize);
+            el.addEventListener('change', updateSweepGridSize);
         }
     });
 
-    // Initial update
+    for (const id of ['dynamicFlex', 'horizonMethod', 'goGoActive', 'dynamicFlexPreset']) {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('input', updateSweepGridSize);
+            el.addEventListener('change', updateSweepGridSize);
+        }
+    }
+
     updateSweepGridSize();
 }
