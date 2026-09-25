@@ -1234,12 +1234,20 @@
                     </div>
                     <div class="detail-block" id="simulator-sweep">
                         <h3>Parameter Sweep &amp; Szenarien</h3>
-                        <p>Der Sweep verwendet eine eigene Laufzahl. Der angezeigte nominelle Aufwand ergibt sich aus
-                            Kombinationen × Läufen × Jahren. Bei mehr als 5.000.000 Laufjahren ist vor dem Start eine
-                            Bestätigung erforderlich. Während des Laufs beendet „Abbrechen“ den aktiven Sweep;
-                            „Abgebrochen“ erscheint am Startknopf. Die letzte vollständige Heatmap bleibt bei
-                            Abbruch oder Fehler erhalten. Ohne früheres Ergebnis bleibt die Ergebnisansicht leer;
-                            erst ein vollständig beendeter neuer Lauf ersetzt die Heatmap.</p>
+                        <p>Der Sweep verwendet standardmäßig 500 Simulationen je Kombination. Seine eigene Laufzahl
+                            ist unabhängig vom Monte-Carlo-Laufzahlfeld und bleibt nach einem Neuladen erhalten.
+                            Ein leerer oder ungültiger gespeicherter beziehungsweise eingegebener Wert wird nicht
+                            still auf 500 zurückgesetzt: Ein Validierungsfehler verhindert den Start, bis Sie die
+                            Laufzahl korrigieren.</p>
+                        <p>Der angezeigte nominelle Aufwand ergibt sich aus Kombinationen × Läufen × Jahren. Erst bei
+                            mehr als 5.000.000 Laufjahren ist vor dem Start eine Bestätigung erforderlich. Im Worker-
+                            und im seriellen Pfad zeigt die Fortschrittsanzeige Zwischenstände bereits innerhalb
+                            einer Kombination beziehungsweise eines Worker-Blocks. Bis das neue Ergebnis vollständig
+                            veröffentlicht ist, zeigt sie höchstens 99 %; 100 % erscheinen erst nach erfolgreichem
+                            Abschluss. Während des Laufs beendet „Abbrechen“ den aktiven Sweep; „Abgebrochen“
+                            erscheint am Startknopf. Die letzte vollständige Heatmap bleibt bei Abbruch oder Fehler
+                            erhalten. Ohne früheres Ergebnis bleibt die Ergebnisansicht leer; erst ein vollständig
+                            beendeter neuer Lauf ersetzt die Heatmap.</p>
                         <p>Der Parameter Sweep vergleicht Kombinationen aus sieben sichtbaren Modelldimensionen. Die
                             Heatmap ist eine Sensitivitätsansicht im gewählten Modell-, Daten- und Stichprobenraum;
                             ihre Kennzahlen sind keine empirischen Zukunftswahrscheinlichkeiten oder extern
