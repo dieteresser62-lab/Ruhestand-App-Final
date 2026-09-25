@@ -2549,14 +2549,55 @@ async function runSimulatorSweepIntegration(browser, baseUrl) {
         setValue('sweepGoldTargetPct', 0);
         setValue('sweepSurvivalQuantile', 0.85);
         setValue('sweepGoGoMultiplier', 1.1);
+        document.getElementById('dynamicFlex').checked = false;
+        document.getElementById('dynamicFlex').dispatchEvent(new Event('change', { bubbles: true }));
+        document.getElementById('goGoActive').checked = false;
+        document.getElementById('goGoActive').dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    assert((await page.locator('#sweepGridSize').textContent()).includes('Grid: 1 Kombis'),
+        'Inaktive VPW-Ranges werden im Grid nicht mitgezaehlt');
+    await page.locator('#sweepButton').click();
+    await page.waitForFunction(() => window.sweepExecution?.results?.length === 1
+        && document.querySelector('#sweepHeatmap svg'), null, { timeout: 30000 });
+    const standard = await page.evaluate(() => {
+        const result = window.sweepExecution.results[0];
+        return {
+            metricVersion: result.metrics?.schemaVersion,
+            invalidCombination: result.metrics?.invalidCombination,
+            invalidReason: result.metrics?.invalidReason,
+            value: result.metrics?.successProbFloor,
+            keys: Object.keys(result.params).sort(),
+            cellCount: document.querySelectorAll('#sweepHeatmap svg rect[stroke]').length,
+            text: document.getElementById('sweepHeatmap').textContent
+        };
+    });
+    assert(standard.metricVersion === 'SweepMetricsV4'
+        && standard.invalidCombination !== true && Number.isFinite(standard.value),
+    `Standard-Sweep muss einen kanonischen Metrikwert liefern: ${JSON.stringify(standard)}`);
+    assert(standard.cellCount > 0 && standard.text.includes(`${standard.value.toFixed(1)}%`)
+        && !standard.text.includes('Keine gültigen Sweep-Ergebnisse'),
+        'Standard-Sweep zeigt eine SVG-Zelle mit kanonischem Wert');
+    assert(standard.keys.length === 5 && !standard.keys.includes('survivalQuantile')
+        && !standard.keys.includes('goGoMultiplier'),
+        'Inaktive VPW-Felder fehlen in der gestarteten Kombination');
+    await page.locator('#sweepMetric').selectOption('p10EndWealth');
+    assert((await page.locator('#sweepHeatmap').textContent()).includes('k €'),
+        'Metrikwechsel rendert vorhandene Ergebnisse erneut');
+    await page.locator('#sweepAxisX').selectOption('goldTargetPct');
+    assert(await page.locator('#sweepHeatmap svg rect[stroke]').count() > 0,
+        'Achsenwechsel rendert vorhandene Ergebnisse erneut');
+    await page.evaluate(() => {
         document.getElementById('dynamicFlex').checked = true;
         document.getElementById('dynamicFlex').dispatchEvent(new Event('change', { bubbles: true }));
         document.getElementById('goGoActive').checked = true;
         document.getElementById('goGoActive').dispatchEvent(new Event('change', { bubbles: true }));
     });
+    await page.locator('#sweepMetric').selectOption('successProbFloor');
+    await page.locator('#sweepAxisX').selectOption('liquidityRunwayYears');
     await page.locator('#sweepButton').click();
     await page.waitForFunction(
-        () => window.sweepExecution?.schemaVersion === 'SweepExecutionV2',
+        () => window.sweepExecution?.schemaVersion === 'SweepExecutionV2'
+            && window.sweepExecution?.results?.[0]?.params?.goGoMultiplier === 1.1,
         null,
         { timeout: 30000 }
     );

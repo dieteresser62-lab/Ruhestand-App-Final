@@ -1475,16 +1475,17 @@
                                     type="text" id="sweepGoldTargetPct" value="5,7.5" placeholder="0,2.5,5,7.5"
                                     title="Format: start:step:end (z.B. 0:2.5:10) oder Liste 0,2.5,5,7.5 oder Einzelwert 7.5">
                             </div>
-                            <div class="form-group"><label for="sweepSurvivalQuantile">VPW Quantile</label><input
+                            <div class="form-group"><label for="sweepSurvivalQuantile">VPW Quantile <span id="sweepQuantileState">– nicht aktiv</span></label><input
                                     type="text" id="sweepSurvivalQuantile" value="0.85" placeholder="0.80,0.85,0.90"
-                                    title="Nur bei Dynamic Flex aktiv. Gueltig: 0.50 bis 0.99.">
+                                    title="Nur bei Dynamic Flex mit Horizon-Methode survival_quantile wirksam. Gueltig: 0.50 bis 0.99.">
                             </div>
-                            <div class="form-group"><label for="sweepGoGoMultiplier">VPW Go-Go Multiplikator</label><input
+                            <div class="form-group"><label for="sweepGoGoMultiplier">VPW Go-Go Multiplikator <span id="sweepGoGoState">– nicht aktiv</span></label><input
                                     type="text" id="sweepGoGoMultiplier" value="1.10" placeholder="1.0,1.1,1.2"
-                                    title="Nur bei Go-Go aktiv. Gueltig fuer Sweep: 1.0 bis 1.5.">
+                                    title="Nur bei Dynamic Flex und Go-Go wirksam. Gueltig fuer Sweep: 1.0 bis 1.5.">
                             </div>
                         </div>
                         <p class="hint">
+                            Der Grid-Zähler erfasst nur wirksame Dimensionen. Inaktive VPW-Ranges bleiben gespeichert, gehen aber nicht in den Lauf ein.
                             Der direkte VPW-Horizon bleibt fuer explizite, validierte Requests
                             verfuegbar, ist aber keine interaktive Sweep-Dimension: Die UI
                             verwendet aktuarische Horizonte.
