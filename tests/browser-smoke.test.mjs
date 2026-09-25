@@ -2637,6 +2637,84 @@ async function runSimulatorSweepIntegration(browser, baseUrl) {
     assert(standard.keys.length === 5 && !standard.keys.includes('survivalQuantile')
         && !standard.keys.includes('goGoMultiplier'),
         'Inaktive VPW-Felder fehlen in der gestarteten Kombination');
+    await page.locator('#sweepRuns').fill('10000');
+    await page.evaluate(() => {
+        window.__sweepBeforeAbort = window.sweepExecution;
+        window.__sweepHeatmapBeforeAbort = document.getElementById('sweepHeatmap').innerHTML;
+        window.__sweepWorkerBase = window.Worker;
+        window.__sweepTerminations = 0;
+        window.Worker = class extends window.__sweepWorkerBase {
+            terminate() {
+                window.__sweepTerminations++;
+                return super.terminate();
+            }
+        };
+    });
+    await page.locator('#sweepButton').click();
+    await page.waitForFunction(() => parseFloat(document.getElementById('sweep-progress-bar').style.width) > 0
+        && !document.getElementById('sweepCancelButton').disabled, null, { timeout: 30000 });
+    await page.locator('#sweepCancelButton').click();
+    await page.waitForFunction(() => document.getElementById('sweepStatus').textContent === 'Abgebrochen'
+        && !document.getElementById('sweepButton').disabled, null, { timeout: 30000 });
+    const aborted = await page.evaluate(() => ({
+        sameExecution: window.sweepExecution === window.__sweepBeforeAbort,
+        sameHeatmap: document.getElementById('sweepHeatmap').innerHTML === window.__sweepHeatmapBeforeAbort,
+        terminated: window.__sweepTerminations,
+        progress: document.getElementById('sweep-progress-bar').textContent,
+        status: document.getElementById('sweepStatus').textContent
+    }));
+    assert(aborted.sameExecution && aborted.sameHeatmap && aborted.terminated > 0
+        && aborted.progress !== '100%' && aborted.status === 'Abgebrochen',
+    `Abbruch bewahrt vollstaendige Heatmap und beendet Worker: ${JSON.stringify(aborted)}`);
+    await page.evaluate(() => { window.Worker = window.__sweepWorkerBase; });
+    await page.locator('#sweepRuns').fill('2');
+    await page.locator('#sweepButton').click();
+    await page.waitForFunction(() => window.sweepExecution !== window.__sweepBeforeAbort
+        && window.sweepExecution?.request?.monteCarloParameters?.anzahl === 2
+        && document.getElementById('sweepStatus').textContent === 'Abgeschlossen',
+    null, { timeout: 30000 });
+    assert(await page.locator('#sweepHeatmap svg rect[stroke]').count() > 0,
+        'Direkter Neustart veroeffentlicht eine vollstaendige neue Heatmap');
+    await page.locator('#sweepRuns').fill('10000');
+    await page.evaluate(() => {
+        window.__sweepBeforeSerialAbort = window.sweepExecution;
+        window.__sweepHeatmapBeforeSerialAbort = document.getElementById('sweepHeatmap').innerHTML;
+        window.Worker = class {
+            constructor() { throw new Error('serial sweep abort smoke'); }
+        };
+    });
+    await page.locator('#sweepButton').click();
+    await page.waitForFunction(() => parseFloat(document.getElementById('sweep-progress-bar').style.width) > 0
+        && !document.getElementById('sweepCancelButton').disabled, null, { timeout: 30000 });
+    await page.locator('#sweepCancelButton').click();
+    await page.waitForFunction(() => document.getElementById('sweepStatus').textContent === 'Abgebrochen'
+        && !document.getElementById('sweepButton').disabled, null, { timeout: 30000 });
+    const serialAbort = await page.evaluate(() => ({
+        sameExecution: window.sweepExecution === window.__sweepBeforeSerialAbort,
+        sameHeatmap: document.getElementById('sweepHeatmap').innerHTML === window.__sweepHeatmapBeforeSerialAbort,
+        progress: document.getElementById('sweep-progress-bar').textContent
+    }));
+    await page.evaluate(() => { window.Worker = window.__sweepWorkerBase; });
+    assert(serialAbort.sameExecution && serialAbort.sameHeatmap && serialAbort.progress !== '100%',
+        `Serieller Abbruch bewahrt das Altresultat: ${JSON.stringify(serialAbort)}`);
+    await page.evaluate(() => {
+        window.sweepExecution = undefined;
+        window.sweepResults = undefined;
+        window.sweepParamRanges = undefined;
+        document.getElementById('sweepHeatmap').innerHTML = '';
+        document.getElementById('sweepResults').style.display = 'none';
+    });
+    await page.locator('#sweepButton').click();
+    await page.waitForFunction(() => parseFloat(document.getElementById('sweep-progress-bar').style.width) > 0
+        && !document.getElementById('sweepCancelButton').disabled, null, { timeout: 30000 });
+    await page.locator('#sweepCancelButton').click();
+    await page.waitForFunction(() => document.getElementById('sweepStatus').textContent === 'Abgebrochen'
+        && !document.getElementById('sweepButton').disabled, null, { timeout: 30000 });
+    assert(await page.evaluate(() => window.sweepExecution === undefined
+        && window.sweepResults === undefined
+        && document.getElementById('sweepHeatmap').innerHTML === ''
+        && document.getElementById('sweepResults').style.display === 'none'),
+    'Abbruch ohne Altresultat laesst die Ergebnisansicht leer');
     // Eine Kombination erzwingt einen einzigen Worker-Block. Jede Breite unter
     // 99 Prozent stammt dann aus einem Lauf innerhalb dieses Blocks.
     await page.locator('#sweepLiquidityRunwayYears').fill('3');

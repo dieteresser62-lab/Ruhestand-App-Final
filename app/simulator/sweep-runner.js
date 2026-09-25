@@ -972,13 +972,16 @@ export async function runSweepChunkAsync(options) {
         }));
     let lastYieldAt = now();
     let yielded = false;
-    for (let step = iterator.next(); ; step = iterator.next()) {
+    while (true) {
+        if (options.signal?.aborted) throw new DOMException('Sweep abgebrochen.', 'AbortError');
+        const step = iterator.next();
         if (step.done) return step.value;
         options.onProgress?.(step.value);
         // Give the first visible update a paint opportunity. Subsequent timer
         // tasks are limited by elapsed time, even for many short simulations.
         if (!yielded || now() - lastYieldAt >= 16) {
             await yieldToEventLoop();
+            if (options.signal?.aborted) throw new DOMException('Sweep abgebrochen.', 'AbortError');
             yielded = true;
             lastYieldAt = now();
         }

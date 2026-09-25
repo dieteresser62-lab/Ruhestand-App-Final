@@ -20,7 +20,7 @@ import { displaySensitivityAnalysis, displayParetoFrontier } from './simulator-v
 import { deepClone, extractP2Invariants } from './simulator-sweep-utils.js';
 import { renderSweepHeatmapSVG } from './simulator-heatmap.js';
 import { WorkerPool } from '../../workers/worker-pool.js';
-import { WorkerJobRunner } from './worker-job-runner.js';
+import { WorkerJobRunner, isWorkerRunCancelledError } from './worker-job-runner.js';
 import { buildSweepInputs, runSweepChunkAsync } from './sweep-runner.js';
 import { persistenceStorage } from '../shared/persistence-facade.js';
 import { formatSimulatorValidationError, validateSimulatorInputs } from './simulator-input-validation.js';
@@ -34,6 +34,18 @@ import { SWEEP_METRICS_VERSION } from './sweep-metrics-contract.js';
 export const SWEEP_EXECUTION_VERSION = 'SweepExecutionV2';
 const SWEEP_LARGE_WORKLOAD_RUN_YEARS = 5_000_000;
 const sweepIntegerFormat = new Intl.NumberFormat('de-DE');
+let activeSweep = null;
+
+export function cancelParameterSweep() {
+    if (!activeSweep) return;
+    activeSweep.controller.abort();
+    activeSweep.pool?.dispose();
+}
+window.cancelParameterSweep = cancelParameterSweep;
+
+function throwIfSweepCancelled(signal) {
+    if (signal?.aborted) throw new DOMException('Sweep abgebrochen.', 'AbortError');
+}
 
 export function calculateSweepWorkload(combinations, monteCarloParameters) {
     const { anzahl: runs, maxDauer: years } = monteCarloParameters;
@@ -177,7 +189,9 @@ async function runSweepWithWorkers({
     paramCombinations,
     sweepRequest,
     refP2Invariants,
-    onProgress
+    onProgress,
+    signal,
+    onPoolCreated
 }) {
     const totalCombos = paramCombinations.length;
     const workerConfig = readSweepWorkerConfig();
@@ -195,6 +209,7 @@ async function runSweepWithWorkers({
         telemetryName: 'SweepPool',
         onError: error => console.error('[SWEEP WorkerPool] Error:', error)
     });
+    onPoolCreated?.(pool);
 
     const sweepResults = new Array(totalCombos);
     const minChunk = 2;
@@ -208,6 +223,7 @@ async function runSweepWithWorkers({
         maxChunk,
         enableStallDetection: false,
         trackPartialProgress: true,
+        signal,
         onProgress,
         buildPayload: (start, count) => ({
             type: 'sweep',
@@ -228,11 +244,13 @@ async function runSweepWithWorkers({
     });
 
     try {
+        throwIfSweepCancelled(signal);
         await pool.broadcast({
             type: 'sweep-init',
             baseInputs,
             paramCombinations
         });
+        throwIfSweepCancelled(signal);
         await runner.run();
     } finally {
         pool.dispose();
@@ -246,7 +264,8 @@ async function runSweepSerial({
     paramCombinations,
     sweepRequest,
     refP2Invariants,
-    onProgress
+    onProgress,
+    signal
 }) {
     const totalCombos = paramCombinations.length;
     const sweepResults = new Array(totalCombos);
@@ -255,6 +274,7 @@ async function runSweepSerial({
     const chunkSize = Math.min(20, Math.max(1, Math.ceil(totalCombos / 20)));
 
     for (let start = 0; start < totalCombos; start += chunkSize) {
+        throwIfSweepCancelled(signal);
         const count = Math.min(chunkSize, totalCombos - start);
         const serial = await runSweepChunkAsync({
             baseInputs,
@@ -262,11 +282,13 @@ async function runSweepSerial({
             comboRange: { start, count },
             sweepRequest,
             refP2Invariants,
+            signal,
             onProgress: completedUnits => {
                 onProgress?.(Math.min(99,
                     ((completedCombos + completedUnits) / totalCombos) * 100));
             }
         });
+        throwIfSweepCancelled(signal);
         for (const item of serial.results) {
             sweepResults[item.comboIdx] = {
                 params: item.params,
@@ -293,15 +315,23 @@ async function runSweepSerial({
  * die UI-Fehlerbehandlung nicht versehentlich entfernen.
  */
 export async function runParameterSweep() {
+    if (activeSweep) return;
+    const run = { controller: new AbortController() };
+    activeSweep = run;
+    const signal = run.controller.signal;
     const sweepButton = document.getElementById('sweepButton');
     sweepButton.disabled = true;
+    const cancelButton = document.getElementById('sweepCancelButton');
+    const status = document.getElementById('sweepStatus');
+    if (cancelButton) cancelButton.disabled = false;
+    if (status) status.textContent = '';
     const progressBarContainer = document.getElementById('sweep-progress-bar-container');
     const progressBar = document.getElementById('sweep-progress-bar');
     let progressStarted = false;
     let completedSuccessfully = false;
     let visibleProgress = 0;
     const showProgress = pct => {
-        if (!Number.isFinite(pct)) return;
+        if (signal.aborted || activeSweep !== run || !Number.isFinite(pct)) return;
         visibleProgress = Math.max(visibleProgress, Math.min(99, pct));
         progressBar.style.width = `${visibleProgress}%`;
         progressBar.textContent = `${Math.round(visibleProgress)}%`;
@@ -362,6 +392,7 @@ export async function runParameterSweep() {
             && !confirm(`${formatSweepWorkload(workload)}.\n\nDas ist eine Großlast; die tatsächliche Dauer ist nicht zuverlässig vorhersagbar. Sweep trotzdem starten?`)) {
             return;
         }
+        throwIfSweepCancelled(signal);
 
         progressBarContainer.style.display = 'block';
         progressBar.style.width = '0%';
@@ -379,49 +410,97 @@ export async function runParameterSweep() {
                 paramCombinations,
                 sweepRequest,
                 refP2Invariants,
-                onProgress: showProgress
+                onProgress: showProgress,
+                signal,
+                onPoolCreated: pool => { run.pool = pool; }
             });
             for (let i = 0; i < workerResults.length; i++) {
                 sweepResults[i] = workerResults[i];
             }
         } catch (error) {
+            if (signal.aborted || isWorkerRunCancelledError(error)) throw error;
             console.error('[SWEEP] Worker execution failed, falling back to serial.', error);
             const serialResults = await runSweepSerial({
                 baseInputs,
                 paramCombinations,
                 sweepRequest,
                 refP2Invariants,
-                onProgress: showProgress
+                onProgress: showProgress,
+                signal
             });
             for (let i = 0; i < serialResults.length; i++) {
                 sweepResults[i] = serialResults[i];
             }
         }
 
-        window.sweepResults = sweepResults;
+        throwIfSweepCancelled(signal);
+        for (let index = 0; index < sweepResults.length; index++) {
+            if (!sweepResults[index]) {
+                throw new Error('Der Sweep hat unvollständige Ergebnisse geliefert.');
+            }
+        }
+        const heatmapHtml = renderSweepHeatmapSVG(
+            sweepResults,
+            document.getElementById('sweepMetric').value,
+            document.getElementById('sweepAxisX').value,
+            document.getElementById('sweepAxisY').value,
+            paramRanges[document.getElementById('sweepAxisX').value] || [],
+            paramRanges[document.getElementById('sweepAxisY').value] || []
+        );
+        throwIfSweepCancelled(signal);
+
         const representativeResult = sweepResults.find(result => result?.metrics);
-        window.sweepExecution = {
+        const sweepExecution = {
             schemaVersion: SWEEP_EXECUTION_VERSION,
             request: sweepRequest,
             metricMetadata: representativeResult?.metrics?.metricMetadata ?? null,
             comparisonRandomness: representativeResult?.provenance?.comparisonRandomness ?? null,
             results: sweepResults
         };
-        window.sweepParamRanges = paramRanges;
-
-        displaySweepResults();
-
-        document.getElementById('sweepResults').style.display = 'block';
-
-        // Zeige Optimierungs- und Visualisierungs-Buttons an
-        document.getElementById('findBestButton').style.display = 'inline-block';
-        document.getElementById('sensitivityButton').style.display = 'inline-block';
-        document.getElementById('paretoButton').style.display = 'inline-block';
+        const heatmap = document.getElementById('sweepHeatmap');
+        const resultsPanel = document.getElementById('sweepResults');
+        const resultButtons = [
+            document.getElementById('findBestButton'),
+            document.getElementById('sensitivityButton'),
+            document.getElementById('paretoButton')
+        ];
+        const previous = {
+            results: window.sweepResults,
+            execution: window.sweepExecution,
+            ranges: window.sweepParamRanges,
+            heatmapHtml: heatmap.innerHTML,
+            panelDisplay: resultsPanel.style.display,
+            buttonDisplays: resultButtons.map(button => button.style.display)
+        };
+        try {
+            window.sweepResults = sweepResults;
+            window.sweepExecution = sweepExecution;
+            window.sweepParamRanges = paramRanges;
+            heatmap.innerHTML = heatmapHtml;
+            resultsPanel.style.display = 'block';
+            for (const button of resultButtons) button.style.display = 'inline-block';
+        } catch (error) {
+            window.sweepResults = previous.results;
+            window.sweepExecution = previous.execution;
+            window.sweepParamRanges = previous.ranges;
+            heatmap.innerHTML = previous.heatmapHtml;
+            resultsPanel.style.display = previous.panelDisplay;
+            resultButtons.forEach((button, index) => {
+                button.style.display = previous.buttonDisplays[index];
+            });
+            throw error;
+        }
+        if (status) status.textContent = 'Abgeschlossen';
         completedSuccessfully = true;
     } catch (error) {
-        // Bewusste, knappe Nutzerwarnung – ergänzt mit Hinweis für Entwickler.
-        alert("Fehler im Parameter-Sweep:\n\n" + formatSimulatorValidationError(error));
-        console.error('Parameter-Sweep Fehler:', error);
+        if (signal.aborted || isWorkerRunCancelledError(error) || error?.name === 'AbortError') {
+            if (status) status.textContent = 'Abgebrochen';
+        } else {
+            // Bewusste, knappe Nutzerwarnung – ergänzt mit Hinweis für Entwickler.
+            alert("Fehler im Parameter-Sweep:\n\n" + formatSimulatorValidationError(error));
+            console.error('Parameter-Sweep Fehler:', error);
+            if (status) status.textContent = 'Fehler';
+        }
 
         // Reset UI on error (damit der Nutzer einen neuen Versuch starten kann)
         progressBar.style.width = '0%';
@@ -431,8 +510,12 @@ export async function runParameterSweep() {
             progressBar.style.width = '100%';
             progressBar.textContent = '100%';
         }
-        if (progressStarted) setTimeout(() => { progressBarContainer.style.display = 'none'; }, 250);
+        if (progressStarted) setTimeout(() => {
+            if (activeSweep === null) progressBarContainer.style.display = 'none';
+        }, 250);
         sweepButton.disabled = false;
+        if (cancelButton) cancelButton.disabled = true;
+        if (activeSweep === run) activeSweep = null;
     }
 }
 

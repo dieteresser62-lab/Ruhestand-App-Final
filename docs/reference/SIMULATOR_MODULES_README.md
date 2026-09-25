@@ -397,10 +397,13 @@ Sweep-spezifische Logik mit Guardrails für Partner:innen-Felder und Heatmap-Aus
 
 **Hauptfunktionen / Exporte:**
 - `runParameterSweep()` – iteriert über Whitelist-Parameter, nutzt Worker-Jobs (Fallback seriell) und leitet Ergebnisse an die Heatmap weiter.
+- `cancelParameterSweep()` – bricht die aktive Sweep-Generation ab, terminiert ihre Worker und stoppt den seriellen Pfad an der naechsten Yield-Grenze. Die UI meldet „Abgebrochen“ und gibt den Startknopf frei; ein Nutzerabbruch loest keinen seriellen Fallback aus.
 - `displaySweepResults()` – rendert Sweep-KPIs und Statushinweise.
 - `initSweepDefaultsWithLocalStorageFallback()` – lädt Sweep-Voreinstellungen und setzt Defaults.
 
 **Einbindung:** Button-Hooks in `initializeUI()` (Sweep-Tab). Nutzt `simulator-sweep-utils.js` für Whitelist/Clone-Logik und `simulator-heatmap.js` für das Rendering.
+
+Die eigene Sweep-Laufzahl ergibt mit wirksamen Kombinationen und maximaler Dauer den nominellen Aufwand. Oberhalb von 5.000.000 Laufjahren muss der Nutzer den Start bestaetigen. Neue Ergebnisse werden erst nach vollstaendiger Berechnung und erfolgreichem Heatmap-Rendering gemeinsam mit `window.sweepExecution` veroeffentlicht. Bei Fehler oder Abbruch bleibt ein altes vollstaendiges Ergebnis stehen; ohne Altresultat bleibt die Ergebnisansicht leer. 100 % erscheinen nur nach Erfolg.
 
 **Dependencies:** `monte-carlo-runner.js` (Mini-Läufe), `simulator-heatmap.js`, `simulator-results.js`, `simulator-sweep-utils.js`, `simulator-utils.js`, `simulator-data.js`.
 

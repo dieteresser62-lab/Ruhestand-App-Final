@@ -11,8 +11,8 @@ Aufgabe: sweep-laufzeit-steuerbar-implement · Zielbranch: `feature/parameter-sw
 |---:|---|---|---|---:|---:|
 | 1 | Eigene Laufzahl und vollständiger Ergebnisnachweis | freigegeben | 1de1fd4e | 1 | 0 |
 | 2 | Rechenaufwand und Rückfrage vor dem Start | freigegeben | fb0832a7 | 1 | 0 |
-| 3 | Zwischenfortschritt in Worker und seriellem Pfad | freigegeben | – | 2 | 2 |
-| 4 | Abbruch, atomare Ergebnisse und Dokumentation | ausstehend | – | 0 | 0 |
+| 3 | Zwischenfortschritt in Worker und seriellem Pfad | freigegeben | 87ae416f | 2 | 2 |
+| 4 | Abbruch, atomare Ergebnisse und Dokumentation | freigegeben | – | 1 | 0 |
 <!-- audit:overview:end -->
 
 ## Befunde

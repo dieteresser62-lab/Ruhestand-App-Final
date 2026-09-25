@@ -1498,7 +1498,9 @@
                         </p>
                     </fieldset>
                     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;"> <button
-                            id="sweepButton" onclick="runParameterSweep()">Run Sweep</button> <button
+                            id="sweepButton" onclick="runParameterSweep()">Run Sweep</button>
+                        <button id="sweepCancelButton" onclick="cancelParameterSweep()" disabled>Abbrechen</button>
+                        <span id="sweepStatus" role="status" aria-live="polite"></span> <button
                             id="findBestButton" onclick="findAndDisplayBest()"
                             style="background-color: #4caf50; display: none;">Parametervergleich anzeigen</button>
                         <button id="sensitivityButton" onclick="showSensitivityAnalysis()"

@@ -262,6 +262,29 @@ function buildSweepRequest(method, overrides = {}, useCapeSampling = false) {
         'Gedrosselte Pausen behalten Sweep-Resultate und Provenienz');
     assertEqual(pauses, 1,
         'Schnelle Fortschrittsschritte erzeugen nur eine erste Timer-Pause');
+
+    const controller = new AbortController();
+    let interruptedUnits = 0;
+    let interruptedPauses = 0;
+    let interruption = null;
+    try {
+        await runSweepChunkAsync({
+            ...options,
+            signal: controller.signal,
+            now: () => 0,
+            onProgress: units => { interruptedUnits = units; },
+            yieldToEventLoop: async () => {
+                interruptedPauses++;
+                controller.abort();
+            }
+        });
+    } catch (error) {
+        interruption = error;
+    }
+    assert(interruption?.name === 'AbortError',
+        'Serieller Sweep bricht an der ersten Yield-Grenze ab');
+    assert(interruptedUnits > 0 && interruptedUnits < 2 && interruptedPauses === 1,
+        'Abbruch liefert kein vollstaendiges Teilergebnis');
 }
 
 // Test 1: parseRangeInput - Einzelwert
