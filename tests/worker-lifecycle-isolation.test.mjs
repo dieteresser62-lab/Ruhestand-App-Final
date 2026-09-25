@@ -10,6 +10,50 @@ import {
 
 console.log('--- Worker Lifecycle Isolation Tests ---');
 
+console.log('Test: Sweep-Zwischenfortschritt bleibt bei parallelen und doppelten Meldungen monoton');
+{
+    const jobs = [];
+    const percentages = [];
+    const pool = {
+        telemetry: { enabled: false },
+        onProgress: null,
+        runJob(payload) {
+            return new Promise(resolve => jobs.push({ payload, resolve }));
+        }
+    };
+    const runner = new WorkerJobRunner({
+        pool, totalItems: 4, workerCount: 2, minChunk: 2, maxChunk: 2,
+        generationId: 'sweep-progress', trackPartialProgress: true,
+        buildPayload: (start, count) => ({ comboRange: { start, count } }),
+        mergeResult: () => {}, onProgress: pct => percentages.push(pct)
+    });
+    const finished = runner.run();
+    await flushMicrotasks();
+    assertEqual(jobs.length, 2, 'zwei Sweep-Blöcke werden parallel eingeplant');
+    const emit = (index, completedUnits, generationId = 'sweep-progress') => {
+        pool.onProgress({
+            phase: 'sweep', generationId,
+            comboRange: jobs[index].payload.comboRange, completedUnits
+        });
+    };
+    emit(0, 0.5);
+    emit(0, 0.5);
+    emit(1, 1.5);
+    emit(0, 0.1);
+    emit(0, 2, 'old-generation');
+    assert(percentages[0] > 0 && percentages[0] < 50,
+        'erster Zwischenstand erscheint vor Blockabschluss');
+    jobs[0].resolve({ elapsedMs: 0 });
+    await flushMicrotasks();
+    emit(0, 1.9);
+    jobs[1].resolve({ elapsedMs: 0 });
+    await finished;
+    assert(percentages.every((value, index) => index === 0 || value >= percentages[index - 1]),
+        'doppelte, verspätete und parallele Meldungen laufen nicht rückwärts');
+    assert(percentages.every(value => value < 100),
+        'Worker-Meldungen erreichen vor dem vollständigen UI-Ergebnis keine 100 Prozent');
+}
+
 class ControlledWorker {
     static instances = [];
 

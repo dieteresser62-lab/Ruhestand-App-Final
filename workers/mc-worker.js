@@ -192,6 +192,11 @@ self.onmessage = async event => {
                 comboRange,
                 sweepRequest: sweepRequest ?? sweepConfig,
                 refP2Invariants,
+                onProgress: completedUnits => {
+                    send('progress', {
+                        jobId, generationId, phase: 'sweep', comboRange, completedUnits
+                    });
+                },
                 engine: EngineAPI
             });
             const elapsedMs = performance.now() - startedAt;

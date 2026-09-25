@@ -397,10 +397,13 @@ Sweep-spezifische Logik mit Guardrails für Partner:innen-Felder und Heatmap-Aus
 
 **Hauptfunktionen / Exporte:**
 - `runParameterSweep()` – iteriert über Whitelist-Parameter, nutzt Worker-Jobs (Fallback seriell) und leitet Ergebnisse an die Heatmap weiter.
+- `cancelParameterSweep()` – bricht die aktive Sweep-Generation ab, terminiert ihre Worker und stoppt den seriellen Pfad an der naechsten Yield-Grenze. Die UI meldet „Abgebrochen“ und gibt den Startknopf frei; ein Nutzerabbruch loest keinen seriellen Fallback aus.
 - `displaySweepResults()` – rendert Sweep-KPIs und Statushinweise.
 - `initSweepDefaultsWithLocalStorageFallback()` – lädt Sweep-Voreinstellungen und setzt Defaults.
 
 **Einbindung:** Button-Hooks in `initializeUI()` (Sweep-Tab). Nutzt `simulator-sweep-utils.js` für Whitelist/Clone-Logik und `simulator-heatmap.js` für das Rendering.
+
+Das eigene UI-Feld `sweepRuns` verwendet standardmaessig 500 Simulationen je Kombination und ist unabhaengig vom Monte-Carlo-Laufzahlfeld `mcAnzahl`. `initSweepDefaultsWithLocalStorageFallback()` speichert die Sweep-Laufzahl unter `sim.sweep.runs` und stellt sie nach einem Neuladen wieder her. Ein leerer oder ungueltiger gespeicherter beziehungsweise eingegebener Wert wird nicht still auf 500 korrigiert; die Validierung verhindert damit den Start. Der nominelle Aufwand ergibt sich aus wirksamen Kombinationen × Sweep-Laeufen × maximaler Dauer in Jahren. Erst oberhalb von 5.000.000 Laufjahren muss der Nutzer den Start bestaetigen. Worker-Jobs und der serielle Runner liefern sichtbaren Zwischenfortschritt bereits innerhalb einer Kombination beziehungsweise eines Worker-Blocks. Neue Ergebnisse werden erst nach vollstaendiger Berechnung und erfolgreichem Heatmap-Rendering gemeinsam mit `window.sweepExecution` veroeffentlicht. Bis dahin zeigt der Fortschritt hoechstens 99 %, 100 % erst nach erfolgreichem Abschluss. Bei Fehler oder Abbruch bleibt ein altes vollstaendiges Ergebnis stehen; ohne Altresultat bleibt die Ergebnisansicht leer.
 
 **Dependencies:** `monte-carlo-runner.js` (Mini-Läufe), `simulator-heatmap.js`, `simulator-results.js`, `simulator-sweep-utils.js`, `simulator-utils.js`, `simulator-data.js`.
 

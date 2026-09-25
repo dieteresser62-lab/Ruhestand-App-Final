@@ -542,7 +542,7 @@ export function readApplicableRunwayMonths(logData) {
         : null;
 }
 
-export function runSweepChunk({
+function* iterateSweepChunk({
     baseInputs,
     paramCombinations,
     comboRange,
@@ -606,6 +606,7 @@ export function runSweepChunk({
                 metrics: makeInvalidSweepMetrics(validation.reason),
                 provenance: buildSweepResultProvenance(normalizedRequest, comboIdx, null, null)
             });
+            yield offset + 1;
             continue;
         }
         const inputs = buildSweepInputs(baseInputs, params);
@@ -906,6 +907,13 @@ export function runSweepChunk({
                 failed: failed
             });
 
+            // A completed simulation is a stable unit of work, even when the
+            // combination later proves invalid. No result data leaves this runner.
+            if ((i + 1) % Math.max(1, Math.floor(anzahlRuns / 100)) === 0
+                || i + 1 === anzahlRuns || invalidComboReason) {
+                yield offset + (i + 1) / anzahlRuns;
+            }
+
             if (invalidComboReason) {
                 break;
             }
@@ -926,6 +934,7 @@ export function runSweepChunk({
                 metrics: makeInvalidSweepMetrics(`Engine Validation: ${invalidComboReason}`),
                 provenance: resultProvenance
             });
+            yield offset + 1;
             continue;
         }
 
@@ -936,7 +945,45 @@ export function runSweepChunk({
         );
         metrics.warningR2Varies = p2VarianceWarning;
         results.push({ comboIdx, params, metrics, provenance: resultProvenance });
+        yield offset + 1;
     }
 
     return { results, p2VarianceCount, sweepRequest: normalizedRequest };
+}
+
+export function runSweepChunk(options) {
+    const iterator = iterateSweepChunk(options);
+    for (let step = iterator.next(); ; step = iterator.next()) {
+        if (step.done) return step.value;
+        options.onProgress?.(step.value);
+    }
+}
+
+export async function runSweepChunkAsync(options) {
+    const iterator = iterateSweepChunk(options);
+    const now = options.now ?? (() => performance.now());
+    const yieldToEventLoop = options.yieldToEventLoop
+        ?? (() => new Promise(resolve => {
+            if (typeof requestAnimationFrame === 'function') {
+                requestAnimationFrame(() => setTimeout(resolve, 0));
+            } else {
+                setTimeout(resolve, 0);
+            }
+        }));
+    let lastYieldAt = now();
+    let yielded = false;
+    while (true) {
+        if (options.signal?.aborted) throw new DOMException('Sweep abgebrochen.', 'AbortError');
+        const step = iterator.next();
+        if (step.done) return step.value;
+        options.onProgress?.(step.value);
+        // Give the first visible update a paint opportunity. Subsequent timer
+        // tasks are limited by elapsed time, even for many short simulations.
+        if (!yielded || now() - lastYieldAt >= 16) {
+            await yieldToEventLoop();
+            if (options.signal?.aborted) throw new DOMException('Sweep abgebrochen.', 'AbortError');
+            yielded = true;
+            lastYieldAt = now();
+        }
+    }
 }

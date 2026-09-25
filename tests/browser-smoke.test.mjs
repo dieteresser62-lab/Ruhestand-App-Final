@@ -2528,8 +2528,27 @@ async function runSimulatorHybridProfileBlocker(browser, baseUrl) {
 async function runSimulatorSweepIntegration(browser, baseUrl) {
     const smoke = await openSmokePage(browser, baseUrl, 'Simulator.html');
     const { page } = smoke;
+    const setMcDuration = value => page.locator('#mcDauer').evaluate((element, next) => {
+        element.value = next;
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+    }, value);
     await page.locator('.tab-btn[data-tab="sweep"]').click();
     await page.locator('#sweepButton').waitFor({ state: 'visible' });
+    assert(await page.locator('#sweepRuns').inputValue() === '500',
+        'Frischer Simulator zeigt 500 Sweep-Simulationen');
+    assert(await page.locator('#mcAnzahl').inputValue() === '10000',
+        'Frischer Simulator behaelt 10000 MC-Simulationen');
+    await page.locator('#sweepRuns').fill('2');
+    await page.evaluate(async () => {
+        const { flush } = await import('./app/shared/persistence-facade.js');
+        await flush();
+    });
+    await page.reload();
+    await page.locator('.tab-btn[data-tab="sweep"]').click();
+    await page.waitForFunction(() => document.getElementById('sweepRuns')?.value === '2');
+    assert(await page.locator('#sweepRuns').inputValue() === '2',
+        'Sweep-Laufzahl ueberlebt das Neuladen');
     await page.evaluate(() => {
         const setValue = (id, value) => {
             const element = document.getElementById(id);
@@ -2537,7 +2556,7 @@ async function runSimulatorSweepIntegration(browser, baseUrl) {
             element.dispatchEvent(new Event('input', { bubbles: true }));
             element.dispatchEvent(new Event('change', { bubbles: true }));
         };
-        setValue('mcAnzahl', 2);
+        setValue('mcAnzahl', 'ungueltig');
         setValue('mcDauer', 2);
         setValue('mcBlockSize', 1);
         setValue('mcWorkerCount', 1);
@@ -2556,12 +2575,48 @@ async function runSimulatorSweepIntegration(browser, baseUrl) {
     });
     assert((await page.locator('#sweepGridSize').textContent()).includes('Grid: 1 Kombis'),
         'Inaktive VPW-Ranges werden im Grid nicht mitgezaehlt');
+    const workload = page.locator('#sweepWorkload');
+    assert((await workload.textContent()).includes('1 Kombination × 2 Läufe × 2 Jahre = 4 nominelle Laufjahre'),
+        'Sweep-Aufwand zeigt Kombinationen, eigene Laufzahl und nominelle Jahre vor dem Start');
+    await page.locator('#sweepRuns').fill('3');
+    assert((await workload.textContent()).includes('= 6 nominelle Laufjahre'),
+        'Sweep-Aufwand reagiert auf die eigene Laufzahl');
+    await page.locator('#sweepRuns').fill('2');
+    await setMcDuration('3');
+    assert((await workload.textContent()).includes('= 6 nominelle Laufjahre'),
+        'Sweep-Aufwand reagiert auf die Dauer');
+    await setMcDuration('2');
+    await page.locator('#sweepLiquidityRunwayYears').fill('3,4');
+    assert((await workload.textContent()).includes('2 Kombinationen × 2 Läufe × 2 Jahre = 8 nominelle Laufjahre'),
+        'Sweep-Aufwand verwendet die aktiven Ranges');
+    await page.locator('#sweepLiquidityRunwayYears').fill('3');
+    await page.locator('#sweepGoldRebalancingBand').fill('0:1:299');
+    assert((await page.locator('#sweepGridSize').textContent()).includes('Grid: 300 Kombis')
+        && !(await page.locator('#sweepGridSize').textContent()).includes('Max: 300')
+        && (await workload.textContent()).includes('= 1.200 nominelle Laufjahre'),
+    'Genau 300 Kombinationen bleiben innerhalb des Grid-Limits');
+    await page.locator('#sweepGoldRebalancingBand').fill('0:1:300');
+    assert((await page.locator('#sweepGridSize').textContent()).includes('Max: 300')
+        && (await workload.textContent()).includes('?'),
+    '300-Kombinationen-Limit bleibt sichtbar und uebergrosse Grids haben keinen belastbaren Aufwand');
+    await page.locator('#sweepGoldRebalancingBand').fill('25');
+    await page.locator('#sweepLiquidityRunwayYears').fill('');
+    assert((await workload.textContent()).includes('?'), 'Leere aktive Range zeigt keinen Aufwand');
+    await page.locator('#sweepLiquidityRunwayYears').fill('3');
+    await page.locator('#sweepRuns').fill('');
+    assert((await workload.textContent()).includes('?'), 'Leere Laufzahl zeigt keinen Aufwand');
+    await page.locator('#sweepRuns').fill('2');
+    await setMcDuration('0');
+    assert((await workload.textContent()).includes('?'), 'Ungueltige Dauer zeigt keinen Aufwand');
+    await setMcDuration('2');
     await page.locator('#sweepButton').click();
     await page.waitForFunction(() => window.sweepExecution?.results?.length === 1
         && document.querySelector('#sweepHeatmap svg'), null, { timeout: 30000 });
     const standard = await page.evaluate(() => {
         const result = window.sweepExecution.results[0];
         return {
+            requestedRuns: window.sweepExecution.request.monteCarloParameters.anzahl,
+            provenRuns: result.provenance.normalizedParameters.anzahl,
             metricVersion: result.metrics?.schemaVersion,
             invalidCombination: result.metrics?.invalidCombination,
             invalidReason: result.metrics?.invalidReason,
@@ -2574,12 +2629,189 @@ async function runSimulatorSweepIntegration(browser, baseUrl) {
     assert(standard.metricVersion === 'SweepMetricsV4'
         && standard.invalidCombination !== true && Number.isFinite(standard.value),
     `Standard-Sweep muss einen kanonischen Metrikwert liefern: ${JSON.stringify(standard)}`);
+    assert(standard.requestedRuns === 2 && standard.provenRuns === 2,
+        'Sweep nutzt seine eigene Laufzahl in Request und gueltiger Provenienz');
     assert(standard.cellCount > 0 && standard.text.includes(`${standard.value.toFixed(1)}%`)
         && !standard.text.includes('Keine gültigen Sweep-Ergebnisse'),
         'Standard-Sweep zeigt eine SVG-Zelle mit kanonischem Wert');
     assert(standard.keys.length === 5 && !standard.keys.includes('survivalQuantile')
         && !standard.keys.includes('goGoMultiplier'),
         'Inaktive VPW-Felder fehlen in der gestarteten Kombination');
+    await page.locator('#sweepRuns').fill('10000');
+    await page.evaluate(() => {
+        window.__sweepBeforeAbort = window.sweepExecution;
+        window.__sweepHeatmapBeforeAbort = document.getElementById('sweepHeatmap').innerHTML;
+        window.__sweepWorkerBase = window.Worker;
+        window.__sweepTerminations = 0;
+        window.Worker = class extends window.__sweepWorkerBase {
+            terminate() {
+                window.__sweepTerminations++;
+                return super.terminate();
+            }
+        };
+    });
+    await page.locator('#sweepButton').click();
+    await page.waitForFunction(() => parseFloat(document.getElementById('sweep-progress-bar').style.width) > 0
+        && !document.getElementById('sweepCancelButton').disabled, null, { timeout: 30000 });
+    await page.locator('#sweepCancelButton').click();
+    await page.waitForFunction(() => document.getElementById('sweepStatus').textContent === 'Abgebrochen'
+        && !document.getElementById('sweepButton').disabled, null, { timeout: 30000 });
+    const aborted = await page.evaluate(() => ({
+        sameExecution: window.sweepExecution === window.__sweepBeforeAbort,
+        sameHeatmap: document.getElementById('sweepHeatmap').innerHTML === window.__sweepHeatmapBeforeAbort,
+        terminated: window.__sweepTerminations,
+        progress: document.getElementById('sweep-progress-bar').textContent,
+        status: document.getElementById('sweepStatus').textContent
+    }));
+    assert(aborted.sameExecution && aborted.sameHeatmap && aborted.terminated > 0
+        && aborted.progress !== '100%' && aborted.status === 'Abgebrochen',
+    `Abbruch bewahrt vollstaendige Heatmap und beendet Worker: ${JSON.stringify(aborted)}`);
+    await page.evaluate(() => { window.Worker = window.__sweepWorkerBase; });
+    await page.locator('#sweepRuns').fill('2');
+    await page.locator('#sweepButton').click();
+    await page.waitForFunction(() => window.sweepExecution !== window.__sweepBeforeAbort
+        && window.sweepExecution?.request?.monteCarloParameters?.anzahl === 2
+        && document.getElementById('sweepStatus').textContent === 'Abgeschlossen',
+    null, { timeout: 30000 });
+    assert(await page.locator('#sweepHeatmap svg rect[stroke]').count() > 0,
+        'Direkter Neustart veroeffentlicht eine vollstaendige neue Heatmap');
+    await page.locator('#sweepRuns').fill('10000');
+    await page.evaluate(() => {
+        window.__sweepBeforeSerialAbort = window.sweepExecution;
+        window.__sweepHeatmapBeforeSerialAbort = document.getElementById('sweepHeatmap').innerHTML;
+        window.Worker = class {
+            constructor() { throw new Error('serial sweep abort smoke'); }
+        };
+    });
+    await page.locator('#sweepButton').click();
+    await page.waitForFunction(() => parseFloat(document.getElementById('sweep-progress-bar').style.width) > 0
+        && !document.getElementById('sweepCancelButton').disabled, null, { timeout: 30000 });
+    await page.locator('#sweepCancelButton').click();
+    await page.waitForFunction(() => document.getElementById('sweepStatus').textContent === 'Abgebrochen'
+        && !document.getElementById('sweepButton').disabled, null, { timeout: 30000 });
+    const serialAbort = await page.evaluate(() => ({
+        sameExecution: window.sweepExecution === window.__sweepBeforeSerialAbort,
+        sameHeatmap: document.getElementById('sweepHeatmap').innerHTML === window.__sweepHeatmapBeforeSerialAbort,
+        progress: document.getElementById('sweep-progress-bar').textContent
+    }));
+    await page.evaluate(() => { window.Worker = window.__sweepWorkerBase; });
+    assert(serialAbort.sameExecution && serialAbort.sameHeatmap && serialAbort.progress !== '100%',
+        `Serieller Abbruch bewahrt das Altresultat: ${JSON.stringify(serialAbort)}`);
+    await page.evaluate(() => {
+        window.sweepExecution = undefined;
+        window.sweepResults = undefined;
+        window.sweepParamRanges = undefined;
+        document.getElementById('sweepHeatmap').innerHTML = '';
+        document.getElementById('sweepResults').style.display = 'none';
+    });
+    await page.locator('#sweepButton').click();
+    await page.waitForFunction(() => parseFloat(document.getElementById('sweep-progress-bar').style.width) > 0
+        && !document.getElementById('sweepCancelButton').disabled, null, { timeout: 30000 });
+    await page.locator('#sweepCancelButton').click();
+    await page.waitForFunction(() => document.getElementById('sweepStatus').textContent === 'Abgebrochen'
+        && !document.getElementById('sweepButton').disabled, null, { timeout: 30000 });
+    assert(await page.evaluate(() => window.sweepExecution === undefined
+        && window.sweepResults === undefined
+        && document.getElementById('sweepHeatmap').innerHTML === ''
+        && document.getElementById('sweepResults').style.display === 'none'),
+    'Abbruch ohne Altresultat laesst die Ergebnisansicht leer');
+    // Eine Kombination erzwingt einen einzigen Worker-Block. Jede Breite unter
+    // 99 Prozent stammt dann aus einem Lauf innerhalb dieses Blocks.
+    await page.locator('#sweepLiquidityRunwayYears').fill('3');
+    await page.locator('#sweepRuns').fill('30');
+    await page.evaluate(() => {
+        const previous = window.sweepExecution;
+        const bar = document.getElementById('sweep-progress-bar');
+        window.__sweepWorkerProgress = false;
+        window.__sweepWorkerMessage = false;
+        window.__sweepOriginalWorker = window.Worker;
+        window.Worker = class extends window.__sweepOriginalWorker {
+            constructor(...args) {
+                super(...args);
+                this.sweepJobs = new Map();
+                this.addEventListener('message', event => {
+                    const message = event.data;
+                    const generationId = this.sweepJobs.get(message?.jobId);
+                    if (window.sweepExecution === previous && message?.type === 'progress'
+                        && message.phase === 'sweep' && generationId
+                        && message.generationId === generationId
+                        && message.comboRange?.start === 0 && message.comboRange?.count === 1
+                        && message.completedUnits > 0 && message.completedUnits < 1) {
+                        window.__sweepWorkerMessage = true;
+                    }
+                });
+            }
+            postMessage(message, transferables) {
+                if (message?.type === 'sweep') {
+                    this.sweepJobs.set(message.jobId, message.generationId);
+                }
+                return super.postMessage(message, transferables);
+            }
+        };
+        const observer = new MutationObserver(() => {
+            const width = parseFloat(bar.style.width);
+            if (window.sweepExecution === previous && width > 0 && width < 99) {
+                window.__sweepWorkerProgress = true;
+            }
+        });
+        observer.observe(bar, { attributes: true, attributeFilter: ['style'] });
+        window.__sweepWorkerObserver = observer;
+        window.__sweepWorkerPrevious = previous;
+    });
+    await page.locator('#sweepButton').click();
+    await page.waitForFunction(() => window.sweepExecution !== window.__sweepWorkerPrevious,
+        null, { timeout: 30000 });
+    const workerReference = await page.evaluate(() => {
+        window.__sweepWorkerObserver.disconnect();
+        window.Worker = window.__sweepOriginalWorker;
+        return {
+            progress: window.__sweepWorkerProgress,
+            message: window.__sweepWorkerMessage,
+            execution: JSON.stringify(window.sweepExecution)
+        };
+    });
+    assert(workerReference.progress && workerReference.message,
+        'Echte Worker-Nachricht erreicht vor dem Ende des einzigen Blocks den Fortschrittsbalken');
+    await page.evaluate(() => {
+        window.Worker = class {
+            constructor() { throw new Error('serial sweep smoke'); }
+        };
+        const probe = window.__sweepProgressProbe = {
+            previous: window.sweepExecution,
+            partial: false, painted: false, clicked: false
+        };
+        const clickTarget = document.createElement('button');
+        clickTarget.id = 'sweep-progress-click-target';
+        clickTarget.addEventListener('click', () => { probe.clicked = true; });
+        document.body.append(clickTarget);
+        const observe = () => {
+            if (window.sweepExecution !== probe.previous) return;
+            const width = parseFloat(document.getElementById('sweep-progress-bar').style.width);
+            if (width > 0 && width < 100) {
+                probe.partial = true;
+                clickTarget.click();
+                probe.painted = true;
+            }
+            requestAnimationFrame(observe);
+        };
+        requestAnimationFrame(observe);
+    });
+    await page.locator('#sweepButton').click();
+    await page.waitForFunction(() => window.sweepExecution !== window.__sweepProgressProbe.previous,
+        null, { timeout: 30000 });
+    const serialProbe = await page.evaluate(() => {
+        const { partial, painted, clicked } = window.__sweepProgressProbe;
+        const execution = JSON.stringify(window.sweepExecution);
+        window.Worker = window.__sweepOriginalWorker;
+        document.getElementById('sweep-progress-click-target').remove();
+        return { partial, painted, clicked, execution };
+    });
+    assert(serialProbe.partial && serialProbe.painted && serialProbe.clicked,
+        `Serieller Sweep zeigt Zwischenfortschritt und verarbeitet Paint und Klick: ${JSON.stringify({ partial: serialProbe.partial, painted: serialProbe.painted, clicked: serialProbe.clicked })}`);
+    assert(serialProbe.execution === workerReference.execution,
+        'Worker und serieller Sweep liefern identische Resultate, Seeds und Provenienz');
+    await page.locator('#sweepLiquidityRunwayYears').fill('3');
+    await page.locator('#sweepRuns').fill('2');
     await page.locator('#sweepMetric').selectOption('p10EndWealth');
     assert((await page.locator('#sweepHeatmap').textContent()).includes('k €'),
         'Metrikwechsel rendert vorhandene Ergebnisse erneut');
@@ -2632,7 +2864,89 @@ async function runSimulatorSweepIntegration(browser, baseUrl) {
     ]), 'Browser Sweep result must expose every interactive parameter and no unsupported direct-horizon field');
     assert(execution.maxBearRefillPct === 5,
         'Browser Sweep must preserve the visible Bear-Refill assumption instead of forcing zero');
-    smoke.assertNoErrors();
+    await page.locator('#sweepGoldRebalancingBand').fill('999');
+    await page.locator('#sweepButton').click();
+    await page.waitForFunction(() => window.sweepExecution?.results?.[0]?.metrics?.invalidCombination === true);
+    const invalid = await page.evaluate(() => ({
+        runs: window.sweepExecution.request.monteCarloParameters.anzahl,
+        provenRuns: window.sweepExecution.results[0].provenance.normalizedParameters.anzahl,
+        provenMethod: window.sweepExecution.results[0].provenance.requestedSamplingMethod
+    }));
+    assert(invalid.runs === 2 && invalid.provenRuns === 2 && invalid.provenMethod,
+        'Ungueltige Kombination behaelt die validierte Laufzahl und Methode in der Provenienz');
+    await setMcDuration('40');
+    await page.locator('#sweepRuns').fill('125000');
+    assert((await workload.textContent()).includes('125.000 Läufe × 40 Jahre = 5.000.000 nominelle Laufjahre'),
+        'Der Schwellwert wird aus validierten Faktoren im deutschen Zahlenformat angezeigt');
+    await page.evaluate(() => {
+        window.__sweepConfirmations = [];
+        window.confirm = message => {
+            window.__sweepConfirmations.push(String(message));
+            return false;
+        };
+    });
+    await page.locator('#sweepButton').click();
+    await page.waitForFunction(() => window.sweepExecution?.request?.monteCarloParameters?.anzahl === 125000,
+        null, { timeout: 30000 });
+    await page.locator('#sweep-progress-bar-container').waitFor({ state: 'hidden' });
+    assert((await page.evaluate(() => window.__sweepConfirmations)).length === 0,
+        'Genau 5.000.000 nominelle Laufjahre brauchen keine Bestaetigung');
+    await page.locator('#sweepRuns').fill('125001');
+    await page.evaluate(() => {
+        window.__sweepExecutionBeforeRefusal = window.sweepExecution;
+        window.__sweepResultsBeforeRefusal = window.sweepResults;
+        window.__sweepHeatmapBeforeRefusal = document.getElementById('sweepHeatmap').innerHTML;
+        window.__sweepWorkerCount = 0;
+        const NativeWorker = window.Worker;
+        window.Worker = class extends NativeWorker {
+            constructor(...args) {
+                window.__sweepWorkerCount++;
+                super(...args);
+            }
+        };
+    });
+    await page.locator('#sweepButton').click();
+    const refusal = await page.evaluate(() => ({
+        confirmations: window.__sweepConfirmations,
+        sameExecution: window.sweepExecution === window.__sweepExecutionBeforeRefusal,
+        sameResults: window.sweepResults === window.__sweepResultsBeforeRefusal,
+        sameHeatmap: document.getElementById('sweepHeatmap').innerHTML === window.__sweepHeatmapBeforeRefusal,
+        workerCount: window.__sweepWorkerCount,
+        progressVisible: document.getElementById('sweep-progress-bar-container').style.display !== 'none'
+    }));
+    assert(refusal.confirmations.length === 1
+        && refusal.confirmations[0].includes('5.000.040 nominelle Laufjahre')
+        && refusal.confirmations[0].includes('nicht zuverlässig vorhersagbar'),
+    'Ueber dem Schwellwert nennt die Rueckfrage den konkreten Aufwand und unsichere Dauer');
+    assert(refusal.sameExecution && refusal.sameResults && refusal.sameHeatmap && refusal.workerCount === 0
+        && !refusal.progressVisible,
+    'Ablehnung behaelt das vorherige Ergebnis und startet weder Worker noch Fortschritt');
+    await page.locator('#sweepRuns').fill('');
+    await page.evaluate(async () => {
+        const { flush } = await import('./app/shared/persistence-facade.js');
+        await flush();
+    });
+    await page.reload();
+    await page.locator('.tab-btn[data-tab="sweep"]').click();
+    await page.waitForFunction(() => document.getElementById('sweepRuns')?.value === '');
+    await page.locator('#sweepButton').click();
+    assert((await page.evaluate(() => window.__browserSmokeAlerts || []))
+        .some(message => message.includes('Sweep-Simulationen je Kombination')),
+    'Leere gespeicherte Laufzahl verhindert den Sweep mit verstaendlicher Meldung');
+    assert(await page.evaluate(() => window.sweepExecution === undefined),
+        'Fehleingabe startet keinen Sweep');
+    await page.evaluate(async () => {
+        const { persistenceStorage, flush } = await import('./app/shared/persistence-facade.js');
+        persistenceStorage.setItem('sim.sweep.runs', 'ungueltig');
+        await flush();
+    });
+    await page.reload();
+    await page.locator('.tab-btn[data-tab="sweep"]').click();
+    await page.locator('#sweepButton').click();
+    assert((await page.evaluate(() => window.__browserSmokeAlerts || []))
+        .some(message => message.includes('Sweep-Simulationen je Kombination')),
+    'Ungueltiger gespeicherter Wert wird nicht auf 500 korrigiert');
+    smoke.assertNoErrors(['Parameter-Sweep Fehler:', '[SWEEP] Worker execution failed, falling back to serial.']);
     await smoke.close();
 }
 
@@ -2763,7 +3077,11 @@ async function main() {
             ['Balance annual commit', runBalanceAnnualCommit]
         ];
 
-        for (const [label, smoke] of smokes) {
+        const only = process.argv.find(argument => argument.startsWith('--only='))?.slice('--only='.length);
+        if (only && !smokes.some(([label]) => label === only)) {
+            throw new Error(`Unbekannter Browser-Smoke: ${only}`);
+        }
+        for (const [label, smoke] of smokes.filter(([label]) => !only || label === only)) {
             console.log(`Running browser smoke: ${label}`);
             await smoke(browser, baseUrl);
             console.log(`Browser smoke passed: ${label}`);

@@ -372,6 +372,7 @@ class MockDocument {
     const documentRef = new MockDocument();
     const values = {
         mcAnzahl: '100001',
+        sweepRuns: '500',
         mcDauer: '35',
         mcBlockSize: '5',
         mcSeed: '12345',
@@ -402,6 +403,22 @@ class MockDocument {
         global.document = documentRef;
         const uiParameters = readMonteCarloParameters({ startAlter: 65, partner: { aktiv: false } });
         assertEqual(uiParameters.anzahl, 100001, 'UI consumer returns centrally normalized parameters');
+        documentRef.getElementById('mcAnzahl').value = 'ungueltig';
+        const sweepParameters = readMonteCarloParameters(
+            { startAlter: 65, partner: { aktiv: false } },
+            { runsElementId: 'sweepRuns' }
+        );
+        assertEqual(sweepParameters.anzahl, 500, 'Sweep liest seine eigene Laufzahl trotz ungueltigem MC-Feld');
+        expectRejected(() => readMonteCarloParameters({ startAlter: 65, partner: { aktiv: false } }),
+            'MC liest weiterhin sein eigenes Feld');
+        documentRef.getElementById('mcAnzahl').value = '100001';
+        documentRef.getElementById('sweepRuns').value = '';
+        expectRejected(() => readMonteCarloParameters(null, { runsElementId: 'sweepRuns' }),
+            'Leere Sweep-Laufzahl wird nicht auf den MC-Default gesetzt');
+        documentRef.getElementById('sweepRuns').value = '500.5';
+        expectRejected(() => readMonteCarloParameters(null, { runsElementId: 'sweepRuns' }),
+            'Sweep-Laufzahl muss ganzzahlig sein');
+        documentRef.getElementById('sweepRuns').value = '500';
         initMonteCarloResourceControls();
         assert(estimate.textContent.includes('Run-Jahre'), 'UI shows run-years before execution');
         assert(estimate.textContent.includes('Speicherklasse'), 'UI shows a memory class before execution');
@@ -465,6 +482,7 @@ class MockDocument {
 {
     const html = fs.readFileSync(new URL('../Simulator.html', import.meta.url), 'utf8');
     assert(/id="mcAnzahl" value="10000" min="1" max="1000000" step="1"/.test(html), 'HTML uses the reviewed 10,000 default and hard run bounds');
+    assert(/id="sweepRuns" value="500" min="1" max="1000000" step="1"/.test(html), 'Sweep hat einen eigenen Default mit denselben harten Grenzen');
     assert(/id="mc-progress-bar-container" role="progressbar"/.test(html), 'progress element has a semantic progressbar role');
     assert(/aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"/.test(html), 'progress element declares min, max and current values');
     assert(/id="mc-error-container"[\s\S]*?role="alert"/.test(html), 'error region has an alert role');

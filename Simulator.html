@@ -1444,6 +1444,10 @@
                         📊 Parameter Sweep (Exploration) </h3>
                     <p style="color: #666; margin-bottom: 20px; font-size: 0.95rem;">Systematische Exploration des
                         Parameter-Raums über vordefinierte Ranges. Gut für erste Analysen und Heatmaps. </p>
+                    <div class="form-group"><label for="sweepRuns">Simulationen je Kombination</label><input
+                            type="number" id="sweepRuns" value="500" min="1" max="1000000" step="1"
+                            title="Anzahl der Simulationen pro Sweep-Kombination; unabhängig vom Monte-Carlo-Feld">
+                    </div>
                     <fieldset>
                         <legend><span class="section-icon">🔄</span>Sweep-Ranges</legend>
                         <div
@@ -1453,6 +1457,8 @@
                             <div id="sweepGridSize" style="font-weight: 600; color: var(--secondary-color);"> Grid:
                                 0 Kombis </div>
                         </div>
+                        <p id="sweepWorkload" class="hint" aria-live="polite">Nomineller Aufwand: ?</p>
+                        <p class="hint">Laufjahre sind ein Maß für den geplanten Rechenaufwand, keine Laufzeitprognose. Einzelne Läufe können früher enden.</p>
                         <div class="form-grid-four-col">
                             <div class="form-group"><label for="sweepLiquidityRunwayYears">Liquiditäts-Runway (Jahre)</label><input
                                     type="text" id="sweepLiquidityRunwayYears" value="3:1:7" placeholder="3,5,7"
@@ -1492,7 +1498,9 @@
                         </p>
                     </fieldset>
                     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;"> <button
-                            id="sweepButton" onclick="runParameterSweep()">Run Sweep</button> <button
+                            id="sweepButton" onclick="runParameterSweep()">Run Sweep</button>
+                        <button id="sweepCancelButton" onclick="cancelParameterSweep()" disabled>Abbrechen</button>
+                        <span id="sweepStatus" role="status" aria-live="polite"></span> <button
                             id="findBestButton" onclick="findAndDisplayBest()"
                             style="background-color: #4caf50; display: none;">Parametervergleich anzeigen</button>
                         <button id="sensitivityButton" onclick="showSensitivityAnalysis()"

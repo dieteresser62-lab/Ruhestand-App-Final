@@ -37,9 +37,11 @@ import {
     SWEEP_HOUSEHOLD_RISK_DIAGNOSTICS_VERSION,
     SWEEP_COMPARISON_RANDOMNESS_VERSION,
     buildSweepInputs,
-    runSweepChunk
+    runSweepChunk,
+    runSweepChunkAsync
 } from '../app/simulator/sweep-runner.js';
 import { SWEEP_METRICS_VERSION } from '../app/simulator/sweep-metrics-contract.js';
+import { resetPersistenceForTests, resetPersistenceRuntimeForTests } from '../app/shared/persistence-facade.js';
 import {
     SWEEP_REQUEST_VERSION,
     SWEEP_SAMPLING_METHOD_RESOLUTION,
@@ -117,6 +119,88 @@ const samplingTestCombination = Object.freeze({
     goldTargetPct: 0
 });
 
+{
+    const previousDocument = globalThis.document;
+    const previousWindow = globalThis.window;
+    const records = new Map();
+    resetPersistenceForTests({
+        getItemSync: key => records.get(key) ?? null,
+        setItemSync: (key, value) => records.set(key, value),
+        removeItemSync: key => records.delete(key)
+    });
+    const createField = () => ({
+        value: '500',
+        listeners: {},
+        addEventListener(type, listener) { this.listeners[type] = listener; }
+    });
+    try {
+        globalThis.window = {};
+        let field = createField();
+        globalThis.document = {
+            addEventListener() {},
+            getElementById: id => id === 'sweepRuns' ? field : null
+        };
+        const { initSweepDefaultsWithLocalStorageFallback } = await import('../app/simulator/simulator-sweep.js');
+        initSweepDefaultsWithLocalStorageFallback();
+        assertEqual(field.value, '500', 'fehlender Speicherwert behaelt den Sweep-Default 500');
+        field.value = '17';
+        field.listeners.input();
+        assertEqual(records.get('sim.sweep.runs'), '17', 'Eingabe wird unter eigenem Sweep-Schluessel gespeichert');
+        field = createField();
+        initSweepDefaultsWithLocalStorageFallback();
+        assertEqual(field.value, '17', 'gespeicherte Laufzahl wird beim Laden wiederhergestellt');
+        records.set('sim.sweep.runs', '');
+        field = createField();
+        initSweepDefaultsWithLocalStorageFallback();
+        assertEqual(field.value, '', 'leerer Speicherwert bleibt als Fehleingabe sichtbar');
+        records.set('sim.sweep.runs', 'ungueltig');
+        field = createField();
+        initSweepDefaultsWithLocalStorageFallback();
+        assertEqual(field.value, 'ungueltig', 'ungueltiger Speicherwert wird nicht auf 500 ersetzt');
+    } finally {
+        if (previousDocument === undefined) delete globalThis.document;
+        else globalThis.document = previousDocument;
+        if (previousWindow === undefined) delete globalThis.window;
+        else globalThis.window = previousWindow;
+        resetPersistenceRuntimeForTests();
+    }
+}
+
+// Request und Provenienz aller Kombinationen tragen dieselbe validierte Laufzahl.
+{
+    const request = buildSweepRequest('block', {
+        anzahl: 2,
+        maxDauer: 2,
+        blockSize: 1,
+        seed: 0,
+        startYearMode: 'FILTER',
+        startYearFilter: 1980
+    }, true);
+    const invalidCombination = { ...samplingTestCombination, goldRebalancingBand: 999 };
+    const execution = runSweepChunk({
+        baseInputs: buildSamplingTestInputs(),
+        paramCombinations: [samplingTestCombination, invalidCombination],
+        comboRange: { start: 0, count: 2 },
+        sweepRequest: request
+    });
+    assertEqual(execution.sweepRequest.monteCarloParameters.anzahl, 2, 'Sweep-Request behaelt die Laufzahl');
+    assert(execution.results[0].metrics.invalidCombination !== true, 'erste Kombination ist gueltig');
+    assert(execution.results[1].metrics.invalidCombination === true, 'zweite Kombination ist ungueltig');
+    for (const result of execution.results) {
+        const proven = result.provenance.normalizedParameters;
+        assertEqual(JSON.stringify(proven), JSON.stringify(execution.sweepRequest.monteCarloParameters),
+            'jede Ergebnis-Provenienz enthaelt das gesamte validierte Parameterobjekt');
+        assertEqual(proven.anzahl, 2, 'jede Ergebnis-Provenienz behaelt die Laufzahl');
+        assertEqual(proven.maxDauer, 2, 'Dauer bleibt erhalten');
+        assertEqual(proven.blockSize, 1, 'Blockgroesse bleibt erhalten');
+        assertEqual(proven.seed, 0, 'Seed bleibt erhalten');
+        assertEqual(proven.startYearMode, 'FILTER', 'Startjahr-Modus bleibt erhalten');
+        assertEqual(proven.startYearFilter, 1980, 'Startjahr-Filter bleibt erhalten');
+        assertEqual(result.provenance.useCapeSampling, true, 'CAPE bleibt erhalten');
+        assertEqual(result.provenance.requestedSamplingMethod, 'block', 'Methode bleibt erhalten');
+    }
+}
+
 function buildSweepRequest(method, overrides = {}, useCapeSampling = false) {
     return normalizeSweepRequestV1({
         schemaVersion: SWEEP_REQUEST_VERSION,
@@ -138,6 +222,69 @@ function buildSweepRequest(method, overrides = {}, useCapeSampling = false) {
         inputs: buildSamplingTestInputs(),
         historicalRecordCount: annualData.length
     });
+}
+
+// Der Fortschritts-Hook und die serielle Pause dürfen keine Ergebnisdaten ändern.
+{
+    const options = {
+        baseInputs: buildSamplingTestInputs(),
+        paramCombinations: [samplingTestCombination,
+            { ...samplingTestCombination, goldRebalancingBand: 999 }],
+        comboRange: { start: 0, count: 2 },
+        sweepRequest: buildSweepRequest('block', { anzahl: 4, maxDauer: 2 })
+    };
+    const baseline = runSweepChunk(options);
+    const synchronousProgress = [];
+    const withHook = runSweepChunk({
+        ...options, onProgress: units => synchronousProgress.push(units)
+    });
+    const asynchronousProgress = [];
+    const serial = await runSweepChunkAsync({
+        ...options, onProgress: units => asynchronousProgress.push(units)
+    });
+    assertEqual(JSON.stringify(withHook), JSON.stringify(baseline),
+        'Fortschritts-Hook behaelt Sweep-Resultate und Provenienz');
+    assertEqual(JSON.stringify(serial), JSON.stringify(baseline),
+        'Serieller Yield behaelt Sweep-Resultate und Provenienz');
+    assert(synchronousProgress.some(units => units > 0 && units < 1),
+        'Synchroner Chunk meldet Fortschritt vor Ende der ersten Kombination');
+    assert(asynchronousProgress.some(units => units > 0 && units < 1),
+        'Serieller Chunk meldet Fortschritt vor Ende der ersten Kombination');
+    assert(serial.results[1].metrics.invalidCombination === true,
+        'Ungueltige Kombination bleibt im seriellen Pfad klassifiziert');
+    let pauses = 0;
+    const fastSerial = await runSweepChunkAsync({
+        ...options,
+        now: () => 0,
+        yieldToEventLoop: async () => { pauses++; }
+    });
+    assertEqual(JSON.stringify(fastSerial), JSON.stringify(baseline),
+        'Gedrosselte Pausen behalten Sweep-Resultate und Provenienz');
+    assertEqual(pauses, 1,
+        'Schnelle Fortschrittsschritte erzeugen nur eine erste Timer-Pause');
+
+    const controller = new AbortController();
+    let interruptedUnits = 0;
+    let interruptedPauses = 0;
+    let interruption = null;
+    try {
+        await runSweepChunkAsync({
+            ...options,
+            signal: controller.signal,
+            now: () => 0,
+            onProgress: units => { interruptedUnits = units; },
+            yieldToEventLoop: async () => {
+                interruptedPauses++;
+                controller.abort();
+            }
+        });
+    } catch (error) {
+        interruption = error;
+    }
+    assert(interruption?.name === 'AbortError',
+        'Serieller Sweep bricht an der ersten Yield-Grenze ab');
+    assert(interruptedUnits > 0 && interruptedUnits < 2 && interruptedPauses === 1,
+        'Abbruch liefert kein vollstaendiges Teilergebnis');
 }
 
 // Test 1: parseRangeInput - Einzelwert

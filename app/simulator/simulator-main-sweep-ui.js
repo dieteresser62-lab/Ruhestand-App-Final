@@ -1,6 +1,8 @@
 "use strict";
 
-import { displaySweepResults, readInteractiveSweepRanges } from './simulator-sweep.js';
+import {
+    displaySweepResults, formatSweepWorkload, readInteractiveSweepRanges, readSweepWorkload
+} from './simulator-sweep.js';
 
 export function initSweepUIControls() {
     const sweepMetricSelect = document.getElementById('sweepMetric');
@@ -63,13 +65,22 @@ export function initSweepUIControls() {
                 gridSizeEl.style.color = 'var(--secondary-color)';
             }
         }
+        const workloadEl = document.getElementById('sweepWorkload');
+        if (workloadEl) {
+            try {
+                if (hasError || totalSize < 1 || totalSize > 300) throw new Error('Ungültiges Grid');
+                workloadEl.textContent = `Nomineller Aufwand: ${formatSweepWorkload(readSweepWorkload(totalSize))}.`;
+            } catch {
+                workloadEl.textContent = 'Nomineller Aufwand: ? (Eingaben prüfen).';
+            }
+        }
     }
 
     // Add event listeners to all sweep input fields
     const sweepInputIds = [
         'sweepLiquidityRunwayYears', 'sweepGoldRebalancingBand',
         'sweepMaxSkimPct', 'sweepMaxBearRefillPct', 'sweepGoldTargetPct',
-        'sweepSurvivalQuantile', 'sweepGoGoMultiplier'
+        'sweepSurvivalQuantile', 'sweepGoGoMultiplier', 'sweepRuns', 'mcDauer'
     ];
 
     sweepInputIds.forEach(id => {
