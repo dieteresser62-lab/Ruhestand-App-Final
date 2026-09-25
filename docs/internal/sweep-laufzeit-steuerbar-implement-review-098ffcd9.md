@@ -10,8 +10,8 @@ Aufgabe: sweep-laufzeit-steuerbar-implement · Zielbranch: `feature/parameter-sw
 | Slice | Titel | Stand | Commit | Runden | Befunde |
 |---:|---|---|---|---:|---:|
 | 1 | Eigene Laufzahl und vollständiger Ergebnisnachweis | freigegeben | 1de1fd4e | 1 | 0 |
-| 2 | Rechenaufwand und Rückfrage vor dem Start | freigegeben | – | 1 | 0 |
-| 3 | Zwischenfortschritt in Worker und seriellem Pfad | ausstehend | – | 0 | 0 |
+| 2 | Rechenaufwand und Rückfrage vor dem Start | freigegeben | fb0832a7 | 1 | 0 |
+| 3 | Zwischenfortschritt in Worker und seriellem Pfad | freigegeben | – | 2 | 2 |
 | 4 | Abbruch, atomare Ergebnisse und Dokumentation | ausstehend | – | 0 | 0 |
 <!-- audit:overview:end -->
 
@@ -20,7 +20,8 @@ Aufgabe: sweep-laufzeit-steuerbar-implement · Zielbranch: `feature/parameter-sw
 <!-- audit:findings:begin -->
 | ID | Herkunft | Klasse | Stand | Titel |
 |---|---|---|---|---|
-| – | – | – | – | Keine. |
+| C-01 | Slice 3 | Befund | geschlossen | Serieller Pfad: `runSweepChunkAsync` gibt nach jedem Fortschrittsschritt per `await new Promise(resolve =>… |
+| C-02 | Slice 3 | Befund | geschlossen | Der Browser-Smoke weist im Worker-Pfad keinen Zwischenfortschritt innerhalb eines Blocks nach |
 <!-- audit:findings:end -->
 
 ## Halte und Entscheidungen

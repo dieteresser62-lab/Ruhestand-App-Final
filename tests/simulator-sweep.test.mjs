@@ -37,7 +37,8 @@ import {
     SWEEP_HOUSEHOLD_RISK_DIAGNOSTICS_VERSION,
     SWEEP_COMPARISON_RANDOMNESS_VERSION,
     buildSweepInputs,
-    runSweepChunk
+    runSweepChunk,
+    runSweepChunkAsync
 } from '../app/simulator/sweep-runner.js';
 import { SWEEP_METRICS_VERSION } from '../app/simulator/sweep-metrics-contract.js';
 import { resetPersistenceForTests, resetPersistenceRuntimeForTests } from '../app/shared/persistence-facade.js';
@@ -221,6 +222,46 @@ function buildSweepRequest(method, overrides = {}, useCapeSampling = false) {
         inputs: buildSamplingTestInputs(),
         historicalRecordCount: annualData.length
     });
+}
+
+// Der Fortschritts-Hook und die serielle Pause dürfen keine Ergebnisdaten ändern.
+{
+    const options = {
+        baseInputs: buildSamplingTestInputs(),
+        paramCombinations: [samplingTestCombination,
+            { ...samplingTestCombination, goldRebalancingBand: 999 }],
+        comboRange: { start: 0, count: 2 },
+        sweepRequest: buildSweepRequest('block', { anzahl: 4, maxDauer: 2 })
+    };
+    const baseline = runSweepChunk(options);
+    const synchronousProgress = [];
+    const withHook = runSweepChunk({
+        ...options, onProgress: units => synchronousProgress.push(units)
+    });
+    const asynchronousProgress = [];
+    const serial = await runSweepChunkAsync({
+        ...options, onProgress: units => asynchronousProgress.push(units)
+    });
+    assertEqual(JSON.stringify(withHook), JSON.stringify(baseline),
+        'Fortschritts-Hook behaelt Sweep-Resultate und Provenienz');
+    assertEqual(JSON.stringify(serial), JSON.stringify(baseline),
+        'Serieller Yield behaelt Sweep-Resultate und Provenienz');
+    assert(synchronousProgress.some(units => units > 0 && units < 1),
+        'Synchroner Chunk meldet Fortschritt vor Ende der ersten Kombination');
+    assert(asynchronousProgress.some(units => units > 0 && units < 1),
+        'Serieller Chunk meldet Fortschritt vor Ende der ersten Kombination');
+    assert(serial.results[1].metrics.invalidCombination === true,
+        'Ungueltige Kombination bleibt im seriellen Pfad klassifiziert');
+    let pauses = 0;
+    const fastSerial = await runSweepChunkAsync({
+        ...options,
+        now: () => 0,
+        yieldToEventLoop: async () => { pauses++; }
+    });
+    assertEqual(JSON.stringify(fastSerial), JSON.stringify(baseline),
+        'Gedrosselte Pausen behalten Sweep-Resultate und Provenienz');
+    assertEqual(pauses, 1,
+        'Schnelle Fortschrittsschritte erzeugen nur eine erste Timer-Pause');
 }
 
 // Test 1: parseRangeInput - Einzelwert

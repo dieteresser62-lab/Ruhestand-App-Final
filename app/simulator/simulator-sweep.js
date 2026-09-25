@@ -21,7 +21,7 @@ import { deepClone, extractP2Invariants } from './simulator-sweep-utils.js';
 import { renderSweepHeatmapSVG } from './simulator-heatmap.js';
 import { WorkerPool } from '../../workers/worker-pool.js';
 import { WorkerJobRunner } from './worker-job-runner.js';
-import { buildSweepInputs, runSweepChunk } from './sweep-runner.js';
+import { buildSweepInputs, runSweepChunkAsync } from './sweep-runner.js';
 import { persistenceStorage } from '../shared/persistence-facade.js';
 import { formatSimulatorValidationError, validateSimulatorInputs } from './simulator-input-validation.js';
 import { readMonteCarloParameters } from './monte-carlo-ui.js';
@@ -207,6 +207,7 @@ async function runSweepWithWorkers({
         minChunk,
         maxChunk,
         enableStallDetection: false,
+        trackPartialProgress: true,
         onProgress,
         buildPayload: (start, count) => ({
             type: 'sweep',
@@ -255,12 +256,16 @@ async function runSweepSerial({
 
     for (let start = 0; start < totalCombos; start += chunkSize) {
         const count = Math.min(chunkSize, totalCombos - start);
-        const serial = runSweepChunk({
+        const serial = await runSweepChunkAsync({
             baseInputs,
             paramCombinations,
             comboRange: { start, count },
             sweepRequest,
-            refP2Invariants
+            refP2Invariants,
+            onProgress: completedUnits => {
+                onProgress?.(Math.min(99,
+                    ((completedCombos + completedUnits) / totalCombos) * 100));
+            }
         });
         for (const item of serial.results) {
             sweepResults[item.comboIdx] = {
@@ -270,10 +275,7 @@ async function runSweepSerial({
             };
         }
         completedCombos += count;
-        if (typeof onProgress === 'function') {
-            onProgress((completedCombos / totalCombos) * 100);
-        }
-        await new Promise(resolve => setTimeout(resolve, 0));
+        onProgress?.(Math.min(99, (completedCombos / totalCombos) * 100));
     }
 
     return sweepResults;
@@ -296,6 +298,14 @@ export async function runParameterSweep() {
     const progressBarContainer = document.getElementById('sweep-progress-bar-container');
     const progressBar = document.getElementById('sweep-progress-bar');
     let progressStarted = false;
+    let completedSuccessfully = false;
+    let visibleProgress = 0;
+    const showProgress = pct => {
+        if (!Number.isFinite(pct)) return;
+        visibleProgress = Math.max(visibleProgress, Math.min(99, pct));
+        progressBar.style.width = `${visibleProgress}%`;
+        progressBar.textContent = `${Math.round(visibleProgress)}%`;
+    };
 
     try {
         prepareHistoricalDataOnce();
@@ -369,10 +379,7 @@ export async function runParameterSweep() {
                 paramCombinations,
                 sweepRequest,
                 refP2Invariants,
-                onProgress: pct => {
-                    progressBar.style.width = `${pct}%`;
-                    progressBar.textContent = `${Math.round(pct)}%`;
-                }
+                onProgress: showProgress
             });
             for (let i = 0; i < workerResults.length; i++) {
                 sweepResults[i] = workerResults[i];
@@ -384,10 +391,7 @@ export async function runParameterSweep() {
                 paramCombinations,
                 sweepRequest,
                 refP2Invariants,
-                onProgress: pct => {
-                    progressBar.style.width = `${pct}%`;
-                    progressBar.textContent = `${Math.round(pct)}%`;
-                }
+                onProgress: showProgress
             });
             for (let i = 0; i < serialResults.length; i++) {
                 sweepResults[i] = serialResults[i];
@@ -413,6 +417,7 @@ export async function runParameterSweep() {
         document.getElementById('findBestButton').style.display = 'inline-block';
         document.getElementById('sensitivityButton').style.display = 'inline-block';
         document.getElementById('paretoButton').style.display = 'inline-block';
+        completedSuccessfully = true;
     } catch (error) {
         // Bewusste, knappe Nutzerwarnung – ergänzt mit Hinweis für Entwickler.
         alert("Fehler im Parameter-Sweep:\n\n" + formatSimulatorValidationError(error));
@@ -422,7 +427,7 @@ export async function runParameterSweep() {
         progressBar.style.width = '0%';
         progressBar.textContent = '0%';
     } finally {
-        if (progressStarted && progressBar.style.width !== '0%') {
+        if (progressStarted && completedSuccessfully) {
             progressBar.style.width = '100%';
             progressBar.textContent = '100%';
         }
