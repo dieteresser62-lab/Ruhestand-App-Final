@@ -40,6 +40,7 @@ import {
     runSweepChunk
 } from '../app/simulator/sweep-runner.js';
 import { SWEEP_METRICS_VERSION } from '../app/simulator/sweep-metrics-contract.js';
+import { resetPersistenceForTests, resetPersistenceRuntimeForTests } from '../app/shared/persistence-facade.js';
 import {
     SWEEP_REQUEST_VERSION,
     SWEEP_SAMPLING_METHOD_RESOLUTION,
@@ -116,6 +117,88 @@ const samplingTestCombination = Object.freeze({
     maxBearRefillPct: 5,
     goldTargetPct: 0
 });
+
+{
+    const previousDocument = globalThis.document;
+    const previousWindow = globalThis.window;
+    const records = new Map();
+    resetPersistenceForTests({
+        getItemSync: key => records.get(key) ?? null,
+        setItemSync: (key, value) => records.set(key, value),
+        removeItemSync: key => records.delete(key)
+    });
+    const createField = () => ({
+        value: '500',
+        listeners: {},
+        addEventListener(type, listener) { this.listeners[type] = listener; }
+    });
+    try {
+        globalThis.window = {};
+        let field = createField();
+        globalThis.document = {
+            addEventListener() {},
+            getElementById: id => id === 'sweepRuns' ? field : null
+        };
+        const { initSweepDefaultsWithLocalStorageFallback } = await import('../app/simulator/simulator-sweep.js');
+        initSweepDefaultsWithLocalStorageFallback();
+        assertEqual(field.value, '500', 'fehlender Speicherwert behaelt den Sweep-Default 500');
+        field.value = '17';
+        field.listeners.input();
+        assertEqual(records.get('sim.sweep.runs'), '17', 'Eingabe wird unter eigenem Sweep-Schluessel gespeichert');
+        field = createField();
+        initSweepDefaultsWithLocalStorageFallback();
+        assertEqual(field.value, '17', 'gespeicherte Laufzahl wird beim Laden wiederhergestellt');
+        records.set('sim.sweep.runs', '');
+        field = createField();
+        initSweepDefaultsWithLocalStorageFallback();
+        assertEqual(field.value, '', 'leerer Speicherwert bleibt als Fehleingabe sichtbar');
+        records.set('sim.sweep.runs', 'ungueltig');
+        field = createField();
+        initSweepDefaultsWithLocalStorageFallback();
+        assertEqual(field.value, 'ungueltig', 'ungueltiger Speicherwert wird nicht auf 500 ersetzt');
+    } finally {
+        if (previousDocument === undefined) delete globalThis.document;
+        else globalThis.document = previousDocument;
+        if (previousWindow === undefined) delete globalThis.window;
+        else globalThis.window = previousWindow;
+        resetPersistenceRuntimeForTests();
+    }
+}
+
+// Request und Provenienz aller Kombinationen tragen dieselbe validierte Laufzahl.
+{
+    const request = buildSweepRequest('block', {
+        anzahl: 2,
+        maxDauer: 2,
+        blockSize: 1,
+        seed: 0,
+        startYearMode: 'FILTER',
+        startYearFilter: 1980
+    }, true);
+    const invalidCombination = { ...samplingTestCombination, goldRebalancingBand: 999 };
+    const execution = runSweepChunk({
+        baseInputs: buildSamplingTestInputs(),
+        paramCombinations: [samplingTestCombination, invalidCombination],
+        comboRange: { start: 0, count: 2 },
+        sweepRequest: request
+    });
+    assertEqual(execution.sweepRequest.monteCarloParameters.anzahl, 2, 'Sweep-Request behaelt die Laufzahl');
+    assert(execution.results[0].metrics.invalidCombination !== true, 'erste Kombination ist gueltig');
+    assert(execution.results[1].metrics.invalidCombination === true, 'zweite Kombination ist ungueltig');
+    for (const result of execution.results) {
+        const proven = result.provenance.normalizedParameters;
+        assertEqual(JSON.stringify(proven), JSON.stringify(execution.sweepRequest.monteCarloParameters),
+            'jede Ergebnis-Provenienz enthaelt das gesamte validierte Parameterobjekt');
+        assertEqual(proven.anzahl, 2, 'jede Ergebnis-Provenienz behaelt die Laufzahl');
+        assertEqual(proven.maxDauer, 2, 'Dauer bleibt erhalten');
+        assertEqual(proven.blockSize, 1, 'Blockgroesse bleibt erhalten');
+        assertEqual(proven.seed, 0, 'Seed bleibt erhalten');
+        assertEqual(proven.startYearMode, 'FILTER', 'Startjahr-Modus bleibt erhalten');
+        assertEqual(proven.startYearFilter, 1980, 'Startjahr-Filter bleibt erhalten');
+        assertEqual(result.provenance.useCapeSampling, true, 'CAPE bleibt erhalten');
+        assertEqual(result.provenance.requestedSamplingMethod, 'block', 'Methode bleibt erhalten');
+    }
+}
 
 function buildSweepRequest(method, overrides = {}, useCapeSampling = false) {
     return normalizeSweepRequestV1({

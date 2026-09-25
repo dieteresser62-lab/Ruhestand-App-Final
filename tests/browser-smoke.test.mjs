@@ -2530,6 +2530,20 @@ async function runSimulatorSweepIntegration(browser, baseUrl) {
     const { page } = smoke;
     await page.locator('.tab-btn[data-tab="sweep"]').click();
     await page.locator('#sweepButton').waitFor({ state: 'visible' });
+    assert(await page.locator('#sweepRuns').inputValue() === '500',
+        'Frischer Simulator zeigt 500 Sweep-Simulationen');
+    assert(await page.locator('#mcAnzahl').inputValue() === '10000',
+        'Frischer Simulator behaelt 10000 MC-Simulationen');
+    await page.locator('#sweepRuns').fill('2');
+    await page.evaluate(async () => {
+        const { flush } = await import('./app/shared/persistence-facade.js');
+        await flush();
+    });
+    await page.reload();
+    await page.locator('.tab-btn[data-tab="sweep"]').click();
+    await page.waitForFunction(() => document.getElementById('sweepRuns')?.value === '2');
+    assert(await page.locator('#sweepRuns').inputValue() === '2',
+        'Sweep-Laufzahl ueberlebt das Neuladen');
     await page.evaluate(() => {
         const setValue = (id, value) => {
             const element = document.getElementById(id);
@@ -2537,7 +2551,7 @@ async function runSimulatorSweepIntegration(browser, baseUrl) {
             element.dispatchEvent(new Event('input', { bubbles: true }));
             element.dispatchEvent(new Event('change', { bubbles: true }));
         };
-        setValue('mcAnzahl', 2);
+        setValue('mcAnzahl', 'ungueltig');
         setValue('mcDauer', 2);
         setValue('mcBlockSize', 1);
         setValue('mcWorkerCount', 1);
@@ -2562,6 +2576,8 @@ async function runSimulatorSweepIntegration(browser, baseUrl) {
     const standard = await page.evaluate(() => {
         const result = window.sweepExecution.results[0];
         return {
+            requestedRuns: window.sweepExecution.request.monteCarloParameters.anzahl,
+            provenRuns: result.provenance.normalizedParameters.anzahl,
             metricVersion: result.metrics?.schemaVersion,
             invalidCombination: result.metrics?.invalidCombination,
             invalidReason: result.metrics?.invalidReason,
@@ -2574,6 +2590,8 @@ async function runSimulatorSweepIntegration(browser, baseUrl) {
     assert(standard.metricVersion === 'SweepMetricsV4'
         && standard.invalidCombination !== true && Number.isFinite(standard.value),
     `Standard-Sweep muss einen kanonischen Metrikwert liefern: ${JSON.stringify(standard)}`);
+    assert(standard.requestedRuns === 2 && standard.provenRuns === 2,
+        'Sweep nutzt seine eigene Laufzahl in Request und gueltiger Provenienz');
     assert(standard.cellCount > 0 && standard.text.includes(`${standard.value.toFixed(1)}%`)
         && !standard.text.includes('Keine gültigen Sweep-Ergebnisse'),
         'Standard-Sweep zeigt eine SVG-Zelle mit kanonischem Wert');
@@ -2632,7 +2650,42 @@ async function runSimulatorSweepIntegration(browser, baseUrl) {
     ]), 'Browser Sweep result must expose every interactive parameter and no unsupported direct-horizon field');
     assert(execution.maxBearRefillPct === 5,
         'Browser Sweep must preserve the visible Bear-Refill assumption instead of forcing zero');
-    smoke.assertNoErrors();
+    await page.locator('#sweepGoldRebalancingBand').fill('999');
+    await page.locator('#sweepButton').click();
+    await page.waitForFunction(() => window.sweepExecution?.results?.[0]?.metrics?.invalidCombination === true);
+    const invalid = await page.evaluate(() => ({
+        runs: window.sweepExecution.request.monteCarloParameters.anzahl,
+        provenRuns: window.sweepExecution.results[0].provenance.normalizedParameters.anzahl,
+        provenMethod: window.sweepExecution.results[0].provenance.requestedSamplingMethod
+    }));
+    assert(invalid.runs === 2 && invalid.provenRuns === 2 && invalid.provenMethod,
+        'Ungueltige Kombination behaelt die validierte Laufzahl und Methode in der Provenienz');
+    await page.locator('#sweepRuns').fill('');
+    await page.evaluate(async () => {
+        const { flush } = await import('./app/shared/persistence-facade.js');
+        await flush();
+    });
+    await page.reload();
+    await page.locator('.tab-btn[data-tab="sweep"]').click();
+    await page.waitForFunction(() => document.getElementById('sweepRuns')?.value === '');
+    await page.locator('#sweepButton').click();
+    assert((await page.evaluate(() => window.__browserSmokeAlerts || []))
+        .some(message => message.includes('Sweep-Simulationen je Kombination')),
+    'Leere gespeicherte Laufzahl verhindert den Sweep mit verstaendlicher Meldung');
+    assert(await page.evaluate(() => window.sweepExecution === undefined),
+        'Fehleingabe startet keinen Sweep');
+    await page.evaluate(async () => {
+        const { persistenceStorage, flush } = await import('./app/shared/persistence-facade.js');
+        persistenceStorage.setItem('sim.sweep.runs', 'ungueltig');
+        await flush();
+    });
+    await page.reload();
+    await page.locator('.tab-btn[data-tab="sweep"]').click();
+    await page.locator('#sweepButton').click();
+    assert((await page.evaluate(() => window.__browserSmokeAlerts || []))
+        .some(message => message.includes('Sweep-Simulationen je Kombination')),
+    'Ungueltiger gespeicherter Wert wird nicht auf 500 korrigiert');
+    smoke.assertNoErrors(['Parameter-Sweep Fehler:']);
     await smoke.close();
 }
 
@@ -2763,7 +2816,11 @@ async function main() {
             ['Balance annual commit', runBalanceAnnualCommit]
         ];
 
-        for (const [label, smoke] of smokes) {
+        const only = process.argv.find(argument => argument.startsWith('--only='))?.slice('--only='.length);
+        if (only && !smokes.some(([label]) => label === only)) {
+            throw new Error(`Unbekannter Browser-Smoke: ${only}`);
+        }
+        for (const [label, smoke] of smokes.filter(([label]) => !only || label === only)) {
             console.log(`Running browser smoke: ${label}`);
             await smoke(browser, baseUrl);
             console.log(`Browser smoke passed: ${label}`);

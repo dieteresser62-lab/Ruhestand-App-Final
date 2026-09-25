@@ -74,6 +74,7 @@ export function initSweepDefaultsWithLocalStorageFallback() {
     persistenceStorage.removeItem('sim.sweep.targetEq');
 
     const map = [
+        ['sweepRuns', 'sim.sweep.runs'],
         ['sweepLiquidityRunwayYears', 'sim.sweep.liquidityRunwayYears'],
         ['sweepGoldRebalancingBand', 'sim.sweep.goldRebalancingBand'],
         ['sweepMaxSkimPct', 'sim.sweep.maxSkimPct'],
@@ -91,7 +92,8 @@ export function initSweepDefaultsWithLocalStorageFallback() {
         }
 
         const persistedValue = persistenceStorage.getItem(storageKey);
-        if (persistedValue !== null && persistedValue !== undefined && persistedValue !== '') {
+        if (persistedValue !== null && persistedValue !== undefined
+            && (persistedValue !== '' || elementId === 'sweepRuns')) {
             element.value = persistedValue;
         }
 
@@ -320,7 +322,7 @@ export async function runParameterSweep() {
         const baseInputs = deepClone(validateSimulatorInputs(getCommonInputs()));
         const sweepRequest = normalizeSweepRequestV1({
             schemaVersion: SWEEP_REQUEST_VERSION,
-            monteCarloParameters: readMonteCarloParameters(baseInputs),
+            monteCarloParameters: readMonteCarloParameters(baseInputs, { runsElementId: 'sweepRuns' }),
             useCapeSampling: document.getElementById('useCapeSampling')?.checked === true
         }, { inputs: baseInputs });
         const sweepResults = new Array(paramCombinations.length);

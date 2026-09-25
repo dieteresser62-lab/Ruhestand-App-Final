@@ -395,9 +395,12 @@ function readOptionalIntegerInput(elementId, description, { min = -Infinity, max
  * und liefert dem Nutzer klare Fehlermeldungen.
  * @returns {{ anzahl: number, maxDauer: number, blockSize: number, seed: number, methode: string, rngMode: string, startYearMode: string, startYearFilter: number, startYearHalfLife: number, excludeEstimatedHistory: boolean }}
  */
-export function readMonteCarloParameters(inputs = null) {
+export function readMonteCarloParameters(inputs = null, { runsElementId = 'mcAnzahl' } = {}) {
     const methodeSelect = requireElement('mcMethode', 'Monte-Carlo Methode');
-    const anzahlElement = requireElement('mcAnzahl', 'Anzahl der Simulationen');
+    const runsDescription = runsElementId === 'mcAnzahl'
+        ? 'Anzahl der Simulationen'
+        : 'Sweep-Simulationen je Kombination';
+    const anzahlElement = requireElement(runsElementId, runsDescription);
     const durationElement = requireElement('mcDauer', 'Simulationsdauer in Jahren');
     const blockSizeElement = requireElement('mcBlockSize', 'Blocklaenge');
     const seedElement = requireElement('mcSeed', 'Zufalls-Seed');
@@ -406,7 +409,12 @@ export function readMonteCarloParameters(inputs = null) {
     const excludeEstimatedHistoryElement = document.getElementById('mcExcludeEstimatedHistory');
 
     return normalizeMonteCarloParametersV1({
-        anzahl: anzahlElement.value,
+        anzahl: runsElementId === 'mcAnzahl'
+            ? anzahlElement.value
+            : readIntegerInput(runsElementId, runsDescription, {
+                min: MONTE_CARLO_PARAMETER_LIMITS.runs.minimum,
+                max: MONTE_CARLO_PARAMETER_LIMITS.runs.hardMaximum
+            }),
         maxDauer: durationElement.value,
         blockSize: blockSizeElement.value,
         seed: seedElement.value,
