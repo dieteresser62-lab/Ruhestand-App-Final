@@ -9,8 +9,8 @@ Aufgabe: sweep-laufzeit-steuerbar-implement · Zielbranch: `feature/parameter-sw
 <!-- audit:overview:begin -->
 | Slice | Titel | Stand | Commit | Runden | Befunde |
 |---:|---|---|---|---:|---:|
-| 1 | Eigene Laufzahl und vollständiger Ergebnisnachweis | freigegeben | – | 1 | 0 |
-| 2 | Rechenaufwand und Rückfrage vor dem Start | ausstehend | – | 0 | 0 |
+| 1 | Eigene Laufzahl und vollständiger Ergebnisnachweis | freigegeben | 1de1fd4e | 1 | 0 |
+| 2 | Rechenaufwand und Rückfrage vor dem Start | freigegeben | – | 1 | 0 |
 | 3 | Zwischenfortschritt in Worker und seriellem Pfad | ausstehend | – | 0 | 0 |
 | 4 | Abbruch, atomare Ergebnisse und Dokumentation | ausstehend | – | 0 | 0 |
 <!-- audit:overview:end -->

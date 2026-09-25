@@ -2570,6 +2570,40 @@ async function runSimulatorSweepIntegration(browser, baseUrl) {
     });
     assert((await page.locator('#sweepGridSize').textContent()).includes('Grid: 1 Kombis'),
         'Inaktive VPW-Ranges werden im Grid nicht mitgezaehlt');
+    const workload = page.locator('#sweepWorkload');
+    assert((await workload.textContent()).includes('1 Kombination × 2 Läufe × 2 Jahre = 4 nominelle Laufjahre'),
+        'Sweep-Aufwand zeigt Kombinationen, eigene Laufzahl und nominelle Jahre vor dem Start');
+    await page.locator('#sweepRuns').fill('3');
+    assert((await workload.textContent()).includes('= 6 nominelle Laufjahre'),
+        'Sweep-Aufwand reagiert auf die eigene Laufzahl');
+    await page.locator('#sweepRuns').fill('2');
+    await page.locator('#mcDauer').fill('3');
+    assert((await workload.textContent()).includes('= 6 nominelle Laufjahre'),
+        'Sweep-Aufwand reagiert auf die Dauer');
+    await page.locator('#mcDauer').fill('2');
+    await page.locator('#sweepLiquidityRunwayYears').fill('3,4');
+    assert((await workload.textContent()).includes('2 Kombinationen × 2 Läufe × 2 Jahre = 8 nominelle Laufjahre'),
+        'Sweep-Aufwand verwendet die aktiven Ranges');
+    await page.locator('#sweepLiquidityRunwayYears').fill('3');
+    await page.locator('#sweepGoldRebalancingBand').fill('0:1:299');
+    assert((await page.locator('#sweepGridSize').textContent()).includes('Grid: 300 Kombis')
+        && !(await page.locator('#sweepGridSize').textContent()).includes('Max: 300')
+        && (await workload.textContent()).includes('= 1.200 nominelle Laufjahre'),
+    'Genau 300 Kombinationen bleiben innerhalb des Grid-Limits');
+    await page.locator('#sweepGoldRebalancingBand').fill('0:1:300');
+    assert((await page.locator('#sweepGridSize').textContent()).includes('Max: 300')
+        && (await workload.textContent()).includes('?'),
+    '300-Kombinationen-Limit bleibt sichtbar und uebergrosse Grids haben keinen belastbaren Aufwand');
+    await page.locator('#sweepGoldRebalancingBand').fill('25');
+    await page.locator('#sweepLiquidityRunwayYears').fill('');
+    assert((await workload.textContent()).includes('?'), 'Leere aktive Range zeigt keinen Aufwand');
+    await page.locator('#sweepLiquidityRunwayYears').fill('3');
+    await page.locator('#sweepRuns').fill('');
+    assert((await workload.textContent()).includes('?'), 'Leere Laufzahl zeigt keinen Aufwand');
+    await page.locator('#sweepRuns').fill('2');
+    await page.locator('#mcDauer').fill('0');
+    assert((await workload.textContent()).includes('?'), 'Ungueltige Dauer zeigt keinen Aufwand');
+    await page.locator('#mcDauer').fill('2');
     await page.locator('#sweepButton').click();
     await page.waitForFunction(() => window.sweepExecution?.results?.length === 1
         && document.querySelector('#sweepHeatmap svg'), null, { timeout: 30000 });
@@ -2660,6 +2694,53 @@ async function runSimulatorSweepIntegration(browser, baseUrl) {
     }));
     assert(invalid.runs === 2 && invalid.provenRuns === 2 && invalid.provenMethod,
         'Ungueltige Kombination behaelt die validierte Laufzahl und Methode in der Provenienz');
+    await page.locator('#mcDauer').fill('40');
+    await page.locator('#sweepRuns').fill('125000');
+    assert((await workload.textContent()).includes('125.000 Läufe × 40 Jahre = 5.000.000 nominelle Laufjahre'),
+        'Der Schwellwert wird aus validierten Faktoren im deutschen Zahlenformat angezeigt');
+    await page.evaluate(() => {
+        window.__sweepConfirmations = [];
+        window.confirm = message => {
+            window.__sweepConfirmations.push(String(message));
+            return false;
+        };
+    });
+    await page.locator('#sweepButton').click();
+    await page.waitForFunction(() => window.sweepExecution?.request?.monteCarloParameters?.anzahl === 125000,
+        null, { timeout: 30000 });
+    await page.locator('#sweep-progress-bar-container').waitFor({ state: 'hidden' });
+    assert((await page.evaluate(() => window.__sweepConfirmations)).length === 0,
+        'Genau 5.000.000 nominelle Laufjahre brauchen keine Bestaetigung');
+    await page.locator('#sweepRuns').fill('125001');
+    await page.evaluate(() => {
+        window.__sweepExecutionBeforeRefusal = window.sweepExecution;
+        window.__sweepResultsBeforeRefusal = window.sweepResults;
+        window.__sweepHeatmapBeforeRefusal = document.getElementById('sweepHeatmap').innerHTML;
+        window.__sweepWorkerCount = 0;
+        const NativeWorker = window.Worker;
+        window.Worker = class extends NativeWorker {
+            constructor(...args) {
+                window.__sweepWorkerCount++;
+                super(...args);
+            }
+        };
+    });
+    await page.locator('#sweepButton').click();
+    const refusal = await page.evaluate(() => ({
+        confirmations: window.__sweepConfirmations,
+        sameExecution: window.sweepExecution === window.__sweepExecutionBeforeRefusal,
+        sameResults: window.sweepResults === window.__sweepResultsBeforeRefusal,
+        sameHeatmap: document.getElementById('sweepHeatmap').innerHTML === window.__sweepHeatmapBeforeRefusal,
+        workerCount: window.__sweepWorkerCount,
+        progressVisible: document.getElementById('sweep-progress-bar-container').style.display !== 'none'
+    }));
+    assert(refusal.confirmations.length === 1
+        && refusal.confirmations[0].includes('5.000.040 nominelle Laufjahre')
+        && refusal.confirmations[0].includes('nicht zuverlässig vorhersagbar'),
+    'Ueber dem Schwellwert nennt die Rueckfrage den konkreten Aufwand und unsichere Dauer');
+    assert(refusal.sameExecution && refusal.sameResults && refusal.sameHeatmap && refusal.workerCount === 0
+        && !refusal.progressVisible,
+    'Ablehnung behaelt das vorherige Ergebnis und startet weder Worker noch Fortschritt');
     await page.locator('#sweepRuns').fill('');
     await page.evaluate(async () => {
         const { flush } = await import('./app/shared/persistence-facade.js');

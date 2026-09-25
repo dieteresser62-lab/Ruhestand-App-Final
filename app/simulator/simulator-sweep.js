@@ -32,6 +32,31 @@ import {
 import { SWEEP_METRICS_VERSION } from './sweep-metrics-contract.js';
 
 export const SWEEP_EXECUTION_VERSION = 'SweepExecutionV2';
+const SWEEP_LARGE_WORKLOAD_RUN_YEARS = 5_000_000;
+const sweepIntegerFormat = new Intl.NumberFormat('de-DE');
+
+export function calculateSweepWorkload(combinations, monteCarloParameters) {
+    const { anzahl: runs, maxDauer: years } = monteCarloParameters;
+    if (!Number.isSafeInteger(combinations) || combinations < 1
+        || !Number.isSafeInteger(runs) || runs < 1
+        || !Number.isSafeInteger(years) || years < 1
+        || !Number.isSafeInteger(combinations * runs * years)) {
+        throw new Error('Der nominelle Sweep-Aufwand ist nicht berechenbar.');
+    }
+    return { combinations, runs, years, runYears: combinations * runs * years };
+}
+
+export function readSweepWorkload(combinations) {
+    const inputs = getCommonInputs();
+    const parameters = readMonteCarloParameters(inputs, { runsElementId: 'sweepRuns' });
+    return calculateSweepWorkload(combinations, parameters);
+}
+
+export function formatSweepWorkload({ combinations, runs, years, runYears }) {
+    const format = value => sweepIntegerFormat.format(value);
+    const combinationLabel = combinations === 1 ? 'Kombination' : 'Kombinationen';
+    return `${format(combinations)} ${combinationLabel} × ${format(runs)} Läufe × ${format(years)} Jahre = ${format(runYears)} nominelle Laufjahre`;
+}
 
 const SWEEP_FIELDS = [
     ['liquidityRunwayYears', 'sweepLiquidityRunwayYears', 'Liquiditäts-Runway'],
@@ -270,6 +295,7 @@ export async function runParameterSweep() {
     sweepButton.disabled = true;
     const progressBarContainer = document.getElementById('sweep-progress-bar-container');
     const progressBar = document.getElementById('sweep-progress-bar');
+    let progressStarted = false;
 
     try {
         prepareHistoricalDataOnce();
@@ -313,10 +339,6 @@ export async function runParameterSweep() {
             return obj;
         });
 
-        progressBarContainer.style.display = 'block';
-        progressBar.style.width = '0%';
-        progressBar.textContent = '0%';
-
         // Basis-Inputs nur EINMAL lesen und einfrieren (Deep Clone)
         // Clone once so each combo can be safely overridden without side effects.
         const baseInputs = deepClone(validateSimulatorInputs(getCommonInputs()));
@@ -325,6 +347,16 @@ export async function runParameterSweep() {
             monteCarloParameters: readMonteCarloParameters(baseInputs, { runsElementId: 'sweepRuns' }),
             useCapeSampling: document.getElementById('useCapeSampling')?.checked === true
         }, { inputs: baseInputs });
+        const workload = calculateSweepWorkload(paramCombinations.length, sweepRequest.monteCarloParameters);
+        if (workload.runYears > SWEEP_LARGE_WORKLOAD_RUN_YEARS
+            && !confirm(`${formatSweepWorkload(workload)}.\n\nDas ist eine Großlast; die tatsächliche Dauer ist nicht zuverlässig vorhersagbar. Sweep trotzdem starten?`)) {
+            return;
+        }
+
+        progressBarContainer.style.display = 'block';
+        progressBar.style.width = '0%';
+        progressBar.textContent = '0%';
+        progressStarted = true;
         const sweepResults = new Array(paramCombinations.length);
 
         // Reference P2 invariants guard against accidental partner changes.
@@ -390,11 +422,11 @@ export async function runParameterSweep() {
         progressBar.style.width = '0%';
         progressBar.textContent = '0%';
     } finally {
-        if (progressBar.style.width !== '0%') {
+        if (progressStarted && progressBar.style.width !== '0%') {
             progressBar.style.width = '100%';
             progressBar.textContent = '100%';
         }
-        setTimeout(() => { progressBarContainer.style.display = 'none'; }, 250);
+        if (progressStarted) setTimeout(() => { progressBarContainer.style.display = 'none'; }, 250);
         sweepButton.disabled = false;
     }
 }
