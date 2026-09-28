@@ -1396,6 +1396,9 @@ app/simulator/simulator-main.js
 17. `mc-result-cockpit.js`: schliesst das Setup nach Erfolg, synchronisiert den Laufkopf und stellt vor dem Ergebnisfokus die sichtbare Cockpit-Ansicht her.
 
 ### Parameter-Sweep
+Im Simulator liegt die Exploration im Tab `Parameter-Sweep`; der eigenstaendige
+Tab `Auto-Optimize` steht direkt rechts daneben.
+
 1. `simulator-main.js`: Sweep-Button bindet `runParameterSweep()` aus `simulator-sweep.js`.
 2. `simulator-sweep.js`: Iteriert über Whitelist-Parameter, nutzt Worker-Jobs (Fallback seriell).
 3. `simulator-heatmap.js`: `renderHeatmapSVG()` visualisiert Ergebnisse und

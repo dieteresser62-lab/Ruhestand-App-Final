@@ -395,7 +395,8 @@
 
             <div class="tab-buttons"><button class="tab-btn active" data-tab="rahmendaten">Rahmendaten</button><button
                     class="tab-btn" data-tab="montecarlo">Monte-Carlo</button><button class="tab-btn" data-tab="backtesting">Backtesting</button><button class="tab-btn"
-                    data-tab="sweep">Parameter-Sweep</button></div>
+                    data-tab="sweep">Parameter-Sweep</button><button class="tab-btn"
+                    data-tab="auto-optimize">Auto-Optimize</button></div>
             <div class="tab-content">
                 <div id="tab-rahmendaten" class="tab-panel active">
                     <fieldset class="collapsible" data-fieldset="profile-selection">
@@ -1576,9 +1577,11 @@
                         </div>
                         <div id="sweepHeatmap"></div>
                     </div>
+                </div>
+                <div id="tab-auto-optimize" class="tab-panel">
                     <!--==========AUTO-OPTIMIZE (INTELLIGENT SEARCH)==========-->
                     <h3
-                        style="margin-top: 40px; color: var(--secondary-color); border-bottom: 2px solid var(--secondary-color); padding-bottom: 8px;">
+                        style="margin-top: 0; color: var(--secondary-color); border-bottom: 2px solid var(--secondary-color); padding-bottom: 8px;">
                         🚀 Auto-Optimize (Intelligent Search) </h3>
                     <p style="color: #666; margin-bottom: 20px; font-size: 0.95rem;">
                         Experimentelles Vergleichsverfahren mit Latin Hypercube Sampling,
