@@ -170,7 +170,7 @@ console.log('Test 4: Simulator DOM keeps cockpit contracts and ordering');
     assert(setup.includes('id="mcButton"'), 'canonical start button remains inside setup');
     assert(!setup.includes('max-height'), 'setup disclosure has no fixed clipping height');
     assert(html.indexOf('id="monteCarloResults"') < html.indexOf('id="stressReplayWorkspace"'), 'results precede replay deep-dive');
-    assertEqual((html.match(/class="[^"]*\btab-btn\b[^"]*"/g) || []).length, 4, 'Simulator keeps exactly four main tabs');
+    assertEqual((html.match(/class="[^"]*\btab-btn\b[^"]*"/g) || []).length, 5, 'Simulator keeps exactly five main tabs');
     assertEqual((html.match(/class="mc-view-tab"/g) || []).length, 5, 'cockpit exposes exactly five dedicated result tabs');
     assertEqual((html.match(/class="mc-view-panel"/g) || []).length, 5, 'cockpit exposes exactly five dedicated result panels');
     const logsPanel = html.match(/id="mcViewPanelLogs"[\s\S]*?<\/section>\s*<section id="mcViewPanelReplay"/)?.[0] || '';

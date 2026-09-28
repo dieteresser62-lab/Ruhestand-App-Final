@@ -2953,7 +2953,21 @@ async function runSimulatorSweepIntegration(browser, baseUrl) {
 async function runSimulatorOptimizerApplyIntegration(browser, baseUrl) {
     const smoke = await openSmokePage(browser, baseUrl, 'Simulator.html');
     const { page } = smoke;
-    await page.locator('.tab-btn[data-tab="sweep"]').click();
+    const tabLayout = await page.evaluate(() => ({
+        labels: [...document.querySelectorAll('.tab-buttons .tab-btn')].map(button => button.textContent.trim()),
+        optimizePanel: document.getElementById('ao_run_btn')?.closest('.tab-panel')?.id,
+        sweepPanel: document.getElementById('sweepButton')?.closest('.tab-panel')?.id
+    }));
+    assert(JSON.stringify(tabLayout.labels) === JSON.stringify([
+        'Rahmendaten', 'Monte-Carlo', 'Backtesting', 'Parameter-Sweep', 'Auto-Optimize'
+    ]), 'Simulator tabs must include Auto-Optimize directly after Parameter-Sweep');
+    assert(tabLayout.optimizePanel === 'tab-auto-optimize' && tabLayout.sweepPanel === 'tab-sweep',
+        'Optimizer and sweep controls must belong to separate tab panels');
+    await page.locator('.tab-btn[data-tab="auto-optimize"]').click();
+    await page.locator('#ao_run_btn').waitFor({ state: 'visible' });
+    assert(await page.locator('#tab-auto-optimize.active').count() === 1
+        && await page.locator('#tab-sweep.active').count() === 0,
+    'Auto-Optimize tab must activate its own panel');
     await page.locator('#ao_parameters_container .ao-parameter-block').first().waitFor({
         state: 'visible',
         timeout: 10000

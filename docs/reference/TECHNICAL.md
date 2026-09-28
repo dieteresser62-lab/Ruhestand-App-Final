@@ -656,6 +656,11 @@ Die Worker-Pools bieten ein opt-in Telemetrie-System für lokale Performance-Ana
 
 ### Parameter-Sweep & Auto-Optimize
 
+`Simulator.html` trennt die Oberflaechen in die benachbarten Tabs
+`Parameter-Sweep` und `Auto-Optimize`. Beide nutzen den vorhandenen
+`tab-btn`/`tab-panel`-Mechanismus; Sweep- und Optimizer-Bindungen bleiben
+an ihren bisherigen Element-IDs.
+
 #### Schutzmechanismen
 
 * **Whitelist** (`SWEEP_ALLOWED_KEYS`) beschränkt veränderbare Parameter.
