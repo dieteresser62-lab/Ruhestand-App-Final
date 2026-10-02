@@ -1,14 +1,14 @@
 # Balance-App – Modulübersicht
 
-Die Balance-App besteht aus 36 ES6-Modulen unter `app/balance/`. Das folgende Dokument fasst Verantwortung, Exporte und wichtige Abhängigkeiten zusammen.
+Die Balance-App besteht aus 39 ES6-Modulen unter `app/balance/`. Das folgende Dokument fasst Verantwortung, Exporte und wichtige Abhängigkeiten zusammen.
 Dateinamen werden unten kurz ohne Präfix genannt; tatsächlicher Pfad ist in der Regel `app/balance/<datei>.js`.
 Ausnahmen: Profilverbund-Module liegen unter `app/profile/`, Shared-Formatter unter `app/shared/`.
 
-**Stand:** 2026-07-26
+**Stand:** 2026-10-02
 
 ## Vollstaendige Datei-Inventur
 
-Die folgende Inventur wurde vor dem Balance-App-Hardening direkt gegen `app/balance/` abgeglichen. Sie ist die verbindliche Scope-Kontrolle fuer die geplanten Slices; gruppierte Detailbeschreibungen folgen darunter.
+Die folgende Inventur ist gegen den fertigen Stand von `app/balance/` abgeglichen; gruppierte Detailbeschreibungen folgen darunter.
 
 | Datei | Primaere Verantwortung |
 |---|---|
@@ -48,8 +48,11 @@ Die folgende Inventur wurde vor dem Balance-App-Hardening direkt gegen `app/bala
 | `balance-storage.js` | Balance-State, Migration, Snapshot-Archiv, Import-Recovery und Restore |
 | `balance-update-pipeline.js` | Validierung, Last-State, Diagnose und Persistenzentscheidung |
 | `balance-utils.js` | Zahlen-/Waehrungsformatierung und UI-Hilfen |
+| `balance-wealth-history-metrics.js` | Unverändernde Verlaufssortierung, drei Stapelgruppen, Anlass und Teildepotwerte |
+| `balance-wealth-history-renderer.js` | SVG, zugängliche Datentabelle sowie vollständiger Leer-/Fehler-Replace |
+| `balance-wealth-history.js` | Manuelle und jährliche Erfassung mit Profil-Recheck, gemeinsamer Schreibkoordination und bestätigtem State-/Registry-Replace |
 
-**Inventurergebnis:** 36 von 36 Dateien erfasst.
+**Inventurergebnis:** 39 von 39 Dateien erfasst. Der DOM-freie Datenvertrag liegt zusätzlich unter `types/wealth-history-contract.js`.
 
 ---
 
@@ -212,6 +215,25 @@ Event-Hub der Anwendung.
 - `balance-binder-imports.js` – erzeugt `balance-state`-Exports mit stabiler App-ID, `schemaVersion: 2` und `inputSchemaVersion: 2`; `BALANCE_IMPORT_INPUT_SCHEMA_V2` validiert alle importierbaren Felder, Bounds und Enums und akzeptiert im aktuellen Format nur echte Booleans. Der aktuelle Runway-Vertrag kennt nur `liquidityRunwayYears` (1 bis 10 in 0,5er-Schritten) und das Goldband `rebalancingBand` (0 bis 100). `balance-state` V1 und die expliziten v21.1-/v22.0-Legacy-Envelopes besitzen benannte Migratoren: Fehlt der kanonische Runway, gilt zuerst `runwayTargetMonths`, danach `runwayMinMonths`, sonst Default 5. Ganzzahlige Altwerte der frueheren UI-Domains werden auf das naechste Sechsmonatsraster aufgerundet und anschliessend in Jahre umgerechnet, sodass die Migration den Puffer nie verkuerzt; `targetEq` und `rebalBand` werden entfernt. Domainabweichungen blockieren den Recovery-Export nicht, sondern werden feldgenau unter `validationWarnings` inventarisiert. Alle Migrierpfade durchlaufen danach denselben vollstaendigen V2-Vertrag. JSON- und Markt-CSV-Pfade fuehren zuerst `PREVIEW`, dann Recovery/Replace und abschliessend `PERSIST_INPUTS` aus; spaete Fehler rollen Storage und sichtbare Eingaben zurueck. Der CSV-Pfad bindet Modus, Periode, Stichtag, Instrument und Dateiquelle, persistiert Abdeckung/Zeilenzahl/Hoch-Scope und kennzeichnet das lokale Fensterhoch weiterhin als `windowHigh`; nach D-13 verwendet die Engine es nur bei positivem Fensterabstand separat dokumentiert als konservative ATH-Untergrenze. `engineReference.applied` unterscheidet Anwendung und neutralen Fallback. File-Inputs werden nie auf einen nichtleeren Wert restauriert, weil Browser nur das programmgesteuerte Leeren erlauben.
 - `balance-binder-snapshots.js` – Snapshot-Handling und Jahresprozess-Coordinator; validiert den Live-State, flusht, bestaetigt den Snapshot vor fachlichen Writes und persistiert bei Teilfehlern Snapshot-ID sowie Recovery-Phase
 - `balance-binder-diagnosis.js` – Diagnose-Export
+
+---
+
+## 6a. Vermögensverlauf
+
+**Module und Exporte:**
+- `balance-wealth-history.js`: `createBalanceWealthHistoryService()` mit `captureContext()`, `assertContext()`, `runAnnual()`, `finalizeAnnual()` und `captureManual()`; `createManualWealthHistoryController()` mit `capture()` und `withAnnual()`.
+- `balance-wealth-history-metrics.js`: `prepareWealthHistoryMetrics()` validiert und sortiert ohne Mutation; Alt-/Neu-Depot bilden eine einzige Aktiengruppe.
+- `balance-wealth-history-renderer.js`: `renderBalanceWealthHistory()` und `refreshBalanceWealthHistory()` ersetzen SVG und Tabelle auch bei leerem oder fehlerhaftem State. Datum, Euro-Skala, drei Gruppen und Anlass als Text/Symbol/Rahmen ergänzen die per Tab erreichbare Tabelle mit Summe und beiden Teildepots; Einzel- und Nullstände bleiben gültig, schmale Ansichten scrollen intern. Es gibt keine Interpolation ungemessener Zwischenwerte.
+
+**Datenvertrag:** Optionales Top-Level-Feld `wealthHistory: { schemaVersion: 1, entries: [...] }` außerhalb von `inputs`/`lastState`, validiert durch `types/wealth-history-contract.js`. Records enthalten `id`, `asOf`, `reason`, `periodId`, `tagesgeld`, `geldmarktEtf`, `depotwertAlt`, `depotwertNeu`, `aktienEtf` und `total`. Nominale Euro-Werte bleiben ungerundet, nichtnegativ und endlich; Summen und Identitäten werden geprüft. `aktienEtf = depotwertAlt + depotwertNeu`, `total = tagesgeld + geldmarktEtf + aktienEtf`. Gold und separate Anleihen gehören nicht dazu; die Pflegezweckbindung wird weder addiert noch pauschal abgezogen. Fehlendes Feld ist leer; ein beschädigtes vorhandenes Feld wird sichtbar abgelehnt und nicht durch Erfassung überschrieben.
+
+**Quelle und Stichtag:** `result.inputData` nach Profil-/Tranchenaggregation, keine DOM-Anzeigetexte oder simulierten `newState`-Bestände. „Stand jetzt erfassen“ hält den lokalen Klicktag fest und führt synchron frisches `PREVIEW` aus; `manual:YYYY-MM-DD` (`reason: manual`, `periodId: null`) ersetzt ausschließlich den manuellen Tagesstand. Andere Tage und ein Jahresrecord am selben Datum bleiben separat. Jahreswerte stammen nach den Jahresdatenupdates aus dem erfolgreichen `commitLiveState()` für `planning.plan.targetYear`: `annual:YYYY`, `YYYY-12-31`, `annual_close`, `calendar-year:YYYY`, ohne zusätzliche historische Neubewertung. Beginn 2026, erster automatischer Stand für 2026 beim Abschluss 2027; kein Nachtragen alter Perioden. Normale Vorschauen erzeugen keine Stände, manuell entsteht kein zusätzlicher Engine-Periodencommit.
+
+**Persistenz und Recovery:** Gemeinsame Warteschlange, Flush sowie Profil-/State-Rechecks verhindern fremde oder veraltete Writes. Der transaktionale Replace umfasst ausschließlich den vorhandenen Balance-State-Key und `rs_profiles_v1`; Readback bestätigt Live-State und aktive Registrykopie. Jahresrecord und `annualPeriodMetadata.lastCommittedPeriod` werden gemeinsam finalisiert, Wiederholung ist ein No-op. Fehler bewahren vorherigen Verlauf und Pending-/Recoveryzustand; `incomplete_recovery` blockiert weitere Jahresläufe und manuelle Zwischenstände bis zum Snapshot-Restore, ohne direkten Resume. Der Verlauf gehört ausschließlich zum aktiven Profil, auch bei angezeigtem Verbund; andere Profile erhalten keine Kopie und spätere Verbundänderungen ändern frühere Stände nicht.
+
+**Transport:** Balance-JSON, Profilbundle, Komplettbackup und Standard-Snapshots erhalten das Feld ohne neue Keys oder äußere Schema-Version. Ein unterstützter Replace ohne Feld leert den Verlauf; Restore stellt den damaligen Verlauf wieder her, ohne append-only-Garantie über Restore/Replace hinweg. Die State-/Import-/Profil-/Backupgrenzen prüfen auch inaktive Profilverläufe. Einzelheiten und Summen-Toleranz stehen in `TECHNICAL.md`, gezielte Tests und separates Browsergate in `tests/README.md`.
+
+**Dependencies:** `balance-storage.js`, `balance-update-pipeline.js`, `balance-utils.js`, `app/shared/persistence-facade.js`, Profilregistry/-state und `types/wealth-history-contract.js`. Integration durch `balance-binder.js`/`balance-main.js`; Jahresfinalisierung durch `balance-binder-snapshots.js`.
 
 ---
 

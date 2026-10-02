@@ -4,7 +4,7 @@ Dieses Dokument beschreibt die Architektur und zentrale Datenflüsse der Ruhesta
 
 **Dokumentrolle:** Operative Entwickler-Referenz für aktuelle Modulzuständigkeiten, Datenflüsse und Laufzeitverhalten.
 **Abgrenzung:** Vertiefte fachliche Herleitungen, Marktvergleiche und Forschungsabgleich stehen in `ARCHITEKTUR_UND_FACHKONZEPT.md`.
-**Dokumentstand:** 2026-08-17; bestehender Architekturstand ergaenzt um das Monte-Carlo-Ergebnis-Cockpit.
+**Dokumentstand:** 2026-10-02; ergänzt um den profilbezogenen Vermögensverlauf in Balance.
 
 ---
 
@@ -14,7 +14,7 @@ Dieses Dokument beschreibt die Architektur und zentrale Datenflüsse der Ruhesta
 
 | Komponente | Dateien | Zweck |
 |------------|---------|-------|
-| Balance-App | `Balance.html`, `app/balance/*.js`, `css/balance.css` | Jahresabschluss, Liquiditäts- und Entnahmeplanung, Diagnosen, Ausgaben-Check mit Jahreshistorie |
+| Balance-App | `Balance.html`, `app/balance/*.js`, `css/balance.css` | Jahresabschluss, Liquiditäts- und Entnahmeplanung, Diagnosen, Ausgaben-Check mit Jahreshistorie und profilbezogener Vermögensverlauf |
 | Simulator | `Simulator.html`, `app/simulator/*.js`, `simulator.css` | Monte Carlo, Backtest, Sweeps, Auto-Optimize, Stationary Bootstrap, Tail-Risk-Stresstest, Pflegefall- und Pflegebucket-Wirklogik |
 | Profil/Verbund | `index.html`, `app/profile/*.js` | Profilverwaltung, Handoff/Flush, Profilverbund und Pflegebucket-Definition |
 | Tranchen | `depot-tranchen-manager.html`, `types/tranche-contract.js`, `app/tranches/*.js` | Kanonischer Lotvertrag, CRUD/Recovery, EUR-Quotes, Consumerstatus, bestaetigter Realbestandsabgleich und append-only Cashnachweis |
@@ -221,6 +221,18 @@ Persistenz.
 * `app/balance/balance-binder-snapshots.js` – Laufzeit-Coordinator fuer beide Jahres-Buttons: nebenwirkungsarme Engine-Vorpruefung, Pre-Mutation-Flush, validierter Recovery-Snapshot, persistierte Phasen `snapshot_confirmed`/`writes_started`/`validating`, fachliche Writes, Post-Write-Validierung und finaler Flush. Ein Pending-Commit blockiert weitere Jahresprozesse bis zum Snapshot-Restore.
 * `app/balance/balance-expenses.js` – Controller/Fassade fuer den Ausgaben-Check: Initialisierung, Event-Wiring, CSV-Import-Ablauf, Jahrumschaltung und gesperrte Korruptions-Recovery-UI.
 * `app/balance/balance-expenses-storage.js` / `balance-expenses-csv.js` / `balance-expenses-metrics.js` / `balance-expenses-renderer.js` – expliziter `ok`-/`empty`-/`corrupt`-Storagevertrag mit Recovery-Dokument, CSV-Parsing, Kennzahlen und DOM-Rendering des Ausgaben-Checks.
+
+### Vermögensverlauf: Daten- und Schreibvertrag
+
+* `types/wealth-history-contract.js` definiert und validiert das optionale Top-Level-Feld `wealthHistory` im Balance-State: `{ schemaVersion: 1, entries: [...] }`. Es liegt außerhalb von `inputs` und `lastState` und verwendet den vorhandenen profilbezogenen Balance-Key `ruhestandsmodellValues_v29_guardrails`; es gibt keinen zusätzlichen Storage-Key und keine neue äußere Exportversion. Fehlendes Feld bedeutet leer, Laden erzeugt keine Historie. Vorhandene beschädigte Verläufe werden an State-, Balance-Import-, Profil- und Backupgrenzen abgelehnt, auch in inaktiven Registryprofilen.
+* Ein Record enthält `id`, `asOf`, `reason`, `periodId`, `tagesgeld`, `geldmarktEtf`, `depotwertAlt`, `depotwertNeu`, `aktienEtf` und `total`. Nichtnegative endliche Beträge werden ungerundet gespeichert. `aktienEtf = depotwertAlt + depotwertNeu`, `total = tagesgeld + geldmarktEtf + aktienEtf`. Gold, separate Anleihen und simulierte Entnahme-/Verkaufsergebnisse werden nicht addiert. Die Pflegezweckbindung wird weder zusätzlich addiert noch pauschal abgezogen. Summenprüfung toleriert nur Gleitkomma-Rauschen bis `8 * Number.EPSILON * max(1, abs(erwarteteSumme))`.
+* `app/balance/balance-wealth-history.js` übernimmt `result.inputData` eines frischen erfolgreichen Balance-Updates nach Profil-/Tranchenaggregation. Die manuelle UI-Koordination hält vor dem Warten das lokale Klickdatum fest und führt synchron `PREVIEW` aus: `manual:YYYY-MM-DD`, `reason: manual`, `periodId: null`. Ein erneuter Tagesklick ersetzt ausschließlich diesen manuellen Record; andere Tage und ein Jahresrecord desselben Datums bleiben eigenständig. Es entsteht kein zusätzlicher `COMMIT_PERIOD`.
+* Der Jahres-Coordinator verwendet die Eingaben des erfolgreichen periodengebundenen `commitLiveState()` nach den Jahresdatenupdates sowie `planning.plan.targetYear`: `annual:YYYY`, `asOf: YYYY-12-31`, `reason: annual_close`, `periodId: calendar-year:YYYY`. Er erfasst die dann tatsächlich verwendeten Bestände ohne zusätzliche historische Neubewertung. Beginn ist `2026-01-01`, erster automatischer Abschluss 2026 im Jahr 2027. Jahresprozesse vor 2026 bleiben ohne Verlaufseintrag; alte Perioden werden nicht nachgetragen.
+* Eine gemeinsame Warteschlange koordiniert manuell/Jahresabschluss. Profilidentität, Pending-/Live-State und Registry werden nach asynchronen Schritten und vor dem Write erneut geprüft. `PersistenceFacade.replaceRecordsTransactional()` ersetzt ausschließlich Balance-State und `rs_profiles_v1` mit Flush, Backend-/Cache-Readback und Rollback. Jahresrecord und `annualPeriodMetadata.lastCommittedPeriod` werden im selben finalen State sowie derselben aktiven Registrykopie bestätigt. Erfolg kommt erst nach Readback; Wiederholung derselben abgeschlossenen Periode ist ein No-op. Bei finalem Schreibfehler bleiben vorheriger Verlauf und Pending-/Recoveryzustand maßgeblich. `incomplete_recovery` blockiert Wiederholung und manuelle Zwischenstände bis zum bestätigten Snapshot-Restore; es gibt keinen direkten Resume.
+* Der Verlauf gehört nur zum aktiven Profil, auch bei erfasstem Verbundbestand. Andere Profile erhalten keine Kopie, Verbundänderungen wirken nicht rückwirkend. Balance-JSON, Profilbundle, Komplettbackup und Standard-Snapshot-Restore transportieren das Feld über ihre bestehenden Pfade. Replace ohne Feld leert die Historie; Restore stellt den damaligen Verlauf wieder her. Es gilt keine append-only-Garantie über absichtliche Restore-/Replace-Operationen hinweg.
+* `balance-wealth-history-metrics.js` sortiert unverändernd nach Stichtag, danach Jahresabschluss vor manuell und anschließend ID. `balance-wealth-history-renderer.js` ersetzt SVG und Datentabelle bei jeder neuen Datenbasis, auch bei Legacy-/Fehlerzuständen. Drei gestapelte Gruppen, Datums-/Euro-Skala sowie Anlass als Text, Symbol und Rahmen ergänzen eine zugängliche Tabelle mit beiden Teildepots. Einzel- und Nullstände sind gültig. SVG-/Tabellenregionen sind per Tab erreichbar und scrollen bei Bedarf intern; es werden keine ungemessenen Zwischenwerte interpoliert.
+
+Validierung: `wealth-history-contract.test.mjs`, `balance-wealth-history.test.mjs`, `balance-wealth-history-chart.test.mjs` und `balance-annual-workflow-contract.test.mjs`, ergänzt durch bestehende Persistenz-/Profil-/Importtests. Das separate `npm run test:browser` prüft reale Erfassung, Tagesersetzung, Reload, Profilwechsel, Legacy-Replace, schmale Ansicht und den kontrollierten Abschluss 2026 bei fester Zeit im Januar 2027. `npm test` führt dieses Browsergate nicht aus; im orchestrierten Lauf fährt die volle Node-Suite allein der Orchestrator und das Browsergate außerhalb einer port-/browserbeschränkten Agentensandbox.
 
 ### Ablauf einer Aktualisierung
 
