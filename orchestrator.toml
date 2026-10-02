@@ -34,6 +34,17 @@ generated = [
 default_command = ["npm", "test"]
 default_timeout_seconds = 1200
 
+# Browser-Smoke (Playwright/Chromium) als zusaetzliche Pruefung ausserhalb der
+# Agenten-Sandbox: laeuft, sobald ein Arbeitspaket Oberflaeche, Logik oder den
+# Smoke selbst aendert. In der Sandbox scheitert er am Serverstart (listen EPERM).
+[[validation.rules]]
+patterns = [
+    "app/**", "engine/**", "workers/**", "types/**", "css/**", "assets/**",
+    "*.html", "*.js", "*.mjs", "tests/browser-smoke.test.mjs", "package.json",
+]
+command = ["npm", "run", "test:browser"]
+timeout_seconds = 900
+
 [workflow]
 plan_gate = false
 test_change_gate = false

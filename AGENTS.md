@@ -81,7 +81,7 @@ Im Handbetrieb gelten zusätzlich die Stoppbedingungen der jeweiligen Anweisung.
 - `dist/` nur anfassen, wenn der Auftrag explizit Build-, Sync- oder Release-Artefakte umfasst; keine EXE oder andere Build-Binaries committen.
 
 ## Validierung
-- Default: `npm test`. Der Browser-Smoke läuft separat mit `npm run test:browser`.
+- Default: `npm test`. Der Browser-Smoke (`npm run test:browser`) läuft im orchestrierten Lauf als zusätzliche Prüfregel außerhalb der Sandbox mit, sobald ein Arbeitspaket Oberfläche, Logik oder den Smoke selbst ändert (`orchestrator.toml`). In der Agenten-Sandbox scheitert er am Serverstart; gezielte Browserläufe dort sind kein Grund zum Anhalten.
 - Mandatory after changes to:
   - `engine/`,
   - `workers/`,
