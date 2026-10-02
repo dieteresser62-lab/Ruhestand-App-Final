@@ -58,6 +58,30 @@ fail-closed mit der Traceability-Matrix ab. Witness-Gates werden gegen
 `TEST_EXECUTION_POLICY` geprueft. Die Matrix belegt kanonische Zuordnung,
 Consumer und Provenienz, nicht eigenstaendig eine KPI-Wirkung.
 
+### Engine-Wrappervertrag
+
+`engine-wrapper-contract.test.mjs` wird automatisch von `npm test` entdeckt
+und prüft mit einer gezählten Assertion den vollständigen Inhalt von
+`engine.js` gegen einen unabhängig festgelegten Solltext. Geschützt sind
+der direkte Import aus `engine/index.mjs`, die Browser-Globals und die
+Exporte einschließlich des Legacy-Alias. Ausschließlich CRLF wird zu LF
+normalisiert; zusätzliche Anweisungen oder andere Inhaltsänderungen
+werden abgewiesen. Der Dateipfad wird aus `import.meta.url` abgeleitet,
+sodass die Prüfung unabhängig vom Arbeitsverzeichnis erfolgt.
+
+```bash
+node tests/run-single.mjs tests/engine-wrapper-contract.test.mjs
+```
+
+Die Prüfung liest nur den Wrapper und benötigt weder Build noch Bundler,
+Netz oder Browser. Ein echtes Bundle scheitert bewusst, auch wenn es
+frisch erzeugt wurde oder zusätzlich zum vollständigen Wrapper angehängt
+ist. Ein bewusster Bundlewechsel benötigt eine eigene geprüfte Änderung
+des Schutzvertrags mit einem nachvollziehbaren Aktualitätsnachweis;
+der Test darf dafür nicht still abgeschwächt oder übersprungen werden.
+Änderungen hinter demselben Modulimport erfordern für diese Prüfung
+keinen Neuaufbau von `engine.js`.
+
 ### Coverage-Baseline
 ```bash
 npm run test:coverage
