@@ -6,13 +6,13 @@ Provider-Attempts:
 
 | Slot | Rolle | Provider | Profil | Modell | Effort | Binary-Identität |
 |---|---|---|---|---|---|---|
-| implementer | implementer | codex | implementation | gpt-6.1-sol | high | verified: /home/dieter/.nvm/versions/node/v22.23.2/bin/codex (`b54337198672060af3d8dbf12f54c9b97b0b21a0f72252f03f7f32d63bbfe81d`) |
-| reviewer | reviewer | claude | review | opus | high | verified: /home/dieter/.local/bin/claude (`88694734fe19206de74d00d345886f58f1223377d235266d22eaa50394a25214`) |
-| implementer | implementer | codex | implementation | gpt-6.1-sol | high | verified: /home/dieter/.nvm/versions/node/v22.23.2/bin/codex (`b54337198672060af3d8dbf12f54c9b97b0b21a0f72252f03f7f32d63bbfe81d`) |
-| implementer | implementer | codex | implementation | gpt-6.1-sol | high | verified: /home/dieter/.nvm/versions/node/v22.23.2/bin/codex (`b54337198672060af3d8dbf12f54c9b97b0b21a0f72252f03f7f32d63bbfe81d`) |
-| implementer | implementer | codex | implementation | gpt-6.1-sol | high | verified: /home/dieter/.nvm/versions/node/v22.23.2/bin/codex (`b54337198672060af3d8dbf12f54c9b97b0b21a0f72252f03f7f32d63bbfe81d`) |
-| reviewer | reviewer | claude | review | opus | high | verified: /home/dieter/.local/bin/claude (`88694734fe19206de74d00d345886f58f1223377d235266d22eaa50394a25214`) |
-| final_reviewer | reviewer | claude | review | opus | high | verified: /home/dieter/.local/bin/claude (`88694734fe19206de74d00d345886f58f1223377d235266d22eaa50394a25214`) |
+| implementer | implementer | codex | implementation | gpt-6.1-sol | high | verified: ~/.nvm/versions/node/v22.23.2/bin/codex (`b54337198672060af3d8dbf12f54c9b97b0b21a0f72252f03f7f32d63bbfe81d`) |
+| reviewer | reviewer | claude | review | opus | high | verified: ~/.local/bin/claude (`88694734fe19206de74d00d345886f58f1223377d235266d22eaa50394a25214`) |
+| implementer | implementer | codex | implementation | gpt-6.1-sol | high | verified: ~/.nvm/versions/node/v22.23.2/bin/codex (`b54337198672060af3d8dbf12f54c9b97b0b21a0f72252f03f7f32d63bbfe81d`) |
+| implementer | implementer | codex | implementation | gpt-6.1-sol | high | verified: ~/.nvm/versions/node/v22.23.2/bin/codex (`b54337198672060af3d8dbf12f54c9b97b0b21a0f72252f03f7f32d63bbfe81d`) |
+| implementer | implementer | codex | implementation | gpt-6.1-sol | high | verified: ~/.nvm/versions/node/v22.23.2/bin/codex (`b54337198672060af3d8dbf12f54c9b97b0b21a0f72252f03f7f32d63bbfe81d`) |
+| reviewer | reviewer | claude | review | opus | high | verified: ~/.local/bin/claude (`88694734fe19206de74d00d345886f58f1223377d235266d22eaa50394a25214`) |
+| final_reviewer | reviewer | claude | review | opus | high | verified: ~/.local/bin/claude (`88694734fe19206de74d00d345886f58f1223377d235266d22eaa50394a25214`) |
 <!-- audit:meta:end -->
 
 ## Übersicht
