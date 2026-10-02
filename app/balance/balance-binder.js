@@ -23,6 +23,7 @@ import { createDiagnosisHandlers } from './balance-binder-diagnosis.js';
 import { createSnapshotHandlers } from './balance-binder-snapshots.js';
 import { PersistenceFacade } from '../shared/persistence-facade.js';
 import { BALANCE_UPDATE_MODE } from './balance-update-pipeline.js';
+import { createBalanceWealthHistoryService } from './balance-wealth-history.js';
 
 // Module-level references
 let dom = null;
@@ -52,7 +53,9 @@ export function initUIBinder(domRefs, state, updateFn, debouncedUpdateFn) {
     });
     const imports = createImportExportHandlers({ dom, debouncedUpdate, update });
     const diagnosis = createDiagnosisHandlers({ dom, appState });
+    const wealthHistory = createBalanceWealthHistoryService();
     const snapshots = createSnapshotHandlers({
+        wealthHistory,
         dom,
         appState,
         debouncedUpdate,
@@ -80,7 +83,7 @@ export function initUIBinder(domRefs, state, updateFn, debouncedUpdateFn) {
             return result;
         }
     });
-    handlers = { annual, imports, diagnosis, snapshots };
+    handlers = { annual, imports, diagnosis, snapshots, wealthHistory };
 }
 
 export const UIBinder = {
