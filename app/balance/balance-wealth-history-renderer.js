@@ -25,7 +25,7 @@ function chartMarkup(rows) {
         const dashed = row.reason === 'manual' ? ' stroke-dasharray="4 3"' : '';
         return `<g><title>${escape(dateLabel(row.asOf))}: ${row.label}, Summe ${euro(row.total)}</title>${segments}<rect class="wealth-outline" x="${x}" y="${y(row.total)}" width="44" height="${(row.total / maximum) * plotHeight}"${dashed}/><text x="${x + 22}" y="${baseline + 20}" text-anchor="middle">${dateLabel(row.asOf)}</text><text x="${x + 22}" y="${baseline + 40}" text-anchor="middle">${row.marker} ${row.label}</text></g>`;
     }).join('');
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} 325" style="min-width:${width}px" role="img" aria-labelledby="wealthChartTitle wealthChartDesc"><title id="wealthChartTitle">Vermögensverlauf in nominalen Euro</title><desc id="wealthChartDesc">Gestapelte Säulen für Liquidität, Geldmarkt-ETF und Aktien-ETF. Jahresabschluss: Quadrat und durchgezogener Rahmen. Manuell: Raute und gestrichelter Rahmen. Alle Werte und beide Teildepots stehen in der folgenden Tabelle.</desc><text x="100" y="20">Euro (€)</text>${axis}${bars}</svg>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} 325" style="min-width:${width}px" role="img" aria-labelledby="wealthChartTitle" aria-describedby="wealthChartDesc"><title id="wealthChartTitle">Vermögensverlauf in nominalen Euro</title><desc id="wealthChartDesc">Gestapelte Säulen für Liquidität, Geldmarkt-ETF und Aktien-ETF. Jahresabschluss: Quadrat und durchgezogener Rahmen. Manuell: Raute und gestrichelter Rahmen. Alle Werte und beide Teildepots stehen in der folgenden Tabelle.</desc><text x="100" y="20">Euro (€)</text>${axis}${bars}</svg>`;
 }
 
 function tableMarkup(rows) {

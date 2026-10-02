@@ -763,6 +763,12 @@ async function assertWealthBrowserTable(page, entries) {
     }
     const chart = page.getByRole('img', { name: 'Vermögensverlauf in nominalen Euro', exact: true });
     assert(await chart.count() === 1, 'Der Verlauf besitzt ein benanntes SVG');
+    assert(await chart.getAttribute('aria-labelledby') === 'wealthChartTitle', 'Nur der Titel benennt das SVG');
+    assert(await chart.getAttribute('aria-describedby') === 'wealthChartDesc', 'Die Beschreibung ist separat zugeordnet');
+    const description = chart.locator('desc[id="wealthChartDesc"]');
+    assert(await description.count() === 1, 'Das SVG besitzt genau ein referenziertes Beschreibungselement');
+    assert(await description.textContent() === 'Gestapelte Säulen für Liquidität, Geldmarkt-ETF und Aktien-ETF. Jahresabschluss: Quadrat und durchgezogener Rahmen. Manuell: Raute und gestrichelter Rahmen. Alle Werte und beide Teildepots stehen in der folgenden Tabelle.',
+        'Die vollständige Langbeschreibung ist erhalten');
     assert(await chart.locator('g').count() === entries.length, 'Jeder Stand besitzt eine eigene Säule');
     assert(!(await chart.innerHTML()).match(/NaN|Infinity/), 'Auch Nullstände haben endliche SVG-Koordinaten');
 }
@@ -958,7 +964,9 @@ async function runBalanceAnnualCommit(browser, baseUrl) {
     const current = (await readIndexedDb(smoke.page, 'kv', 'rs_current_profile')).value;
     assert(JSON.stringify(JSON.parse(registry.profiles[current].data[BALANCE_STATE_KEY]).wealthHistory) === JSON.stringify(state.wealthHistory),
         'Der Jahresstand ist auch in der aktiven Registrykopie bestätigt');
+    await smoke.page.getByRole('button', { name: 'Ausgaben-Check', exact: true }).click();
     await smoke.page.locator('#expensesYearSelect').selectOption('2026');
+    await smoke.page.getByRole('button', { name: 'Jahres-Update', exact: true }).click();
     await smoke.page.locator('#btnJahresUpdate').click();
     await smoke.page.waitForFunction(() => !document.getElementById('captureWealthBtn').disabled);
     const repeatMessages = await smoke.page.evaluate(() => window.__browserSmokeMessages);

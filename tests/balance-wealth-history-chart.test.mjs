@@ -10,6 +10,21 @@ const manual = createManualWealthHistoryEntry(source, '2026-12-31');
 const earlier = createManualWealthHistoryEntry({ ...source, tagesgeld: 1 }, '2026-06-01');
 const state = { wealthHistory: { schemaVersion: 1, entries: [manual, annual, earlier] } };
 const original = JSON.stringify(state);
+const chartDescription = 'Gestapelte Säulen für Liquidität, Geldmarkt-ETF und Aktien-ETF. Jahresabschluss: Quadrat und durchgezogener Rahmen. Manuell: Raute und gestrichelter Rahmen. Alle Werte und beide Teildepots stehen in der folgenden Tabelle.';
+
+function assertChartAccessibility(svg) {
+    const openingTag = svg.match(/^<svg\b[^>]*>/)?.[0] || '';
+    assertEqual(openingTag.match(/\srole="([^"]*)"/)?.[1], 'img', 'Das SVG hat die Rolle img');
+    assertEqual(openingTag.match(/\saria-labelledby="([^"]*)"/)?.[1], 'wealthChartTitle', 'Nur der Titel benennt das SVG');
+    assertEqual(openingTag.match(/\saria-describedby="([^"]*)"/)?.[1], 'wealthChartDesc', 'Die Beschreibung ist separat zugeordnet');
+    const titles = [...svg.matchAll(/<title id="wealthChartTitle">([^<]*)<\/title>/g)];
+    const descriptions = [...svg.matchAll(/<desc id="wealthChartDesc">([^<]*)<\/desc>/g)];
+    assertEqual(titles.length, 1, 'Genau ein referenziertes Titelelement');
+    assertEqual(descriptions.length, 1, 'Genau ein referenziertes Beschreibungselement');
+    assertEqual(titles[0]?.[1], 'Vermögensverlauf in nominalen Euro', 'Der zugängliche Titel ist exakt erhalten');
+    assertEqual(descriptions[0]?.[1], chartDescription, 'Die vollständige Langbeschreibung ist erhalten');
+}
+
 const rows = prepareWealthHistoryMetrics(state);
 assertEqual(rows.map(row => row.id).join(','), 'manual:2026-06-01,annual:2026,manual:2026-12-31', 'Chronologisch; Jahresabschluss vor manuell am gleichen Tag');
 assertEqual(JSON.stringify(state), original, 'Aufbereitung verändert keine gespeicherten Werte oder Reihenfolgen');
@@ -22,7 +37,7 @@ assertEqual(rows[1].total, 114000, 'Summe enthält keine doppelt gestapelten Tei
 const dom = { chart: { innerHTML: '' }, table: { innerHTML: '' }, hint: { textContent: '' } };
 assert(renderBalanceWealthHistory(dom, state), 'Unsortierter Verlauf wird dargestellt');
 const svg = dom.chart.innerHTML;
-assert(svg.includes('role="img"') && svg.includes('aria-labelledby='), 'SVG hat zugänglichen Namen und Beschreibung');
+assertChartAccessibility(svg);
 assert(svg.includes('Euro (€)') && svg.includes('31.12.2026'), 'Datum und Euro-Skala sichtbar');
 assertEqual((svg.match(/class="wealth-tagesgeld"/g) || []).length, 3, 'Pro Stand genau ein Liquiditätssegment');
 assertEqual((svg.match(/class="wealth-aktienEtf"/g) || []).length, 3, 'Teildepots nicht zusätzlich gestapelt');
@@ -37,6 +52,7 @@ for (const values of [source, { tagesgeld: 0, geldmarktEtf: 0, depotwertAlt: 0, 
     { tagesgeld: 1e300, geldmarktEtf: 2e300, depotwertAlt: 3e300, depotwertNeu: 4e300 }]) {
     const entry = createManualWealthHistoryEntry(values, '2026-10-01');
     assert(renderBalanceWealthHistory(dom, { wealthHistory: { schemaVersion: 1, entries: [entry] } }), 'Einzelstand, Nullstand und sehr große endliche Werte gültig');
+    assertChartAccessibility(dom.chart.innerHTML);
     assert(!/NaN|Infinity|undefined/.test(dom.chart.innerHTML), 'SVG enthält keine ungültigen Werte');
     const coordinates = [...dom.chart.innerHTML.matchAll(/\s(?:x|y|width|height|x1|x2|y1|y2)="([^"]+)"/g)];
     assert(coordinates.length > 0 && coordinates.every(match => Number.isFinite(Number(match[1]))), 'Alle SVG-Koordinaten endlich');
