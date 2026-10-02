@@ -591,6 +591,25 @@
                     und bestätigen Sie dort die dauerhafte Bestandsänderung separat.
                 </aside>
 
+                <section class="wealth-history" aria-labelledby="wealthHistoryTitle">
+                    <h3 id="wealthHistoryTitle">Vermögensverlauf</h3>
+                    <p>Die Stände gehören zum aktiven Profil, auch bei angezeigtem Profilverbund.
+                        Enthalten sind Tagesgeld, Geldmarkt-ETF und Aktien-ETF (Alt- und Neu-Depot).
+                        Gold und separate Anleihen gehören nicht zu dieser Summe.</p>
+                    <button id="captureWealthBtn" type="button" class="btn btn-primary">Stand jetzt erfassen</button>
+                    <p id="wealthHistoryStatus" role="status" aria-live="polite"></p>
+                    <p id="wealthHistoryHint" aria-live="polite"></p>
+                    <ul class="wealth-legend" aria-label="Vermögensgruppen">
+                        <li><span class="wealth-swatch wealth-tagesgeld" aria-hidden="true"></span>Liquidität (Tagesgeld)</li>
+                        <li><span class="wealth-swatch wealth-geldmarktEtf" aria-hidden="true"></span>Geldmarkt-ETF</li>
+                        <li><span class="wealth-swatch wealth-aktienEtf" aria-hidden="true"></span>Aktien-ETF</li>
+                    </ul>
+                    <p>■ Jahresabschluss: durchgezogener Rahmen · ◇ Manuell: gestrichelter Rahmen.
+                        Unregelmäßig erfasste Stände werden ohne Zwischenwerte dargestellt.</p>
+                    <div id="wealthHistoryChart" class="wealth-scroll" tabindex="0" role="region" aria-label="Vermögensdiagramm"></div>
+                    <div id="wealthHistoryTable" class="wealth-scroll" tabindex="0" role="region" aria-label="Tabelle der Vermögensstände"></div>
+                </section>
+
                 <div id="print-footer"></div>
             </div>
         </div>

@@ -5,12 +5,14 @@ import { StorageManager } from './balance-storage.js';
 import { PersistenceFacade, persistenceStorage } from '../shared/persistence-facade.js';
 import { PROFILE_STORAGE_KEYS } from '../profile/profile-state.js';
 import { getProfileRegistry } from '../profile/profile-registry.js';
+import { BALANCE_UPDATE_MODE } from './balance-update-pipeline.js';
 import {
     createAnnualWealthHistoryEntry,
     createManualWealthHistoryEntry,
     readWealthHistory,
     upsertAnnualWealthHistory,
-    upsertManualWealthHistory
+    upsertManualWealthHistory,
+    formatLocalWealthHistoryDate
 } from '../../types/wealth-history-contract.js';
 
 const coordinators = new WeakMap();
@@ -133,6 +135,58 @@ export function createBalanceWealthHistoryService({
             if (!result?.ok) return Promise.reject(result?.error || new Error('Aktuelle gültige Balance-Eingaben fehlen.'));
             const entry = createManualWealthHistoryEntry(result.inputData, asOf);
             return enqueue(() => persistEntry({ context, entry }));
+        }
+    };
+}
+
+/** UI-Koordination hält Klickdatum und frische Vorschau vor dem ersten Warten fest. */
+export function createManualWealthHistoryController({ service, update, refresh, button, status,
+    annualButtons = [], now = () => new Date(), toast = () => {} }) {
+    let manualBusy = false;
+    let annualBusy = 0;
+    const syncControls = () => {
+        if (button) button.disabled = manualBusy || annualBusy > 0;
+        annualButtons.forEach(control => { if (control) control.disabled = manualBusy || annualBusy > 0; });
+    };
+    const message = text => { if (status) status.textContent = text; };
+    return {
+        async capture() {
+            if (manualBusy || annualBusy) return { status: 'in_flight' };
+            manualBusy = true;
+            syncControls();
+            message('Stand wird geprüft und gespeichert …');
+            try {
+                const asOf = formatLocalWealthHistoryDate(now());
+                const context = service.captureContext();
+                const result = update({ mode: BALANCE_UPDATE_MODE.PREVIEW });
+                service.assertContext(context);
+                if (!result?.ok) throw result?.error || new Error('Aktuelle gültige Balance-Eingaben fehlen.');
+                await service.captureManual({ result, asOf });
+                service.assertContext(context);
+                refresh();
+                message('Aktueller Stand dauerhaft gespeichert.');
+                toast('Aktueller Vermögensstand gespeichert.');
+                return { status: 'saved' };
+            } catch (error) {
+                refresh();
+                message(`Stand nicht bestätigt: ${error.message || error}`);
+                return { status: 'failed', error };
+            } finally {
+                manualBusy = false;
+                syncControls();
+            }
+        },
+        async withAnnual(operation) {
+            if (manualBusy) return { status: 'in_flight' };
+            annualBusy += 1;
+            syncControls();
+            message('');
+            try { return await operation(); }
+            finally {
+                annualBusy -= 1;
+                refresh();
+                syncControls();
+            }
         }
     };
 }
