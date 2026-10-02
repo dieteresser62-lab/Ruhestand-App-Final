@@ -14,6 +14,7 @@
  */
 
 import { CONFIG, StorageError } from './balance-config.js';
+import { assertBalanceWealthHistory, WealthHistoryError } from '../../types/wealth-history-contract.js';
 import { PersistenceFacade, persistenceStorage } from '../shared/persistence-facade.js';
 import { SnapshotArchive, SNAPSHOT_KINDS } from '../shared/snapshot-archive.js';
 import {
@@ -101,6 +102,7 @@ async function createArchiveSnapshot({ label = '', kind = SNAPSHOT_KINDS.manual,
 }
 
 async function restoreImportRecoverySnapshot(snapshot) {
+    validateSnapshotWealthHistory(snapshot);
     if (isFullImportRecoverySnapshot(snapshot)) {
         const targetRecords = Object.fromEntries(
             Object.entries(snapshot.records || {})
@@ -165,6 +167,15 @@ function buildRestoredProfileData(records) {
         data[key] = String(value);
     });
     return data;
+}
+
+function validateSnapshotWealthHistory(snapshot) {
+    const records = snapshot.records || {};
+    assertBalanceWealthHistory(parseJsonObject(records[CONFIG.STORAGE.LS_KEY]));
+    const registry = parseJsonObject(records[PROFILE_STORAGE_KEYS.registry]);
+    Object.values(registry?.profiles || {}).forEach(profile => {
+        assertBalanceWealthHistory(parseJsonObject(profile?.data?.[CONFIG.STORAGE.LS_KEY]));
+    });
 }
 
 function buildStandardRestorePlan(snapshot, currentRegistry) {
@@ -340,10 +351,11 @@ export const StorageManager = {
         try {
             const data = persistenceStorage.getItem(CONFIG.STORAGE.LS_KEY);
             const parsed = data ? JSON.parse(data) : {};
+            assertBalanceWealthHistory(parsed);
             validateStoredCumulativeInflationFactor(parsed);
             return this._runMigrations(parsed);
         } catch (e) {
-            if (e instanceof CumulativeInflationFactorError) throw e;
+            if (e instanceof CumulativeInflationFactorError || e instanceof WealthHistoryError) throw e;
             throw new StorageError("Fehler beim Laden des Zustands aus dem LocalStorage.", { originalError: e });
         }
     },
@@ -356,10 +368,11 @@ export const StorageManager = {
      */
     saveState(state) {
         try {
+            assertBalanceWealthHistory(state);
             validateStoredCumulativeInflationFactor(state);
             persistenceStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify(state));
         } catch (e) {
-            if (e instanceof CumulativeInflationFactorError) throw e;
+            if (e instanceof CumulativeInflationFactorError || e instanceof WealthHistoryError) throw e;
             throw new StorageError("Fehler beim Speichern des Zustands im LocalStorage.", { originalError: e });
         }
     },
@@ -376,6 +389,7 @@ export const StorageManager = {
      * @private
      */
     _runMigrations(data) {
+        assertBalanceWealthHistory(data);
         validateStoredCumulativeInflationFactor(data);
         const ensureTaxState = (payload) => {
             if (!payload || typeof payload !== 'object') return payload;
@@ -424,6 +438,7 @@ export const StorageManager = {
         if (!state || typeof state !== 'object' || Array.isArray(state)) {
             throw new StorageError('Der validierte Importzustand ist ungueltig.');
         }
+        assertBalanceWealthHistory(state);
 
         let serializedState;
         try {
@@ -643,6 +658,7 @@ export const StorageManager = {
      */
     async restoreSnapshot(key, handle) {
         const snapshot = await SnapshotArchive.readSnapshot(key);
+        validateSnapshotWealthHistory(snapshot);
         if (isFullImportRecoverySnapshot(snapshot)) {
             await restoreImportRecoverySnapshot(snapshot);
             location.reload();

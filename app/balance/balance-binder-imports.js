@@ -21,6 +21,7 @@ import {
 } from './balance-annual-period.js';
 import { normalizeTrancheCollection } from '../../types/tranche-contract.js';
 import { isValidCumulativeInflationFactor } from '../../types/cumulative-inflation-contract.js';
+import { assertBalanceWealthHistory, WealthHistoryError } from '../../types/wealth-history-contract.js';
 import {
     LIQUIDITY_RUNWAY_CONTRACT_V1,
     migrateLiquidityRunwayInput
@@ -843,6 +844,7 @@ function migrateBalanceStateV1(payload) {
     if (!isRecord(payload)) {
         failImport('invalid_payload', 'Der Balance-Inhalt ist kein Objekt. Bitte eine unveränderte Balance-Exportdatei auswählen.');
     }
+    validateWealthHistoryForImport(payload);
     if (!isRecord(payload.inputs)) {
         failImport('invalid_inputs', 'Der Pflichtbereich „inputs“ fehlt oder ist ungültig. Bitte eine vollständige Balance-Exportdatei auswählen.');
     }
@@ -917,10 +919,20 @@ function migrateBalanceStateV1(payload) {
     return validateBalanceState(migrated);
 }
 
+function validateWealthHistoryForImport(payload) {
+    try {
+        assertBalanceWealthHistory(payload);
+    } catch (error) {
+        if (!(error instanceof WealthHistoryError)) throw error;
+        failImport('invalid_wealth_history', error.message);
+    }
+}
+
 function validateBalanceState(payload) {
     if (!isRecord(payload)) {
         failImport('invalid_payload', 'Der Balance-Inhalt ist kein Objekt. Bitte eine unveränderte Balance-Exportdatei auswählen.');
     }
+    validateWealthHistoryForImport(payload);
     if (!isRecord(payload.inputs)) {
         failImport('invalid_inputs', 'Der Pflichtbereich „inputs“ fehlt oder ist ungültig. Bitte eine vollständige Balance-Exportdatei auswählen.');
     }
@@ -972,6 +984,7 @@ function validateBalanceState(payload) {
 }
 
 function migrateCurrentBalanceState(payload, { preserveInvalidRecoveryState = false } = {}) {
+    if (!preserveInvalidRecoveryState) validateWealthHistoryForImport(payload);
     const migrated = cloneJson(payload);
     if (isRecord(migrated?.inputs)) {
         try {

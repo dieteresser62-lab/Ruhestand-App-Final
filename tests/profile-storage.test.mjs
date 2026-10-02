@@ -1,3 +1,4 @@
+import { readWealthHistory } from '../types/wealth-history-contract.js';
 "use strict";
 
 /**
@@ -1488,6 +1489,51 @@ try {
         );
     }
     console.log('✓ Contaminated legacy profile ownership migration OK');
+
+    console.log('Test: Verlauf bleibt bei Profilwechsel und Bundle-Roundtrip profilbezogen');
+    {
+        global.localStorage = createLocalStorageMock();
+        const entry = { id: 'manual:2026-10-02', asOf: '2026-10-02', reason: 'manual', periodId: null,
+            tagesgeld: 12000, geldmarktEtf: 23000, depotwertAlt: 34000, depotwertNeu: 45000, aktienEtf: 79000, total: 114000 };
+        const historyA = { schemaVersion: 1, entries: [entry] };
+        const historyB = { schemaVersion: 1, entries: [{ ...entry, tagesgeld: 0, total: 102000 }] };
+        ensureProfileRegistry();
+        localStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify({ inputs: {}, wealthHistory: historyA }));
+        saveCurrentProfileFromLocalStorage();
+        const second = createProfile('Verlauf B');
+        updateProfileData(second.id, { [CONFIG.STORAGE.LS_KEY]: JSON.stringify({ inputs: {}, wealthHistory: historyB }) });
+        assertEqual(switchProfile(second.id), true, 'Zweites Profil kann aktiviert werden');
+        assertEqual(JSON.stringify(JSON.parse(localStorage.getItem(CONFIG.STORAGE.LS_KEY)).wealthHistory), JSON.stringify(historyB), 'Profil B lädt ausschließlich seinen Verlauf');
+        assertEqual(switchProfile('default'), true, 'Rückwechsel auf Profil A gelingt');
+        assertEqual(JSON.stringify(JSON.parse(localStorage.getItem(CONFIG.STORAGE.LS_KEY)).wealthHistory), JSON.stringify(historyA), 'Profil A erhält seinen ursprünglichen Verlauf');
+        const bundle = JSON.parse(JSON.stringify(exportProfilesBundle()));
+        assertEqual(bundle.schemaVersion, PROFILE_BUNDLE_SCHEMA_VERSION, 'Das optionale Feld erhöht die äußere Bundleversion nicht');
+        global.localStorage = createLocalStorageMock();
+        assertEqual(importProfilesBundle(bundle).ok, true, 'Serialisiertes Profilbundle mit Verlauf ist importierbar');
+        for (const [id, history] of [['default', historyA], [second.id, historyB]]) {
+            assertEqual(JSON.stringify(JSON.parse(getProfileData(id)[CONFIG.STORAGE.LS_KEY]).wealthHistory), JSON.stringify(history), 'Bundle-Roundtrip erhält alle Verlauffelder in beiden Profilen');
+        }
+        const brokenBundle = JSON.parse(JSON.stringify(bundle));
+        brokenBundle.registry.profiles[second.id].data[CONFIG.STORAGE.LS_KEY] = JSON.stringify({ inputs: {}, wealthHistory: { schemaVersion: 1, entries: [{ ...entry, total: 1 }] } });
+        const before = serializeStorage(localStorage);
+        let writes = 0;
+        const setItem = localStorage.setItem;
+        localStorage.setItem = (...args) => { writes += 1; return setItem(...args); };
+        const rejected = importProfilesBundle(brokenBundle);
+        assertEqual(rejected.ok, false, 'Ein beschädigter Verlauf des inaktiven Profils blockiert den Import');
+        assertEqual(writes, 0, 'Bundle-Preflight erkennt den Fehler vor sämtlichen Writes');
+        assertEqual(serializeStorage(localStorage), before, 'Abgewiesenes Bundle lässt Live- und Registrydaten bytegleich');
+        const legacy = { version: bundle.version, exportedAt: bundle.exportedAt, currentProfileId: bundle.currentProfileId,
+            registry: JSON.parse(JSON.stringify(bundle.registry)), globals: bundle.globals };
+        for (const profile of Object.values(legacy.registry.profiles)) {
+            profile.data[CONFIG.STORAGE.LS_KEY] = JSON.stringify({ inputs: {} });
+        }
+        assertEqual(importProfilesBundle(legacy).ok, true, 'Legacy-Profilbundle ohne Verlauf bleibt importierbar');
+        assertEqual(readWealthHistory(JSON.parse(localStorage.getItem(CONFIG.STORAGE.LS_KEY))).entries.length, 0, 'Legacy-Bundle-Replace entfernt den bisherigen Live-Verlauf');
+        for (const id of ['default', second.id]) {
+            assertEqual(readWealthHistory(JSON.parse(getProfileData(id)[CONFIG.STORAGE.LS_KEY])).entries.length, 0, 'Legacy-Bundle-Replace entfernt alte Verläufe auch in der Registry');
+        }
+    }
 
     console.log('✅ Profile storage behaviors validated');
 

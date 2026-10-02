@@ -197,3 +197,26 @@ console.log('Test 7: Typed health-bucket and balance-state load results fail clo
 console.log('✓ Typed profile-state load results OK');
 
 console.log('✅ Profile state contract validated');
+
+console.log('Test 8: Vermögensverlauf wird unverändert geladen und strikt geprüft');
+{
+    const entry = { id: 'manual:2026-10-02', asOf: '2026-10-02', reason: 'manual', periodId: null,
+        tagesgeld: 12000, geldmarktEtf: 23000, depotwertAlt: 34000, depotwertNeu: 45000, aktienEtf: 79000, total: 114000 };
+    const history = { schemaVersion: 1, entries: [entry] };
+    const state = { inputs: {}, wealthHistory: history };
+    const result = loadStoredBalanceStateFromData({ [CONFIG.STORAGE.LS_KEY]: JSON.stringify(state) });
+    assertEqual(result.status, PROFILE_LOAD_STATUS.VALID, 'Ein gültiger Verlauf ist gültiger Profilstate');
+    assertEqual(JSON.stringify(result.value.wealthHistory), JSON.stringify(history), 'Alle Verlauffelder bleiben erhalten');
+    for (const corruptHistory of [null, [], {}, { schemaVersion: 99, entries: [] },
+        { schemaVersion: 1, entries: [entry, entry] },
+        { schemaVersion: 1, entries: [{ ...entry, total: 1 }] }]) {
+        const raw = JSON.stringify({ ...state, wealthHistory: corruptHistory });
+        const corrupt = loadStoredBalanceStateFromData({ [CONFIG.STORAGE.LS_KEY]: raw });
+        assertEqual(corrupt.status, PROFILE_LOAD_STATUS.CORRUPT, 'Ein beschädigter Verlauf wird als CORRUPT gemeldet');
+        assertEqual(corrupt.error.code, 'PROFILE_WEALTH_HISTORY_INVALID', 'Der Verlauf besitzt einen eigenen Fehlercode');
+        assertEqual(corrupt.raw, raw, 'Der beschädigte Rohstate bleibt für Recovery bytegleich erhalten');
+        assertEqual(corrupt.value, null, 'Beschädigter Verlauf wird nicht als verwendbarer State geliefert');
+    }
+    const explicitUndefined = loadStoredBalanceStateFromData({ [CONFIG.STORAGE.LS_KEY]: { inputs: {}, wealthHistory: undefined } });
+    assertEqual(explicitUndefined.status, PROFILE_LOAD_STATUS.CORRUPT, 'Vorhandenes undefined ist kein fehlendes Legacy-Feld');
+}

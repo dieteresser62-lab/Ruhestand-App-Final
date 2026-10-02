@@ -1,3 +1,4 @@
+import { readWealthHistory } from '../types/wealth-history-contract.js';
 import { detectRuntime, isTauriRuntime } from '../app/shared/runtime-env.js';
 import {
     isAllowedPersistenceImportKey,
@@ -685,6 +686,64 @@ try {
         assertEqual(adapter.snapshots.size, 1, 'Recovery-Snapshot wurde persistent im Adapterarchiv geschrieben');
         const recoverySnapshot = adapter.snapshots.get(result.recoverySnapshotId);
         assertEqual(recoverySnapshot.records.sim_old, 'remove-me', 'Recovery-Snapshot enthaelt den vorherigen Livebestand');
+    }
+
+    console.log('Test: Komplettbackup erhält profilgetrennte Verläufe und validiert vor Importwrites');
+    {
+        const entry = { id: 'manual:2026-12-31', asOf: '2026-12-31', reason: 'manual', periodId: null,
+            tagesgeld: 12000, geldmarktEtf: 23000, depotwertAlt: 34000, depotwertNeu: 45000, aktienEtf: 79000, total: 114000 };
+        const historyA = { schemaVersion: 1, entries: [entry, { ...entry, id: 'annual:2026', reason: 'annual_close', periodId: 'calendar-year:2026' }] };
+        const historyB = { schemaVersion: 1, entries: [{ ...entry, tagesgeld: 0, total: 102000 }] };
+        const stateA = JSON.stringify({ inputs: {}, wealthHistory: historyA });
+        const stateB = JSON.stringify({ inputs: {}, wealthHistory: historyB });
+        const registry = { version: 1, profiles: {
+            a: { meta: { id: 'a', name: 'A' }, data: { [CONFIG.STORAGE.LS_KEY]: stateA } },
+            b: { meta: { id: 'b', name: 'B' }, data: { [CONFIG.STORAGE.LS_KEY]: stateB } }
+        } };
+        const source = createMemoryAdapter({ [CONFIG.STORAGE.LS_KEY]: stateA, [PROFILE_STORAGE_KEYS.registry]: JSON.stringify(registry),
+            [PROFILE_STORAGE_KEYS.current]: 'a', [PROFILE_STORAGE_KEYS.active]: 'a' });
+        resetPersistenceForTests(source);
+        await init();
+        const backup = JSON.parse(JSON.stringify(buildFullPersistenceBackup()));
+        const destination = createMemoryAdapter({ sim_previous: 'alt' });
+        resetPersistenceForTests(destination);
+        await init();
+        assertEqual((await importFullPersistenceBackup(backup)).ok, true, 'Ein exportiertes und serialisiertes Vollbackup ist importierbar');
+        assertEqual(JSON.stringify(JSON.parse(getItemSync(CONFIG.STORAGE.LS_KEY)).wealthHistory), JSON.stringify(historyA), 'Vollbackup-Roundtrip erhält jedes Live-Verlauffeld');
+        const restored = JSON.parse(getItemSync(PROFILE_STORAGE_KEYS.registry));
+        for (const [id, history] of [['a', historyA], ['b', historyB]]) {
+            assertEqual(JSON.stringify(JSON.parse(restored.profiles[id].data[CONFIG.STORAGE.LS_KEY]).wealthHistory), JSON.stringify(history), 'Vollbackup erhält getrennte Registryverläufe');
+        }
+        const before = JSON.stringify(exportAllSync().records);
+        const batchesBefore = destination.batches.length;
+        const snapshotsBefore = destination.snapshots.size;
+        const invalidValues = [null, { schemaVersion: 99, entries: [] }, { schemaVersion: 1, entries: [{ ...entry, total: 1 }] }];
+        for (const invalid of invalidValues) {
+            for (const target of ['live', 'inactive']) {
+                const records = { ...backup.records };
+                const corruptState = JSON.stringify({ inputs: {}, wealthHistory: invalid });
+                if (target === 'live') records[CONFIG.STORAGE.LS_KEY] = corruptState;
+                else {
+                    const corruptRegistry = JSON.parse(records[PROFILE_STORAGE_KEYS.registry]);
+                    corruptRegistry.profiles.b.data[CONFIG.STORAGE.LS_KEY] = corruptState;
+                    records[PROFILE_STORAGE_KEYS.registry] = JSON.stringify(corruptRegistry);
+                }
+                const result = await importFullPersistenceBackup(createFullBackupPayload(records));
+                assertEqual(result.ok, false, 'Beschädigter Live- oder inaktiver Profilverlauf verhindert Vollimport');
+                assertEqual(destination.batches.length, batchesBefore, 'Preflight schreibt keine Live-Batches');
+                assertEqual(destination.snapshots.size, snapshotsBefore, 'Preflight schreibt auch keinen Recovery-Snapshot');
+                assertEqual(JSON.stringify(exportAllSync().records), before, 'Abgewiesenes Backup lässt sämtliche Records unverändert');
+            }
+        }
+        const legacyRegistry = JSON.parse(JSON.stringify(registry));
+        for (const profile of Object.values(legacyRegistry.profiles)) profile.data[CONFIG.STORAGE.LS_KEY] = JSON.stringify({ inputs: {} });
+        const legacyRecords = { ...backup.records, [CONFIG.STORAGE.LS_KEY]: JSON.stringify({ inputs: {} }),
+            [PROFILE_STORAGE_KEYS.registry]: JSON.stringify(legacyRegistry) };
+        const legacy = createFullBackupPayload(legacyRecords, { schemaVersion: FULL_BACKUP_LEGACY_SCHEMA_VERSION });
+        assertEqual((await importFullPersistenceBackup(legacy)).ok, true, 'Legacy-Vollbackup ohne Verlauf bleibt importierbar');
+        assertEqual(readWealthHistory(JSON.parse(getItemSync(CONFIG.STORAGE.LS_KEY))).entries.length, 0, 'Legacy-Replace übernimmt keinen bisherigen Live-Verlauf');
+        const cleared = JSON.parse(getItemSync(PROFILE_STORAGE_KEYS.registry));
+        assertEqual(readWealthHistory(JSON.parse(cleared.profiles.b.data[CONFIG.STORAGE.LS_KEY])).entries.length, 0, 'Legacy-Replace leert auch den bisher inaktiven Verlauf');
     }
 
     console.log('Test 11b: full backup import UI creates recovery backup before replacing records');

@@ -1,3 +1,4 @@
+import { readWealthHistory, WealthHistoryError } from '../types/wealth-history-contract.js';
 import { CONFIG, StorageError } from '../app/balance/balance-config.js';
 import { BALANCE_IMPORT_RECOVERY_KIND, StorageManager } from '../app/balance/balance-storage.js';
 import { createLocalStorageAdapter } from '../app/shared/persistence-adapter-localstorage.js';
@@ -517,6 +518,71 @@ try {
         helper.db = null;
         helper.openPromise = null;
         helper.migrationPromise = null;
+    }
+
+    console.log('Test 11: Verlauf-Roundtrip, Replace und Validierung vor jeglichem Write');
+    {
+        installMockLocalStorage();
+        const entry = { id: 'manual:2026-12-31', asOf: '2026-12-31', reason: 'manual', periodId: null,
+            tagesgeld: 12000, geldmarktEtf: 23000, depotwertAlt: 34000, depotwertNeu: 45000, aktienEtf: 79000, total: 114000 };
+        const annual = { ...entry, id: 'annual:2026', reason: 'annual_close', periodId: 'calendar-year:2026' };
+        const history = { schemaVersion: 1, entries: [annual, entry] };
+        StorageManager.saveState({ inputs: {}, wealthHistory: history });
+        assertEqual(JSON.stringify(StorageManager.loadState().wealthHistory), JSON.stringify(history), 'Speichern und Laden erhalten jedes Verlauffeld');
+        const oldRaw = localStorage.getItem(CONFIG.STORAGE.LS_KEY);
+        for (const invalid of [null, undefined, { schemaVersion: 2, entries: [] }, { schemaVersion: 1, entries: [{ ...entry, total: 0 }] }]) {
+            let error;
+            try { StorageManager.saveState({ inputs: {}, wealthHistory: invalid }); } catch (caught) { error = caught; }
+            assert(error instanceof WealthHistoryError, 'Ungültiges Speichern wird kontrolliert abgelehnt');
+            assertEqual(localStorage.getItem(CONFIG.STORAGE.LS_KEY), oldRaw, 'Ungültiges Speichern verändert den Bestand nicht');
+            error = null;
+            try { await StorageManager.replaceStateFromImport({ inputs: {}, wealthHistory: invalid }); } catch (caught) { error = caught; }
+            assert(error instanceof WealthHistoryError, 'Direkter Import-Replace validiert den Verlauf selbst');
+            assertEqual(localStorage.getItem(CONFIG.STORAGE.LS_KEY), oldRaw, 'Ungültiger Replace verändert den Bestand nicht');
+        }
+        const receipt = await StorageManager.replaceStateFromImport({ inputs: {} });
+        assertEqual(readWealthHistory(StorageManager.loadState()).entries.length, 0, 'Replace ohne Verlauf übernimmt keine alte Historie');
+        await StorageManager.rollbackImportReplace(receipt);
+        assertEqual(JSON.stringify(StorageManager.loadState().wealthHistory), JSON.stringify(history), 'Recovery-Restore erhält den kompletten vorherigen Verlauf');
+        installMockLocalStorage();
+        const corruptRaw = JSON.stringify({ inputs: {}, wealthHistory: { ...history, entries: [{ ...entry, asOf: '2026-02-30' }] } });
+        localStorage.setItem(CONFIG.STORAGE.LS_KEY, corruptRaw);
+        let loadError;
+        try { StorageManager.loadState(); } catch (caught) { loadError = caught; }
+        assert(loadError instanceof WealthHistoryError, 'Ungültiger Verlauf wird beim Laden sichtbar abgelehnt');
+        assertEqual(localStorage.getItem(CONFIG.STORAGE.LS_KEY), corruptRaw, 'Laden repariert oder überschreibt keinen beschädigten Verlauf');
+        assertEqual(localStorage.getItem(CONFIG.STORAGE.MIGRATION_FLAG), null, 'Validierung erfolgt vor Migrationswrites');
+    }
+
+    console.log('Test 12: Standard-Snapshot-Restore transportiert und validiert den Verlauf');
+    {
+        installMockLocalStorage();
+        let reloads = 0;
+        global.location = { reload() { reloads += 1; } };
+        const entry = { id: 'manual:2026-10-02', asOf: '2026-10-02', reason: 'manual', periodId: null,
+            tagesgeld: 12000, geldmarktEtf: 23000, depotwertAlt: 34000, depotwertNeu: 45000, aktienEtf: 79000, total: 114000 };
+        const history = { schemaVersion: 1, entries: [entry] };
+        const registry = { version: 1, profiles: { default: { meta: { id: 'default', name: 'Default' }, data: {} } } };
+        const records = { [CONFIG.STORAGE.LS_KEY]: JSON.stringify({ inputs: {}, wealthHistory: history }),
+            [PROFILE_STORAGE_KEYS.registry]: JSON.stringify(registry), [PROFILE_STORAGE_KEYS.active]: 'default', [PROFILE_STORAGE_KEYS.current]: 'default' };
+        for (const [key, value] of Object.entries(records)) localStorage.setItem(key, value);
+        const snapshot = await SnapshotArchive.createSnapshot({ records, activeProfileId: 'default' });
+        StorageManager.saveState({ inputs: {} });
+        await StorageManager.restoreSnapshot(snapshot.id, null);
+        assertEqual(JSON.stringify(StorageManager.loadState().wealthHistory), JSON.stringify(history), 'Standard-Restore erhält alle Live-Verlauffelder');
+        const restoredRegistry = JSON.parse(localStorage.getItem(PROFILE_STORAGE_KEYS.registry));
+        assertEqual(JSON.stringify(JSON.parse(restoredRegistry.profiles.default.data[CONFIG.STORAGE.LS_KEY]).wealthHistory), JSON.stringify(history), 'Standard-Restore schreibt denselben Verlauf in die aktive Registrykopie');
+        const corruptSnapshot = await SnapshotArchive.createSnapshot({ records: { ...records,
+            [CONFIG.STORAGE.LS_KEY]: JSON.stringify({ inputs: {}, wealthHistory: { schemaVersion: 1, entries: [{ ...entry, total: 0 }] } }) }, activeProfileId: 'default' });
+        const before = JSON.stringify(Array.from(localStorage.store.entries()));
+        let error;
+        try { await StorageManager.restoreSnapshot(corruptSnapshot.id, null); } catch (caught) { error = caught; }
+        assert(error instanceof WealthHistoryError, 'Ein beschädigter Snapshot-Verlauf wird vor Restorewrites abgewiesen');
+        assertEqual(JSON.stringify(Array.from(localStorage.store.entries())), before, 'Fehlerhafter Restore verändert weder Live-State noch Registry');
+        assertEqual(reloads, 1, 'Abgewiesener Restore meldet keinen Erfolg durch Reload');
+        const legacySnapshot = await SnapshotArchive.createSnapshot({ records: { ...records, [CONFIG.STORAGE.LS_KEY]: JSON.stringify({ inputs: {} }) }, activeProfileId: 'default' });
+        await StorageManager.restoreSnapshot(legacySnapshot.id, null);
+        assertEqual(readWealthHistory(StorageManager.loadState()).entries.length, 0, 'Legacy-Snapshot ohne Verlauf entfernt den bisherigen Verlauf');
     }
 
     console.log('Balance storage contract tests passed');
