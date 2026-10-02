@@ -1,6 +1,17 @@
 # Regeln des Dual-Agent-Orchestrators fuer die RuhestandsApp.
 # Vorlage: docs/reference/einrichtung.md im Orchestrator-Repository.
 # Stoppgruende: nur die eingebauten des Orchestrators (siehe AGENTS.md).
+# Belegung: ohne [roles]/[agent_profiles] gilt die mitgelieferte Standardbelegung
+# Codex (Implementierer) / Claude (Pruefer und Finalpruefer); Haengererkennung
+# mit den Standardwerten (900 s Modellstille, 3600 s je Befehl).
+# Toolchain: node und npm kommen aus dem System, node_modules liegt im
+# Repository. Der gehaertete Codex-Implementierer braucht deshalb keine
+# toolchain_read_roots; ein Node unter dem Home-Verzeichnis (etwa nvm) ist in
+# seiner Sandbox unsichtbar, dort laufen /usr/bin/node und /usr/bin/npm
+# (gemessen am 02.10.2026 mit codex sandbox und dem erzeugten Rechteprofil).
+# Abschluss: bewusst Standard (merge_completed_branch = true). Nach befundfreier
+# Abnahme merged der Orchestrator lokal nach main und startet danach den lokalen
+# post-merge-Hook (Grenze 600 s). Gepusht wird nie.
 
 [repository]
 base_branch = "main"

@@ -1,10 +1,11 @@
 # CODEX.md
 
 ## Rolle
-- Codex arbeitet in diesem Repository ausschließlich als **Implementer**. Gemeinsame Regeln, Rollen, Betriebsarten und Stoppgründe stehen in `AGENTS.md`.
-- Führt zur Qualitätssicherung Selbstprüfungen und technische Plausibilisierungen durch (z. B. gezielte Tests), darf aber die eigene Implementierung niemals selbst als freigegeben markieren; die Prüfung liegt bei Claude (optional zusätzlich Antigravity) und beim Nutzer.
-- Legt keine Branches an und wechselt keine, staged, committet, pusht und merged nicht. Branch und Commit gehören im orchestrierten Lauf dem Orchestrator, im Handbetrieb Claude auf Anweisung des Nutzers.
-- Im orchestrierten Lauf gelten Auftrag, Umfang und Antwortformat der Orchestrator-Anfrage; die volle Suite fährt der Orchestrator. Im Handbetrieb gilt die Implementierungsanweisung einschließlich ihrer Meldepflichten und Stoppbedingungen.
+- Codex übernimmt die zugewiesene Rolle. Gemeinsame Regeln, Rollen, Betriebsarten und Stoppgründe stehen in `AGENTS.md`.
+- **Im orchestrierten Lauf** bestimmt die Belegung die Rolle: standardmäßig **Implementierer** (zertifiziert), auf ausdrückliche Wahl in `orchestrator.toml` auch Prüfer oder Finalprüfer (`experimental`, dann nur lesend). Der Orchestrator startet Codex dort ohne diese Datei; maßgeblich sind `AGENTS.md` und seine Anfrage mit Auftrag, Umfang und Antwortformat. Die volle Suite fährt der Orchestrator.
+- **Im Handbetrieb** ist Codex der Implementierer und setzt Claudes Implementierungsanweisung einschließlich ihrer Meldepflichten und Stoppbedingungen um.
+- Führt als Implementierer zur Qualitätssicherung Selbstprüfungen und technische Plausibilisierungen durch (z. B. gezielte Tests), darf aber die eigene Implementierung niemals selbst als freigegeben markieren; die Prüfung liegt bei den Prüfrollen und beim Nutzer.
+- Legt keine Branches an und wechselt keine, staged, committet, pusht und merged nicht. Branch, Commit und lokaler Abschlussmerge gehören im orchestrierten Lauf dem Orchestrator, im Handbetrieb Claude auf Anweisung des Nutzers.
 - Diese Datei muss konsistent mit `AGENTS.md`, `CLAUDE.md` und `GEMINI.md` bleiben.
 
 ## Repo-spezifische Arbeitsweise

@@ -21,7 +21,7 @@
   - `engine/README.md`
 - Test-Infrastruktur: `tests/README.md`
 - Desktop-Konfiguration: `src-tauri/tauri.conf.json`
-- Regeln für orchestrierte Läufe: `orchestrator.toml`
+- Konfiguration orchestrierter Läufe (Pfadklassen, Testbefehl, Ablaufschalter, bei Bedarf Rollenbelegung): `orchestrator.toml`
 - Keep instruction files synchronized and non-contradictory:
   - `AGENTS.md`
   - `CLAUDE.md`
@@ -29,18 +29,21 @@
   - `GEMINI.md`
 
 ## Rollen
-- **Codex – Implementierer.** Plant und implementiert. Gibt die eigene Arbeit nie selbst frei.
-- **Claude – Prüfer.** Prüft jeden Plan und jede Umsetzung gegenläufig. Im orchestrierten Lauf nur lesend; im Handbetrieb zusätzlich die vom Nutzer gesteuerte Sitzung (siehe unten).
-- **Antigravity (Gemini) – optionaler zusätzlicher Prüfer und Analyst.** Nur lesend für Anwendungscode; staged, committet, pusht und merged nicht.
-- Niemand gibt eigene Arbeit frei. Niemand pusht, merged, schreibt Historie um oder löscht destruktiv ohne ausdrückliche Freigabe des Nutzers.
+- Es gibt drei Rollen: **Implementierer** (plant und setzt um), **Prüfer** (prüft Plan und jedes Arbeitspaket gegenläufig) und **Finalprüfer** (prüft den fertigen Zweig als Ganzes). Welcher Agent welche Rolle übernimmt, legt im orchestrierten Lauf die Belegung fest, im Handbetrieb die Anweisung des Nutzers (siehe Betriebsarten). Ein Agent bekommt seine Rolle immer zugewiesen und leitet sie nie aus seinem Namen ab.
+- Prüfer und Finalprüfer arbeiten nur lesend. Niemand gibt eigene Arbeit frei.
+- Agenten pushen und mergen nie, schreiben keine Historie um und löschen nichts destruktiv ohne ausdrückliche Freigabe des Nutzers. Den lokalen Abschlussmerge im orchestrierten Lauf führt allein der Orchestrator aus (siehe unten).
 
 ## Betriebsarten
 
 ### Orchestrierter Lauf (Dual-Agent-Orchestrator)
-- Der Nutzer legt eine Idee in `inbox/`. Der Orchestrator plant, schneidet Arbeitspakete, legt Zielbranch, Arbeitsplan und Prüfberichte unter `docs/internal/` an, führt `npm test` aus und committet. Er pusht und merged nie.
-- Codex bearbeitet nur den zugewiesenen Auftrag innerhalb seines Umfangs. Keine Branches anlegen oder wechseln, nicht stagen, nicht committen, nicht pushen oder mergen, keine eigenen Slice-Dokumente neben dem Arbeitsplan des Orchestrators.
+- Der Nutzer legt eine Idee in `inbox/`. Der Orchestrator plant, schneidet Arbeitspakete, legt Zielbranch, Arbeitsplan und Prüfberichte unter `docs/internal/` an, führt nach jedem Arbeitspaket `npm test` aus und committet.
+- **Belegung:** Standard ist Codex als Implementierer, Claude als Prüfer und Finalprüfer; diese Plätze sind zertifiziert. Andere Belegungen werden in `orchestrator.toml` unter `[roles]` und `[agent_profiles.*]` gewählt; der Hersteller des Implementierers muss sich von beiden Prüfplätzen unterscheiden. Claude als Implementierer, Codex als Prüfer oder Finalprüfer und Antigravity (Gemini) als Prüfer oder Finalprüfer sind `experimental`; Antigravity sendet den vollständigen Repository-Stand an Google.
+- **Abschluss:** Nach einem Finalreview ohne Befunde archiviert der Orchestrator die Laufdokumente unter `docs/internal/archive/` und führt den Zielbranch standardmäßig lokal in `main` zusammen; danach startet er einen vorhandenen lokalen `post-merge`-Hook (Grenze 600 Sekunden). Gepusht wird nie. Mit `merge_completed_branch = false` unter `[workflow]` bleibt der Zielbranch ungemergt ausgecheckt.
+- Der Implementierer bearbeitet nur den zugewiesenen Auftrag innerhalb seines Umfangs. Keine Branches anlegen oder wechseln, nicht stagen, nicht committen, nicht pushen oder mergen, keine eigenen Slice-Dokumente neben dem Arbeitsplan des Orchestrators.
+- **Sandbox des Codex-Implementierers:** kein Netz; beschreibbar sind nur das Repository und ein privater Scratch-Ordner (`TMPDIR`); `.git/`, `.orchestrator/`, `inbox/`, `outbox/` und Agentenverzeichnisse wie `.codex/` oder `.claude/` sind schreibgeschützt; vom Home-Verzeichnis ist nur das Codex-Programmpaket sichtbar. `node` und `npm` kommen deshalb aus dem System, Abhängigkeiten aus `node_modules/` im Repository. `npm install` und andere Netzzugriffe scheitern dort; fehlt eine Abhängigkeit, gilt `OPERATOR-PREREQUISITE-MISSING`.
+- **Hängererkennung:** Gibt der Implementierer 15 Minuten lang nichts aus (laufende Befehle zählen nicht mit) oder läuft ein einzelner Befehl länger als 60 Minuten, bricht der Orchestrator den Aufruf ab und wiederholt ihn. Lange Rechenläufe wie große Monte-Carlo- oder Sweep-Läufe gehören deshalb nicht in die gezielten Testläufe des Agenten.
 - Die volle Suite führt nur der Orchestrator aus; gezielte Läufe mit `node tests/run-single.mjs <datei>` sind erlaubt. Ein in der Agenten-Sandbox gescheiterter Port- oder Browserstart ist kein Grund zum Anhalten.
-- Antwortformat und Ablauf gibt die Anfrage des Orchestrators vor.
+- Antwortformat und Ablauf gibt die Anfrage des Orchestrators vor. Diese Datei erreicht im Lauf alle drei Rollen (die ersten 12.000 Zeichen). `CLAUDE.md`, `CODEX.md` und `GEMINI.md` werden dort nicht gelesen; sie gelten für den Handbetrieb und die direkte Nutzung der CLIs.
 
 ### Handbetrieb (Claude an der Front)
 - Claude arbeitet als vom Nutzer gesteuerte Sitzung: legt vor der Umsetzung einen Feature-Branch an, schreibt eine Implementierungsanweisung und startet Codex direkt.
@@ -52,7 +55,7 @@
 - Umsetzungs-, Paket- und Slice-Nummern beginnen immer bei 1. Keine neuen Arbeitspläne, Paketlisten oder Slice-Dateien mit 0-basierter Nummerierung anlegen.
 
 ## Stoppgründe
-Es gelten dieselben Stoppgründe wie im Orchestrator. Codex hält an und meldet, statt zu raten:
+Es gelten dieselben Stoppgründe wie im Orchestrator. Der Implementierer hält an und meldet, statt zu raten:
 - `CONTRACT-UNCLEAR` – ein Vertrag ist unklar, oder die Umsetzung würde einen bestehenden Vertrag still ändern. Dazu gehören, sofern der Auftrag es nicht ausdrücklich verlangt: geänderte Engine-Semantik, unerwartet abweichende Snapshot- oder Backtest-Ergebnisse, ein auffälliges FlowDelta, unterschiedliche Parameternamen in UI und Engine sowie ein `minimumFlexAnnual`, das still begrenzt statt validiert wird.
 - `OPERATOR-PREREQUISITE-MISSING` – eine Voraussetzung fehlt, die nur der Nutzer schaffen kann, etwa ein Werkzeug, ein Zugang oder eine Datei.
 - `SCOPE-EXTENSION-REQUESTED` – die Umsetzung braucht Dateien außerhalb des zugewiesenen Umfangs.

@@ -1,13 +1,16 @@
 # GEMINI.md
 
 ## Rolle
-- Antigravity (Gemini) ist optionaler zusätzlicher Prüfer und Analyst. Gemeinsame Regeln, Rollen, Betriebsarten und Stoppgründe stehen in `AGENTS.md`.
+- Antigravity (Gemini) prüft und analysiert, implementiert aber nie. Gemeinsame Regeln, Rollen, Betriebsarten und Stoppgründe stehen in `AGENTS.md`.
+- **Im orchestrierten Lauf** nur als Prüfer oder Finalprüfer (`experimental`), wenn `orchestrator.toml` den Platz ausdrücklich so belegt. Der Orchestrator startet Antigravity dort ohne diese Datei; maßgeblich sind `AGENTS.md` und seine Anfrage. Jeder Aufruf sendet den vollständigen Repository-Stand an Google.
+- **Im Handbetrieb** optionaler zusätzlicher Prüfer und Analyst auf Wunsch des Nutzers.
 - Nur lesend für Anwendungscode (`.js`, `.mjs`, `.rs`, `.html`, `.css`); Dateien bearbeitet Antigravity nur für Dokumentation, Analysen und Reviews, wenn der Nutzer das verlangt.
 - Staged, committet, pusht und merged nicht. Commits entstehen im orchestrierten Lauf durch den Orchestrator, im Handbetrieb durch Claude auf Anweisung des Nutzers.
 - Das Repository liegt unter WSL (`~/repos/RuhestandsApp`). Git-Befehle laufen deshalb nur über `wsl git …`; das Windows-Git weist das Repository ab.
 - Diese Datei muss konsistent mit `AGENTS.md`, `CLAUDE.md` und `CODEX.md` bleiben.
 
 ## Review-Pflichten
+Diese Pflichten gelten für Reviews im Handbetrieb und bei direkter Nutzung. Im orchestrierten Lauf geben Prüfvertrag und Antwortschema des Orchestrators Format und Freigaberegeln vor.
 
 ### Adversariale Grundhaltung
 - Die primäre Aufgabe bei jedem Review ist nicht zu bestätigen, dass Code oder Pläne funktionieren, sondern aktiv Szenarien zu konstruieren, in denen sie versagen.
