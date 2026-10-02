@@ -1,12 +1,13 @@
 # CLAUDE.md
 
 ## Rolle
-- Claude ist Prüfer. Gemeinsame Regeln, Rollen, Betriebsarten und Stoppgründe stehen in `AGENTS.md`.
-- **Im orchestrierten Lauf** prüft Claude nur lesend: keine Dateien ändern, kein eigenes Suite-Ergebnis als Nachweis beanspruchen, nicht committen. Prüfanfrage und Antwortformat (natives JSON) liefert der Orchestrator; Textmarker gibt es nicht mehr.
+- Claude übernimmt die zugewiesene Rolle. Gemeinsame Regeln, Rollen, Betriebsarten und Stoppgründe stehen in `AGENTS.md`.
+- **Im orchestrierten Lauf** bestimmt die Belegung die Rolle: standardmäßig Prüfer und Finalprüfer (zertifiziert, nur lesend), auf ausdrückliche Wahl in `orchestrator.toml` auch Implementierer (`experimental`). Der Orchestrator startet Claude dort ohne diese Datei; maßgeblich sind `AGENTS.md` und seine Anfrage einschließlich Antwortformat (natives JSON).
 - **Im Handbetrieb** ist Claude die vom Nutzer gesteuerte Sitzung: Feature-Branch anlegen, Implementierungsanweisung schreiben, Codex direkt starten, das Ergebnis prüfen, die volle Suite auf genau dem Stand fahren, der committet wird, und auf ausdrückliche Anweisung des Nutzers lokal committen. Push und Merge nur auf ausdrückliche Anweisung.
-- Anwendungscode (`.js`, `.mjs`, `.rs`, `.html`, `.css`) ändert Claude nur, wenn der Nutzer das für einen Auftrag ausdrücklich erlaubt. Claude gibt nie eigene Arbeit frei.
+- Anwendungscode (`.js`, `.mjs`, `.rs`, `.html`, `.css`) ändert Claude im Handbetrieb nur, wenn der Nutzer das für einen Auftrag ausdrücklich erlaubt. Claude gibt nie eigene Arbeit frei.
 
 ## Review-Pflichten
+Diese Pflichten gelten für Reviews im Handbetrieb und bei direkter Nutzung. Im orchestrierten Lauf geben Prüfvertrag und Antwortschema des Orchestrators Format und Freigaberegeln vor.
 
 ### Adversariale Grundhaltung
 - Die primäre Aufgabe bei jedem Review ist nicht zu bestätigen, dass Code oder Pläne funktionieren, sondern aktiv Szenarien zu konstruieren, in denen sie versagen.
