@@ -631,9 +631,25 @@ async function runFailedReplayProjectionCase(browser, baseUrl) {
     try {
         const { page } = test;
         await configureMonteCarloRun(page, { runs: 1, duration: 2, workers: 1, seed: 818181 });
-        await page.locator('#startFloorBedarf').fill('2000000');
+        await page.locator('.tab-btn[data-tab="rahmendaten"]').click();
+        await page.locator('#tab-rahmendaten').waitFor({ state: 'visible' });
+        const portfolio = page.locator('#tab-rahmendaten fieldset[data-fieldset="portfolio"]');
+        if (await portfolio.evaluate(fieldset => fieldset.classList.contains('collapsed'))) {
+            await portfolio.locator('legend').click();
+        }
+        const floorInput = portfolio.locator('#startFloorBedarf');
+        await floorInput.waitFor({ state: 'visible' });
+        assert(await floorInput.isEditable(), 'Floor-Eingabe muss im Rahmendatenbereich bedienbar sein');
+        await floorInput.fill('2000000');
+        assert(await floorInput.inputValue() === '2000000', 'Sichtbare Floor-Eingabe bestaetigt 2000000');
+        await page.locator('.tab-btn[data-tab="montecarlo"]').click();
+        await page.locator('#tab-montecarlo').waitFor({ state: 'visible' });
+        await page.locator('#mcButton').waitFor({ state: 'visible' });
         await page.locator('#mcButton').click();
         await waitForCompletedRun(page);
+        const exported = await downloadRunExport(page);
+        assert(exported.request.scenario.normalizedInputs.startFloorBedarf === 2000000,
+            'Realer Laufexport bestaetigt den normalisierten Floor von 2000000');
         await page.locator('#mcViewTabLogs').click();
 
         const failedScenarioValue = await page.evaluate(() => {

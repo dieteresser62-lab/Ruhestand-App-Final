@@ -1155,15 +1155,25 @@ async function runSimulatorSmoke(browser, baseUrl) {
         return {
             clientWidth: strip.clientWidth,
             scrollWidth: strip.scrollWidth,
+            tabs: tabs.map(tab => ({ id: tab.dataset.tab, label: tab.textContent.trim() })),
             tabWidths: tabs.map(tab => tab.getBoundingClientRect().width)
         };
     });
-    assert(tabStripLayout.tabWidths.length === 4,
-        `Simulator muss vier Haupttabs anzeigen: ${JSON.stringify(tabStripLayout)}`);
-    assert(tabStripLayout.tabWidths.every(width => width < tabStripLayout.clientWidth),
-        `Kein einzelner Haupttab darf die gesamte Stripleiste belegen: ${JSON.stringify(tabStripLayout)}`);
+    assert(JSON.stringify(tabStripLayout.tabs) === JSON.stringify([
+        { id: 'rahmendaten', label: 'Rahmendaten' },
+        { id: 'montecarlo', label: 'Monte-Carlo' },
+        { id: 'backtesting', label: 'Backtesting' },
+        { id: 'sweep', label: 'Parameter-Sweep' },
+        { id: 'auto-optimize', label: 'Auto-Optimize' }
+    ]), `Simulator muss genau die fuenf Haupttabs in der vorgesehenen Reihenfolge anzeigen: ${JSON.stringify(tabStripLayout)}`);
+    for (const { id } of tabStripLayout.tabs) {
+        assert(await page.locator(`.tab-buttons .tab-btn[data-tab="${id}"]`).isVisible(),
+            `Haupttab ${id} muss im Desktop-Viewport sichtbar sein`);
+    }
+    assert(tabStripLayout.tabWidths.every(width => width > 0 && width < tabStripLayout.clientWidth),
+        `Jeder Haupttab muss positive Breite haben und schmaler als die Stripleiste sein: ${JSON.stringify(tabStripLayout)}`);
     assert(tabStripLayout.scrollWidth <= tabStripLayout.clientWidth + 1,
-        `Alle vier Haupttabs muessen im Desktop-Viewport ohne horizontales Scrollen sichtbar sein: ${JSON.stringify(tabStripLayout)}`);
+        `Alle fuenf Haupttabs muessen im Desktop-Viewport ohne horizontales Scrollen sichtbar sein: ${JSON.stringify(tabStripLayout)}`);
     const mcCancelButton = page.locator('#mcCancelButton');
     assert(await mcCancelButton.count() === 1, 'Simulator must expose exactly one Monte-Carlo cancel control');
     assert(await mcCancelButton.isHidden(), 'Monte-Carlo cancel control must stay hidden before a run starts');
@@ -1213,8 +1223,12 @@ async function runSimulatorSmoke(browser, baseUrl) {
         && await page.locator('.mc-setup-state-closed').isHidden(),
     'expanded setup shows only the Setup ausblenden state');
     await page.locator('#mcSeed').fill('24680');
-    await setupSummary.click();
+    // Die Mitte der Summary kann ein eingebettetes output statt der Toggle-Beschriftung treffen.
+    await setupSummary.locator('.mc-setup-state-open').click();
     assert(!(await setupDisclosure.evaluate(details => details.open)), 'setup disclosure closes with the pointer');
+    // Der Chevron dreht per CSS-Transition (0.2s); den Endwinkel erst nach Ablauf der Drehung lesen.
+    await page.locator('.mc-setup-toggle').evaluate(toggle => Promise.all(
+        toggle.getAnimations({ subtree: true }).map(animation => animation.finished.catch(() => {}))));
     const closedChevronTransform = await page.locator('.mc-setup-toggle').evaluate(toggle =>
         getComputedStyle(toggle, '::after').transform);
     assert(await page.locator('.mc-setup-state-open').isHidden()
@@ -1261,6 +1275,9 @@ async function runSimulatorSmoke(browser, baseUrl) {
         ui.beginRun();
         ui.showCancelled();
         ui.finishRun();
+        // Buttons tragen eine allgemeine Transition (0.3s); Breite und Rand des
+        // Skip-Link-Knopfs gleiten von 1px auf die Zielgroesse. Erst danach messen.
+        await Promise.all(primary.getAnimations().map(animation => animation.finished.catch(() => {})));
         const result = {
             setupOpen: setup.open,
             activeElementId: document.activeElement?.id || null,
@@ -1360,6 +1377,10 @@ async function runSimulatorSmoke(browser, baseUrl) {
         'Empty stress replay status requests a Monte-Carlo run before scenario selection');
     assert(await page.locator('#stressReplayVariantLabel').getAttribute('maxlength') === '60',
         'Variant labels have a bounded keyboard-editable control');
+    // Der Varianten-Editor liegt in der Replay-Unteransicht; zuletzt waren die Logs aktiv.
+    await page.locator('#mcShowReplayButton').click();
+    assert(await page.locator('#mcViewPanelReplay').isVisible(),
+        'variant editor checks run inside the visible replay view');
     const focusedEditorPaths = await page.locator('#stressReplayVariantFields > .stress-replay-editor-grid').evaluate(grid =>
         [...grid.querySelectorAll('input, select')].map(control => control.id || control.dataset.stressReplayPath));
     assert(JSON.stringify(focusedEditorPaths) === JSON.stringify([
