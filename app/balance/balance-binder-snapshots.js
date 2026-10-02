@@ -11,6 +11,7 @@ import { StorageManager } from './balance-storage.js';
 import { rollExpensesYear } from './balance-expenses.js';
 import { PersistenceFacade } from '../shared/persistence-facade.js';
 import { SnapshotArchive } from '../shared/snapshot-archive.js';
+import { createBalanceWealthHistoryService } from './balance-wealth-history.js';
 import {
     ANNUAL_PERIOD_STATUS,
     LEGACY_PERIOD_DECISION,
@@ -67,9 +68,11 @@ export function createSnapshotHandlers({
     applyAnnualInflation,
     runAnnualUpdate = async () => ({ ok: true }),
     validateLiveState = () => ({ ok: true }),
+    wealthHistory = createBalanceWealthHistoryService(),
+    getReferenceDate = () => new Date(),
     getTargetYear = () => {
         const selectedYear = Number(dom.expenses?.yearSelect?.value);
-        return Number.isInteger(selectedYear) ? selectedYear : deriveCompletedCalendarYear(new Date());
+        return Number.isInteger(selectedYear) ? selectedYear : deriveCompletedCalendarYear(getReferenceDate());
     },
     getLegacyDecision = chooseLegacyDecision,
     rollExpensesYearFn = rollExpensesYear,
@@ -83,11 +86,13 @@ export function createSnapshotHandlers({
 }) {
     let annualCloseInFlight = false;
 
-    const persistMetadata = async (metadata) => {
+    const persistMetadata = async (metadata, context) => {
+        if (context) wealthHistory.assertContext(context);
         const state = StorageManager.loadState();
         state[ANNUAL_PERIOD_METADATA_KEY] = metadata;
         StorageManager.saveState(state);
         await flushLiveState({ sync: false });
+        if (context) wealthHistory.assertContext(context);
     };
 
     return {
@@ -97,72 +102,82 @@ export function createSnapshotHandlers({
                 return { status: 'in_flight' };
             }
 
-            const label = dom.inputs.profilName.value.trim();
-            const targetYear = getTargetYear();
-            const expectedTargetYear = deriveCompletedCalendarYear(new Date());
-            if (targetYear !== expectedTargetYear) {
-                const result = {
-                    status: ANNUAL_PERIOD_STATUS.INVALID,
-                    errors: [{
-                        code: 'ANNUAL_PERIOD_UI_YEAR_MISMATCH',
-                        field: 'expenses.yearSelect',
-                        message: `Der Ausgaben-Check muss fuer den Abschluss auf ${expectedTargetYear} stehen.`
-                    }]
-                };
-                UIRenderer.handleError(new Error(formatPeriodErrors(result)));
-                return result;
-            }
-            let state = StorageManager.loadState();
-            const currentAgeInput = dom.inputs.aktuellesAlter?.value ?? state.inputs?.aktuellesAlter ?? 0;
-            const currentAge = Number.parseInt(currentAgeInput, 10);
-            let metadata = state[ANNUAL_PERIOD_METADATA_KEY];
-            let planning = createAnnualPeriodPlan({ targetYear, currentAge, metadata });
-
-            if (planning.status === ANNUAL_PERIOD_STATUS.LEGACY_CONFIRMATION_REQUIRED) {
-                const resolution = resolveLegacyAnnualPeriod({
-                    targetYear,
-                    decision: getLegacyDecision(targetYear)
-                });
-                if (!resolution.metadata) return resolution;
-                metadata = resolution.metadata;
-                await persistMetadata(metadata);
-                planning = createAnnualPeriodPlan({ targetYear, currentAge, metadata });
-            }
-
-            if (planning.status === ANNUAL_PERIOD_STATUS.ALREADY_COMMITTED) {
-                UIRenderer.toast(`Die Jahresperiode ${targetYear} wurde bereits abgeschlossen.`, false);
-                return planning;
-            }
-            if (planning.status !== ANNUAL_PERIOD_STATUS.READY || !planning.plan) {
-                UIRenderer.handleError(new Error(formatPeriodErrors(planning)));
-                return planning;
-            }
-
-            if (!confirm(`Soll die Jahresperiode ${targetYear} ${label ? `fuer "${label}" ` : ''}jetzt abgeschlossen werden?\n\nDabei werden Alter (+1), Inflation und Marktdaten aktualisiert und der Ausgaben-Check auf ${planning.plan.expenses.nextYear} umgestellt. Vor der ersten Aenderung wird ein Recovery-Snapshot erstellt.`)) return;
-
             annualCloseInFlight = true;
+            let metadata;
             let commitStarted = false;
-            try {
+            let completedResult;
+            let context;
+            let targetYear;
+            let referenceDate;
+            const execute = async (capturedContext) => {
+                context = capturedContext;
+                const checkContext = () => { if (context) wealthHistory.assertContext(context); };
+                const label = dom.inputs.profilName.value.trim();
+                const expectedTargetYear = deriveCompletedCalendarYear(referenceDate);
+                if (targetYear !== expectedTargetYear) {
+                    const result = {
+                        status: ANNUAL_PERIOD_STATUS.INVALID,
+                        errors: [{
+                            code: 'ANNUAL_PERIOD_UI_YEAR_MISMATCH',
+                            field: 'expenses.yearSelect',
+                            message: `Der Ausgaben-Check muss fuer den Abschluss auf ${expectedTargetYear} stehen.`
+                        }]
+                    };
+                    UIRenderer.handleError(new Error(formatPeriodErrors(result)));
+                    return result;
+                }
+                const state = StorageManager.loadState();
+                const currentAgeInput = dom.inputs.aktuellesAlter?.value ?? state.inputs?.aktuellesAlter ?? 0;
+                const currentAge = Number.parseInt(currentAgeInput, 10);
+                metadata = state[ANNUAL_PERIOD_METADATA_KEY];
+                let planning = createAnnualPeriodPlan({ targetYear, currentAge, metadata });
+
+                if (planning.status === ANNUAL_PERIOD_STATUS.LEGACY_CONFIRMATION_REQUIRED) {
+                    const resolution = resolveLegacyAnnualPeriod({
+                        targetYear,
+                        decision: getLegacyDecision(targetYear)
+                    });
+                    if (!resolution.metadata) return resolution;
+                    metadata = resolution.metadata;
+                    await persistMetadata(metadata, context);
+                    planning = createAnnualPeriodPlan({ targetYear, currentAge, metadata });
+                }
+
+                if (planning.status === ANNUAL_PERIOD_STATUS.ALREADY_COMMITTED) {
+                    UIRenderer.toast(`Die Jahresperiode ${targetYear} wurde bereits abgeschlossen.`, false);
+                    return planning;
+                }
+                if (planning.status !== ANNUAL_PERIOD_STATUS.READY || !planning.plan) {
+                    UIRenderer.handleError(new Error(formatPeriodErrors(planning)));
+                    return planning;
+                }
+
+                if (!confirm(`Soll die Jahresperiode ${targetYear} ${label ? `fuer "${label}" ` : ''}jetzt abgeschlossen werden?\n\nDabei werden Alter (+1), Inflation und Marktdaten aktualisiert und der Ausgaben-Check auf ${planning.plan.expenses.nextYear} umgestellt. Vor der ersten Aenderung wird ein Recovery-Snapshot erstellt.`)) return;
+
                 const validation = await validateLiveState();
+                checkContext();
                 if (!validation?.ok) throw validation?.error || new Error('Die Balance-Vorpruefung ist fehlgeschlagen.');
 
                 await flushLiveState({ sync: true });
+                checkContext();
                 const snapshotId = await createAndVerifySnapshot({ handle: appState.snapshotHandle, label });
+                checkContext();
                 UIRenderer.toast(`Jahresabschluss-Snapshot ${label ? `"${label}" ` : ''}erfolgreich erstellt.`);
 
                 const started = startAnnualPeriodCommit({ plan: planning.plan, metadata, snapshotId });
                 if (!started.metadata) throw new Error(formatPeriodErrors(started));
                 metadata = started.metadata;
-                await persistMetadata(metadata);
                 commitStarted = true;
+                await persistMetadata(metadata, context);
 
                 metadata = {
                     ...metadata,
                     pendingCommit: { ...metadata.pendingCommit, phase: 'writes_started' }
                 };
-                await persistMetadata(metadata);
+                await persistMetadata(metadata, context);
 
                 const annualUpdate = await runAnnualUpdate({ failOnStepError: true });
+                checkContext();
                 if (!annualUpdate?.ok) {
                     throw annualUpdate?.error || new Error('Das Jahres-Update wurde nicht vollstaendig ausgefuehrt.');
                 }
@@ -173,7 +188,7 @@ export function createSnapshotHandlers({
                     ...metadata,
                     pendingCommit: { ...metadata.pendingCommit, phase: 'validating' }
                 };
-                await persistMetadata(metadata);
+                await persistMetadata(metadata, context);
 
                 const ageAfter = Number.parseInt(dom.inputs.aktuellesAlter?.value, 10);
                 if (Number.isFinite(ageAfter) && ageAfter !== planning.plan.age.after) {
@@ -182,21 +197,45 @@ export function createSnapshotHandlers({
                 if (nextYear !== planning.plan.expenses.nextYear) {
                     throw new Error(`Post-Write-Validierung: Ausgabenjahr ${planning.plan.expenses.nextYear} wurde erwartet.`);
                 }
-                await commitLiveState({ periodId: planning.plan.periodId });
+                const commitResult = await commitLiveState({ periodId: planning.plan.periodId });
+                checkContext();
 
                 const completed = completeAnnualPeriodCommit({ periodId: planning.plan.periodId, metadata });
                 if (!completed.metadata) throw new Error(formatPeriodErrors(completed));
-                try {
-                    await persistMetadata(completed.metadata);
-                } catch (finalFlushError) {
-                    await persistMetadata(metadata).catch(() => {});
-                    throw finalFlushError;
+                if (planning.plan.targetYear >= 2026) {
+                    await wealthHistory.finalizeAnnual({
+                        context,
+                        result: commitResult,
+                        targetYear: planning.plan.targetYear,
+                        metadata: completed.metadata,
+                        expectedPending: metadata
+                    });
+                } else {
+                    try {
+                        await persistMetadata(completed.metadata, context);
+                    } catch (finalFlushError) {
+                        await persistMetadata(metadata, context).catch(() => {});
+                        throw finalFlushError;
+                    }
                 }
+                completedResult = completed;
 
                 UIRenderer.toast(`Ausgaben-Check auf ${nextYear} umgestellt.`);
                 await StorageManager.renderSnapshots(dom.outputs.snapshotList, dom.controls.snapshotStatus, appState.snapshotHandle);
                 return completed;
+            };
+            try {
+                // Vor dem ersten await sperren, einschließlich der Legacy-Bestätigung.
+                targetYear = getTargetYear();
+                referenceDate = getReferenceDate();
+                return targetYear >= 2026
+                    ? await wealthHistory.runAnnual(execute)
+                    : await execute(null);
             } catch (err) {
+                if (completedResult) {
+                    UIRenderer.handleError(err);
+                    return completedResult;
+                }
                 if (commitStarted) {
                     const recoveryError = new Error(
                         `Der Jahresprozess ist unvollstaendig. Stellen Sie zuerst den Recovery-Snapshot `

@@ -23,6 +23,8 @@ import { createDiagnosisHandlers } from './balance-binder-diagnosis.js';
 import { createSnapshotHandlers } from './balance-binder-snapshots.js';
 import { PersistenceFacade } from '../shared/persistence-facade.js';
 import { BALANCE_UPDATE_MODE } from './balance-update-pipeline.js';
+import { createBalanceWealthHistoryService, createManualWealthHistoryController } from './balance-wealth-history.js';
+import { refreshBalanceWealthHistory } from './balance-wealth-history-renderer.js';
 
 // Module-level references
 let dom = null;
@@ -32,6 +34,8 @@ let debouncedUpdate = null;
 let lastUpdateResults = null;
 let handlers = null;
 let uiBound = false;
+const wealthButtonsBound = new WeakSet();
+const wealthControllers = new WeakMap();
 
 /**
  * Initialisiert den UIBinder mit den notwendigen Abhängigkeiten
@@ -52,7 +56,9 @@ export function initUIBinder(domRefs, state, updateFn, debouncedUpdateFn) {
     });
     const imports = createImportExportHandlers({ dom, debouncedUpdate, update });
     const diagnosis = createDiagnosisHandlers({ dom, appState });
+    const wealthHistory = createBalanceWealthHistoryService();
     const snapshots = createSnapshotHandlers({
+        wealthHistory,
         dom,
         appState,
         debouncedUpdate,
@@ -80,12 +86,28 @@ export function initUIBinder(domRefs, state, updateFn, debouncedUpdateFn) {
             return result;
         }
     });
-    handlers = { annual, imports, diagnosis, snapshots };
+    const captureButton = dom.controls.captureWealthBtn;
+    const manual = (captureButton && wealthControllers.get(captureButton)) || createManualWealthHistoryController({
+        service: wealthHistory,
+        update: options => update(options),
+        refresh: () => refreshBalanceWealthHistory(dom.wealthHistory),
+        button: dom.controls.captureWealthBtn,
+        status: dom.wealthHistory?.status,
+        annualButtons: [dom.controls.jahresabschlussBtn, dom.controls.btnJahresUpdate],
+        toast: text => UIRenderer.toast(text)
+    });
+    if (captureButton) wealthControllers.set(captureButton, manual);
+    handlers = { annual, imports, diagnosis, snapshots, wealthHistory, manual };
 }
 
 export const UIBinder = {
     bindUI() {
         if (uiBound) return;
+        const captureButton = dom.controls.captureWealthBtn;
+        if (captureButton && !wealthButtonsBound.has(captureButton)) {
+            captureButton.addEventListener('click', () => this.handleCaptureWealth());
+            wealthButtonsBound.add(captureButton);
+        }
         // Keyboard shortcuts
         document.addEventListener('keydown', this.handleKeyboardShortcuts.bind(this));
 
@@ -219,7 +241,11 @@ export const UIBinder = {
     },
 
     async handleImport(e) {
-        return handlers.imports.handleImport(e);
+        try { return await handlers.imports.handleImport(e); }
+        finally {
+            if (dom.wealthHistory?.status) dom.wealthHistory.status.textContent = '';
+            refreshBalanceWealthHistory(dom.wealthHistory);
+        }
     },
 
     async handleCsvImport(e) {
@@ -236,7 +262,7 @@ export const UIBinder = {
      * @returns {Promise<Object|undefined>} Ergebnis des Jahresprozess-Coordinators.
      */
     async handleJahresUpdate() {
-        return handlers.snapshots.handleJahresabschluss();
+        return this.handleJahresabschluss();
     },
 
     /**
@@ -261,11 +287,24 @@ export const UIBinder = {
     },
 
     async handleJahresabschluss() {
-        return handlers.snapshots.handleJahresabschluss();
+        return handlers.manual.withAnnual(() => handlers.snapshots.handleJahresabschluss());
+    },
+
+    async handleCaptureWealth() {
+        // Einen bereits geplanten Inputwrite erst nach der Verlaufstransaktion ausführen.
+        // Seine Eingaben liest die synchrone Vorschau schon jetzt vollständig.
+        const pending = appState.debounceTimer;
+        if (pending) {
+            clearTimeout(pending);
+            appState.debounceTimer = null;
+        }
+        try { return await handlers.manual.capture(); }
+        finally { if (pending) debouncedUpdate(); }
     },
 
     async handleSnapshotActions(e) {
-        return handlers.snapshots.handleSnapshotActions(e);
+        try { return await handlers.snapshots.handleSnapshotActions(e); }
+        finally { refreshBalanceWealthHistory(dom.wealthHistory); }
     },
 
     handleCopyDiagnosis() {

@@ -11,11 +11,17 @@ import { CONFIG } from '../app/balance/balance-config.js';
 import { UIRenderer } from '../app/balance/balance-renderer.js';
 import { StorageManager } from '../app/balance/balance-storage.js';
 import { SnapshotArchive } from '../app/shared/snapshot-archive.js';
-import { PROFILE_VALUE_KEYS } from '../app/profile/profile-state.js';
+import { PersistenceFacade, persistenceStorage, resetPersistenceRuntimeForTests } from '../app/shared/persistence-facade.js';
+import { createBalanceWealthHistoryService } from '../app/balance/balance-wealth-history.js';
+import { createManualWealthHistoryEntry } from '../types/wealth-history-contract.js';
+import { PROFILE_STORAGE_KEYS, PROFILE_VALUE_KEYS } from '../app/profile/profile-state.js';
 
 console.log('--- Balance Annual Workflow Contract Tests ---');
 
-const TARGET_YEAR = deriveCompletedCalendarYear(new Date());
+const REFERENCE_DATE = new Date(2027, 0, 15, 12);
+const TARGET_YEAR = deriveCompletedCalendarYear(REFERENCE_DATE);
+const SOURCE = { tagesgeld: 12000.25, geldmarktEtf: 23000.5, depotwertAlt: 34000.75, depotwertNeu: 45000.125 };
+const COMMIT_RESULT = { ok: true, inputData: SOURCE, modelResult: { newState: { tagesgeld: 1, geldmarktEtf: 2, depotwertAlt: 3, depotwertNeu: 4 } } };
 const NEXT_YEAR = TARGET_YEAR + 1;
 
 function createLocalStorageMock() {
@@ -31,6 +37,13 @@ function createLocalStorageMock() {
 }
 
 function seedBalanceState() {
+    resetPersistenceRuntimeForTests();
+    localStorage.setItem(PROFILE_STORAGE_KEYS.current, 'a');
+    localStorage.setItem(PROFILE_STORAGE_KEYS.active, 'a');
+    localStorage.setItem(PROFILE_STORAGE_KEYS.registry, JSON.stringify({ version: 1, profiles: {
+        a: { meta: { id: 'a', name: 'A' }, data: {} },
+        b: { meta: { id: 'b', name: 'B' }, data: { [CONFIG.STORAGE.LS_KEY]: JSON.stringify({ wealthHistory: { schemaVersion: 1, entries: [createManualWealthHistoryEntry(SOURCE, '2026-02-01')] } }) } }
+    } }));
     localStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify({
         inputs: { aktuellesAlter: 67, floorBedarf: 24000 },
         lastState: { cumulativeInflationFactor: 1 }
@@ -135,9 +148,11 @@ try {
         StorageManager.createSnapshot = async () => { calls.push('snapshot'); return { id: `snapshot-${TARGET_YEAR}` }; };
         StorageManager.renderSnapshots = async () => { calls.push('render'); };
 
+        const otherBefore = localStorage.getItem(PROFILE_STORAGE_KEYS.registry);
         const handlers = createSnapshotHandlers({
             dom,
             appState: { snapshotHandle: null },
+            getReferenceDate: () => REFERENCE_DATE,
             getTargetYear: () => TARGET_YEAR,
             getLegacyDecision: () => LEGACY_PERIOD_DECISION.NOT_COMMITTED,
             validateLiveState: () => { calls.push('validate-pre'); return { ok: true }; },
@@ -149,7 +164,7 @@ try {
             applyAnnualInflation: () => { calls.push('inflation-write'); },
             rollExpensesYearFn: () => { calls.push('expenses-write'); return NEXT_YEAR; },
             flushLiveState: async ({ sync = false } = {}) => { calls.push(`flush:${sync}`); },
-            commitLiveState: async ({ periodId }) => { calls.push(`commit:${periodId}`); }
+            commitLiveState: async ({ periodId }) => { calls.push(`commit:${periodId}`); return COMMIT_RESULT; }
         });
 
         const result = await handlers.handleJahresabschluss();
@@ -157,6 +172,18 @@ try {
         assertEqual(result.status, 'already_committed', 'Erfolgreicher Coordinator liefert committed-Status');
         assertEqual(metadata.lastCommittedPeriod, `calendar-year:${TARGET_YEAR}`, 'Perioden-ID wird nach finalem Flush committed');
         assertEqual(metadata.pendingCommit, null, 'Erfolgreicher Abschluss entfernt Recovery-Marker');
+        const live = StorageManager.loadState();
+        const registry = JSON.parse(localStorage.getItem(PROFILE_STORAGE_KEYS.registry));
+        assertEqual(registry.profiles.a.data[CONFIG.STORAGE.LS_KEY], localStorage.getItem(CONFIG.STORAGE.LS_KEY), 'Live-State und aktive Registry sind bytegleich');
+        assertEqual(JSON.stringify(registry.profiles.b), JSON.stringify(JSON.parse(otherBefore).profiles.b), 'Fremder Profilverlauf bleibt unverändert');
+        const entry = live.wealthHistory.entries[0];
+        assertEqual(live.wealthHistory.entries.length, 1, 'Genau ein Jahresrecord');
+        assertEqual(entry.id, 'annual:2026', 'Abgeschlossenes Jahr bestimmt die Identität');
+        assertEqual(entry.asOf, '2026-12-31', 'Stichtag ist das Jahresende');
+        assertEqual(entry.periodId, 'calendar-year:2026', 'Periode bleibt die abgeschlossene Periode');
+        for (const field of Object.keys(SOURCE)) assertEqual(entry[field], SOURCE[field], `Commit-Quelle für ${field}`);
+        assertEqual(entry.aktienEtf, 79000.875, 'Beide Teildepots ergeben Aktien-ETF');
+        assertEqual(entry.total, 114001.625, 'Nur beauftragte Bestandteile ergeben die Summe');
         assert(calls.indexOf('validate-pre') < calls.indexOf('snapshot'), 'Vorpruefung liegt vor Snapshot');
         assert(calls.indexOf('snapshot') < calls.indexOf('annual-update'), 'Snapshot liegt vor erster fachlicher Jahresmutation');
         assert(calls.indexOf('annual-update') < calls.indexOf('inflation-write'), 'Jahresupdate liegt vor Inflationsfortschreibung');
@@ -170,6 +197,7 @@ try {
         const duplicate = await handlers.handleJahresabschluss();
         assertEqual(duplicate.status, 'already_committed', 'Wiederholung derselben Periode ist idempotent');
         assertEqual(calls.filter(call => call === 'snapshot').length, 1, 'Wiederholung erzeugt keinen zweiten Snapshot');
+        assertEqual(calls.filter(call => call.startsWith('commit:')).length, 1, 'Wiederholung führt keinen zweiten Engine-Commit aus');
     }
 
     console.log('Test 3: failed preflight aborts before snapshot and annual writes');
@@ -184,6 +212,7 @@ try {
         const handlers = createSnapshotHandlers({
             dom: createAnnualDom(),
             appState: { snapshotHandle: null },
+            getReferenceDate: () => REFERENCE_DATE,
             getTargetYear: () => TARGET_YEAR,
             getLegacyDecision: () => LEGACY_PERIOD_DECISION.NOT_COMMITTED,
             validateLiveState: () => ({ ok: false, error: new Error('invalid inputs') }),
@@ -191,7 +220,7 @@ try {
             applyAnnualInflation: () => { calls.push('inflation-write'); },
             rollExpensesYearFn: () => { calls.push('expenses-write'); return NEXT_YEAR; },
             flushLiveState: async () => {},
-            commitLiveState: async () => {}
+            commitLiveState: async () => COMMIT_RESULT
         });
         await handlers.handleJahresabschluss();
         assert(!calls.includes('snapshot'), 'Fehlgeschlagene Vorpruefung verhindert Snapshot');
@@ -212,6 +241,7 @@ try {
         const handlers = createSnapshotHandlers({
             dom: createAnnualDom(),
             appState: { snapshotHandle: null },
+            getReferenceDate: () => REFERENCE_DATE,
             getTargetYear: () => TARGET_YEAR,
             getLegacyDecision: () => LEGACY_PERIOD_DECISION.NOT_COMMITTED,
             validateLiveState: () => ({ ok: true }),
@@ -219,7 +249,7 @@ try {
             applyAnnualInflation: () => { calls.push('inflation-write'); },
             rollExpensesYearFn: () => { calls.push('expenses-write'); return NEXT_YEAR; },
             flushLiveState: async () => {},
-            commitLiveState: async () => {}
+            commitLiveState: async () => COMMIT_RESULT
         });
         const result = await handlers.handleJahresabschluss();
         assertEqual(result.status, 'invalid', 'Snapshot-Fehler vor Commit liefert fail-closed Status ohne Recovery-Behauptung');
@@ -243,6 +273,7 @@ try {
         const handlers = createSnapshotHandlers({
             dom,
             appState: { snapshotHandle: null },
+            getReferenceDate: () => REFERENCE_DATE,
             getTargetYear: () => TARGET_YEAR,
             getLegacyDecision: () => LEGACY_PERIOD_DECISION.NOT_COMMITTED,
             validateLiveState: () => ({ ok: true }),
@@ -253,7 +284,7 @@ try {
             applyAnnualInflation: () => { calls.push('inflation-write'); },
             rollExpensesYearFn: () => { calls.push('expenses-write'); return NEXT_YEAR; },
             flushLiveState: async () => {},
-            commitLiveState: async () => {}
+            commitLiveState: async () => COMMIT_RESULT
         });
         const result = await handlers.handleJahresabschluss();
         const metadata = StorageManager.loadState()[ANNUAL_PERIOD_METADATA_KEY];
@@ -284,6 +315,7 @@ try {
         const handlers = createSnapshotHandlers({
             dom,
             appState: { snapshotHandle: null },
+            getReferenceDate: () => REFERENCE_DATE,
             getTargetYear: () => TARGET_YEAR,
             getLegacyDecision: () => LEGACY_PERIOD_DECISION.NOT_COMMITTED,
             validateLiveState: () => ({ ok: true }),
@@ -295,7 +327,7 @@ try {
             applyAnnualInflation: () => {},
             rollExpensesYearFn: () => NEXT_YEAR,
             flushLiveState: async () => {},
-            commitLiveState: async () => {}
+            commitLiveState: async () => COMMIT_RESULT
         });
         const first = handlers.handleJahresabschluss();
         await Promise.resolve();

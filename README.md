@@ -17,7 +17,7 @@ Netzwerkpfade.
 
 ## Release-Stand
 
-**Aktueller Dokumentationsstand:** 2026-08-15
+**Aktueller Dokumentationsstand:** 2026-10-02
 
 **Changelog:** siehe [CHANGELOG.md](CHANGELOG.md)
 
@@ -44,6 +44,9 @@ Netzwerkpfade.
 ## Funktionen im Überblick
 
 ### Balance-App
+* **Vermögensverlauf:** „Stand jetzt erfassen“ speichert die frisch berechneten Bestände als nominale Euro-Werte. Ein weiterer Klick am selben lokalen Kalendertag ersetzt den manuellen Stand; ein anderer Tag ergänzt einen Stand. Erfasst werden Tagesgeld, Geldmarkt-ETF und Aktien-ETF (Alt- plus Neu-Depot). Gold und separate Anleihen gehören nicht zur Summe; der Pflegebucket ist eine enthaltene Zweckbindung und wird weder zusätzlich addiert noch pauschal abgezogen. Diagramm und tastaturzugängliche Tabelle zeigen Datum, Anlass, Gruppen, Teildepots und Summe, ohne Zwischenwerte zu interpolieren.
+* **Zuordnung und Jahresstände:** Der Verlauf gehört zum aktiven Profil, auch wenn der erfasste Bestand einen Profilverbund umfasst; die anderen Profilverläufe erhalten keine Kopie. Änderungen der Verbundauswahl verändern gespeicherte Stände nicht rückwirkend. Der erfolgreiche Jahresabschluss erfasst genau einen Stand zum 31. Dezember des abgeschlossenen Jahres aus den dann verwendeten Balance-Beständen. Beginn ist 2026; der erste automatische Stand für 2026 entsteht beim Abschluss 2027. Es gibt keine Rückrechnung alter Jahre. Normale Eingabeänderungen und Vorschauen erzeugen keinen Stand und eine manuelle Erfassung keinen zusätzlichen Engine-Jahresschritt.
+* **Verlauf sichern und wiederherstellen:** Balance-JSON, Profilbundle, Komplettbackup und interne Snapshots transportieren den Verlauf. Ein unterstützter Import ohne Verlauf ersetzt ihn durch eine leere Historie. Snapshot-Restore stellt den damaligen Stand wieder her; der Verlauf ist daher kein unveränderliches Archiv über Restore-/Replace-Vorgänge hinweg. Während eines laufenden oder unvollständigen Jahresabschlusses ist keine manuelle Erfassung möglich. Bei einem Teilfehler bleibt der bestätigte Recovery-Snapshot maßgeblich: zuerst wiederherstellen, dann erneut abschließen. Ein beschädigter Verlauf ist ein Validierungsfehler und wird nicht still geleert oder überschrieben.
 * Speichert Eingaben ueber die zentrale Persistenz-Facade; im Browser ist IndexedDB die lokale Source of Truth, Tauri nutzt `ruhestand_suite_data.json` im App-Datenverzeichnis. Ein optional verbundenes Browser-Snapshot-Verzeichnis wird in einer eigenen Handle-Datenbank gespeichert; bestehende Handles aus der frueheren `snapshotDB` werden einmalig uebernommen, ohne die Snapshot-Archivmigration zu blockieren.
 * Komplett-Backup und Komplett-Import liegen zentral auf der Startseite unter `Profile > Erweitert`; Jahresabschluss-Snapshots bleiben als fachlicher Sicherungspunkt in einem separaten internen Snapshot-Archiv erhalten.
 * Liest Marktdaten und Ausgaben aus CSV-Dateien ein. Manuelle Markt-CSVs verlangen

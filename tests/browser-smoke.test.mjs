@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runMonteCarloBrowserRegression } from './simulator-monte-carlo-browser.mjs';
 import { SNAPSHOT_KINDS } from '../app/shared/snapshot-archive.js';
+import { formatCurrency } from '../app/shared/shared-formatting.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -184,7 +185,8 @@ function stopStaticServer(server) {
 async function createPage(browser, label, options = {}) {
     const context = await browser.newContext({
         viewport: { width: 1366, height: 900 },
-        locale: 'de-DE'
+        locale: 'de-DE',
+        ...(options.fixedTime ? { timezoneId: 'Europe/Berlin' } : {})
     });
     await context.addInitScript(storage => {
         if (!sessionStorage.getItem('__browserSmokeSeeded')) {
@@ -248,8 +250,9 @@ async function createPage(browser, label, options = {}) {
             }
         }
         if (options.annualFixtures && url.hostname === '127.0.0.1' && url.port === '8787') {
+            const year = options.annualFixtures.targetYear ?? 2025;
             await route.fulfill({ json: { chart: { result: [{
-                timestamp: [Math.floor(Date.UTC(2025, 11, 30) / 1000)],
+                timestamp: [Math.floor(Date.UTC(year, 11, 30) / 1000)],
                 indicators: { quote: [{ close: [120] }] }
             }] } } });
             return;
@@ -260,12 +263,13 @@ async function createPage(browser, label, options = {}) {
         }
         if (options.annualFixtures && url.hostname === 'api.worldbank.org') {
             await route.fulfill({ json: [{ lastupdated: '2026-07-01' }, [{
-                indicator: { id: 'FP.CPI.TOTL.ZG' }, countryiso3code: 'DEU', date: '2025', value: 2
+                indicator: { id: 'FP.CPI.TOTL.ZG' }, countryiso3code: 'DEU', date: String(options.annualFixtures.targetYear ?? 2025), value: 2
             }]] });
             return;
         }
         if (options.annualFixtures && url.hostname === 'r.jina.ai') {
-            await route.fulfill({ contentType: 'text/plain', body: '2026.07 100 25.5' });
+            const year = (options.annualFixtures.targetYear ?? 2025) + 1;
+            await route.fulfill({ contentType: 'text/plain', body: `${year}.01 100 25.5` });
             return;
         }
         if (EXTERNAL_HOSTS.has(url.hostname)) {
@@ -284,6 +288,8 @@ async function createPage(browser, label, options = {}) {
     });
 
     const page = await context.newPage();
+    // Nur Date fixieren; Debounce, Netzwerk und Persistenz laufen mit echten Timern.
+    if (options.fixedTime) await page.clock.setFixedTime(new Date(options.fixedTime));
     const errors = [];
     page.on('console', message => {
         if (message.type() === 'error') {
@@ -718,18 +724,210 @@ async function runBalanceFiveYearRunwayForcedSale(browser, baseUrl) {
     await smoke.close();
 }
 
+function createWealthBrowserTranches() {
+    return JSON.stringify([
+        createBrowserTranche({ trancheId: 'wealth-old', type: 'aktien_alt', shares: 340,
+            currentPrice: 100, purchaseDate: '2008-01-02', taxExempt: true }),
+        createBrowserTranche({ trancheId: 'wealth-new', shares: 450, currentPrice: 100 }),
+        createBrowserTranche({ trancheId: 'wealth-money', category: 'money_market', type: 'geldmarkt',
+            shares: 230, currentPrice: 100, tqf: 0 })
+    ]);
+}
+
+async function readBalanceBrowserState(page) {
+    return JSON.parse((await readIndexedDb(page, 'kv', BALANCE_STATE_KEY)).value);
+}
+
+async function captureWealthBrowserStand(page, keyboard = false) {
+    const button = page.getByRole('button', { name: 'Stand jetzt erfassen', exact: true });
+    if (keyboard) {
+        await button.focus();
+        await page.keyboard.press('Enter');
+    } else {
+        await button.click();
+    }
+    await page.locator('#wealthHistoryStatus').filter({ hasText: 'Aktueller Stand dauerhaft gespeichert.' }).waitFor();
+}
+
+async function assertWealthBrowserTable(page, entries) {
+    const rows = page.locator('#wealthHistoryTable tbody tr');
+    assert(await rows.count() === entries.length, 'Die Verlaufstabelle zeigt genau die gespeicherten Stände');
+    for (const [index, entry] of entries.entries()) {
+        const cells = await rows.nth(index).locator('th, td').allTextContents();
+        assert(cells[0] === entry.asOf.split('-').reverse().join('.'), 'Die Tabelle zeigt den gespeicherten Stichtag');
+        assert(cells[1].includes(entry.reason === 'manual' ? '◇ Manuell' : '■ Jahresabschluss'),
+            'Der Anlass ist als Text und Form zugänglich');
+        const amounts = ['tagesgeld', 'geldmarktEtf', 'aktienEtf', 'depotwertAlt', 'depotwertNeu', 'total'];
+        assert(JSON.stringify(cells.slice(2)) === JSON.stringify(amounts.map(key => formatCurrency(entry[key]))),
+            'Alle Gruppen, Teildepots und die Summe entsprechen dem persistenten Stand');
+    }
+    const chart = page.getByRole('img', { name: 'Vermögensverlauf in nominalen Euro', exact: true });
+    assert(await chart.count() === 1, 'Der Verlauf besitzt ein benanntes SVG');
+    assert(await chart.getAttribute('aria-labelledby') === 'wealthChartTitle', 'Nur der Titel benennt das SVG');
+    assert(await chart.getAttribute('aria-describedby') === 'wealthChartDesc', 'Die Beschreibung ist separat zugeordnet');
+    const description = chart.locator('desc[id="wealthChartDesc"]');
+    assert(await description.count() === 1, 'Das SVG besitzt genau ein referenziertes Beschreibungselement');
+    assert(await description.textContent() === 'Gestapelte Säulen für Liquidität, Geldmarkt-ETF und Aktien-ETF. Jahresabschluss: Quadrat und durchgezogener Rahmen. Manuell: Raute und gestrichelter Rahmen. Alle Werte und beide Teildepots stehen in der folgenden Tabelle.',
+        'Die vollständige Langbeschreibung ist erhalten');
+    assert(await chart.locator('g').count() === entries.length, 'Jeder Stand besitzt eine eigene Säule');
+    assert(!(await chart.innerHTML()).match(/NaN|Infinity/), 'Auch Nullstände haben endliche SVG-Koordinaten');
+}
+
+async function switchWealthBrowserProfile(page, baseUrl, profileId) {
+    // Derselbe echte Profilwechsel und Handoff wie bei der regulären Suite-Bedienung.
+    await page.goto(`${baseUrl}/index.html`, { waitUntil: 'load' });
+    await page.locator('#profileSelect').selectOption(profileId);
+    await page.waitForFunction(id => document.getElementById('profileSelect')?.value === id
+        && document.body.textContent.includes('Profil gewechselt und geladen.'), profileId);
+    await page.evaluate(async () => {
+        const { PersistenceFacade } = await import('./app/shared/persistence-facade.js');
+        await PersistenceFacade.flush();
+    });
+    await page.goto(`${baseUrl}/Balance.html`, { waitUntil: 'load' });
+    await page.locator('#profilverbund-profile-list input').first().waitFor();
+}
+
+async function runBalanceWealthHistory(browser, baseUrl) {
+    const baseline = createBalanceStorage(2026);
+    const profileState = JSON.parse(baseline[BALANCE_STATE_KEY]);
+    profileState.inputs.floorBedarf = 0;
+    profileState.inputs.flexBedarf = 0;
+    Object.assign(profileState.inputs, { tagesgeld: 12000, geldmarktEtf: 23000, depotwertAlt: 34000, depotwertNeu: 45000 });
+    baseline[BALANCE_STATE_KEY] = JSON.stringify(profileState);
+    const zeroEntry = { id: 'manual:2026-01-02', asOf: '2026-01-02', reason: 'manual', periodId: null,
+        tagesgeld: 0, geldmarktEtf: 0, depotwertAlt: 0, depotwertNeu: 0, aktienEtf: 0, total: 0 };
+    const tranchesRaw = createWealthBrowserTranches();
+    const smoke = await openSmokePage(browser, baseUrl, 'Balance.html', {
+        fixedTime: '2026-10-03T00:30:00+02:00',
+        storage: {
+            ...baseline, profile_tagesgeld: '12000', depot_tranchen: tranchesRaw,
+            ...createBrowserProfileStorage({
+                'wealth-a': { name: 'Verlauf A', tagesgeld: '12000', tranchesRaw,
+                    balanceStateRaw: baseline[BALANCE_STATE_KEY] },
+                'wealth-b': { name: 'Verlauf B', tagesgeld: '2000', balanceStateRaw: JSON.stringify({
+                    ...profileState, inputs: { ...profileState.inputs, tagesgeld: 2000,
+                        geldmarktEtf: 0, depotwertAlt: 0, depotwertNeu: 0 },
+                    wealthHistory: { schemaVersion: 1, entries: [zeroEntry] }
+                }) }
+            }, 'wealth-a')
+        }
+    });
+    const { page } = smoke;
+    await page.locator('#wealthHistoryHint').filter({ hasText: 'Noch keine Stände erfasst' }).waitFor();
+    await page.waitForFunction(() => document.querySelectorAll('#profilverbund-profile-list input:checked').length === 2);
+    await captureWealthBrowserStand(page, true);
+    const first = (await readBalanceBrowserState(page)).wealthHistory.entries;
+    assert(first.length === 1 && first[0].asOf === '2026-10-03' && first[0].id === 'manual:2026-10-03',
+        'Tastaturerfassung nutzt den lokalen Klicktag statt des noch vorherigen UTC-Tags');
+    assert(first[0].tagesgeld === 14000 && first[0].geldmarktEtf === 23000
+        && first[0].depotwertAlt === 34000 && first[0].depotwertNeu === 45000
+        && first[0].aktienEtf === 79000 && first[0].total === 116000,
+    'Der echte Knopf erfasst die Profilverbund- und Tranchenwerte, keine simulierten Bestände');
+    await assertWealthBrowserTable(page, first);
+    const registryAfterCapture = JSON.parse((await readIndexedDb(page, 'kv', 'rs_profiles_v1')).value);
+    assert(JSON.stringify(JSON.parse(registryAfterCapture.profiles['wealth-a'].data[BALANCE_STATE_KEY]).wealthHistory.entries)
+        === JSON.stringify(first), 'Live-State und aktive Registrykopie sind dauerhaft gleich');
+    assert(JSON.stringify(JSON.parse(registryAfterCapture.profiles['wealth-b'].data[BALANCE_STATE_KEY]).wealthHistory.entries)
+        === JSON.stringify([zeroEntry]), 'Der Verbundstand wird nicht in den Verlauf des zweiten Profils kopiert');
+
+    await page.locator('input[data-profile-id="wealth-b"]').uncheck();
+    await captureWealthBrowserStand(page);
+    const replaced = (await readBalanceBrowserState(page)).wealthHistory.entries;
+    assert(replaced.length === 1 && replaced[0].tagesgeld === 12000 && replaced[0].total === 114000,
+        'Ein weiterer Klick am selben Tag ersetzt den Stand aus der frischen Profilbasis');
+    await page.reload({ waitUntil: 'load' });
+    await page.locator('#wealthHistoryTable tbody tr').waitFor();
+    assert(JSON.stringify((await readBalanceBrowserState(page)).wealthHistory.entries) === JSON.stringify(replaced),
+        'Reload erhält die gespeicherten Werte exakt');
+    await assertWealthBrowserTable(page, replaced);
+
+    await page.clock.setFixedTime(new Date('2026-10-04T12:00:00+02:00'));
+    await captureWealthBrowserStand(page);
+    const nextDay = (await readBalanceBrowserState(page)).wealthHistory.entries;
+    assert(nextDay.length === 2 && nextDay[1].asOf === '2026-10-04', 'Ein anderer lokaler Tag ergänzt einen Stand');
+    await assertWealthBrowserTable(page, nextDay);
+
+    await switchWealthBrowserProfile(page, baseUrl, 'wealth-b');
+    await page.locator('#wealthHistoryTable tbody tr').waitFor();
+    await assertWealthBrowserTable(page, [zeroEntry]);
+    await page.setViewportSize({ width: 375, height: 812 });
+    const capture = page.getByRole('button', { name: 'Stand jetzt erfassen', exact: true });
+    await capture.focus();
+    await page.keyboard.press('Tab');
+    assert(await page.getByRole('region', { name: 'Vermögensdiagramm', exact: true }).evaluate(el => el === document.activeElement),
+        'Das Diagramm ist per Tab erreichbar');
+    await page.keyboard.press('Tab');
+    const table = page.getByRole('region', { name: 'Tabelle der Vermögensstände', exact: true });
+    assert(await table.evaluate(el => el === document.activeElement), 'Die Datentabelle ist per Tab erreichbar');
+    await page.keyboard.press('End');
+    await assertWealthBrowserTable(page, [zeroEntry]);
+    const widths = await page.evaluate(() => {
+        const section = document.querySelector('.wealth-history');
+        const before = document.documentElement.scrollWidth;
+        const regions = [...section.querySelectorAll('.wealth-scroll')].map(el => ({
+            width: el.clientWidth, scroll: el.scrollWidth, overflow: getComputedStyle(el).overflowX
+        }));
+        section.hidden = true;
+        const withoutChart = document.documentElement.scrollWidth;
+        section.hidden = false;
+        return { before, withoutChart, regions };
+    });
+    assert(widths.before <= widths.withoutChart, 'Der Verlauf verursacht keinen zusätzlichen seitenweiten Überlauf');
+    assert(widths.regions.every(region => region.width <= 375 && region.scroll > region.width && region.overflow === 'auto'),
+        'Die schmale Ansicht scrollt SVG und Tabelle ausschließlich innerhalb ihrer Regionen');
+
+    await page.setViewportSize({ width: 1366, height: 900 });
+    await switchWealthBrowserProfile(page, baseUrl, 'wealth-a');
+    await page.waitForFunction(() => document.querySelectorAll('#wealthHistoryTable tbody tr').length === 2);
+    await assertWealthBrowserTable(page, nextDay);
+    const legacy = {
+        app: await page.evaluate(async () => (await import('./app/balance/balance-config.js')).CONFIG.APP.NAME),
+        version: 'v21.1 Refactored (Engine v31)', payload: profileState
+    };
+    await page.locator('.tab-btn[data-tab="settings"]').click();
+    await page.locator('#snapshot-management').evaluate(el => { el.open = true; });
+    await page.locator('#importFile').setInputFiles({ name: 'synthetischer-legacy-verlauf.json',
+        mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(legacy)) });
+    await page.locator('#wealthHistoryHint').filter({ hasText: 'Noch keine Stände erfasst' }).waitFor();
+    assert(!(await readBalanceBrowserState(page)).wealthHistory, 'Legacy-Replace übernimmt keinen alten Verlauf');
+    assert(await page.locator('#wealthHistoryChart svg, #wealthHistoryTable table').count() === 0,
+        'Legacy-Import entfernt sämtliche bisherigen Diagramm- und Tabelleninhalte');
+    await page.reload({ waitUntil: 'load' });
+    await page.locator('#wealthHistoryHint').filter({ hasText: 'Noch keine Stände erfasst' }).waitFor();
+    assert(await page.locator('#wealthHistoryChart svg, #wealthHistoryTable table').count() === 0,
+        'Der leere Legacy-Verlauf bleibt nach Reload leer');
+    await switchWealthBrowserProfile(page, baseUrl, 'wealth-b');
+    await page.locator('#wealthHistoryTable tbody tr').waitFor();
+    await assertWealthBrowserTable(page, [zeroEntry]);
+    smoke.assertNoErrors();
+    await smoke.close();
+}
+
 async function runBalanceAnnualCommit(browser, baseUrl) {
     const smoke = await openSmokePage(browser, baseUrl, 'Balance.html', {
-        storage: createBalanceStorage(2025), annualFixtures: true
+        storage: createBalanceStorage(2026), annualFixtures: { targetYear: 2026 },
+        fixedTime: '2027-01-15T12:00:00+01:00'
     });
     await smoke.page.locator('#profilverbund-profile-list input').waitFor({ state: 'visible' });
     await smoke.page.locator('#aktuellesAlter').waitFor({ state: 'attached' });
     await smoke.page.waitForTimeout(750);
     const closeButton = smoke.page.locator('#jahresabschlussBtn');
+    let releaseAnnualFetch;
+    const annualFetchGate = new Promise(resolve => { releaseAnnualFetch = resolve; });
+    await smoke.page.route(url => url.hostname === '127.0.0.1' && url.port === '8787' && url.pathname === '/chart', async route => {
+        await annualFetchGate;
+        await route.fallback();
+    });
     await closeButton.click({ force: true });
+    await smoke.page.waitForFunction(() => document.getElementById('captureWealthBtn').disabled);
+    assert(await closeButton.isDisabled() && await smoke.page.locator('#btnJahresUpdate').isDisabled(),
+        'Der laufende Abschluss sperrt beide Jahresknöpfe und die manuelle Erfassung');
     await closeButton.click({ force: true });
+    await smoke.page.keyboard.press('Alt+j');
+    releaseAnnualFetch();
     try {
-        await smoke.page.waitForFunction(() => document.getElementById('expensesYearSelect')?.value === '2026');
+        await smoke.page.waitForFunction(() => document.getElementById('expensesYearSelect')?.value === '2027'
+            && !document.getElementById('captureWealthBtn').disabled);
     } catch (error) {
         const details = await smoke.page.evaluate(() => ({
             age: document.getElementById('aktuellesAlter')?.value,
@@ -744,16 +942,42 @@ async function runBalanceAnnualCommit(browser, baseUrl) {
     }
     const committedAge = await smoke.page.locator('#aktuellesAlter').inputValue();
     assert(committedAge === '68', `Erfolgreicher Commit muss das Alter genau einmal erhoehen (Ist: ${committedAge})`);
-    const messages = await smoke.page.evaluate(() => window.__browserSmokeMessages);
-    assert(messages.some(message => message.includes('laeuft bereits')), 'Doppelklick muss als in-flight erkannt werden');
     const row = await readIndexedDb(smoke.page, 'kv', BALANCE_STATE_KEY);
     const state = JSON.parse(row.value);
-    assert(state.annualPeriodMetadata.lastCommittedPeriod === 'calendar-year:2025', 'Commit muss stabile Perioden-ID speichern');
+    assert(state.annualPeriodMetadata.lastCommittedPeriod === 'calendar-year:2026', 'Commit muss stabile Perioden-ID speichern');
     assert(
-        state.balanceStateLifecycle?.lastCommittedPeriod === 'calendar-year:2025',
+        state.balanceStateLifecycle?.lastCommittedPeriod === 'calendar-year:2026',
         'Fachlicher State-Commit muss dieselbe stabile Perioden-ID speichern'
     );
     assert(await readIndexedDb(smoke.page, 'snapshots', null) === 1, 'Doppelklick darf nur einen Recovery-Snapshot erzeugen');
+    await smoke.page.keyboard.press('Escape');
+    const entries = state.wealthHistory.entries;
+    assert(entries.length === 1 && entries[0].id === 'annual:2026' && entries[0].asOf === '2026-12-31'
+        && entries[0].reason === 'annual_close' && entries[0].periodId === 'calendar-year:2026',
+    'Genau ein Jahresstand gehört zum abgeschlossenen Jahr, nicht zum Ausführungs- oder Rolloverjahr');
+    assert(entries[0].tagesgeld === 100000 && entries[0].geldmarktEtf === 0
+        && entries[0].depotwertAlt === 500000 && entries[0].depotwertNeu === 0
+        && entries[0].aktienEtf === 500000 && entries[0].total === 600000,
+    'Der Jahresstand erfasst die kontrollierten realen Eingabebestände statt simulierter Entnahmen');
+    await assertWealthBrowserTable(smoke.page, entries);
+    const registry = JSON.parse((await readIndexedDb(smoke.page, 'kv', 'rs_profiles_v1')).value);
+    const current = (await readIndexedDb(smoke.page, 'kv', 'rs_current_profile')).value;
+    assert(JSON.stringify(JSON.parse(registry.profiles[current].data[BALANCE_STATE_KEY]).wealthHistory) === JSON.stringify(state.wealthHistory),
+        'Der Jahresstand ist auch in der aktiven Registrykopie bestätigt');
+    await smoke.page.getByRole('button', { name: 'Ausgaben-Check', exact: true }).click();
+    await smoke.page.locator('#expensesYearSelect').selectOption('2026');
+    await smoke.page.getByRole('button', { name: 'Jahres-Update', exact: true }).click();
+    await smoke.page.locator('#btnJahresUpdate').click();
+    await smoke.page.waitForFunction(() => !document.getElementById('captureWealthBtn').disabled);
+    const repeatMessages = await smoke.page.evaluate(() => window.__browserSmokeMessages);
+    assert(repeatMessages.some(message => message.includes('Die Jahresperiode 2026 wurde bereits abgeschlossen.')),
+        'Die Wiederholung erreicht den fachlichen No-op statt an einer Vorprüfung zu scheitern');
+    assert(JSON.stringify((await readBalanceBrowserState(smoke.page)).wealthHistory.entries) === JSON.stringify(entries),
+        'Der zweite Jahresknopf verändert einen bereits abgeschlossenen Jahresstand nicht');
+    assert(await readIndexedDb(smoke.page, 'snapshots', null) === 1, 'Wiederholung erzeugt keinen zweiten Recovery-Snapshot');
+    await smoke.page.reload({ waitUntil: 'load' });
+    await smoke.page.locator('#wealthHistoryTable tbody tr').waitFor();
+    await assertWealthBrowserTable(smoke.page, entries);
     smoke.assertNoErrors();
     await smoke.close();
 }
@@ -3064,6 +3288,7 @@ async function main() {
             ['full backup recovery', runFullBackupRecoverySmoke],
             ['Balance.html', runBalanceSmoke],
             ['Balance membership reload', runBalanceMembershipReload],
+            ['Balance wealth history', runBalanceWealthHistory],
             ['Balance shared tranche ids', runBalanceSharedTrancheIds],
             ['Balance engine gate', runBalanceEngineGate],
             ['Balance annual preflight', runBalanceAnnualPreflight],

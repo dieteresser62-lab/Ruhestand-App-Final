@@ -124,6 +124,17 @@ Das Browser-Gate nutzt Playwright mit einem vom Test verwalteten lokalen HTTP-Se
 
 Wichtig fuer CI/Release: Weil `npm test` dieses Gate nicht ausfuehrt, muss `npm run test:browser` explizit als eigener Job oder Release-Schritt laufen, wenn Browser-Regressionen blockierend sein sollen.
 
+Der Fall **`Balance wealth history`** betätigt „Stand jetzt erfassen“ auch per Tastatur, prüft den lokalen Tag bei abweichendem UTC-Datum, Profilverbund-/Tranchenwerte, Tagesersetzung und einen weiteren Tag. Er vergleicht alle sichtbaren Tabellenwerte mit dem bestätigten IndexedDB-State, prüft Reload, den echten Profilwechsel über die Startseite, Profilisolation, einen einzelnen Nullstand und Legacy-Import ohne Verlauf. Bei 375 CSS-Pixeln werden Tab-Reihenfolge, interne Scrollregionen und der durch das Diagramm verursachte zusätzliche Seitenüberlauf geprüft. **`Balance annual commit`** verwendet feste Zeit im Januar 2027 und geroutete Daten für 2026: genau ein `annual:2026` am 31.12.2026 mit erwarteten Beständen, aktive Registrykopie, gesperrte Mehrfachbedienung, Wiederholung über den zweiten Jahresknopf und Reload. Keine Live-Netzabhängigkeit; nur Date ist fixiert, die asynchronen Timer laufen regulär.
+
+Gezielte Browserläufe:
+
+```bash
+node tests/browser-smoke.test.mjs --only='Balance wealth history'
+node tests/browser-smoke.test.mjs --only='Balance annual commit'
+```
+
+Im orchestrierten Lauf führt allein der Orchestrator `npm test` aus. Verhindert die Agentensandbox den lokalen Server-/Browserstart (z. B. `listen EPERM`), wird das als nicht ausführbar dokumentiert; `npm run test:browser` bleibt ein außerhalb dieser Sandbox auszuführendes separates Gate. Ein Syntaxcheck ersetzt keinen Browsernachweis.
+
 ### Release-nahe Tauri-Gates
 ```bash
 node tests/run-single.mjs tests/tauri-csp.test.mjs
@@ -651,6 +662,23 @@ Inventar liegen bewusst in den jeweiligen Fachtests.
 
 ### 6. Balance-App Module
 
+#### Vermögensverlauf
+
+- `wealth-history-contract.test.mjs`: Eintrags-/Schema-/Datumsprüfung, Identitäten, ungerundete Beträge und abgeleitete Summen, lokale Tagesersetzung, getrennte Jahresstände sowie fehlende/defekte Historie.
+- `balance-wealth-history.test.mjs`: frische Preview-Quelle, gemeinsame Schreibkoordination, State-/Registry-Readback, Profilwechsel, Write-/Flush-/Readbackfehler und echter Snapshot-Restore mit anschließend genau einem Jahresrecord; auch Renderfehler nach bestätigtem Abschluss und Jahre vor 2026.
+- `balance-wealth-history-chart.test.mjs`: chronologische unverändernde Aufbereitung, Jahresabschluss vor manuell bei gleichem Datum, genau drei Stapelgruppen, zugängliche SVG-/Tabellenausgabe, einzelne/Null-/große Stände sowie vollständiger Legacy-/Fehler-Replace.
+- `balance-annual-workflow-contract.test.mjs`: genau ein Jahresrecord aus `commitLiveState().inputData`, abgeschlossene Periode/Stichtag, atomare finale Metadaten-/Verlaufbestätigung, unveränderte andere Profile, Idempotenz und Recovery-Sperren.
+- Ergänzende Roundtrips und Negativfälle: `balance-storage-contract.test.mjs`, `balance-ui-orchestration.test.mjs`, `profile-state.test.mjs`, `profile-storage.test.mjs` und `persistence.test.mjs` für Balance-V2/V1/Legacy, Profilbundle, Komplettbackup und korrupte inaktive Profile.
+
+Fokussierte Ausführung:
+
+```bash
+node tests/run-single.mjs tests/wealth-history-contract.test.mjs
+node tests/run-single.mjs tests/balance-wealth-history.test.mjs
+node tests/run-single.mjs tests/balance-wealth-history-chart.test.mjs
+node tests/run-single.mjs tests/balance-annual-workflow-contract.test.mjs
+```
+
 #### `balance-smoke.test.mjs`
 **Zweck:** End-to-End Smoke-Test der Balance-App ohne JSDOM.
 - Initialisierung über DOMContentLoaded
@@ -699,7 +727,7 @@ Inventar liegen bewusst in den jeweiligen Fachtests.
 - **Jahresupdate-Orchestrator:** Reihenfolge Alter → Inflation → ETF → CAPE → Update
 - **Result-Shape:** CAPE-Fehlerdetails, altes/neues Alter, gespeichertes Log
 - **Profil-Save:** Jahresupdate schreibt den aktuellen Profil-Snapshot
-- **Jahresabschluss:** Snapshot nach Jahresfortschreibung und vor Ausgaben-Rollover
+- **Jahresabschluss:** bestätigter Recovery-Snapshot vor fachlichen Jahresmutationen; finale Bestätigung nach Jahresfortschreibung, Ausgaben-Rollover und periodengebundenem State-Commit
 - **Snapshot-Refresh:** Snapshot-Liste wird nach Abschluss neu gerendert
 
 #### `balance-binder-snapshots.test.mjs`

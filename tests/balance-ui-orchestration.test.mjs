@@ -1,3 +1,4 @@
+import { readWealthHistory } from '../types/wealth-history-contract.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { UIBinder, initUIBinder } from '../app/balance/balance-binder.js';
@@ -877,6 +878,26 @@ async function runBalanceUiOrchestrationTests() {
                 return error;
             }
         };
+        const wealthEntry = { id: 'manual:2026-12-31', asOf: '2026-12-31', reason: 'manual', periodId: null,
+            tagesgeld: 12000, geldmarktEtf: 23000, depotwertAlt: 34000, depotwertNeu: 45000, aktienEtf: 79000, total: 114000 };
+        const wealthHistory = { schemaVersion: 1, entries: [wealthEntry,
+            { ...wealthEntry, id: 'annual:2026', reason: 'annual_close', periodId: 'calendar-year:2026' }] };
+        const wealthDocument = createBalanceExportDocument({ ...validState, wealthHistory });
+        assertEqual(wealthDocument.schemaVersion, 2, 'Das optionale Feld erhöht die äußere Balance-Version nicht');
+        assertEqual(JSON.stringify(normalizeBalanceImportDocument(wealthDocument).payload.wealthHistory), JSON.stringify(wealthHistory), 'Balance-V2-Export und Import erhalten alle Verlauffelder');
+        for (const supported of [currentDocument, versionOneDocument, legacyDocument]) {
+            assertEqual(readWealthHistory(normalizeBalanceImportDocument(supported).payload).entries.length, 0, 'Unterstützte Exporte ohne Feld besitzen einen leeren Verlauf');
+            for (const invalid of [null, undefined, { schemaVersion: 2, entries: [] }, { schemaVersion: 1, entries: [wealthEntry, wealthEntry] },
+                { schemaVersion: 1, entries: [{ ...wealthEntry, total: -1 }] }]) {
+                const error = captureImportError({ ...supported, payload: { ...supported.payload, wealthHistory: invalid } });
+                assert(error instanceof BalanceImportError, 'Auch Legacy-Import prüft ein vorhandenes Verlauffeld strikt');
+                assertEqual(error.code, 'invalid_wealth_history', 'Der Import meldet einen gezielten Verlauffehler');
+            }
+        }
+        const warningExport = createBalanceExportDocument({ ...validState, wealthHistory: { schemaVersion: 1, entries: [{ ...wealthEntry, total: 1 }] } });
+        assertEqual(warningExport.validationWarnings[0].code, 'invalid_wealth_history', 'Der bestehende Recovery-Export kann einen Validierungshinweis transportieren');
+        assertEqual(warningExport.payload.wealthHistory.entries[0].total, 1, 'Der Warnungsexport repariert keine beschädigten Werte');
+
         const createVersionOneProbe = inputOverrides => ({
             ...currentDocument,
             schemaVersion: 1,

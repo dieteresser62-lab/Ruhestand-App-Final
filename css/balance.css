@@ -20,6 +20,25 @@
 }
 
 /* Base Layout */
+.wealth-history { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border-color); min-width: 0; }
+.wealth-history p { font-size: .9rem; line-height: 1.5; }
+.wealth-legend { display: flex; flex-wrap: wrap; gap: 12px; list-style: none; padding: 0; font-size: .85rem; }
+.wealth-swatch { display: inline-block; width: 12px; height: 12px; margin-right: 5px; }
+.wealth-tagesgeld { fill: #357963; background: #357963; }
+.wealth-geldmarktEtf { fill: #c5a059; background: #c5a059; }
+.wealth-aktienEtf { fill: #4779ad; background: #4779ad; }
+.wealth-outline { fill: none; stroke: var(--primary-text); stroke-width: 2; }
+.wealth-grid { stroke: var(--border-color); }
+.wealth-scroll { max-width: 100%; overflow-x: auto; margin-top: 12px; }
+.wealth-scroll:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 2px; }
+.wealth-scroll svg { display: block; width: 100%; min-width: 640px; height: auto; }
+.wealth-scroll svg text { fill: var(--primary-text); font-size: 10px; }
+.wealth-scroll table { border-collapse: collapse; width: 100%; font-size: .85rem; }
+.wealth-scroll caption { text-align: left; margin-bottom: 8px; }
+.wealth-scroll th, .wealth-scroll td { text-align: right; padding: 8px; border-bottom: 1px solid var(--border-color); white-space: nowrap; }
+.wealth-scroll th:first-child, .wealth-scroll td:nth-child(2) { text-align: left; }
+.results-column { min-width: 0; }
+
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     background-color: var(--background-color);
@@ -59,7 +78,7 @@ body {
 @media (max-width: 1250px) {
     .main-layout { flex-direction: column; align-items: stretch; gap: 25px; }
     .form-column { max-height: none; overflow: visible; padding-right: 0; }
-    .results-column { position: static; }
+    .results-column { position: static; align-self: stretch; }
 }
 
 /* Typography */

@@ -460,6 +460,7 @@
                         </li>
                         <li><a class="toc-link" data-tab-target="manual" href="#balance-marktdaten-csv">Marktdaten</a>
                         </li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#balance-vermoegensverlauf">Vermögensverlauf</a></li>
                         <li><a class="toc-link" data-tab-target="manual" href="#balance-snapshots">Snapshots &amp;
                                 Recovery</a></li>
                         <li><a class="toc-link" data-tab-target="manual" href="#balance-diagnose">Diagnose</a></li>
@@ -1409,6 +1410,36 @@
                                 wieder her, wenn das Snapshot-Profil in der aktuellen Profil-Registry noch existiert.
                                 Er ist kein Profil-Merge.</li>
                         </ul>
+                    </div>
+                    <div class="detail-block" id="balance-vermoegensverlauf">
+                        <h3>Vermögensverlauf</h3>
+                        <p>Im Ergebnisbereich speichert <strong>„Stand jetzt erfassen“</strong> die aktuellen,
+                            frisch geprüften Balance-Bestände. Ein erneuter Klick am selben lokalen Kalendertag
+                            ersetzt den manuellen Stand; an einem anderen Tag kommt ein Stand hinzu. Normale
+                            Eingabeänderungen und Vorschauen erfassen nichts automatisch. Die Erfassung führt
+                            keinen zusätzlichen Engine-Jahresschritt aus.</p>
+                        <p>Die nominale Euro-Summe enthält <strong>Tagesgeld, Geldmarkt-ETF und Aktien-ETF</strong>.
+                            Aktien-ETF ist die Summe aus Alt- und Neu-Depot. Gold und separate Anleihen gehören
+                            nicht dazu. Der Pflegebucket ist eine Zweckbindung innerhalb der Bestände und wird
+                            weder zusätzlich addiert noch pauschal abgezogen. Gestapelte Säulen zeigen die drei
+                            Gruppen ohne interpolierte Zwischenwerte. Die per Tab erreichbare Tabelle nennt
+                            außerdem beide Teildepots, Summe und Anlass. Jahresabschluss und manuell sind durch
+                            Text, Symbol und Rahmen erkennbar; auf schmalen Ansichten scrollen die Bereiche intern.</p>
+                        <p><strong>Profilzuordnung:</strong> Jeder Stand gehört ausschließlich zum aktiven Profil,
+                            auch bei einem angezeigten Profilverbund. Andere Profile erhalten keine Verlaufskopie;
+                            eine spätere Änderung der Verbundauswahl verändert frühere Stände nicht.</p>
+                        <p><strong>Jahresabschluss:</strong> Ein erfolgreicher Abschluss erfasst genau einen Stand
+                            zum 31. Dezember des abgeschlossenen Jahres aus den zu diesem Zeitpunkt verwendeten
+                            Balance-Beständen. Ein wiederholter Abschluss erzeugt keinen zweiten Stand. Der Verlauf
+                            beginnt 2026: Manuelle Stände sind ab 2026 möglich, der erste automatische Stand für
+                            2026 entsteht beim Abschluss 2027. Frühere Jahre werden nicht rückgerechnet.</p>
+                        <p><strong>Sicherung und Recovery:</strong> Balance-JSON, Profilbundle, Komplettbackup und
+                            interne Snapshots enthalten den Verlauf. Unterstützte ältere Importe ohne Verlauf
+                            ersetzen ihn durch eine leere Historie. Restore setzt ihn auf den damaligen Snapshotstand
+                            zurück. Während eines laufenden oder unvollständigen Jahresprozesses kann kein manueller
+                            Zwischenstand gespeichert werden. Nach einem Teilfehler zuerst den benannten Recovery-Snapshot
+                            wiederherstellen und danach erneut abschließen; es gibt keinen direkten Resume.
+                            Ein beschädigter Verlauf wird als Fehler angezeigt und nicht durch Erfassen überschrieben.</p>
                     </div>
                     <div class="detail-block" id="balance-diagnose">
                         <h3>Diagnose</h3>

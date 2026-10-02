@@ -169,7 +169,7 @@ function validateProfileData(data, path) {
     const balanceResult = loadStoredBalanceStateFromData(data);
     if (balanceResult.status === PROFILE_LOAD_STATUS.CORRUPT
         || balanceResult.status === PROFILE_LOAD_STATUS.UNAVAILABLE) {
-        throw new Error(balanceResult.error?.message || `${path}.${CONFIG.STORAGE.LS_KEY} ist ungueltig.`);
+        throw new Error(`${path}.${CONFIG.STORAGE.LS_KEY}: ${balanceResult.error?.message || 'Der Balance-State ist ungueltig.'}`);
     }
     if (balanceResult.value) {
         validateBalanceInflationState(balanceResult.value, `${path}.${CONFIG.STORAGE.LS_KEY}`);

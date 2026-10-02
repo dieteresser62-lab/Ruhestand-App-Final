@@ -2,6 +2,7 @@
 
 import { CONFIG } from '../balance/balance-config.js';
 import { persistenceStorage } from '../shared/persistence-facade.js';
+import { assertBalanceWealthHistory } from '../../types/wealth-history-contract.js';
 
 export const PROFILE_STORAGE_KEYS = {
     registry: 'rs_profiles_v1',
@@ -204,6 +205,19 @@ function validateHealthBucketResult(parsedResult) {
 function validateBalanceStateResult(parsedResult) {
     if (parsedResult.status !== PROFILE_LOAD_STATUS.VALID) return parsedResult;
     const value = parsedResult.value;
+    try {
+        assertBalanceWealthHistory(value);
+    } catch (error) {
+        return createProfileLoadResult(PROFILE_LOAD_STATUS.CORRUPT, parsedResult.storageKey, {
+            raw: parsedResult.raw,
+            error: {
+                code: 'PROFILE_WEALTH_HISTORY_INVALID',
+                message: error.message,
+                field: 'wealthHistory',
+                cause: error
+            }
+        });
+    }
     if (Object.keys(value).length === 0) {
         return { ...parsedResult, status: PROFILE_LOAD_STATUS.EMPTY };
     }
