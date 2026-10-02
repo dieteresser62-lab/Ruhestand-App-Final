@@ -19,18 +19,21 @@ Dieses Dokument beschreibt die Architektur und zentrale Datenflüsse der Ruhesta
 | Profil/Verbund | `index.html`, `app/profile/*.js` | Profilverwaltung, Handoff/Flush, Profilverbund und Pflegebucket-Definition |
 | Tranchen | `depot-tranchen-manager.html`, `types/tranche-contract.js`, `app/tranches/*.js` | Kanonischer Lotvertrag, CRUD/Recovery, EUR-Quotes, Consumerstatus, bestaetigter Realbestandsabgleich und append-only Cashnachweis |
 | Shared | `app/shared/*.js` | Gemeinsame Formatter, Feature-Flags, CAPE-Helfer, Persistenz-Facade |
-| Engine | `engine/` (ESM) → `engine.js` | Validierung, Marktanalyse, diskrete und kontinuierliche Regime-Signale, VPW-Rendite-Policy, Spending- und Transaktionslogik |
+| Engine | `engine/` (ESM), `engine.js` als Import-Wrapper | Validierung, Marktanalyse, diskrete und kontinuierliche Regime-Signale, VPW-Rendite-Policy, Spending- und Transaktionslogik |
 
 Die Pfade und Contracts sind normativ; volatile Modul- und Testdateizaehler stehen im Coverage-Inventar statt in dieser Architekturreferenz.
 
-Alle Skripte sind ES6-Module. Die Engine wird per `build-engine.mjs` mit esbuild (oder Modul-Fallback) gebündelt und stellt eine globale `EngineAPI` bereit.
-Für CI/Release ist Strict-Mode vorgesehen (`npm run build:engine:strict`), der ohne `esbuild` fehlschlägt.
+Alle Skripte sind ES6-Module. `engine.js` ist aktuell ein reiner generierter Wrapper, der `EngineAPI` aus `engine/index.mjs` importiert, die Browser-Globals einschließlich Legacy-Alias bereitstellt und beide Namen exportiert. Balance und Simulator laden ihn als Modul; Fachtests und Worker importieren die Engine-Module direkt.
+
+`build-engine.mjs` schreibt ohne `esbuild` im nicht strikten Modus den konstanten Modul-Fallback; mit `esbuild` erzeugt es ein echtes IIFE-Bundle. Ein Bundle enthält kopierte Engine-Logik und übernimmt Quelländerungen nicht automatisch. `tests/engine-wrapper-contract.test.mjs` weist auch ein frisch erzeugtes Bundle ab; der Wechsel benötigt eine eigene geprüfte Vertragsänderung. Andere Buildfehler werden nicht durch einen erfolgreichen Fallback verdeckt.
+
+`npm run build:engine:strict` ist optional für einen bewusst gewählten Bundle-Auslieferungsvertrag. Ohne `esbuild` scheitert Strict vor dem Fallback. Auch `ENGINE_BUILD_STRICT` oder `CI` mit `1`/`true` (Groß-/Kleinschreibung beliebig) machen den normalen Build strikt. Der bestehende Browser-/Tauri-Wrapperpfad verlangt keinen Strict-Build.
 
 ### Tauri Desktop-Build und Live-Daten
 
 Die Desktop-App lädt das Frontend direkt aus `dist/` (`src-tauri/tauri.conf.json -> build.frontendDist = "../dist"`). Der Build-Pfad ist plattformneutral:
 
-1. `npm run sync-dist` (`scripts/sync-dist.mjs`) baut `dist/` aus einem Git-Commit. Kopiert werden nur Laufzeitdateien: `app/`, `engine/`, `workers/`, `types/`, `css/`, `assets/` sowie die HTML-, JS- und CSS-Dateien im Wurzelverzeichnis. `data/`, Dokumentation, Tests, Werkzeuge und Agentendateien gelangen nicht in die App. `__build-provenance.json` hält den Quell-Commit fest.
+1. `npm run sync-dist` (`scripts/sync-dist.mjs`) baut `dist/` aus einem Git-Commit. Kopiert werden nur Laufzeitdateien: `app/`, `engine/`, `workers/`, `types/`, `css/`, `assets/` sowie die HTML-, JS- und CSS-Dateien im Wurzelverzeichnis. `data/`, Dokumentation, Tests, Werkzeuge und Agentendateien gelangen nicht in die App. `engine/` und `engine.js` werden aus demselben gewählten Commit übernommen; der Sync führt keinen Engine-Build aus. `__build-provenance.json` hält den Quell-Commit fest.
 2. `npm run tauri:build` bettet `dist/` ein und legt die Binary unter `src-tauri/target/release/` ab (Windows: `ruhestand_suite.exe`).
 
 `npm run build:desktop` führt beide Schritte nacheinander aus. Ohne `--rev` verlangt `sync-dist` einen sauberen Stand der versionierten Quellen und blockiert unversionierte Laufzeitdateien; mit `--rev <commit>` und `--out <ordner>` überträgt es einen beliebigen Commit in einen externen Buildordner. Die EXE ist kein Repository-Artefakt; ältere Stände für Regressionsvergleiche werden außerhalb des Repositories archiviert. `tests/dist-runtime-inventory.test.mjs` verfolgt die statischen Verweise der HTML-Einstiege und schlägt fehl, sobald eine referenzierte Datei außerhalb dieser Laufzeitliste liegt.
@@ -75,7 +78,7 @@ Nach einem erfolgreichen manuellen EXE-Build sollte die erzeugte `RuhestandSuite
 
 ## Engine
 
-Die Engine besteht aus zentralen ES-Modulen, die von `build-engine.mjs` zu `engine.js` zusammengeführt werden. Die Reihenfolge entspricht zugleich der internen Verarbeitungskette:
+Die Engine besteht aus zentralen ES-Modulen unter `engine/`; `engine.js` importiert ihren Einstieg `engine/index.mjs`, ohne die Implementierung zu kopieren. Die Reihenfolge entspricht zugleich der internen Verarbeitungskette:
 
 1. **`engine/validators/InputValidator.mjs`** – prüft sämtliche Eingaben auf Vollständigkeit, Wertebereiche und Konsistenz. Liefert strukturierte Fehlermeldungen.
 2. **`engine/analyzers/MarketAnalyzer.mjs`** – klassifiziert Marktregime, berechnet Drawdowns und leitet Kennzahlen für Guardrails ab. `marketDataStatus` unterscheidet `missing`, `partial` und `complete`; ohne positive endliche Werte fuer aktuellen Kurs und ATH bleiben ATH-Abstand und `seiATH` `null`, und fehlende Kerndaten verwenden `side_long` statt eines falschen ATH-Signals. CAPE bleibt unabhaengig auswertbar. Additiv liefert `engine/analyzers/regime-signals.mjs` kontinuierliche Signal-Severities fuer Drawdown, CAPE und Runway. Die Stuetzwerte bleiben richtungssensitiv: aufsteigende Skalen wie Drawdown und absteigende Skalen wie Runway duerfen nicht per `Math.min`/`Math.max` sortiert werden.
@@ -913,7 +916,8 @@ definiert werden. Ergebnisse werden gegen diese Limits geprüft und als OK/Verle
 
 ## Build- und Laufzeit-Hinweise
 
-* Engine anpassen → `npm run build:engine` ausführen, anschließend `engine.js` prüfen; für CI/Release `npm run build:engine:strict` nutzen.
+* Engine-Fachlogik, Versionswerte und API-Methoden hinter demselben Import unter `engine/` anpassen; Fachtests und Vertragsprüfungen bleiben verpflichtend. Ein unveränderter Wrapper ist erwartbar, eine Größen-/Bundlekontrolle nach jeder Fachänderung ist nicht erforderlich.
+* `engine.js` niemals manuell editieren. Neuerzeugung über `npm run build:engine` nur bei fehlendem Artefakt oder geändertem Generator, Import-Einstieg oder Wrapper-/Global-/Exportvertrag; Generator, Artefakt und Wrappertest gemeinsam prüfen. Varianten und optionaler Strict-Vertrag stehen im Architekturüberblick und in [engine/README.md](../../engine/README.md#build-prozess).
 * Desktop-Build → `npm run build:desktop` (führt `npm run sync-dist` und `npm run tauri:build` aus). Wer `npm run tauri:build` einzeln startet, muss vorher `npm run sync-dist` ausführen, damit `src-tauri/tauri.conf.json` den aktuellen `dist/`-Stand lädt.
 * Nach einer Revision der historischen Forschungsdatenkette ist ein
   vorhandenes `dist/` ausdruecklich veraltet, bis `npm run sync-dist`

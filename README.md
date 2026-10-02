@@ -245,7 +245,7 @@ Der Pflegebucket ist eine optionale, zweckgebundene Selbstversicherungsreserve f
 
 ### Gemeinsame Engine
 * Modulare ES-Module (`engine/`) kapseln Validierung, Marktanalyse, Ausgabenplanung und Transaktionslogik.
-* `build-engine.mjs` bündelt die Module per `esbuild` (oder Modul-Fallback) zu `engine.js`, das in beiden Oberflächen als `EngineAPI` geladen wird.
+* `engine.js` ist aktuell ein reiner generierter Modul-Wrapper: Er importiert `EngineAPI` aus `engine/index.mjs`, stellt `window.EngineAPI` und den Legacy-Alias bereit und exportiert beide Namen. Balance und Simulator laden ihn als ES-Modul; Fachtests und Worker importieren die Engine-Module direkt. Die Implementierung bleibt unter `engine/`.
 * Konfigurierbare Guardrails, Marktregime-Übersetzungen und Strategien für Liquiditätsziele.
 * Kontinuierliche Regime-Signale sind DOM-frei getestet. Grenzwerte um 10%, 20% und 30% Drawdown werden bei aktivierter Zielwert-Glättung monoton interpoliert; harte Mindest-Runway- und Notfallgrenzen bleiben hart.
 
@@ -290,8 +290,8 @@ Ruhestand-App-Final/
 │   │   ├── sale-engine.mjs
 │   │   └── transaction-utils.mjs
 │   └── validators/InputValidator.mjs
-├── engine.js                   # Gebündelte Engine (generiert)
-├── build-engine.mjs            # Node-Skript zum Bundlen der Engine
+├── engine.js                   # Reiner Modul-Wrapper (generiert)
+├── build-engine.mjs            # Generator: Modul-Fallback oder IIFE-Bundle
 ├── css/
 │   └── balance.css             # Styling der Balance-App
 ├── simulator.css               # Styling der Simulator-Oberfläche
@@ -368,8 +368,8 @@ IP-/Transportmetadaten fallen bei externen Providern dennoch an.
 3. `Balance.html` bzw. `Simulator.html` im Browser aufrufen.
    * Das automatisierte Browser-Gate läuft mit Chromium; weitere Browser bleiben Teil der manuellen Kompatibilitätsprüfung.
    * Keine Build-Schritte nötig.
-4. Optional: `npm run build:engine` ausführen, wenn Änderungen in `engine/` vorgenommen wurden. Dadurch wird `engine.js` aktualisiert (esbuild-Bundle oder Modul-Fallback).
-5. Für CI/Release: `npm run build:engine:strict` nutzen. Der Build schlägt dann ohne `esbuild` bewusst fehl.
+
+Der Wrapper lädt die Module unter `engine/` direkt. Fachänderungen werden beim nächsten Reload übernommen; Build-Varianten und Neuerzeugungsanlässe stehen im Abschnitt „Entwicklung“.
 
 **Optionen des Servers** (`node scripts/serve.mjs …` bzw. `npm run serve -- …`):
 * `--port <n>` und `--proxy-port <n>` ändern die Ports; `--no-proxy` startet nur den Webserver (Online-Kurse dann nicht verfügbar).
@@ -382,8 +382,10 @@ IP-/Transportmetadaten fallen bei externen Providern dennoch an.
 ## Entwicklung
 
 * Die Balance- und Simulator-Module nutzen native ES6-Imports. Änderungen an einzelnen Modulen werden nach dem Speichern direkt beim nächsten Reload geladen.
-* Engine-Anpassungen erfolgen in den Modulen unter `engine/`. Nach Anpassungen `npm run build:engine` ausführen und die Größe der generierten `engine.js` kontrollieren.
-* Der Desktop-Build bleibt ein bewusst manueller Schritt nach grüner Suite: `npm run build:desktop`. `scripts/sync-dist.mjs` baut `dist/` ausschließlich aus einem Git-Commit (ohne `--rev` aus `HEAD`, dann nur bei sauberem Stand ohne unversionierte Laufzeitdateien) und kopiert nur Laufzeitdateien: `app/`, `engine/`, `workers/`, `types/`, `css/`, `assets/` sowie die HTML-, JS- und CSS-Dateien im Wurzelverzeichnis. `__build-provenance.json` hält den Quell-Commit fest. Mit `--rev <commit> --out <ordner>` lässt sich ein Commit in einen externen Buildordner übertragen. Die EXE ist kein Repository-Artefakt; ältere Stände für Regressionsvergleiche werden außerhalb des Repositories archiviert.
+* Engine-Anpassungen erfolgen unter `engine/`, niemals manuell in `engine.js`. Fach-, Versions- und API-Methodenänderungen hinter demselben Import erfordern keinen Wrapper-Neuaufbau; Fachtests und Vertragsprüfungen bleiben verpflichtend. `tests/engine-wrapper-contract.test.mjs` prüft in `npm test` den vollständigen reinen Wrapper.
+* Eine Neuerzeugung über `npm run build:engine` ist nur bei fehlendem Artefakt oder Änderungen am Generator, Import-Einstieg oder Wrapper-/Global-/Exportvertrag nötig. Dabei Generator, Artefakt und Test gemeinsam prüfen: Ohne `esbuild` schreibt der nicht strikte Generator den konstanten Modul-Fallback; mit `esbuild` entsteht ein echtes IIFE-Bundle mit kopierter Engine-Implementierung. Ein solches Bundle übernimmt Quelländerungen nicht automatisch und wird vom Wrappertest auch frisch gebaut abgewiesen. Ein bewusster Bundlewechsel benötigt eine eigene geprüfte Vertragsänderung; der Test darf dafür nicht still abgeschwächt werden.
+* `npm run build:engine:strict` ist ein optionales Gate für einen ausdrücklich gewählten Bundle-Auslieferungsvertrag, keine Voraussetzung für den bestehenden Browser-/Tauri-Wrapperpfad. Ohne `esbuild` scheitert Strict vor dem Fallback; auch `ENGINE_BUILD_STRICT` oder `CI` mit `1` oder `true` (Groß-/Kleinschreibung beliebig) machen den normalen Build strikt. Andere Buildfehler werden nicht durch einen erfolgreichen Fallback verdeckt. Details: [engine/README.md](engine/README.md#build-prozess).
+* Der Desktop-Build bleibt ein bewusst manueller Schritt nach grüner Suite: `npm run build:desktop`. `scripts/sync-dist.mjs` baut `dist/` ausschließlich aus einem Git-Commit (ohne `--rev` aus `HEAD`, dann nur bei sauberem Stand ohne unversionierte Laufzeitdateien) und kopiert nur Laufzeitdateien: `app/`, `engine/`, `workers/`, `types/`, `css/`, `assets/` sowie die HTML-, JS- und CSS-Dateien im Wurzelverzeichnis. `engine/` und `engine.js` stammen dabei aus demselben gewählten Commit; der Sync führt keinen Engine-Build aus. `__build-provenance.json` hält den Quell-Commit fest. Mit `--rev <commit> --out <ordner>` lässt sich ein Commit in einen externen Buildordner übertragen. Die EXE ist kein Repository-Artefakt; ältere Stände für Regressionsvergleiche werden außerhalb des Repositories archiviert.
 * Für schnelle QA bitte `npm test` einmal durchlaufen lassen. Kritische Browserabläufe werden zusätzlich mit `npm run test:browser` geprüft; `npm run test:coverage` aktualisiert die transparente V8-Coverage-Baseline. Wenn lokal `npm` defekt ist, kann die fachliche Suite direkt mit `node tests/run-tests.mjs` validiert werden; der Tauri-Release-Build selbst benötigt weiterhin ein funktionierendes `npm`.
 
 ## Abschluss-Checkliste

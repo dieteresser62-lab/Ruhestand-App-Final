@@ -42,7 +42,7 @@
 - Der Implementierer bearbeitet nur den zugewiesenen Auftrag innerhalb seines Umfangs. Keine Branches anlegen oder wechseln, nicht stagen, nicht committen, nicht pushen oder mergen, keine eigenen Slice-Dokumente neben dem Arbeitsplan des Orchestrators.
 - **Sandbox des Codex-Implementierers:** kein Netz; beschreibbar sind nur das Repository und ein privater Scratch-Ordner (`TMPDIR`); `.git/`, `.orchestrator/`, `inbox/`, `outbox/` und Agentenverzeichnisse wie `.codex/` oder `.claude/` sind schreibgeschützt; vom Home-Verzeichnis ist nur das Codex-Programmpaket sichtbar. `node` und `npm` kommen deshalb aus dem System, Abhängigkeiten aus `node_modules/` im Repository. `npm install` und andere Netzzugriffe scheitern dort; fehlt eine Abhängigkeit, gilt `OPERATOR-PREREQUISITE-MISSING`.
 - **Hängererkennung:** Gibt der Implementierer 15 Minuten lang nichts aus (laufende Befehle zählen nicht mit) oder läuft ein einzelner Befehl länger als 60 Minuten, bricht der Orchestrator den Aufruf ab und wiederholt ihn. Lange Rechenläufe wie große Monte-Carlo- oder Sweep-Läufe gehören deshalb nicht in die gezielten Testläufe des Agenten.
-- Die volle Suite führt nur der Orchestrator aus; gezielte Läufe mit `node tests/run-single.mjs <datei>` sind erlaubt. Ein in der Agenten-Sandbox gescheiterter Port- oder Browserstart ist kein Grund zum Anhalten.
+- Die volle Suite führt nur der Orchestrator aus; gezielte Läufe mit `node tests/run-single.mjs <datei>` sind erlaubt. Ein in der Agenten-Sandbox gescheiterter Port-, Browser- oder Unterprozessstart (etwa `spawnSync … EPERM` in Tests, die `node` als Kindprozess starten) ist kein Grund zum Anhalten: Solche Prüfungen im Bericht als in der Sandbox nicht ausführbar nennen; der Orchestrator führt `npm test` außerhalb der Sandbox aus.
 - Antwortformat und Ablauf gibt die Anfrage des Orchestrators vor. Diese Datei erreicht im Lauf alle drei Rollen (die ersten 12.000 Zeichen). `CLAUDE.md`, `CODEX.md` und `GEMINI.md` werden dort nicht gelesen; sie gelten für den Handbetrieb und die direkte Nutzung der CLIs.
 
 ### Handbetrieb (Claude an der Front)
@@ -73,7 +73,11 @@ Im Handbetrieb gelten zusätzlich die Stoppbedingungen der jeweiligen Anweisung.
   - `app/shared/` für gemeinsam genutzte Formatter, Flags und Hilfen,
   - `engine/` für deterministische Kernlogik,
   - `workers/` und DOM-freie Runner für parallele Rechenpfade.
-- `engine.js` nie manuell editieren; Änderungen an `engine/` laufen über `build-engine.mjs`.
+- `engine.js` nie manuell editieren. Aktuell ist es ein reiner generierter Modul-Wrapper für `engine/index.mjs`; Fachtests und Worker importieren die Engine-Module direkt. Änderungen an Fachlogik, Versionswerten oder API-Methoden hinter demselben Import erfordern keinen Neuaufbau.
+- Neuerzeugung über `build-engine.mjs` nur bei fehlendem Artefakt oder Änderungen am Generator, Import-Einstieg oder Wrapper-/Global-/Exportvertrag; Generator, Artefakt und Wrappertest gemeinsam prüfen.
+- `npm run build:engine` schreibt ohne `esbuild` im nicht strikten Modus den konstanten Wrapper, mit `esbuild` ein echtes IIFE-Bundle. Bundles übernehmen Quelländerungen nicht automatisch und werden von `tests/engine-wrapper-contract.test.mjs` auch frisch gebaut abgewiesen; ein Bundlewechsel braucht eine eigene geprüfte Vertragsänderung.
+- `npm run build:engine:strict` ist optional für einen bewusst gewählten Bundle-Auslieferungsvertrag, keine Voraussetzung für den bestehenden Browser-/Tauri-Wrapperpfad. Ohne `esbuild` scheitert Strict vor dem Fallback. Auch `ENGINE_BUILD_STRICT` oder `CI` mit `1` oder `true` (ohne Beachtung der Groß-/Kleinschreibung) machen den normalen Build strikt.
+- `scripts/sync-dist.mjs` übernimmt `engine/` und `engine.js` aus demselben gewählten Commit und führt keinen Engine-Build aus. Bestehende Sauberkeits-/Versionierungsanforderungen bleiben erhalten.
 - `dist/` nur anfassen, wenn der Auftrag explizit Build-, Sync- oder Release-Artefakte umfasst; keine EXE oder andere Build-Binaries committen.
 
 ## Validierung
@@ -84,7 +88,7 @@ Im Handbetrieb gelten zusätzlich die Stoppbedingungen der jeweiligen Anweisung.
   - DOM-freie Runner wie Monte Carlo, Sweep oder Auto-Optimize,
   - Persistenz- oder Datenverträge in Profil-/Tranchen-Modulen,
   - gemeinsam genutzte Formatter, Feature-Flags oder Engine-Contracts.
-- Nach Änderungen an `engine/` oder an der öffentlichen `EngineAPI` zusätzlich `npm run build:engine` ausführen.
+- Nach Änderungen an `engine/` oder an der öffentlichen `EngineAPI` bleiben Fachtests und Vertragsprüfungen verpflichtend; ein unveränderter Wrapper ist erwartbar. Der Wrappervertrag wird durch `tests/engine-wrapper-contract.test.mjs` in `npm test` geprüft; im orchestrierten Lauf fährt die volle Suite allein der Orchestrator.
 - Für fokussierte Fehlersuche sind gezielte Läufe via `node tests/run-single.mjs <datei>` zulässig; wenn nicht die ganze Suite lief, muss das berichtet werden.
 
 ## Dokumentations-Sync
