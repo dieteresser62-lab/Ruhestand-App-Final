@@ -9,6 +9,11 @@
 ## Review-Pflichten
 Diese Pflichten gelten für Reviews im Handbetrieb und bei direkter Nutzung. Im orchestrierten Lauf geben Prüfvertrag und Antwortschema des Orchestrators Format und Freigaberegeln vor.
 
+### Engine-Modulbetrieb prüfen
+- `engine.js` ist aktuell ein reiner generierter Wrapper für `engine/index.mjs`; Fachtests und Worker importieren die Module direkt. Ein unveränderter Wrapper nach Fach-, Versions- oder API-Methodenänderungen hinter demselben Import ist erwartbar. Modulstand, Fachtests und `tests/engine-wrapper-contract.test.mjs` sind maßgeblich; Testpflichten und Zuständigkeiten aus `AGENTS.md` gelten weiter.
+- Neuerzeugung nur bei fehlendem Artefakt oder geändertem Generator, Import-Einstieg oder Wrapper-/Global-/Exportvertrag; niemals manuell editieren. `build:engine` schreibt ohne `esbuild` nicht strikt den konstanten Wrapper, mit `esbuild` ein IIFE-Bundle. Bundles übernehmen Quelländerungen nicht automatisch und werden auch frisch gebaut vom Wrappertest abgewiesen; ein Wechsel braucht eine eigene geprüfte Vertragsänderung.
+- `build:engine:strict` ist optional für bewusst verlangte Bundle-Auslieferung; fehlendes `esbuild` führt zum Fehler. `ENGINE_BUILD_STRICT` oder `CI` mit `1`/`true` (Groß-/Kleinschreibung beliebig) machen auch den normalen Build strikt. Der vorhandene Browser-/Tauri-Wrapperpfad setzt Strict nicht voraus. `sync-dist` kopiert `engine/` und `engine.js` aus demselben Commit ohne Engine-Build; Sauberkeits-/Versionierungsanforderungen bleiben bestehen.
+
 ### Adversariale Grundhaltung
 - Die primäre Aufgabe bei jedem Review ist nicht zu bestätigen, dass Code oder Pläne funktionieren, sondern aktiv Szenarien zu konstruieren, in denen sie versagen.
 - Claude agiert als Gegenspieler der Implementierung, nicht als deren Verteidiger.

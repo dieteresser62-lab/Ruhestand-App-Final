@@ -271,7 +271,7 @@ git rev-parse HEAD
 
 ## B.1 Drei-Schichten-Architektur
 
-Die Suite umfasst mehrere HTML-Oberflächen und Begleitmodule: Neben Balance und Simulator gibt es Einstiegsseiten für Profilverwaltung, Tranchenverwaltung und Handbuch; die UI-nahe Logik ist in thematische ES-Module aufgeteilt. Die Engine bildet die gemeinsame deterministische Rechenschicht, `engine.js` ist daraus generiert.
+Die Suite umfasst mehrere HTML-Oberflächen und Begleitmodule: Neben Balance und Simulator gibt es Einstiegsseiten für Profilverwaltung, Tranchenverwaltung und Handbuch; die UI-nahe Logik ist in thematische ES-Module aufgeteilt. Die Engine unter `engine/` bildet die gemeinsame deterministische Rechenschicht. `engine.js` ist aktuell ein reiner generierter Modul-Wrapper für `engine/index.mjs`, keine Kopie der Implementierung. Balance und Simulator laden ihn als ES-Modul; Fachtests und Worker importieren die Module direkt.
 
 ### B.1.0 Aktuelle Top-Level-Struktur
 
@@ -283,7 +283,7 @@ Die Suite umfasst mehrere HTML-Oberflächen und Begleitmodule: Neben Balance und
 | **Profil/Verbund/Tranchen** | `app/profile/`, `app/tranches/` | Profilregistry, Profilwechsel, Profilverbund-Aggregation, Tranchenstatus und Tranchenmanager |
 | **Shared Utilities** | `app/shared/`, `types/` | Formatter, Feature-Flags, Security-Utilities, PersistenceFacade, SnapshotArchive, gemeinsame Typ-/Contract-Hilfen |
 | **Engine-Quellen** | `engine/` | ESM-Quelle für Validierung, Marktanalyse, Spending-Policies, Steuer-/Transaktionslogik |
-| **Generierte Engine** | `engine.js` | Browser-Bundle bzw. Modul-Fallback der Engine; nicht manuell bearbeiten |
+| **Generierter Engine-Wrapper** | `engine.js` | Reiner Modul-Import mit `EngineAPI`-Globals, Legacy-Alias und benannten Exporten; nicht manuell bearbeiten |
 | **Workers** | `workers/`, `app/simulator/worker-job-runner.js` | Parallele MC-/Sweep-/Optimizer-Jobs mit seriellen Fallbacks |
 | **Desktop-Paketierung** | `src-tauri/`, `dist/`, `scripts/` | Tauri-WebView, integrierter Yahoo-Proxy, Sync-/Build-Skripte |
 | **Tests und Doku** | `tests/`, `docs/reference/`, `docs/internal/` | Regressionstests, Referenzdoku, interne Arbeitspläne |
@@ -415,10 +415,32 @@ grünen Testlauf noch einen manuellen Funktions-Smoke. Am 2026-09-24 wurde
 die Windows-EXE aus Commit `0b651b1` außerhalb des Repositories gebaut. Ob genau dieses Artefakt extern veröffentlicht wurde, lässt sich aus
 dem Repositoryzustand nicht ableiten und wird hier nicht behauptet.
 
-Änderungen unter `engine/` müssen vor dem Release über `npm run build:engine`
-in `engine.js` übertragen werden; CI-/Releasepfade sollen
-`npm run build:engine:strict` verwenden. `dist/`, das Tauri-Zielverzeichnis und
-die Root-EXE sind generierte Artefakte und keine primären Bearbeitungsorte.
+`scripts/sync-dist.mjs` übernimmt `engine/` und `engine.js` aus demselben
+gewählten Commit und führt keinen Engine-Build aus. Ohne `--rev` gilt `HEAD`:
+Alle versionierten Quellen müssen sauber sein; normale und ignorierte
+unversionierte Laufzeitdateien werden abgewiesen. Mit `--rev <commit>` wird
+gezielt dieser Commit ausgeliefert. Testgates bleiben separat verpflichtend.
+
+Fach-, Versions- und API-Methodenänderungen hinter demselben Import benötigen
+im aktuellen Wrapperbetrieb keinen Neuaufbau von `engine.js`. Neuerzeugung
+über `npm run build:engine` ist nur bei fehlendem Artefakt oder Änderungen am
+Generator, Import-Einstieg oder Wrapper-/Global-/Exportvertrag nötig;
+Generator, Artefakt und Test müssen gemeinsam geprüft werden.
+
+Ohne `esbuild` schreibt der nicht strikte Generator den konstanten
+Modul-Fallback, mit `esbuild` ein echtes IIFE-Bundle. Bundles enthalten kopierte
+Engine-Logik, übernehmen Quelländerungen nicht automatisch und werden auch
+frisch gebaut von `tests/engine-wrapper-contract.test.mjs` abgewiesen. Ein
+bewusster Bundlewechsel benötigt eine eigene geprüfte Vertragsänderung;
+der Test darf nicht still abgeschwächt werden. Andere Buildfehler werden
+nicht durch einen erfolgreichen Fallback verdeckt.
+
+`npm run build:engine:strict` ist optional für einen ausdrücklich gewählten
+Bundle-Auslieferungsvertrag. Ohne `esbuild` scheitert Strict vor dem Fallback.
+Auch `ENGINE_BUILD_STRICT` oder `CI` mit `1`/`true` (Groß-/Kleinschreibung
+beliebig) machen den normalen Build strikt. Der bestehende Browser-/Tauri-
+Wrapperpfad benötigt keinen Strict-Build. `dist/`, das Tauri-Zielverzeichnis
+und die Root-EXE sind generierte Artefakte und keine primären Bearbeitungsorte.
 
 ### B.1.2b Netzwerk- und Datenschutzgrenzen
 
@@ -1060,7 +1082,7 @@ Diese Trennung ist fachlich wichtig: Der Simulator soll nicht nur eine Floor-Dec
 
 ## B.4 Engine: Kernlogik und Verträge
 
-Die Engine ist die deterministische Rechenschicht der Suite. Balance und Simulator liefern ihr ein normalisiertes Jahres-Inputobjekt und einen optionalen Vorjahreszustand; die Engine liefert daraus eine einjährige Entnahmeentscheidung, Diagnose, Transaktionsvorschlag, finale Jahressteuer und neuen Folgezustand. Sie besitzt bewusst keine DOM-Abhängigkeiten und wird aus `engine/index.mjs` per `build-engine.mjs` in das Browser-Artefakt `engine.js` gebündelt.
+Die Engine ist die deterministische Rechenschicht der Suite. Balance und Simulator liefern ihr ein normalisiertes Jahres-Inputobjekt und einen optionalen Vorjahreszustand; die Engine liefert daraus eine einjährige Entnahmeentscheidung, Diagnose, Transaktionsvorschlag, finale Jahressteuer und neuen Folgezustand. Ihre Fachlogik besitzt bewusst keine DOM-Abhängigkeiten. Der Einstieg `engine/index.mjs` wird direkt von Fachtests und Workern und über den reinen generierten Modul-Wrapper `engine.js` von den Browseroberflächen importiert. Der Wrapper enthält keine Engine-Implementierung; Generatorvarianten und Release-Regeln stehen in B.1.2a.
 
 ### B.4.1 Modulstruktur
 
@@ -1359,9 +1381,12 @@ Balance und Simulator nutzen die gleiche Erkennung für Bond-Tranchen. Der Simul
 | Einzeltest | `node tests/run-single.mjs <testfile>` | fokussierte Fehlersuche; im Ergebnis berichten, dass nicht die ganze Suite lief |
 | Coverage-Baseline | `npm run test:coverage` | Review-/Transparenz-Gate fuer `app/`, `engine/`, `workers/` und `types/`; noch keine harte Mindestschwelle |
 | Browser-Smokes | `npm run test:browser` | Playwright-Gate fuer HTML-Einstiege mit lokalem Testserver; getrennt von `npm test` |
-| Engine-Bundle | `npm run build:engine` | zusätzlich nach Änderungen an `engine/` oder öffentlicher `EngineAPI` |
-| Strict Engine-Build | `npm run build:engine:strict` | CI/Release, damit fehlendes `esbuild` nicht still auf Fallback geht |
+| Wrappervertrag | `node tests/run-single.mjs tests/engine-wrapper-contract.test.mjs` | fokussierter Textvertrag; automatisch in `npm test`, weist auch frische Bundles ab |
+| Engine-Artefakt erzeugen | `npm run build:engine` | nur bei fehlendem Artefakt oder geändertem Generator, Import-Einstieg oder Wrapper-/Global-/Exportvertrag; Varianten siehe B.1.2a |
+| Strict Engine-Build | `npm run build:engine:strict` | optional bei bewusst verlangter Bundle-Auslieferung; scheitert ohne `esbuild`, keine Voraussetzung für den Browser-/Tauri-Wrapperpfad |
 | Tauri/Rust-Gate | `npm run tauri:build` | zusätzlich bei Änderungen an `src-tauri/` oder release-nahen Tauri-Pfaden |
+
+Nach Engine- oder öffentlichen API-Änderungen bleiben Fachtests und Vertragsprüfungen verpflichtend, auch wenn der Wrapper unverändert bleibt. Im orchestrierten Lauf führt nur der Orchestrator die volle Suite aus.
 
 Für reine Dokumentationsänderungen ist kein Testlauf erforderlich, sofern keine Code- oder Build-Artefakte geändert wurden. Wenn Dokumentation jedoch konkrete Assertion-Zahlen oder Testausgaben behauptet, müssen diese Zahlen aus einem aktuellen Runner-Lauf stammen oder ausdrücklich als nicht neu verifiziert gekennzeichnet werden.
 

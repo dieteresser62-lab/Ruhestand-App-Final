@@ -1,6 +1,6 @@
 # Engine Module – Übersicht
 
-Die Berechnungs-Engine wurde aus dem historischen Monolithen extrahiert und besteht nun aus klar getrennten ES-Modulen. `build-engine.mjs` ruft einen einfachen esbuild-Bundle-Lauf (oder einen Modul-Fallback) auf und erzeugt `engine.js`, das die globale `EngineAPI` bereitstellt.
+Die Berechnungs-Engine wurde aus dem historischen Monolithen extrahiert und besteht aus klar getrennten ES-Modulen unter `engine/`. Das aktuelle `engine.js` ist ein reiner generierter Modul-Wrapper: Er importiert `EngineAPI` aus `engine/index.mjs`, stellt bei vorhandenem `window` die globale API samt Legacy-Alias bereit und exportiert beide Namen. Balance und Simulator laden ihn als ES-Modul; Fachtests und Worker importieren die Module direkt.
 
 ---
 
@@ -11,7 +11,7 @@ engine/
 ├── config.mjs                    # Schwellenwerte, Profile, Texte, Build-ID
 ├── core.mjs                      # Orchestrierung & EngineAPI
 ├── errors.mjs                    # Fehlerklassen (AppError, ValidationError, FinancialCalculationError)
-├── index.mjs                     # Bündel-Entry, re-exportiert API
+├── index.mjs                     # Modul-Einstieg, re-exportiert API
 ├── tax-settlement.mjs            # Jahres-Settlement (Verlusttopf, SPB, finale Steuer)
 ├── analyzers/
 │   └── MarketAnalyzer.mjs        # Marktanalyse & Regime-Klassifikation
@@ -39,7 +39,7 @@ engine/
     └── InputValidator.mjs        # Eingabevalidierung
 ```
 
-`build-engine.mjs` nutzt `engine/index.mjs` als Einstieg und erzeugt daraus das Browser-Artefakt `engine.js`.
+`engine/index.mjs` ist der gemeinsame Import-Einstieg. Der aktuelle Wrapper verweist darauf, ohne Engine-Logik zu kopieren. `build-engine.mjs` kann den Wrapper oder ein echtes Bundle erzeugen; die Varianten stehen im Build-Prozess.
 
 ---
 
@@ -158,33 +158,76 @@ reales Hoch auf 0 normalisiert.
 
 ## Build-Prozess
 
+Im aktuellen Modulbetrieb werden Fach-, Versions- und API-Methodenänderungen
+hinter demselben Import beim nächsten Laden der Module übernommen. Sie
+benötigen keinen Neuaufbau von `engine.js`; Fachtests und Vertragsprüfungen
+bleiben verpflichtend. Das Artefakt niemals manuell editieren.
+
+Neuerzeugung ist nur erforderlich, wenn das Artefakt fehlt oder sich Generator,
+Import-Einstieg oder Wrapper-/Global-/Exportvertrag ändern. Generator,
+erzeugtes Artefakt und Test-Erwartung müssen gemeinsam geprüft werden:
+
 ```bash
 npm run build:engine
 ```
 
-Der Suite-Datenintegritaets-Abschluss aendert keine Engine-Semantik. Er bindet
-die bestehenden Engine-Orakel fuer Jahressettlement, 3-Bucket-Final-Action,
-Flex-/Renteninvarianten und Requestparitaet an
-`tests/fixtures/suite-data-integrity/oracle-traceability-v1.json`. Nach dem
-Slice-16-Build blieb der Git-Blob-Hash von `engine.js`
-`ec49961ed58134928723be5ddb6185e11f7fbcb5`; das Artefakt wurde ausschliesslich
-ueber `build-engine.mjs` erzeugt.
+`build-engine.mjs` versucht zuerst einen echten `esbuild`-Build mit
+`engine/index.mjs` als Einstieg, Format IIFE und globalem Bundlenamen
+`RuhestandEngineBundle`; der Footer stellt `globalThis.EngineAPI` und den
+Legacy-Alias bereit. Fehlt `esbuild`, schreibt der nicht strikte Modus den
+konstanten Modul-Fallback mit Import, Browser-Globals und benannten Exporten.
+Andere Buildfehler werden nicht durch einen erfolgreichen Fallback verdeckt.
+`esbuild` ist keine deklarierte Projektabhängigkeit; ein verfügbarer Bundler
+kann bereits beim normalen Build den Wrapper durch ein Bundle ersetzen.
 
-Das Skript versucht zuerst einen esbuild-Bundle-Lauf (IIFE, globale Exporte). Wenn `esbuild` nicht verfügbar ist (z. B. Offline-Umgebung), wird automatisch ein Modul-Fallback geschrieben, der die Globals per `engine.js` bereitstellt.
+Ein echtes Bundle enthält eine Kopie der Engine-Implementierung und müsste
+nach Änderungen seiner Quellen neu gebaut werden. Es übernimmt Quelländerungen
+nicht automatisch und entspricht nicht dem heutigen geprüften Wrappervertrag.
+[tests/engine-wrapper-contract.test.mjs](../tests/engine-wrapper-contract.test.mjs)
+prüft in `npm test` den vollständigen reinen Wrapper und weist auch ein frisch
+erzeugtes Bundle ab. Ein bewusster Bundlewechsel benötigt eine eigene geprüfte
+Vertragsänderung; den Test dafür nicht still abschwächen oder überspringen.
+Fokuslauf ohne Build:
 
-Für CI/Release sollte Strict-Mode genutzt werden:
+```bash
+node tests/run-single.mjs tests/engine-wrapper-contract.test.mjs
+```
+
+Für einen bewusst gewählten Auslieferungspfad, der tatsächlich ein Bundle
+verlangt, steht optional das Strict-Gate bereit:
 
 ```bash
 npm run build:engine:strict
 ```
 
-Strict-Mode (`ENGINE_BUILD_STRICT=1` oder `CI=true`) bricht ohne `esbuild` ab und verhindert versehentliche Fallback-Releases.
+Ohne `esbuild` scheitert Strict vor dem Schreiben des Fallbacks. Der normale
+Build ist ebenfalls strikt, wenn `ENGINE_BUILD_STRICT` oder `CI` den Wert `1`
+oder `true` tragen (jeweils ohne Beachtung der Groß-/Kleinschreibung).
+Tests sowie der bestehende Browser-/Tauri-Wrapperpfad setzen keinen
+Strict-Build voraus.
+
+`scripts/sync-dist.mjs` übernimmt `engine/` und `engine.js` zusammen aus
+demselben gewählten Git-Commit und führt keinen Engine-Build aus. Ohne `--rev`
+müssen alle versionierten Quellen sauber und sämtliche Laufzeitdateien
+versioniert sein, auch normalerweise ignorierte Dateien; mit `--rev` wird
+gezielt dieser Commit gewählt. Desktop-Build und fachliche Testgates bleiben
+getrennte Anforderungen.
+
+**Historischer Nachweis, hier nicht neu gemessen:** Der damalige
+Suite-Datenintegritäts-Abschluss band die bestehenden Engine-Orakel für
+Jahressettlement, 3-Bucket-Final-Action, Flex-/Renteninvarianten und
+Requestparität an `tests/fixtures/suite-data-integrity/oracle-traceability-v1.json`,
+ohne die Engine-Semantik zu ändern. Nach dem damaligen Slice-16-Build blieb der
+Git-Blob-Hash von `engine.js` `ec49961ed58134928723be5ddb6185e11f7fbcb5`;
+das Artefakt wurde ausschließlich über `build-engine.mjs` erzeugt.
+Dieser historische Build begründet keine heutige Neubaupflicht nach
+Engine-Fachänderungen.
 
 ---
 
 ## Entwicklungstipps
 
 1. Änderungen immer im jeweiligen Modul vornehmen, nicht in `engine.js`.
-2. Nach Anpassungen `npm run build:engine` ausführen und `engine.js` im Versionskontrollsystem prüfen.
-3. Balance-App und Simulator testen – beide nutzen dieselbe gebündelte Datei bzw. den Modul-Fallback.
+2. Fachtests und Vertragsprüfungen nach Engine- oder öffentlichen API-Änderungen ausführen; ein unveränderter Wrapper ist erwartbar. Neuerzeugungsanlässe stehen im Build-Prozess.
+3. Balance-App und Simulator testen – beide nutzen über den Wrapper dieselben Engine-Module.
 4. Für Regressionstests steht `npm test` bereit.

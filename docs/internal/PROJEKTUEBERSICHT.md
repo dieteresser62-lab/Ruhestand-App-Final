@@ -68,7 +68,7 @@ Wichtige Prinzipien:
 
 ## Engine
 
-Die Engine ist die zentrale Source of Truth fuer ein einzelnes Simulationsjahr. Sie liegt als ES-Modulstruktur unter `engine/` und wird ueber `build-engine.mjs` zu `engine.js` gebuendelt oder in einen Modul-Fallback geschrieben.
+Die Engine ist die zentrale Source of Truth fuer ein einzelnes Simulationsjahr und liegt als ES-Modulstruktur unter `engine/`. `engine.js` ist aktuell ein reiner generierter Wrapper: Er importiert `EngineAPI` aus `engine/index.mjs`, stellt die Browser-Globals samt Legacy-Alias bereit und exportiert beide Namen. Balance und Simulator laden ihn als ES-Modul; Fachtests und Worker importieren die Module direkt.
 
 Hauptmodule:
 
@@ -100,7 +100,11 @@ Oeffentliche `EngineAPI`:
 - `calculateTargetLiquidity()`
 - `simulateSingleYear()`
 
-Bearbeitungsregel: `engine.js` nie manuell editieren. Aenderungen erfolgen in `engine/`, danach `npm run build:engine`.
+Bearbeitungsregel: `engine.js` nie manuell editieren. Fach-, Versions- und API-Methodenänderungen hinter demselben Import erfolgen in `engine/` und erfordern keinen Neuaufbau des Wrappers; Fachtests und Vertragsprüfungen bleiben verpflichtend. Neuerzeugung über `npm run build:engine` nur bei fehlendem Artefakt oder geändertem Generator, Import-Einstieg oder Wrapper-/Global-/Exportvertrag; Generator, Artefakt und Test gemeinsam prüfen.
+
+Ohne `esbuild` schreibt der nicht strikte Generator den konstanten Modul-Fallback, mit `esbuild` ein echtes IIFE-Bundle. Ein Bundle enthält kopierte Engine-Logik, übernimmt Quelländerungen nicht automatisch und wird auch frisch gebaut von `tests/engine-wrapper-contract.test.mjs` abgewiesen. Der Bundlewechsel braucht eine eigene geprüfte Vertragsänderung. Andere Buildfehler werden nicht durch einen erfolgreichen Fallback verdeckt.
+
+`npm run build:engine:strict` ist optional für bewusst verlangte Bundle-Auslieferung und scheitert ohne `esbuild` vor dem Fallback. Auch `ENGINE_BUILD_STRICT` oder `CI` mit `1`/`true` (Groß-/Kleinschreibung beliebig) machen den normalen Build strikt. Der bestehende Browser-/Tauri-Wrapperpfad verlangt keinen Strict-Build.
 
 ## Balance-App
 
@@ -255,13 +259,15 @@ Relevante Skripte aus `package.json`:
 | `node tests/run-single.mjs <datei>` | gezielter Einzeltest |
 | `npm run test:coverage` | Coverage-Runner mit frischem `.coverage/` und V8-Report |
 | `npm run test:browser` | Playwright-Smoke-Gate fuer HTML-Einstiege mit lokalem Testserver |
-| `npm run build:engine` | Engine aus `engine/` nach `engine.js` bauen |
-| `npm run build:engine:strict` | Strict Engine-Build fuer CI/Release |
+| `npm run build:engine` | Artefakt bei den oben genannten Neuerzeugungsanlässen erzeugen: ohne Bundler nicht strikt Wrapper, mit Bundler IIFE |
+| `npm run build:engine:strict` | Optionales Gate bei bewusst verlangter Bundle-Auslieferung; Fehler ohne `esbuild` |
 | `npm run serve` | lokaler Webserver plus Yahoo-Proxy fuer die Browser-Variante |
 | `npm run sync-dist` | Laufzeitdateien eines Commits nach `dist/` (`scripts/sync-dist.mjs`) |
 | `npm run tauri:dev` | Tauri-Entwicklung |
 | `npm run tauri:build` | Tauri-Build |
 | `npm run build:desktop` | `sync-dist` plus Tauri-Build |
+
+`scripts/sync-dist.mjs` übernimmt `engine/` und `engine.js` aus demselben gewählten Commit, ohne einen Engine-Build auszuführen. Ohne `--rev` gilt `HEAD`: Alle versionierten Quellen müssen sauber sein; normale und ignorierte unversionierte Laufzeitdateien werden abgewiesen. Mit `--rev <commit>` wird gezielt dieser Commit gewählt. Testgates bleiben separat verpflichtend.
 
 Browser-Variante:
 
@@ -305,7 +311,7 @@ Wichtige Testgruppen:
 Validierungsregel:
 
 - Default nach Codeaenderungen: `npm test`.
-- Nach Engine-Aenderungen zusaetzlich `npm run build:engine`.
+- Nach Engine- oder öffentlichen API-Änderungen bleiben Fachtests und Vertragsprüfungen verpflichtend; der reine Wrapper darf unverändert bleiben. `tests/engine-wrapper-contract.test.mjs` läuft in `npm test`; die volle Suite fährt im orchestrierten Lauf allein der Orchestrator.
 - Nach Browser-Einstiegs-, HTML- oder UI-Orchestrierungs-Aenderungen zusaetzlich `npm run test:browser`.
 - Bei Coverage-relevanten Slices oder vor Review-Abschluss `npm run test:coverage` zur Baseline-Aktualisierung.
 - Bei `src-tauri/`-Aenderungen zusaetzlich ein echtes Tauri-/Rust-Gate (`npm run tauri:build` oder der Windows-Release-Pfad).
@@ -337,7 +343,7 @@ Bei Aenderungen an Architektur, Modulzuschnitt, Build-/Startpfaden oder Nutzer-W
 ## Arbeitsregeln fuer Aenderungen
 
 1. In Quellmodulen arbeiten, nicht in generierten Artefakten.
-2. `engine.js` nur per `npm run build:engine` erzeugen.
+2. `engine.js` nur per Generator bei den oben genannten Neuerzeugungsanlässen erzeugen; keine pauschale Neubau- oder Größenkontrolle nach Engine-Fachänderungen.
 3. `dist/` nur anfassen, wenn Build-/Release-Artefakte explizit Teil des Auftrags sind; eine EXE gehoert nie ins Repository.
 4. DOM-freie Kernlogik bevorzugt in Runner-/Engine-/Helper-Module auslagern.
 5. UI-Bootstrap-Dateien schlank halten und neue Features an passende Fachmodule delegieren.
@@ -375,9 +381,9 @@ Die Gewichtung kombiniert fachlichen Schaden, Eintrittswahrscheinlichkeit und Er
 
 1. **Baseline sichern - umgesetzt 2026-05-12**
    - Aktuellen Teststatus dokumentieren: `npm test`.
-   - Bei Engine-Aenderungen zusaetzlich `npm run build:engine`.
+   - Fachtests und Vertragsprüfungen nach Engine- oder öffentlichen API-Änderungen beibehalten; ein unveränderter reiner Wrapper ist erwartbar.
    - Bekannte offene Findings als kurze Review-Liste in `docs/internal/` oder im jeweiligen Arbeitsauftrag festhalten.
-   - Umgesetzt als Querschnitt in den abgeschlossenen Simulator-, Balance-, Profilverbund-/Tranchen- und Engine-/Tax-Slices; aktuellster Nachweis: `npm run build:engine` und komplette Suite mit 74 Testdateien / 1639 Assertions / 0 Fehlern im Detailprotokoll `docs/internal/archive/2026-engine-tax-golden-cases/ENGINE_TAX_GOLDEN_CASES_PLAN.md`.
+   - Historischer Nachweis vom 2026-05-12, hier nicht neu gemessen: Querschnitt in den damals abgeschlossenen Simulator-, Balance-, Profilverbund-/Tranchen- und Engine-/Tax-Slices mit `npm run build:engine` und kompletter Suite (74 Testdateien / 1639 Assertions / 0 Fehler) im Detailprotokoll `docs/internal/archive/2026-engine-tax-golden-cases/ENGINE_TAX_GOLDEN_CASES_PLAN.md`. Dieser damalige Build begründet keine heutige Neubaupflicht nach Engine-Fachänderungen.
 
 2. **Engine und Steuern zuerst stabilisieren - umgesetzt 2026-05-12**
    - Kritische Contracts erfassen: `EngineAPI`, Settlement-Ausgaben, Transaktions- und Steuerobjekte.
