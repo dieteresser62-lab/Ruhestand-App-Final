@@ -1079,7 +1079,8 @@ async function assertWealthBrowserLayoutMatrix(browser, baseUrl) {
                 assert(expenses.expenses.table.width >= 720 - tolerance && expenses.expenses.visible >= 720 - tolerance
                     && Math.abs(expenses.expenses.table.width - expenses.expenses.visible) <= tolerance,
                 `${width}: mindestens 720 px Ausgabentabelle vollständig sichtbar`);
-                // Gemessen: Die vier Titel brauchen rund 640 px; die Tabzeile bietet erst ab 1440 px Fensterbreite genug Platz.
+                // Gemessen (Linux-Chromium, Arial-Metrik): Die vier Titel brauchen 638 px; einzeilig ab etwa 1382 px.
+                // Gefordert ist 1440 px (668 px Platz, rund 30 px Reserve für abweichende Schriftmetriken).
                 const singleRow = width >= WEALTH_TAB_SINGLE_ROW_MIN_WIDTH;
                 for (const layout of [expenses, before, history]) {
                     assert(layout.tabs.length === 4 && layout.tabs.every(tab => tab.textLines.length === 1
