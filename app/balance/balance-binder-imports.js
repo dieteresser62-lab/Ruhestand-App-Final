@@ -1362,6 +1362,18 @@ function asSafeMarketCsvImportError(error, context = {}) {
 }
 
 export function createImportExportHandlers({ dom, debouncedUpdate, update }) {
+    async function previewRestoredInputs() {
+        // Verworfenes Importdaten-Feedback auch dann entfernen, wenn die
+        // Vorschau vor der üblichen Bereinigung im Main-Update scheitert.
+        // Aktionsfehler anderer Bereiche bleiben dabei erhalten.
+        UIRenderer.clearError();
+        try {
+            await update({ mode: BALANCE_UPDATE_MODE.PREVIEW });
+        } catch {
+            // Der ursprüngliche Import-/Recoveryfehler muss sichtbar bleiben.
+        }
+    }
+
     return {
         handleExport() {
             UIRenderer.clearActionError('balance-export');
@@ -1430,6 +1442,7 @@ export function createImportExportHandlers({ dom, debouncedUpdate, update }) {
                     }
                 }
                 restoreInputUiState(dom.inputs, uiSnapshot);
+                await previewRestoredInputs();
                 UIRenderer.handleActionError(asSafeImportError(err, {
                     replaceReceipt,
                     rollbackSucceeded,
@@ -1525,6 +1538,7 @@ export function createImportExportHandlers({ dom, debouncedUpdate, update }) {
                 UIReader.renderMarketDataProvenance(
                     previousState?.[ANNUAL_MARKET_DATA_META_KEY] || null
                 );
+                await previewRestoredInputs();
                 const safeError = asSafeMarketCsvImportError(err, {
                     replaceReceipt,
                     rollbackSucceeded,

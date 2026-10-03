@@ -8,6 +8,7 @@ import { StorageManager } from '../app/balance/balance-storage.js';
 import { PersistenceFacade } from '../app/shared/persistence-facade.js';
 import { ValidationError } from '../app/balance/balance-config.js';
 import { initUIRenderer, UIRenderer } from '../app/balance/balance-renderer.js';
+import { UIReader } from '../app/balance/balance-reader.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -236,13 +237,13 @@ const compatibleEngine = {
                     deckungVorher: 100,
                     deckungNachher: 110
                 },
-                depotwertGesamt: 200000,
+                depotwertGesamt: 200000 + input.floorBedarf + input.endeVJ,
                 neuerBedarf: 30000,
                 minGold: 0,
                 zielLiquiditaet: 50000,
                 runway: { months: 48, status: 'ok' },
                 spending: {
-                    monatlicheEntnahme: 2000,
+                    monatlicheEntnahme: input.floorBedarf / 12,
                     details: { flexRate: 1.0, entnahmequoteDepot: 0.04, realerDepotDrawdown: 0 },
                     kuerzungQuelle: '-'
                 },
@@ -254,7 +255,7 @@ const compatibleEngine = {
                 action: {
                     type: "test",
                     summary: "Test Action",
-                    title: "Test Action Title",
+                    title: `Test Action Title ${input.floorBedarf}/${input.endeVJ}`,
                     transactionDiagnostics: [],
                     details: {
                         regel: "Test",
@@ -442,8 +443,15 @@ assertEqual(actionText('balance-import'), rejectedText, 'Leere Dateiauswahl lös
 
 // Bereits vorgemerkte Writes des vorigen echten Updates zuerst abschließen.
 await PersistenceFacade.flush();
+document.getElementById('minimumFlexAnnual').value = '-1';
+balanceMain.update({ mode: 'preview' });
+const fileEventError = document.getElementById('error-container').textContent;
 const callsBeforeFiles = simulateCallCount;
 const writesBeforeFiles = storageWrites.length;
+const originalClearError = UIRenderer.clearError;
+let fileEventClears = 0;
+UIRenderer.clearError = (...args) => { fileEventClears++; return originalClearError.apply(UIRenderer, args); };
+try {
 for (const id of ['importFile', 'csvFileInput', 'expensesCsvInput']) {
     const fileInput = document.getElementById(id);
     fileInput.type = 'file';
@@ -453,6 +461,108 @@ for (const id of ['importFile', 'csvFileInput', 'expensesCsvInput']) {
 await new Promise(resolve => setTimeout(resolve, 310));
 assertEqual(simulateCallCount, callsBeforeFiles, 'Reale Main-/Formbindung berechnet für sämtliche Dateievents exakt null Mal');
 assertEqual(storageWrites.length, writesBeforeFiles, 'Dateievents schreiben nicht im Hintergrund');
+assertEqual(fileEventClears, 0, 'Dateievents rufen clearError exakt null Mal auf');
+assertEqual(document.getElementById('error-container').textContent, fileEventError, 'Dateievents erhalten den Berechnungsfehler');
+assert(document.getElementById('minimumFlexAnnual').classList.contains('input-error'), 'Dateievents erhalten die Feldmarkierung');
+} finally { UIRenderer.clearError = originalClearError; }
+document.getElementById('minimumFlexAnnual').value = '0';
+balanceMain.update({ mode: 'preview' });
+
+// Beobachtbare Ergebnisse des echten Renderers mit echten Main-Updates.
+const readResults = () => ({
+    depot: document.getElementById('displayDepotwert').textContent,
+    withdrawal: document.getElementById('monatlicheEntnahme').textContent,
+    action: document.getElementById('handlungsanweisung').children.find(el => el.id === 'handlungContent')?.textContent
+});
+const regressionReplace = StorageManager.replaceStateFromImport;
+const regressionRollback = StorageManager.rollbackImportReplace;
+const regressionRead = UIReader.readAllInputs;
+const regressionActionError = UIRenderer.handleActionError;
+try {
+    const originalState = JSON.stringify(StorageManager.loadState());
+    const baselineFields = Object.fromEntries(Object.entries(handlerDom.inputs).map(([id, el]) => [id, el.value]));
+    const baseline = readResults();
+    const foreignActionError = actionText('expenses-import');
+    const differentDoc = createBalanceExportDocument(StorageManager.loadState());
+    differentDoc.payload.inputs.floorBedarf += 17000;
+    differentDoc.payload.inputs.endeVJ = 432;
+    for (const failure of ['dry', 'replace', 'final', 'preview']) {
+        let updates = 0;
+        let replacements = 0;
+        let rollbacks = 0;
+        const modes = [];
+        await PersistenceFacade.flush();
+        const writesBefore = storageWrites.length;
+        StorageManager.replaceStateFromImport = async () => {
+            replacements++;
+            assert(JSON.stringify(readResults()) !== JSON.stringify(baseline), `${failure}: echte Dry-Run-Ergebnisse unterscheiden sich von der Baseline`);
+            if (failure === 'replace') throw new Error('Synthetischer Replacefehler');
+            document.getElementById('minimumFlexAnnual').value = '-1';
+            return { recoverySnapshotId: 'renderer-recovery' };
+        };
+        StorageManager.rollbackImportReplace = async () => { rollbacks++; };
+        UIRenderer.handleActionError = function (error, scope) {
+            assertEqual(document.getElementById('error-container').textContent, '', `${failure}: Importdaten-Berechnungsfehler ist vor Aktionsfehler entfernt`);
+            assert(!document.getElementById('minimumFlexAnnual').classList.contains('input-error'), `${failure}: verworfene Feldmarkierung ist entfernt`);
+            if (failure !== 'preview') assertEqual(JSON.stringify(readResults()), JSON.stringify(baseline), `${failure}: KPI und Handlungsanweisung vor Aktionsfehler wiederhergestellt`);
+            return regressionActionError.call(this, error, scope);
+        };
+        if (failure === 'dry') UIReader.readAllInputs = () => {
+            UIReader.readAllInputs = regressionRead;
+            const data = regressionRead.call(UIReader);
+            data.minimumFlexAnnual = -1;
+            return data;
+        };
+        const handlers = createImportExportHandlers({ dom: handlerDom, update: options => {
+            updates++;
+            modes.push(options.mode);
+            if (failure === 'preview' && updates === 3) throw new Error('Synthetischer Wiederherstellungsvorschaufehler');
+            const result = balanceMain.update(options);
+            if (!result.ok) assert(document.getElementById('minimumFlexAnnual').classList.contains('input-error'), `${failure}: echter Main-Pfad markiert abgelehnte Eingaben`);
+            return result;
+        }, debouncedUpdate: () => {} });
+        importFile.files = [{ text: async () => JSON.stringify(differentDoc) }];
+        await handlers.handleImport({ target: importFile });
+        assertEqual(modes.join(','), ['final', 'preview'].includes(failure) ? 'preview,persist_inputs,preview' : 'preview,preview', `${failure}: ausschließlich PREVIEW zur Wiederherstellung`);
+        assertEqual(replacements, failure === 'dry' ? 0 : 1, `${failure}: echte Handler-Replaceversuche`);
+        assertEqual(rollbacks, ['final', 'preview'].includes(failure) ? 1 : 0, `${failure}: echte Handler-Rollbackversuche`);
+        assertEqual(JSON.stringify(StorageManager.loadState()), originalState, `${failure}: persistierter Ausgangsstand erhalten`);
+        assertEqual(storageWrites.length, writesBefore, `${failure}: Vorschau schreibt nicht`);
+        for (const id of ['floorBedarf', 'endeVJ', 'minimumFlexAnnual']) assertEqual(handlerDom.inputs[id].value, baselineFields[id], `${failure}: ${id} zurückgesetzt`);
+        assert(actionText('balance-import').includes(failure === 'dry' ? 'Engine-Prüfung' : failure === 'replace' ? 'nicht sicher abgeschlossen' : 'automatisch wiederhergestellt'), `${failure}: ursprünglicher Importaktionsfehler sichtbar`);
+        assertEqual(actionText('expenses-import'), foreignActionError, `${failure}: fremder Aktionsfehler bleibt bestehen`);
+        balanceMain.update({ mode: 'preview' });
+    }
+
+    UIRenderer.handleActionError = regressionActionError;
+    const year = new Date().getFullYear() - 1;
+    handlerDom.inputs.marketCsvMode.value = 'current';
+    handlerDom.inputs.marketCsvTargetYear.value = String(year);
+    handlerDom.inputs.marketCsvExpectedAsOf.value = `${year}-12-30`;
+    handlerDom.inputs.marketCsvInstrument.value = 'VWCE.DE';
+    StorageManager.replaceStateFromImport = async () => {
+        assert(JSON.stringify(readResults()) !== JSON.stringify(baseline), 'CSV: echter Dry-Run zeigt andere Ergebnisse');
+        throw new Error('Synthetischer CSV-Replacefehler');
+    };
+    const csv = ['Datum;Schluss', ...[3, 2, 1, 0].map((offset, index) => `30.12.${year - offset};${100 + index * 10}`)].join('\n');
+    const csvFile = document.getElementById('csvFileInput');
+    csvFile.files = [{ name: 'synthetischer-markt.csv', text: async () => csv }];
+    await imports.handleCsvImport({ target: csvFile });
+    assertEqual(JSON.stringify(readResults()), JSON.stringify(baseline), 'CSV: echter Renderer stellt KPI und Handlung wieder her');
+    assert(actionText('market-csv-import').includes('CSV-Import fehlgeschlagen'), 'CSV: ursprünglicher Aktionsfehler bleibt sichtbar');
+    document.getElementById('minimumFlexAnnual').value = '-1';
+    importFile.files = [{ text: async () => '{kein-json' }];
+    await imports.handleImport({ target: importFile });
+    assert(document.getElementById('error-container').textContent.includes('Einige Eingaben sind ungültig'), 'Ein echter Fehler des wiederhergestellten Standes bleibt nach der Vorschau sichtbar');
+    assert(document.getElementById('minimumFlexAnnual').classList.contains('input-error'), 'Ungültiger Ausgangsstand erhält seine eigene neue Feldmarkierung');
+    document.getElementById('minimumFlexAnnual').value = '0';
+    balanceMain.update({ mode: 'preview' });
+} finally {
+    StorageManager.replaceStateFromImport = regressionReplace;
+    StorageManager.rollbackImportReplace = regressionRollback;
+    UIReader.readAllInputs = regressionRead;
+    UIRenderer.handleActionError = regressionActionError;
+}
 
 const exportDoc = createBalanceExportDocument(StorageManager.loadState());
 const previousReplace = StorageManager.replaceStateFromImport;

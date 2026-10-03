@@ -1565,6 +1565,150 @@ async function runBalanceImportReject(browser, baseUrl) {
     await smoke.close();
 }
 
+// Ohne Modul-Closure auch direkt über page.evaluate verwendbar.
+function readBalanceImportResults() {
+    return Object.fromEntries(['displayDepotwert', 'monatlicheEntnahme', 'miniSummary', 'handlungContent']
+        .map(id => [id, document.getElementById(id)?.textContent]));
+}
+
+async function runBalanceImportRestoration(browser, baseUrl) {
+    const smoke = await openSmokePage(browser, baseUrl, 'Balance.html', {
+        storage: createBalanceStorage(2025), observeWealthUpdates: true,
+        fixedTime: '2026-10-03T12:00:00+02:00'
+    });
+    const { page } = smoke;
+    try {
+        await page.locator('#profilverbund-profile-list input').waitFor({ state: 'visible' });
+        await waitForWealthBrowserIdle(page);
+        const valid = await page.evaluate(async () => (await import('./app/balance/balance-main.js')).update({ mode: 'preview' }).ok);
+        assert(valid, 'Importregression startet mit gültiger Baseline');
+
+        // Gesonderte Dateievents: echte Formbindung, kein Importhandlerstart.
+        const protection = await page.evaluate(async debounceMs => {
+            const { UIReader } = await import('./app/balance/balance-reader.js');
+            const { UIRenderer } = await import('./app/balance/balance-renderer.js');
+            const { ValidationError } = await import('./app/balance/balance-config.js');
+            UIRenderer.handleError(new ValidationError([{ field: 'minimumFlexAnnual', message: 'Synthetischer bestehender Berechnungsfehler' }]));
+            const before = document.getElementById('error-container').textContent;
+            const marks = () => [...document.querySelectorAll('.input-error')].map(el => el.id).sort();
+            const markedBefore = marks();
+            const calls = { updates: 0, clears: 0, scheduled: 0 };
+            const read = UIReader.readAllInputs;
+            const clear = UIRenderer.clearError;
+            const timerDescriptor = Object.getOwnPropertyDescriptor(window, 'setTimeout');
+            const schedule = window.setTimeout;
+            const temporary = document.createElement('input');
+            temporary.type = 'file';
+            document.querySelector('.form-column').appendChild(temporary);
+            try {
+                UIReader.readAllInputs = function (...args) { calls.updates++; return read.apply(this, args); };
+                UIRenderer.clearError = function (...args) { calls.clears++; return clear.apply(this, args); };
+                Object.defineProperty(window, 'setTimeout', { configurable: true, writable: true,
+                    value: (callback, delay, ...args) => {
+                        if (delay === debounceMs) calls.scheduled++;
+                        return schedule(callback, delay, ...args);
+                    } });
+                temporary.dispatchEvent(new Event('input', { bubbles: true }));
+                temporary.dispatchEvent(new Event('change', { bubbles: true }));
+                for (const id of ['importFile', 'csvFileInput', 'expensesCsvInput']) {
+                    document.getElementById(id).dispatchEvent(new Event('input', { bubbles: true }));
+                }
+                await new Promise(resolve => schedule(resolve, debounceMs + 50));
+                return { calls, before, after: document.getElementById('error-container').textContent,
+                    markedBefore, markedAfter: marks() };
+            } finally {
+                temporary.remove();
+                UIReader.readAllInputs = read;
+                UIRenderer.clearError = clear;
+                Object.defineProperty(window, 'setTimeout', timerDescriptor);
+            }
+        }, BALANCE_UPDATE_DEBOUNCE_MS);
+        assert(Object.values(protection.calls).every(count => count === 0), `Dateievents: null Updates, clearError und entprellte Vormerkungen: ${JSON.stringify(protection.calls)}`);
+        assert(protection.before === protection.after && protection.markedBefore.includes('minimumFlexAnnual')
+            && JSON.stringify(protection.markedBefore) === JSON.stringify(protection.markedAfter), 'Dateievents erhalten Fehler und Feldmarkierungen exakt');
+        await page.evaluate(async () => (await import('./app/balance/balance-main.js')).update({ mode: 'preview' }));
+
+        await page.locator('#marketCsvMode').evaluate(el => { el.closest('details').open = true; });
+        // Direkte Belegung vermeidet zusätzliche fachfremde Formupdates vor dem Import.
+        await page.evaluate(() => {
+            for (const [id, value] of Object.entries({ marketCsvMode: 'current', marketCsvTargetYear: '2025',
+                marketCsvExpectedAsOf: '2025-12-30', marketCsvInstrument: 'VWCE.DE' })) document.getElementById(id).value = value;
+        });
+
+        for (const failure of ['json-replace', 'json-final', 'csv-replace']) {
+            await waitForWealthBrowserIdle(page);
+            const baseline = await page.evaluate(readBalanceImportResults);
+            const beforeState = await readBalanceBrowserState(page);
+            const fields = await page.evaluate(() => Object.fromEntries(['floorBedarf', 'endeVJ', 'ath', 'minimumFlexAnnual']
+                .map(id => [id, document.getElementById(id).value])));
+            const provenance = await page.locator('#marketDataProvenance').textContent();
+            const messageIndex = await page.evaluate(() => window.__browserSmokeMessages.length);
+            const document = await page.evaluate(async () => {
+                const { StorageManager } = await import('./app/balance/balance-storage.js');
+                const { createBalanceExportDocument } = await import('./app/balance/balance-binder-imports.js');
+                const doc = createBalanceExportDocument(StorageManager.loadState());
+                doc.payload.inputs.floorBedarf = 32000;
+                doc.payload.inputs.endeVJ = 500;
+                return doc;
+            });
+            await page.evaluate(async ({ failure, baseline }) => {
+                const { StorageManager } = await import('./app/balance/balance-storage.js');
+                const { StorageError } = await import('./app/balance/balance-config.js');
+                const { UIRenderer } = await import('./app/balance/balance-renderer.js');
+                const replace = StorageManager.replaceStateFromImport;
+                const actionError = UIRenderer.handleActionError;
+                const read = () => Object.fromEntries(['displayDepotwert', 'monatlicheEntnahme', 'miniSummary', 'handlungContent']
+                    .map(id => [id, document.getElementById(id)?.textContent]));
+                const observation = window.__importFailureObservation = {};
+                window.__restoreImportFailureHooks = () => {
+                    StorageManager.replaceStateFromImport = replace;
+                    UIRenderer.handleActionError = actionError;
+                    delete window.__restoreImportFailureHooks;
+                    delete window.__importFailureObservation;
+                };
+                StorageManager.replaceStateFromImport = async function (...args) {
+                    observation.dryDiffers = JSON.stringify(read()) !== JSON.stringify(baseline);
+                    if (failure !== 'json-final') throw new StorageError('Synthetischer Import-Snapshotfehler');
+                    const receipt = await replace.apply(this, args);
+                    document.getElementById('minimumFlexAnnual').value = '-1';
+                    return receipt;
+                };
+                UIRenderer.handleActionError = function (error, scope) {
+                    observation.beforeError = read();
+                    observation.code = error.code || error.context?.code;
+                    observation.scope = scope;
+                    return actionError.call(this, error, scope);
+                };
+            }, { failure, baseline });
+            try {
+                const isCsv = failure === 'csv-replace';
+                const id = isCsv ? 'csvFileInput' : 'importFile';
+                const content = isCsv ? 'Datum;Schluss\n30.12.2022;1000\n30.12.2023;1200\n30.12.2024;900\n30.12.2025;500' : JSON.stringify(document);
+                const expectedText = failure === 'json-final' ? 'automatisch wiederhergestellt' : 'Speicherung konnte nicht bestätigt werden';
+                await page.locator(`#${id}`).setInputFiles({ name: isCsv ? 'synthetischer-markt.csv' : 'synthetischer-import.json',
+                    mimeType: isCsv ? 'text/csv' : 'application/json', buffer: Buffer.from(content) });
+                await page.waitForFunction(({ id, index, text }) => document.getElementById(id).value === ''
+                    && window.__browserSmokeMessages.slice(index).some(message => message.includes(text)),
+                { id, index: messageIndex, text: expectedText });
+                await waitForWealthBrowserIdle(page);
+                const observation = await page.evaluate(() => window.__importFailureObservation);
+                assert(observation.dryDiffers, `${failure}: erfolgreicher Dry-Run zeigt abweichende Ergebnisse`);
+                assert(JSON.stringify(observation.beforeError) === JSON.stringify(baseline), `${failure}: KPI und Handlung bereits vor dem Aktionsfehler wiederhergestellt`);
+                assert(observation.code === (failure === 'json-final' ? 'post_replace_validation_failed' : 'storage_failed'), `${failure}: ursprünglicher sicherer Fehlercode`);
+                assert(JSON.stringify(await page.evaluate(readBalanceImportResults)) === JSON.stringify(baseline), `${failure}: Ergebnisse entsprechen gültiger Baseline`);
+                assert(JSON.stringify(await readBalanceBrowserState(page)) === JSON.stringify(beforeState), `${failure}: gespeicherter Ausgangsstand erhalten`);
+                for (const [id, value] of Object.entries(fields)) assert(await page.locator(`#${id}`).inputValue() === value, `${failure}: ${id} wiederhergestellt`);
+                assert(await page.locator('#marketDataProvenance').textContent() === provenance, `${failure}: Provenienzanzeige erhalten`);
+                const error = page.locator(`#action-error-container [data-scope="${isCsv ? 'market-csv-import' : 'balance-import'}"] .action-error-text`);
+                assert(await error.isVisible(), `${failure}: neuer Aktionsfehler sichtbar`);
+                assert((await page.evaluate(index => window.__browserSmokeMessages.slice(index), messageIndex)).includes(await error.textContent()), `${failure}: neuer Aktionsfehler protokolliert`);
+                assert(await page.locator('.input-error').count() === 0 && await page.locator('#error-container').textContent() === '', `${failure}: verworfene Berechnungsfehler und Markierungen entfernt`);
+            } finally { await page.evaluate(() => window.__restoreImportFailureHooks?.()); }
+        }
+        smoke.assertNoErrors(['Synthetischer bestehender Berechnungsfehler', 'Update-Fehler: ValidationError']);
+    } finally { await smoke.close(); }
+}
+
 async function runBalanceCsvImportRoundtrip(browser, baseUrl) {
     const storage = createBalanceStorage(2025);
     const seededState = JSON.parse(storage[BALANCE_STATE_KEY]);
@@ -3879,6 +4023,7 @@ async function main() {
             ['Simulator ghost profile context', runSimulatorGhostProfileContextSmoke],
             ['Handbuch.html', runManualSmoke],
             ['Balance import reject', runBalanceImportReject],
+            ['Balance import restoration', runBalanceImportRestoration],
             ['Balance CSV import roundtrip', runBalanceCsvImportRoundtrip],
             ['Balance annual commit', runBalanceAnnualCommit]
         ];
