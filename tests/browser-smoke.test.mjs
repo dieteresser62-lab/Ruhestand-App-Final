@@ -929,7 +929,8 @@ async function runBalanceExpensesWealthCapture(browser, baseUrl) {
         assert((await readBalanceBrowserState(page)).wealthHistory.entries.length === 1, 'Undatierte reale ETFs erzeugen keinen Verlaufwrite');
         await assertWealthBrowserVisibility(page, false, 1);
         await page.locator('a[href="depot-tranchen-manager.html"]').click();
-        await page.locator('#updatePricesBtn').waitFor();
+        // Erst klicken, wenn der Manager initialisiert ist und alle drei Tranchen zeigt (sonst fehlt der Listener).
+        await page.locator('.tranche-row').nth(2).waitFor({ state: 'visible' });
         await page.locator('#updatePricesBtn').click();
         await page.locator('#priceUpdateStatus').filter({ hasText: 'Kurse erfolgreich aktualisiert.' }).waitFor();
         const priced = JSON.parse((await readIndexedDb(page, 'kv', 'depot_tranchen')).value);
