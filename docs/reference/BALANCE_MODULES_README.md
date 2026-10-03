@@ -237,6 +237,8 @@ Event-Hub der Anwendung.
 
 **Transport:** Balance-JSON, Profilbundle, Komplettbackup und Standard-Snapshots erhalten das Feld ohne neue Keys oder äußere Schema-Version. Ein unterstützter Replace ohne Feld leert den Verlauf; Restore stellt den damaligen Verlauf wieder her, ohne append-only-Garantie über Restore/Replace hinweg. Die State-/Import-/Profil-/Backupgrenzen prüfen auch inaktive Profilverläufe. Einzelheiten und Summen-Toleranz stehen in `TECHNICAL.md`, gezielte Tests und separates Browsergate in `tests/README.md`.
 
+**Testbeobachtung:** Produkt und Tests teilen die DOM-freie Konstante `BALANCE_UPDATE_DEBOUNCE_MS = 250` aus `balance-config.js`. `tests/wealth-browser-update-observer.mjs` kapselt den unabhängig importierbaren Init-Hook; Browser und VM übergeben die Entprellzeit ausdrücklich, sodass die serialisierte Funktion ohne Modul-Closure läuft. Accessors erhalten die Beobachtung bei nachträglicher Timerzuweisung durch `page.clock`. Die Tabprüfung vergleicht nach beobachtetem Idle sortierte Schlüssel und vollständige Schlüssel/Wert-Paare von `localStorage` und `sessionStorage`, zählt deren `setItem`-/`removeItem`-/`clear`-Aufrufe mit Sollwert null und baut alle Hooks im `finally` zurück. Die volle Node-Suite fährt im orchestrierten Lauf der Orchestrator; die gesteuerte Sitzung fährt das Browsergate vor dem Merge.
+
 **Dependencies:** `balance-storage.js`, `balance-update-pipeline.js`, `balance-utils.js`, `app/shared/persistence-facade.js`, Profilregistry/-state und `types/wealth-history-contract.js`. Integration durch `balance-binder.js`/`balance-main.js`; Jahresfinalisierung durch `balance-binder-snapshots.js`.
 
 ---
@@ -246,6 +248,7 @@ Einstiegspunkt und Orchestrator.
 
 **Aufgaben:**
 - Initialisiert DOM-Referenzen, Module und Anwendungszustand.
+- Nutzt für `debouncedUpdate()` die gemeinsame Konstante `BALANCE_UPDATE_DEBOUNCE_MS` (weiterhin 250 ms).
 - Bindet einen kompatiblen Engine-Vertrag (`initVersionHandshake`) und blockiert fehlende, inkompatible oder nachtraeglich ausgetauschte Engines.
 - Definiert `update()` / `debouncedUpdate()`, liefert `success`, `validation_error`, `engine_error` oder `blocked` und reicht Eingaben nur nach erfolgreichem Gate an `EngineAPI.simulateSingleYear()` weiter.
 - Übergibt erfolgreiche Engine-Ergebnisse an Renderer und Storage; blockierte und fehlerhafte Ergebnisse werden nicht persistiert.

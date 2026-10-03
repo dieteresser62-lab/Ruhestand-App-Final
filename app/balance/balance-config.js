@@ -15,6 +15,9 @@
 // Erforderliche Engine-Version
 export const REQUIRED_ENGINE_API_VERSION_PREFIX = "31.";
 
+// Gemeinsame Entprellzeit für Eingabeupdates und deren Testbeobachtung.
+export const BALANCE_UPDATE_DEBOUNCE_MS = 250;
+
 // App-spezifische Konfiguration
 export const CONFIG = {
     APP: {

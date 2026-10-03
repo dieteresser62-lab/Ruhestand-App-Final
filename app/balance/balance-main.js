@@ -14,7 +14,7 @@
  * ===================================================================================
  */
 
-import { CONFIG, REQUIRED_ENGINE_API_VERSION_PREFIX } from './balance-config.js';
+import { BALANCE_UPDATE_DEBOUNCE_MS, CONFIG, REQUIRED_ENGINE_API_VERSION_PREFIX } from './balance-config.js';
 import { StorageManager, initStorageManager } from './balance-storage.js';
 import { UIReader, initUIReader } from './balance-reader.js';
 import { UIRenderer, initUIRenderer } from './balance-renderer.js';
@@ -396,7 +396,7 @@ function debouncedUpdate() {
     clearTimeout(appState.debounceTimer);
     appState.debounceTimer = setTimeout(
         () => update({ mode: BALANCE_UPDATE_MODE.PERSIST_INPUTS }),
-        250
+        BALANCE_UPDATE_DEBOUNCE_MS
     );
 }
 

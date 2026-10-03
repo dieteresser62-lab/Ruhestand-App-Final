@@ -4,7 +4,7 @@ import { createSnapshotHandlers } from '../app/balance/balance-binder-snapshots.
 import { UIBinder, initUIBinder } from '../app/balance/balance-binder.js';
 import { loadProfilverbundProfiles } from '../app/profile/profilverbund-balance.js';
 import { createProfilverbundHandlers } from '../app/balance/balance-main-profilverbund.js';
-import { CONFIG } from '../app/balance/balance-config.js';
+import { BALANCE_UPDATE_DEBOUNCE_MS, CONFIG } from '../app/balance/balance-config.js';
 import { StorageManager } from '../app/balance/balance-storage.js';
 import { UIRenderer } from '../app/balance/balance-renderer.js';
 import { UIReader } from '../app/balance/balance-reader.js';
@@ -17,46 +17,80 @@ import {
 } from '../app/shared/persistence-facade.js';
 import { createManualWealthHistoryEntry } from '../types/wealth-history-contract.js';
 import { runInNewContext } from 'node:vm';
-import { installWealthBrowserUpdateObserver } from './browser-smoke.test.mjs';
+import { installWealthBrowserUpdateObserver } from './wealth-browser-update-observer.mjs';
 
 console.log('--- Vermögensverlauf: Persistenz und Jahresabschluss ---');
 
 // addInitScript serialisiert den Hook in jedes neue Seitendokument. Ein bereits
 // beim Start geplanter Timer muss vor der späteren Idle-/Tabprüfung sichtbar sein.
-for (const phase of ['Start', 'Reload']) {
-    const scheduled = new Map();
+assertEqual(BALANCE_UPDATE_DEBOUNCE_MS, 250, 'Produktentprellzeit bleibt 250 ms');
+for (const documentPhase of ['Start', 'Reload'])
+for (const debounceMs of [BALANCE_UPDATE_DEBOUNCE_MS, 417])
+for (const replaceTimers of [false, true]) {
+    const phase = `${documentPhase}, ${debounceMs} ms, ${replaceTimers ? 'nach Timerzuweisung' : 'ursprüngliche Timer'}`;
+    const nativeScheduled = new Map();
+    let scheduled = nativeScheduled;
     let nextId = 0;
+    let schedules = 0;
+    let cancels = 0;
     const window = {
         setTimeout(callback, delay, ...args) {
+            schedules += 1;
             const id = ++nextId;
-            scheduled.set(id, () => callback(...args));
+            nativeScheduled.set(id, () => callback(...args));
             return id;
         },
-        clearTimeout(id) { scheduled.delete(id); }
+        clearTimeout(id) { cancels += 1; nativeScheduled.delete(id); }
     };
-    const install = () => runInNewContext(`(${installWealthBrowserUpdateObserver.toString()})()`, { window });
+    const install = () => runInNewContext(`(${installWealthBrowserUpdateObserver.toString()})(debounceMs)`, { window, debounceMs });
     const fire = id => {
         const callback = scheduled.get(id);
         scheduled.delete(id);
         callback();
     };
     install();
+    if (replaceTimers) {
+        const originalScheduled = scheduled;
+        const clockScheduled = new Map();
+        // Wie page.clock beide Timerfunktionen erst nach dem Init-Skript zuweisen.
+        window.setTimeout = (callback, delay, ...args) => {
+            schedules += 1;
+            const id = ++nextId;
+            clockScheduled.set(id, () => callback(...args));
+            return id;
+        };
+        window.clearTimeout = id => { cancels += 1; clockScheduled.delete(id); };
+        scheduled = clockScheduled;
+        const assigned = window.setTimeout(() => {}, debounceMs);
+        assert(scheduled.has(assigned), `${phase}: Timer erreicht den neuen Scheduler`);
+        assert(window.__wealthPendingUpdates.has(assigned), `${phase}: neuer Scheduler bleibt beobachtet`);
+        window.clearTimeout(assigned);
+        assert(!scheduled.has(assigned), `${phase}: neuer Cancelpfad entfernt den Timer`);
+        assertEqual(window.__wealthPendingUpdates.size, 0, `${phase}: neuer Cancelpfad beendet die Beobachtung`);
+        assertEqual(originalScheduled.size, 0, `${phase}: ursprünglicher Scheduler bleibt unbenutzt`);
+        schedules = 0;
+        cancels = 0;
+    }
     let updates = 0;
-    const startup = window.setTimeout(() => { updates += 1; }, 250);
+    const startup = window.setTimeout(() => { updates += 1; }, debounceMs);
     const hook = window.setTimeout;
+    const cancelHook = window.clearTimeout;
     install();
     assertEqual(window.setTimeout, hook, `${phase}: erneute Installation verschachtelt keinen Hook`);
+    assertEqual(window.clearTimeout, cancelHook, `${phase}: erneute Installation erhält den Cancelhook`);
+    assertEqual(schedules, 1, `${phase}: genau eine Planung im aktuellen Scheduler`);
     assert(window.__wealthPendingUpdates.has(startup), `${phase}: vor Idle geplanter Startupdate ist ausstehend`);
     assertEqual(updates, 0, `${phase}: Beobachtung führt Startupdate nicht vorzeitig aus`);
     window.clearTimeout(startup);
+    assertEqual(cancels, 1, `${phase}: genau ein Abbruch im aktuellen Scheduler`);
     assertEqual(window.__wealthPendingUpdates.size, 0, `${phase}: Abbruch entfernt den Starttimer`);
     assert(!scheduled.has(startup), `${phase}: Abbruch erreicht den ursprünglichen Scheduler`);
     let followup;
     const replacement = window.setTimeout(amount => {
         updates += amount;
         assert(window.__wealthPendingUpdates.has(replacement), `${phase}: laufender Callback bleibt ausstehend`);
-        followup = window.setTimeout(() => { updates += 1; }, 250);
-    }, 250, 2);
+        followup = window.setTimeout(() => { updates += 1; }, debounceMs);
+    }, debounceMs, 2);
     fire(replacement);
     assertEqual(updates, 2, `${phase}: Callbackargumente bleiben erhalten`);
     assertEqual(window.__wealthPendingUpdates.size, 1, `${phase}: Folgeupdate verhindert vorzeitiges Idle`);
@@ -67,7 +101,12 @@ for (const phase of ['Start', 'Reload']) {
     const unrelated = window.setTimeout(() => {}, 3500);
     assertEqual(window.__wealthPendingUpdates.size, 0, `${phase}: Meldungstimer blockiert Idle nicht`);
     fire(unrelated);
-    const failure = window.setTimeout(() => { throw new Error('Startupdate fehlgeschlagen'); }, 250);
+    if (debounceMs !== BALANCE_UPDATE_DEBOUNCE_MS) {
+        const otherDelay = window.setTimeout(() => {}, BALANCE_UPDATE_DEBOUNCE_MS);
+        assertEqual(window.__wealthPendingUpdates.size, 0, `${phase}: nur die übergebene Verzögerung wird beobachtet`);
+        fire(otherDelay);
+    }
+    const failure = window.setTimeout(() => { throw new Error('Startupdate fehlgeschlagen'); }, debounceMs);
     let error;
     try { fire(failure); } catch (caught) { error = caught; }
     assertEqual(error?.message, 'Startupdate fehlgeschlagen', `${phase}: Callbackfehler bleibt sichtbar`);
@@ -376,10 +415,15 @@ try {
         let clears = 0;
         UIRenderer.clearError = () => { clears += 1; };
         try {
-            for (const index of [3, 0, 3, 2, 3]) {
+            for (const index of [3, 0, 3, 1, 3, 2, 3, 0]) {
                 dom.containers.tabButtons.listeners.click[0]({ target: { closest: () => buttons[index] } });
                 assertEqual(dom.wealthHistory.panel.classList.contains('active'), index === 3, 'Tabaktivität aus bestehender Mechanik');
                 assertEqual(Boolean(dom.wealthHistory.chart.innerHTML), index === 3, 'Aktivierung zeichnet, Verlassen leert');
+                assertEqual(previews, 0, `${buttons[index].dataset.tab}: kein synchrones Update oder Erfassung`);
+                assertEqual(debounceResumed, 0, `${buttons[index].dataset.tab}: keine Entprellplanung`);
+                assertEqual(clears, 0, `${buttons[index].dataset.tab}: keine Fehlerbereinigung`);
+                assertEqual(env.store.get(STATE), persistedBeforeTab, `${buttons[index].dataset.tab}: kein Statewrite`);
+                assertEqual(env.store.get(REGISTRY), registryBeforeTab, `${buttons[index].dataset.tab}: kein Registrywrite`);
             }
             assertEqual(clears, 0, 'Tabwechsel ohne Fehlerbereinigung');
         } finally { UIRenderer.clearError = clearError; }

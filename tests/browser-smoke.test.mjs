@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { runMonteCarloBrowserRegression } from './simulator-monte-carlo-browser.mjs';
 import { SNAPSHOT_KINDS } from '../app/shared/snapshot-archive.js';
 import { formatCurrency } from '../app/shared/shared-formatting.js';
+import { BALANCE_UPDATE_DEBOUNCE_MS } from '../app/balance/balance-config.js';
+import { installWealthBrowserUpdateObserver } from './wealth-browser-update-observer.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -209,7 +211,7 @@ async function createPage(browser, label, options = {}) {
     }, options.storage || {});
     if (options.observeWealthUpdates) {
         // Auch nach Reload und Profilnavigation vor dem ersten Seitenskript installieren.
-        await context.addInitScript(installWealthBrowserUpdateObserver);
+        await context.addInitScript(installWealthBrowserUpdateObserver, BALANCE_UPDATE_DEBOUNCE_MS);
     }
     if (options.engineMismatch) {
         await context.addInitScript(() => {
@@ -829,34 +831,21 @@ async function waitForWealthBrowserStartup(page) {
         'Startpersistenz des Profilverbunds abgeschlossen');
 }
 
-export function installWealthBrowserUpdateObserver() {
-    if (window.__wealthPendingUpdates) return;
-    const pending = window.__wealthPendingUpdates = new Set();
-    // Playwrights Uhr (page.clock) ersetzt setTimeout/clearTimeout per Zuweisung, je nach
-    // Reihenfolge erst nach diesem Init-Skript. Als Accessor angelegt, wickelt der Beobachter
-    // auch die nachträglich gesetzte Uhr-Implementierung ein; sonst blieben die 250-ms-Updates
-    // der App unsichtbar und das Idle-Warten kehrte sofort zurück.
-    const wrapSchedule = schedule => (callback, delay, ...args) => {
-        if (delay !== 250 || typeof callback !== 'function') return schedule(callback, delay, ...args);
-        const id = schedule(() => { try { callback(...args); } finally { pending.delete(id); } }, delay);
-        pending.add(id);
-        return id;
-    };
-    const wrapCancel = cancel => id => { pending.delete(id); return cancel(id); };
-    let scheduleImpl = wrapSchedule(window.setTimeout.bind(window));
-    let cancelImpl = wrapCancel(window.clearTimeout.bind(window));
-    Object.defineProperty(window, 'setTimeout', { configurable: true,
-        get: () => scheduleImpl, set: implementation => { scheduleImpl = wrapSchedule(implementation); } });
-    Object.defineProperty(window, 'clearTimeout', { configurable: true,
-        get: () => cancelImpl, set: implementation => { cancelImpl = wrapCancel(implementation); } });
-}
-
 async function waitForWealthBrowserIdle(page) {
     // Der Init-Hook erfasst bereits den Inputtimer aus initTranchenStatus(), bevor
     // ein gespeichertes profilverbundHouseholdInputs den Startupcheck erfüllen kann.
     // Ausstehende Updates über ihren Abschluss beobachten, nicht über Schlafzeiten.
     await page.waitForFunction(() => window.__wealthPendingUpdates.size === 0);
     await page.evaluate(async () => (await import('./app/shared/persistence-facade.js')).PersistenceFacade.flush());
+}
+
+// page.evaluate serialisiert diese Funktion ebenfalls ohne Modul-Closure.
+function readWealthBrowserStorage() {
+    return Object.fromEntries(['localStorage', 'sessionStorage'].map(name => {
+        const storage = window[name];
+        const keys = Array.from({ length: storage.length }, (_, index) => storage.key(index)).sort();
+        return [name, { keys, entries: keys.map(key => [key, storage.getItem(key)]) }];
+    }));
 }
 
 async function activateWealthBrowserTab(page, expanded, key = null) {
@@ -868,21 +857,45 @@ async function activateWealthBrowserTab(page, expanded, key = null) {
         const { StorageManager } = await import('./app/balance/balance-storage.js');
         return createBalanceExportDocument(StorageManager.loadState()).payload;
     });
-    await page.evaluate(async () => {
-        const { UIReader } = await import('./app/balance/balance-reader.js');
-        const { UIRenderer } = await import('./app/balance/balance-renderer.js');
-        const { persistenceStorage } = await import('./app/shared/persistence-facade.js');
-        const calls = window.__wealthTabCalls = { updates: 0, clears: 0, writes: 0 };
-        const restores = [[UIReader, 'readAllInputs', 'updates'], [UIRenderer, 'clearError', 'clears'],
-            [persistenceStorage, 'setItem', 'writes']].map(([object, key, counter]) => {
-                const original = object[key];
-                object[key] = function (...args) { calls[counter] += 1; return original.apply(this, args); };
-                return () => { object[key] = original; };
-            });
-        window.__restoreWealthTabCalls = () => restores.forEach(restore => restore());
-    });
+    const storageBefore = await page.evaluate(readWealthBrowserStorage);
     const button = page.locator(`.tab-btn[data-tab="${expanded ? 'wealth' : 'update'}"]`);
     try {
+        await page.evaluate(async () => {
+            const { UIReader } = await import('./app/balance/balance-reader.js');
+            const { UIRenderer } = await import('./app/balance/balance-renderer.js');
+            const { persistenceStorage } = await import('./app/shared/persistence-facade.js');
+            const calls = window.__wealthTabCalls = { updates: 0, clears: 0, writes: 0,
+                localStorage: { setItem: 0, removeItem: 0, clear: 0 },
+                sessionStorage: { setItem: 0, removeItem: 0, clear: 0 } };
+            const restores = [];
+            window.__restoreWealthTabCalls = () => {
+                restores.reverse().forEach(restore => restore());
+                delete window.__wealthTabCalls;
+                delete window.__restoreWealthTabCalls;
+            };
+            const instrument = (object, method, count) => {
+                const descriptor = Object.getOwnPropertyDescriptor(object, method);
+                const original = object[method];
+                restores.push(() => {
+                    if (descriptor) Object.defineProperty(object, method, descriptor);
+                    else delete object[method];
+                });
+                Object.defineProperty(object, method, { configurable: true, writable: true,
+                    value: function (...args) { count(this); return original.apply(this, args); } });
+            };
+            for (const [object, method, counter] of [[UIReader, 'readAllInputs', 'updates'],
+                [UIRenderer, 'clearError', 'clears'], [persistenceStorage, 'setItem', 'writes']]) {
+                instrument(object, method, () => { calls[counter] += 1; });
+            }
+            // Storage-Instanzen haben benannte Eigenschaften: Methoden am Prototyp
+            // instrumentieren, damit direkte Zugriffe auf beide Speicher erfasst werden.
+            for (const method of ['setItem', 'removeItem', 'clear']) {
+                instrument(Storage.prototype, method, storage => {
+                    if (storage === window.localStorage) calls.localStorage[method] += 1;
+                    if (storage === window.sessionStorage) calls.sessionStorage[method] += 1;
+                });
+            }
+        });
         if (key) {
             await button.focus();
             await page.keyboard.press(key);
@@ -890,8 +903,18 @@ async function activateWealthBrowserTab(page, expanded, key = null) {
         await assertWealthBrowserVisibility(page, expanded);
         await waitForWealthBrowserIdle(page);
         const calls = await page.evaluate(() => window.__wealthTabCalls);
-        assert(Object.values(calls).every(count => count === 0), `Tabwechsel ohne Update/Fehlerbereinigung/Write: ${JSON.stringify(calls)}`);
-    } finally { await page.evaluate(() => window.__restoreWealthTabCalls()); }
+        assert(calls.updates === 0 && calls.clears === 0 && calls.writes === 0,
+            `Tabwechsel ohne Update/Fehlerbereinigung/Write: ${JSON.stringify(calls)}`);
+        const storageAfter = await page.evaluate(readWealthBrowserStorage);
+        for (const name of ['localStorage', 'sessionStorage']) {
+            assert(Object.values(calls[name]).every(count => count === 0),
+                `Tabwechsel ohne ${name}-Mutationen: ${JSON.stringify(calls[name])}`);
+            assert(JSON.stringify(storageAfter[name].keys) === JSON.stringify(storageBefore[name].keys),
+                `Tabwechsel erhält alle Schlüssel von ${name}`);
+            assert(JSON.stringify(storageAfter[name].entries) === JSON.stringify(storageBefore[name].entries),
+                `Tabwechsel erhält sämtliche Schlüssel/Wert-Paare von ${name}`);
+        }
+    } finally { await page.evaluate(() => window.__restoreWealthTabCalls?.()); }
     const after = await readBalanceBrowserState(page);
     assert(JSON.stringify(after) === JSON.stringify(before), 'Tabwechsel erhält gesamten Fachzustand ohne Erfassung/Sichtbarkeitsflag');
     assert((await readIndexedDb(page, 'kv', 'rs_profiles_v1')).value === registryBefore, 'Tabwechsel erhält aktive Registrykopie');
