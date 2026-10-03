@@ -16,6 +16,8 @@ Provider-Attempts:
 | reviewer | reviewer | claude | review | opus | high | verified: ~/.local/bin/claude (`88694734fe19206de74d00d345886f58f1223377d235266d22eaa50394a25214`) |
 | implementer | implementer | codex | implementation | gpt-6.1-sol | high | verified: ~/.nvm/versions/node/v22.23.2/bin/codex (`b54337198672060af3d8dbf12f54c9b97b0b21a0f72252f03f7f32d63bbfe81d`) |
 | reviewer | reviewer | claude | review | opus | high | verified: ~/.local/bin/claude (`88694734fe19206de74d00d345886f58f1223377d235266d22eaa50394a25214`) |
+| implementer | implementer | codex | implementation | gpt-6.1-sol | high | verified: ~/.nvm/versions/node/v22.23.2/bin/codex (`b54337198672060af3d8dbf12f54c9b97b0b21a0f72252f03f7f32d63bbfe81d`) |
+| reviewer | reviewer | claude | review | opus | high | verified: ~/.local/bin/claude (`88694734fe19206de74d00d345886f58f1223377d235266d22eaa50394a25214`) |
 <!-- audit:meta:end -->
 
 ## Übersicht
@@ -26,8 +28,8 @@ Provider-Attempts:
 | 1 | Importfehler nach Wiederherstellung neu darstellen | freigegeben | 820315a3 | 1 | 0 |
 | 2 | Hinweise korrekt kennzeichnen und interne Sperren erklären | freigegeben | 64fd109f | 1 | 0 |
 | 3 | Snapshotfehler bei abgebrochener Ordnerwahl erhalten | freigegeben | 46ae1e26 | 1 | 0 |
-| 4 | Fokus und kompakte kontrastreiche Meldungsdarstellung | freigegeben | – | 2 | 1 |
-| 5 | Tatsächliche Bedienwege und Prüfnachweise dokumentieren | ausstehend | – | 0 | 0 |
+| 4 | Fokus und kompakte kontrastreiche Meldungsdarstellung | freigegeben | 3b2b5e69 | 2 | 1 |
+| 5 | Tatsächliche Bedienwege und Prüfnachweise dokumentieren | freigegeben | – | 1 | 0 |
 <!-- audit:overview:end -->
 
 ## Befunde
