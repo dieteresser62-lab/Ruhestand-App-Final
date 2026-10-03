@@ -2,6 +2,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createImportExportHandlers, createBalanceExportDocument } from '../app/balance/balance-binder-imports.js';
+import { createSnapshotHandlers } from '../app/balance/balance-binder-snapshots.js';
+import { StorageManager } from '../app/balance/balance-storage.js';
+import { PersistenceFacade } from '../app/shared/persistence-facade.js';
+import { BALANCE_UPDATE_DEBOUNCE_MS, ValidationError } from '../app/balance/balance-config.js';
+import { initUIRenderer, UIRenderer } from '../app/balance/balance-renderer.js';
+import { UIReader } from '../app/balance/balance-reader.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,6 +41,9 @@ class MockElement {
         this.attributes = {};
     }
 
+    set textContent(value) { this.text = String(value); this.children = []; }
+    get textContent() { return (this.text || '') + this.children.map(child => child.textContent).join(''); }
+
     setAttribute(name, value) {
         this.attributes[name] = value;
         if (name === 'class') {
@@ -60,11 +70,13 @@ class MockElement {
                 try {
                     cb(event);
                 } catch (e) {
-                    // Log listener exceptions if critical for debugging
+                    throw e;
                 }
             });
         }
     }
+
+    focus() { document.activeElement = this; }
 
     querySelector(selector) { return new MockElement('dummy-child'); }
     querySelectorAll(selector) { return []; }
@@ -83,6 +95,7 @@ class MockElement {
     }
 
     replaceChildren(...children) {
+        this.textContent = '';
         this.children = [];
         this.append(...children);
     }
@@ -145,7 +158,7 @@ class MockDocument {
             while ((match = regex.exec(htmlContent)) !== null) {
                 const id = match[1];
                 const lowerMatch = match[0].toLowerCase();
-                const type = lowerMatch.includes('type="checkbox"') || lowerMatch.includes("type='checkbox'") ? 'checkbox' : 'text';
+                const type = lowerMatch.includes('type="file"') ? 'file' : lowerMatch.includes('type="checkbox"') || lowerMatch.includes("type='checkbox'") ? 'checkbox' : 'text';
                 const el = this.getElementById(id);
                 el.type = type; // Set type hint
                 inputs.push(el);
@@ -188,6 +201,12 @@ const localStorageMock = {
     get length() { return localStorageData.size; }
 };
 
+const savedGlobals = Object.fromEntries(['window', 'document', 'localStorage', 'Event']
+    .map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+const originalConsoleError = console.error;
+const originalConsoleInfo = console.info;
+
+try {
 global.window = {
     addEventListener: () => { },
     localStorage: localStorageMock,
@@ -220,13 +239,13 @@ const compatibleEngine = {
                     deckungVorher: 100,
                     deckungNachher: 110
                 },
-                depotwertGesamt: 200000,
+                depotwertGesamt: 200000 + input.floorBedarf + input.endeVJ,
                 neuerBedarf: 30000,
                 minGold: 0,
                 zielLiquiditaet: 50000,
                 runway: { months: 48, status: 'ok' },
                 spending: {
-                    monatlicheEntnahme: 2000,
+                    monatlicheEntnahme: input.floorBedarf / 12,
                     details: { flexRate: 1.0, entnahmequoteDepot: 0.04, realerDepotDrawdown: 0 },
                     kuerzungQuelle: '-'
                 },
@@ -238,7 +257,7 @@ const compatibleEngine = {
                 action: {
                     type: "test",
                     summary: "Test Action",
-                    title: "Test Action Title",
+                    title: `Test Action Title ${input.floorBedarf}/${input.endeVJ}`,
                     transactionDiagnostics: [],
                     details: {
                         regel: "Test",
@@ -272,8 +291,6 @@ const compatibleEngine = {
 global.window.EngineAPI = compatibleEngine;
 
 // Mock console
-const originalConsoleError = console.error;
-const originalConsoleInfo = console.info;
 console.error = (...args) => {
     // Suppress expected errors during init if mocks aren't perfect
     // or log them if critical
@@ -319,6 +336,12 @@ assertEqual(document.engineScript.src, 'engine.js', 'Engine script source should
 
 // --- 5. Test Interaction ---
 console.log("Testing Input Change Trigger...");
+const visibleToastText = () => document.getElementById('toast-container').children
+    .find(child => child.className === 'toast-text')?.textContent || '';
+const notification = 'Ausgaben-Check auf 2027 umgestellt. Vermögensstand gesichert.';
+UIRenderer.toast(notification);
+UIRenderer.clearError();
+assertEqual(visibleToastText(), notification, 'Echter Renderer: clearError erhält den Toast');
 
 // Get an input that we served via querySelectorAll
 const inputEl = document.getElementById('p1StartAlter');
@@ -337,6 +360,7 @@ formCheck.dispatchEvent(evt);
 await new Promise(resolve => setTimeout(resolve, 310));
 
 assertEqual(simulateCallCount, 2, 'Debounced input should trigger exactly one additional engine call');
+assertEqual(visibleToastText(), notification, 'Echtes debouncedUpdate erhält den Toast');
 
 console.log("Testing machine-readable update results and fail-closed persistence...");
 
@@ -344,6 +368,7 @@ const successResult = balanceMain.update({ mode: 'preview' });
 if (!successResult.ok || successResult.status !== 'success') {
     throw new Error(`Successful update returned unexpected result: ${JSON.stringify(successResult)}`);
 }
+assertEqual(visibleToastText(), notification, 'Echtes erfolgreiches update erhält den Toast');
 
 const assertMinimumFlexReject = (rawValue, expectedMessages) => {
     const input = document.getElementById('minimumFlexAnnual');
@@ -375,7 +400,15 @@ assertMinimumFlexReject('24001', [
     'Mindest-Flex p.a. darf nicht größer als Flex-Bedarf p.a. sein.',
     'Flex-Bedarf p.a. ist die Obergrenze für Mindest-Flex.'
 ]);
+assertEqual(visibleToastText(), notification, 'Echtes Validierungsfehler-update erhält den Toast');
 document.getElementById('minimumFlexAnnual').value = '0';
+UIRenderer.handleActionError(new Error('Unabhängige Aktion'), 'expenses-import');
+const corrected = balanceMain.update();
+assert(corrected.ok, 'Korrigierte Eingaben führen zum erfolgreichen echten Update');
+assertEqual(document.getElementById('error-container').textContent, '', 'Echtes Update beseitigt Berechnungsfehler und Liste');
+assert(!document.getElementById('minimumFlexAnnual').classList.contains('input-error'), 'Echtes Update entfernt Feldmarkierungen');
+assertEqual(visibleToastText(), notification, 'Korrektur erhält gleichzeitigen Toast');
+assert(document.getElementById('action-error-container').textContent.includes('Unabhängige Aktion'), 'Korrektur erhält Aktionsfehler');
 
 engineFailure = new Error('Simulierter Engine-Fehler');
 const engineResult = balanceMain.update();
@@ -384,7 +417,352 @@ assert(
     document.getElementById('error-container').textContent.includes('Simulierter Engine-Fehler'),
     'Engine error should use the normal UI error path'
 );
+assertEqual(visibleToastText(), notification, 'Enginefehler und Toast bleiben gleichzeitig sichtbar');
 engineFailure = null;
+
+// Reale Import-/Snapshot-/Annualhandler mit echtem Renderer und Main-Debounce.
+const actionContainer = document.getElementById('action-error-container');
+const scopedEntry = scope => actionContainer.children.find(entry => entry.dataset.scope === scope);
+const actionText = scope => scopedEntry(scope)?.children[0].textContent || '';
+// Manueller Abschluss mit echtem Main: kein Engineaufruf, Write oder entprelltes Update.
+{
+    UIRenderer.handleActionError(new Error('Fokusprüfung A'), 'focus-a');
+    UIRenderer.handleActionError(new Error('Fokusprüfung B'), 'focus-b');
+    const first = scopedEntry('focus-a');
+    const second = scopedEntry('focus-b');
+    // Writes des vorangegangenen echten Updates vor der Messung abschließen.
+    await PersistenceFacade.flush();
+    const callsBefore = simulateCallCount;
+    const writesBefore = storageWrites.length;
+    assertEqual(first.children[1].getAttribute('aria-label'), 'Fehlermeldung schließen', 'Echter Renderer verwendet den exakten zugänglichen Namen');
+    assertEqual(first.children[1].getAttribute('aria-describedby'), first.children[0].id, 'Echter Renderer beschreibt den Knopf mit dem eigenen Fehlertext');
+    first.children[1].focus();
+    first.children[1].dispatchEvent(new MockEvent('click'));
+    assertEqual(document.activeElement, second.children[1], 'Schließen fokussiert den nächsten echten Meldungsknopf');
+    second.children[1].dispatchEvent(new MockEvent('click'));
+    assertEqual(document.activeElement, scopedEntry('expenses-import').children[1], 'Schließen am Listenende fokussiert den verbleibenden Knopf');
+    scopedEntry('expenses-import').children[1].dispatchEvent(new MockEvent('click'));
+    assertEqual(document.activeElement, document.getElementById('openDiagnosisBtn'), 'Letzte echte Meldung fokussiert Diagnose');
+    await new Promise(resolve => setTimeout(resolve, BALANCE_UPDATE_DEBOUNCE_MS + 50));
+    assertEqual(simulateCallCount, callsBefore, 'Schließen löst auch verzögert keine Berechnung aus');
+    assertEqual(storageWrites.length, writesBefore, 'Schließen löst keinen Speicherwrite aus');
+    UIRenderer.handleActionError(new Error('Unabhängige Aktion'), 'expenses-import');
+}
+// Tatsächliche Main-/Knopfbindung mit echtem connectFolder und echtem Renderer.
+{
+    const previousPicker = window.showDirectoryPicker;
+    const previousClear = UIRenderer.clearActionError;
+    const previousToast = UIRenderer.toast;
+    const previousHandleSet = StorageManager._idbHelper.set;
+    let rejectPicker;
+    const picker = new Promise((_, reject) => { rejectPicker = reject; });
+    let clears = 0, toasts = 0;
+    try {
+        UIRenderer.handleActionError(new Error('Snapshotfehler vor Ordnerwahl'), 'snapshots');
+        const oldEntry = scopedEntry('snapshots');
+        const oldText = actionText('snapshots');
+        const foreignEntry = scopedEntry('expenses-import');
+        window.showDirectoryPicker = () => picker;
+        UIRenderer.clearActionError = function (...args) { clears++; return previousClear.apply(this, args); };
+        UIRenderer.toast = function (...args) { toasts++; return previousToast.apply(this, args); };
+        const folderButton = document.getElementById('connectFolderBtn');
+        assertEqual(folderButton.listeners.click.length, 1, 'Echter Main bindet den Ordnerknopf genau einmal');
+        const pending = folderButton.listeners.click[0]({ type: 'click', target: folderButton });
+        assertEqual(scopedEntry('snapshots'), oldEntry, 'Offener Ordnerdialog erhält den echten Meldungseintrag');
+        assertEqual(actionText('snapshots'), oldText, 'Offener Ordnerdialog erhält den Meldungstext');
+        assertEqual(clears, 0, 'Offener Ordnerdialog bereinigt keinen Bereich');
+        assertEqual(toasts, 0, 'Offener Ordnerdialog erzeugt keinen Erfolg');
+        rejectPicker(Object.assign(new Error('Ordnerwahl abgebrochen'), { name: 'AbortError' }));
+        assertEqual(await pending, undefined, 'Abgebrochene echte Knopfaktion behält void-Rückgabe');
+        assertEqual(scopedEntry('snapshots'), oldEntry, 'AbortError erhält dieselbe echte Meldung');
+        assertEqual(actionText('snapshots'), oldText, 'AbortError erhält den Meldungstext');
+        assertEqual(scopedEntry('expenses-import'), foreignEntry, 'AbortError erhält fremden Meldungseintrag');
+        assertEqual(clears, 0, 'AbortError ruft clearActionError nicht auf');
+        assertEqual(toasts, 0, 'AbortError erzeugt keine Erfolgsmeldung');
+        for (const outcome of ['denied', 'storage-error']) {
+            const before = scopedEntry('snapshots');
+            window.showDirectoryPicker = async () => ({
+                requestPermission: async () => outcome === 'denied' ? 'denied' : 'granted'
+            });
+            StorageManager._idbHelper.set = async () => { throw new Error('Synthetischer Handle-Speicherfehler'); };
+            await folderButton.listeners.click[0]({ type: 'click', target: folderButton });
+            assert(scopedEntry('snapshots') !== before, `${outcome}: echter Renderer ersetzt bisherigen Snapshotfehler`);
+            assert(actionText('snapshots').includes('Ordner konnte nicht verbunden werden.'), `${outcome}: bestehender Snapshot-Aktionsfehler sichtbar`);
+            assertEqual(scopedEntry('expenses-import'), foreignEntry, `${outcome}: fremder Meldungseintrag bleibt identisch`);
+            assertEqual(toasts, 0, `${outcome}: kein Erfolgstoast bei fehlgeschlagener Verbindung`);
+        }
+        assertEqual(clears, 2, 'Nur der echte Fehlerersatz bereinigt seinen Bereich, ohne vorzeitiges Löschen');
+    } finally {
+        if (previousPicker === undefined) delete window.showDirectoryPicker;
+        else window.showDirectoryPicker = previousPicker;
+        UIRenderer.clearActionError = previousClear;
+        UIRenderer.toast = previousToast;
+        StorageManager._idbHelper.set = previousHandleSet;
+    }
+}
+const inputRefs = Object.fromEntries(document.querySelectorAll('input, select').map(el => [el.id, el]));
+const handlerDom = { inputs: inputRefs, outputs: { snapshotList: document.getElementById('snapshotList') },
+    controls: {}, expenses: {} };
+const imports = createImportExportHandlers({ dom: handlerDom, update: balanceMain.update, debouncedUpdate: () => formCheck.dispatchEvent({ type: 'input', target: inputEl }) });
+const importFile = document.getElementById('importFile');
+importFile.files = [{ text: async () => '{kein-json' }];
+await imports.handleImport({ target: importFile });
+const rejectedText = actionText('balance-import');
+assert(rejectedText.includes('kein gültiges JSON'), 'Realer Importhandler rendert sichere Ablehnung');
+assert(rejectedText.includes('unveränderte Balance-Exportdatei'), 'Ablehnung behält Handlungsoption');
+UIRenderer.clearError();
+balanceMain.update({ mode: 'preview' });
+formCheck.dispatchEvent({ type: 'input', target: inputEl });
+await new Promise(resolve => setTimeout(resolve, 310));
+assertEqual(actionText('balance-import'), rejectedText, 'Ablehnung überlebt clearError und echte direkte/entprellte Updates');
+importFile.files = [];
+await imports.handleImport({ target: importFile });
+assertEqual(actionText('balance-import'), rejectedText, 'Leere Dateiauswahl löscht den vorherigen Fehler nicht');
+
+// Bereits vorgemerkte Writes des vorigen echten Updates zuerst abschließen.
+await PersistenceFacade.flush();
+document.getElementById('minimumFlexAnnual').value = '-1';
+balanceMain.update({ mode: 'preview' });
+const fileEventError = document.getElementById('error-container').textContent;
+const callsBeforeFiles = simulateCallCount;
+const writesBeforeFiles = storageWrites.length;
+const originalClearError = UIRenderer.clearError;
+let fileEventClears = 0;
+UIRenderer.clearError = (...args) => { fileEventClears++; return originalClearError.apply(UIRenderer, args); };
+try {
+for (const id of ['importFile', 'csvFileInput', 'expensesCsvInput']) {
+    const fileInput = document.getElementById(id);
+    fileInput.type = 'file';
+    formCheck.dispatchEvent({ type: 'input', target: fileInput });
+    formCheck.dispatchEvent({ type: 'change', target: fileInput });
+}
+await new Promise(resolve => setTimeout(resolve, 310));
+assertEqual(simulateCallCount, callsBeforeFiles, 'Reale Main-/Formbindung berechnet für sämtliche Dateievents exakt null Mal');
+assertEqual(storageWrites.length, writesBeforeFiles, 'Dateievents schreiben nicht im Hintergrund');
+assertEqual(fileEventClears, 0, 'Dateievents rufen clearError exakt null Mal auf');
+assertEqual(document.getElementById('error-container').textContent, fileEventError, 'Dateievents erhalten den Berechnungsfehler');
+assert(document.getElementById('minimumFlexAnnual').classList.contains('input-error'), 'Dateievents erhalten die Feldmarkierung');
+} finally { UIRenderer.clearError = originalClearError; }
+document.getElementById('minimumFlexAnnual').value = '0';
+balanceMain.update({ mode: 'preview' });
+
+// Beobachtbare Ergebnisse des echten Renderers mit echten Main-Updates.
+const readResults = () => ({
+    depot: document.getElementById('displayDepotwert').textContent,
+    withdrawal: document.getElementById('monatlicheEntnahme').textContent,
+    action: document.getElementById('handlungsanweisung').children.find(el => el.id === 'handlungContent')?.textContent
+});
+const regressionReplace = StorageManager.replaceStateFromImport;
+const regressionRollback = StorageManager.rollbackImportReplace;
+const regressionRead = UIReader.readAllInputs;
+const regressionActionError = UIRenderer.handleActionError;
+try {
+    const originalState = JSON.stringify(StorageManager.loadState());
+    const baselineFields = Object.fromEntries(Object.entries(handlerDom.inputs).map(([id, el]) => [id, el.value]));
+    const baseline = readResults();
+    const foreignActionError = actionText('expenses-import');
+    const differentDoc = createBalanceExportDocument(StorageManager.loadState());
+    differentDoc.payload.inputs.floorBedarf += 17000;
+    differentDoc.payload.inputs.endeVJ = 432;
+    for (const failure of ['dry', 'replace', 'final', 'preview']) {
+        let updates = 0;
+        let replacements = 0;
+        let rollbacks = 0;
+        const modes = [];
+        await PersistenceFacade.flush();
+        const writesBefore = storageWrites.length;
+        StorageManager.replaceStateFromImport = async () => {
+            replacements++;
+            assert(JSON.stringify(readResults()) !== JSON.stringify(baseline), `${failure}: echte Dry-Run-Ergebnisse unterscheiden sich von der Baseline`);
+            if (failure === 'replace') throw new Error('Synthetischer Replacefehler');
+            document.getElementById('minimumFlexAnnual').value = '-1';
+            return { recoverySnapshotId: 'renderer-recovery' };
+        };
+        StorageManager.rollbackImportReplace = async () => { rollbacks++; };
+        UIRenderer.handleActionError = function (error, scope) {
+            assertEqual(document.getElementById('error-container').textContent, '', `${failure}: Importdaten-Berechnungsfehler ist vor Aktionsfehler entfernt`);
+            assert(!document.getElementById('minimumFlexAnnual').classList.contains('input-error'), `${failure}: verworfene Feldmarkierung ist entfernt`);
+            if (failure !== 'preview') assertEqual(JSON.stringify(readResults()), JSON.stringify(baseline), `${failure}: KPI und Handlungsanweisung vor Aktionsfehler wiederhergestellt`);
+            return regressionActionError.call(this, error, scope);
+        };
+        if (failure === 'dry') UIReader.readAllInputs = () => {
+            UIReader.readAllInputs = regressionRead;
+            const data = regressionRead.call(UIReader);
+            data.minimumFlexAnnual = -1;
+            return data;
+        };
+        const handlers = createImportExportHandlers({ dom: handlerDom, update: options => {
+            updates++;
+            modes.push(options.mode);
+            if (failure === 'preview' && updates === 3) throw new Error('Synthetischer Wiederherstellungsvorschaufehler');
+            const result = balanceMain.update(options);
+            if (!result.ok) assert(document.getElementById('minimumFlexAnnual').classList.contains('input-error'), `${failure}: echter Main-Pfad markiert abgelehnte Eingaben`);
+            return result;
+        }, debouncedUpdate: () => {} });
+        importFile.files = [{ text: async () => JSON.stringify(differentDoc) }];
+        await handlers.handleImport({ target: importFile });
+        assertEqual(modes.join(','), ['final', 'preview'].includes(failure) ? 'preview,persist_inputs,preview' : 'preview,preview', `${failure}: ausschließlich PREVIEW zur Wiederherstellung`);
+        assertEqual(replacements, failure === 'dry' ? 0 : 1, `${failure}: echte Handler-Replaceversuche`);
+        assertEqual(rollbacks, ['final', 'preview'].includes(failure) ? 1 : 0, `${failure}: echte Handler-Rollbackversuche`);
+        assertEqual(JSON.stringify(StorageManager.loadState()), originalState, `${failure}: persistierter Ausgangsstand erhalten`);
+        assertEqual(storageWrites.length, writesBefore, `${failure}: Vorschau schreibt nicht`);
+        for (const id of ['floorBedarf', 'endeVJ', 'minimumFlexAnnual']) assertEqual(handlerDom.inputs[id].value, baselineFields[id], `${failure}: ${id} zurückgesetzt`);
+        assert(actionText('balance-import').includes(failure === 'dry' ? 'Engine-Prüfung' : failure === 'replace' ? 'nicht sicher abgeschlossen' : 'automatisch wiederhergestellt'), `${failure}: ursprünglicher Importaktionsfehler sichtbar`);
+        assertEqual(actionText('expenses-import'), foreignActionError, `${failure}: fremder Aktionsfehler bleibt bestehen`);
+        balanceMain.update({ mode: 'preview' });
+    }
+
+    UIRenderer.handleActionError = regressionActionError;
+    const year = new Date().getFullYear() - 1;
+    handlerDom.inputs.marketCsvMode.value = 'current';
+    handlerDom.inputs.marketCsvTargetYear.value = String(year);
+    handlerDom.inputs.marketCsvExpectedAsOf.value = `${year}-12-30`;
+    handlerDom.inputs.marketCsvInstrument.value = 'VWCE.DE';
+    StorageManager.replaceStateFromImport = async () => {
+        assert(JSON.stringify(readResults()) !== JSON.stringify(baseline), 'CSV: echter Dry-Run zeigt andere Ergebnisse');
+        throw new Error('Synthetischer CSV-Replacefehler');
+    };
+    const csv = ['Datum;Schluss', ...[3, 2, 1, 0].map((offset, index) => `30.12.${year - offset};${100 + index * 10}`)].join('\n');
+    const csvFile = document.getElementById('csvFileInput');
+    csvFile.files = [{ name: 'synthetischer-markt.csv', text: async () => csv }];
+    await imports.handleCsvImport({ target: csvFile });
+    assertEqual(JSON.stringify(readResults()), JSON.stringify(baseline), 'CSV: echter Renderer stellt KPI und Handlung wieder her');
+    assert(actionText('market-csv-import').includes('CSV-Import fehlgeschlagen'), 'CSV: ursprünglicher Aktionsfehler bleibt sichtbar');
+    document.getElementById('minimumFlexAnnual').value = '-1';
+    importFile.files = [{ text: async () => '{kein-json' }];
+    await imports.handleImport({ target: importFile });
+    assert(document.getElementById('error-container').textContent.includes('Einige Eingaben sind ungültig'), 'Ein echter Fehler des wiederhergestellten Standes bleibt nach der Vorschau sichtbar');
+    assert(document.getElementById('minimumFlexAnnual').classList.contains('input-error'), 'Ungültiger Ausgangsstand erhält seine eigene neue Feldmarkierung');
+    document.getElementById('minimumFlexAnnual').value = '0';
+    balanceMain.update({ mode: 'preview' });
+} finally {
+    StorageManager.replaceStateFromImport = regressionReplace;
+    StorageManager.rollbackImportReplace = regressionRollback;
+    UIReader.readAllInputs = regressionRead;
+    UIRenderer.handleActionError = regressionActionError;
+}
+
+const exportDoc = createBalanceExportDocument(StorageManager.loadState());
+const previousReplace = StorageManager.replaceStateFromImport;
+const previousRollback = StorageManager.rollbackImportReplace;
+const previousRestore = StorageManager.restoreSnapshot;
+let replaceCalls = 0;
+let rollbackCalls = 0;
+try {
+    StorageManager.replaceStateFromImport = async () => {
+        replaceCalls++;
+        assertEqual(actionText('balance-import'), '', 'Neuer Import entfernt seinen alten Fehler vor der Arbeit');
+        engineFailure = new Error('Synthetischer UI-Fehler nach Replace');
+        return { recoverySnapshotId: 'synthetischer-recovery' };
+    };
+    StorageManager.rollbackImportReplace = async receipt => {
+        assertEqual(receipt.recoverySnapshotId, 'synthetischer-recovery', 'Rollback erhält den bestätigten Recoverypunkt');
+        rollbackCalls++;
+        engineFailure = null;
+    };
+    importFile.files = [{ text: async () => JSON.stringify(exportDoc) }];
+    await imports.handleImport({ target: importFile });
+    const rollbackText = actionText('balance-import');
+    assertEqual(replaceCalls, 1, 'Realer Import führt genau ein Replace aus');
+    assertEqual(rollbackCalls, 1, 'Realer Import führt genau einen Rollback aus');
+    assert(rollbackText.includes('automatisch wiederhergestellt'), 'Realer Rollback rendert seinen unveränderten Recoveryhinweis');
+    formCheck.dispatchEvent({ type: 'input', target: inputEl });
+    await new Promise(resolve => setTimeout(resolve, 310));
+    assertEqual(actionText('balance-import'), rollbackText, 'Rollbackhinweis überlebt den echten Main-Debounce');
+
+    const csvFile = document.getElementById('csvFileInput');
+    csvFile.files = [{ text: async () => 'date;close\nungueltig;kaputt' }];
+    await imports.handleCsvImport({ target: csvFile });
+    const csvText = actionText('market-csv-import');
+    assert(csvText.includes('CSV-Import fehlgeschlagen'), 'Realer CSV-Handler rendert seinen eigenen Bereich');
+    assertEqual(actionText('balance-import'), rollbackText, 'CSV-Fehler erhält JSON-Fehler');
+
+    let confirmed = false;
+    const oldConfirm = globalThis.confirm;
+    globalThis.confirm = () => confirmed;
+    try {
+        StorageManager.restoreSnapshot = async () => { throw new Error('Synthetischer Snapshotfehler'); };
+        let startValidation;
+        let releaseValidation;
+        const validationStarted = new Promise(resolve => { startValidation = resolve; });
+        const validationGate = new Promise(resolve => { releaseValidation = resolve; });
+        const snapshots = createSnapshotHandlers({ dom: handlerDom, appState: {},
+            getTargetYear: () => 2025, getReferenceDate: () => new Date('2026-10-03'),
+            getLegacyDecision: () => 'not_committed',
+            validateLiveState: async () => {
+                startValidation();
+                await validationGate;
+                return { ok: false, error: new ValidationError([{ fieldId: 'minimumFlexAnnual', message: 'Annual-Vorprüfung' }]) };
+            },
+            flushLiveState: async () => {}, applyAnnualInflation: () => {} });
+        const restoreEvent = { target: { closest: selector => selector === '.restore-snapshot' ? { dataset: { key: 'synthetisch.json' } } : null } };
+        UIRenderer.handleActionError(new Error('Vorheriger Snapshotfehler'), 'snapshots');
+        await snapshots.handleSnapshotActions(restoreEvent);
+        assert(actionText('snapshots').includes('Vorheriger'), 'Abgebrochene Snapshotbestätigung erhält den Fehler');
+        confirmed = true;
+        await snapshots.handleSnapshotActions(restoreEvent);
+        const snapshotText = actionText('snapshots');
+        assert(snapshotText.includes('Snapshot-Aktion fehlgeschlagen'), 'Realer Snapshothandler rendert StorageError im Aktionskanal');
+        UIRenderer.handleActionError(new Error('Vorheriger Jahresfehler'), 'annual');
+        confirmed = false;
+        await snapshots.handleJahresabschluss();
+        assert(actionText('annual').includes('Vorheriger Jahresfehler'), 'Abgebrochene Jahresbestätigung erhält ihren Fehler');
+        confirmed = true;
+        const pendingAnnual = snapshots.handleJahresabschluss();
+        await validationStarted;
+        assertEqual(actionText('annual'), '', 'Angenommener Jahresprozess entfernt vorherigen Jahresfehler');
+        UIRenderer.handleActionError(new Error('Fehler während Jahresaktion'), 'annual');
+        const reentrant = await snapshots.handleJahresabschluss();
+        assertEqual(reentrant.status, 'in_flight', 'Realer Jahresprozess weist Reentranz ab');
+        assert(actionText('annual').includes('Fehler während Jahresaktion'), 'Abgewiesene Reentranz löscht keinen Jahresfehler');
+        releaseValidation();
+        const annualResult = await pendingAnnual;
+        assertEqual(annualResult.status, 'invalid', 'Annualvalidierung behält ihren bisherigen Status');
+        const annualText = actionText('annual');
+        assert(annualText.includes('Annual-Vorprüfung'), 'ValidationError aus echtem Annualhandler gehört zum Aktionskanal');
+        assert(!document.getElementById('minimumFlexAnnual').classList.contains('input-error'), 'Annualvalidierung markiert keine Berechnungsfelder');
+        UIRenderer.toast('Zeitlicher Nachweis');
+        balanceMain.update({ mode: 'preview' });
+        formCheck.dispatchEvent({ type: 'input', target: inputEl });
+        await new Promise(resolve => setTimeout(resolve, 6100));
+        for (const [scope, text] of [['balance-import', rollbackText], ['market-csv-import', csvText], ['snapshots', snapshotText], ['annual', annualText]]) {
+            assertEqual(actionText(scope), text, `${scope} überlebt echte Updates und den echten Toastablauf`);
+        }
+        const callsBeforeClose = simulateCallCount;
+        const writesBeforeClose = storageWrites.length;
+        const loadStateBeforeClose = StorageManager.loadState;
+        const getItemBeforeClose = localStorageMock.getItem;
+        let storageReads = 0;
+        StorageManager.loadState = (...args) => { storageReads++; return loadStateBeforeClose(...args); };
+        localStorageMock.getItem = (...args) => { storageReads++; return getItemBeforeClose(...args); };
+        try {
+            const entriesBeforeClose = actionContainer.children;
+            const closingEntry = scopedEntry('balance-import');
+            const expectedFocus = entriesBeforeClose[entriesBeforeClose.indexOf(closingEntry) + 1].children[1];
+            closingEntry.children[1].focus();
+            scopedEntry('balance-import').children[1].dispatchEvent({ type: 'click' });
+            assertEqual(document.activeElement, expectedFocus, 'Echter Importfehler übergibt beim Schließen Fokus an den nächsten Bereich');
+            await new Promise(resolve => setTimeout(resolve, 310));
+            assertEqual(storageReads, 0, 'Schließen greift auch lesend nicht auf den Speicher zu');
+        } finally {
+            StorageManager.loadState = loadStateBeforeClose;
+            localStorageMock.getItem = getItemBeforeClose;
+        }
+        assertEqual(actionText('balance-import'), '', 'Echter Schließenknopf entfernt seinen Fehler');
+        assertEqual(actionText('snapshots'), snapshotText, 'Schließen erhält anderen Bereich');
+        await new Promise(resolve => setTimeout(resolve, 310));
+        assertEqual(simulateCallCount, callsBeforeClose, 'Schließen verursacht weder direkte noch entprellte Berechnung');
+        assertEqual(storageWrites.length, writesBeforeClose, 'Schließen verursacht keinen Speicherzugriff');
+    } finally {
+        if (oldConfirm === undefined) delete globalThis.confirm;
+        else globalThis.confirm = oldConfirm;
+    }
+} finally {
+    engineFailure = null;
+    StorageManager.replaceStateFromImport = previousReplace;
+    StorageManager.rollbackImportReplace = previousRollback;
+    StorageManager.restoreSnapshot = previousRestore;
+}
 
 let incompatibleCalls = 0;
 global.window.EngineAPI = {
@@ -412,6 +790,13 @@ global.window.EngineAPI = compatibleEngine;
 
 console.log("✅ Balance App Smoke Test Completed Successfully.");
 
-// Restore console
-console.error = originalConsoleError;
-console.info = originalConsoleInfo;
+} finally {
+    // Beendet den echten Toasttimer auch bei fehlgeschlagenen Assertions.
+    initUIRenderer(null, null);
+    console.error = originalConsoleError;
+    console.info = originalConsoleInfo;
+    for (const [key, descriptor] of Object.entries(savedGlobals)) {
+        if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+        else delete globalThis[key];
+    }
+}

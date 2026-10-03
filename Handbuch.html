@@ -1328,9 +1328,44 @@
                 <div class="manual-grid" style="margin-top: 1.5rem;">
                     <div class="detail-block" id="balance-jahresupdate">
                         <h3>Jahres-Update</h3>
+                        <p><strong>Kurzmeldungen und Aktionsfehler:</strong> Kurzmeldungen in Balance bleiben
+                            sechs Sekunden sichtbar. Eine neue Kurzmeldung ersetzt die vorherige und beginnt eine
+                            eigene Frist, auch bei identischem Text. Erfolg (✓), neutraler Hinweis (i) und Fehler (!)
+                            unterscheiden sich durch Symbol, Form und zugängliche Typkennzeichnung. Fortschritt,
+                            lokale CAPE-Warnungen und Vorgänge ohne neue Änderung erscheinen als Hinweis.
+                            Fehler aus Import, Export, Jahresprozess, Snapshotaktionen
+                            und Ausgaben-Recovery bleiben je Bereich bis zum nächsten tatsächlich begonnenen passenden
+                            Vorgang oder bis <strong>„Schließen“</strong> stehen. Mehrere Bereiche können gleichzeitig
+                            einen Fehler anzeigen. Eingabeänderungen, Berechnungen, Tabwechsel und Erfolgsmeldungen
+                            anderer Bereiche entfernen diese Fehler nicht. Eine Dateiauswahl ohne Importdatei, eine abgebrochene
+                            Bestätigung oder ein abgewiesener Doppelklick setzt sie nicht zurück.</p>
+                        <p>Die kompakte Fehlerliste lässt sich bei langen Texten scrollen; alle Meldungen und
+                            Schließenknöpfe bleiben erreichbar. Der Knopf „Schließen“ heißt für Hilfstechnologien
+                            „Fehlermeldung schließen“. Nach manuellem Schließen erhält der nächste Schließenknopf
+                            den Fokus, am Listenende ein verbleibender Nachbar und beim letzten Fehler der
+                            Diagnoseknopf. Automatische Bereinigung verschiebt den Fokus nicht. Bei „Ordner verbinden“
+                            bleibt ein vorhandener Snapshotfehler während der Auswahl und bei Dialogabbruch stehen;
+                            erst bestätigte Berechtigung und gespeicherte Verbindung bereinigen ihn.</p>
+                        <p><strong>Schließen bestätigt nur das Lesen:</strong> Es repariert keine Daten und führt
+                            keine Wiederherstellung oder Berechnung aus. Befolgen Sie weiterhin den angezeigten
+                            Recovery-Hinweis. Meldungen werden nicht gespeichert und verschwinden nach Reload;
+                            eine erforderliche Recovery ist dadurch nicht erledigt. Berechnungs- und
+                            Eingabevalidierungsfehler mit Feldmarkierungen behalten ihren bisherigen Lebenszyklus.</p>
                         <p>„🌐 Jahres-Update“ und „⭐ Jahresabschluss“ führen in denselben fail-safe,
-                            periodengebundenen Abschluss. Der Prozess darf für ein Kalenderjahr nur einmal
-                            erfolgreich abgeschlossen werden.</p>
+                            periodengebundenen Abschluss mit gemeinsamem Doppelklickschutz. Der Prozess darf für
+                            ein Kalenderjahr nur einmal erfolgreich abgeschlossen werden. Die Abschlussmeldung bleibt
+                            mindestens drei Sekunden sichtbar. Separate Inflations-, ETF- oder CAPE-Abrufknöpfe
+                            gibt es nicht; direkte Aufrufe und zusätzliche Sperren dienen nur internen Abläufen.</p>
+                        <p><strong>Anzeige nach gescheitertem Import:</strong> Bei Balance-JSON und Markt-CSV stellt
+                            die App die Eingabefelder, beim CSV auch die Datenquellenanzeige, wieder her und wartet
+                            vor dem Aktionsfehler eine neue Vorschau ab. KPIs und Handlungsschritte beziehen sich
+                            wieder auf die wiederhergestellten Eingaben, sofern diese gültig sind. War schon vor dem Import ein
+                            Eingabefeld ungültig, zuerst den markierten Wert korrigieren; erst dann stimmen die Ergebnisse wieder. Diese Vorschau speichert nichts und ersetzt
+                            keinen Commit. Berechnungsfehler verworfener Importdaten werden bereinigt; echte Fehler
+                            des wiederhergestellten Standes können weiterhin erscheinen. Auch wenn die Vorschau
+                            scheitert, bleibt der ursprüngliche Import-/Recoveryfehler erhalten. Bei fehlgeschlagenem
+                            Rollback (<code>rollback_failed</code>) beweist die Vorschau keine Speicherreparatur:
+                            Folgen Sie dem Recovery-Hinweis und stellen Sie den genannten Snapshot wieder her.</p>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
                             <li><strong>Vorprüfung:</strong> Das aktive Profil muss stimmen, der Ausgaben-Check muss
@@ -1428,7 +1463,8 @@
                             Rollback. Im aktiven Verlauf erscheinen die bestätigten Werte sofort; inaktiv aktualisieren
                             sich nur Anzahl und Datum, ohne Diagramm und Tabelle zu erzeugen.
                             <strong>„Stand gesichert“</strong> bestätigt erst dauerhaft gespeicherte manuelle Erfassung
-                            oder einen neuen Jahresstand. Fehler werden im Verlaufspanel gemeldet; ein wiederholter
+                            oder einen neuen Jahresstand. Fehler der Verlaufserfassung werden im Verlaufspanel gemeldet;
+                            ein wiederholter
                             Jahresabschluss bestätigt keinen neuen Stand. Ein Dateidialog ohne Auswahl verändert nichts.
                             Die Tabaktivität wird weder gespeichert noch exportiert.</p>
                         <p>Tabs und Capturetaste lassen sich mit Klick, Enter und Leertaste bedienen. Inaktive Regionen

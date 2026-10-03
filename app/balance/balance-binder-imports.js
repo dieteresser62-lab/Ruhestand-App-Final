@@ -1362,8 +1362,21 @@ function asSafeMarketCsvImportError(error, context = {}) {
 }
 
 export function createImportExportHandlers({ dom, debouncedUpdate, update }) {
+    async function previewRestoredInputs() {
+        // Verworfenes Importdaten-Feedback auch dann entfernen, wenn die
+        // Vorschau vor der üblichen Bereinigung im Main-Update scheitert.
+        // Aktionsfehler anderer Bereiche bleiben dabei erhalten.
+        UIRenderer.clearError();
+        try {
+            await update({ mode: BALANCE_UPDATE_MODE.PREVIEW });
+        } catch {
+            // Der ursprüngliche Import-/Recoveryfehler muss sichtbar bleiben.
+        }
+    }
+
     return {
         handleExport() {
+            UIRenderer.clearActionError('balance-export');
             try {
                 const dataToExport = createBalanceExportDocument(StorageManager.loadState());
                 const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' });
@@ -1375,20 +1388,21 @@ export function createImportExportHandlers({ dom, debouncedUpdate, update }) {
                 const warning = dataToExport.validationWarnings?.[0];
                 UIRenderer.toast(warning
                     ? `Export erstellt mit Validierungshinweis [${warning.code}]: ${warning.message}`
-                    : 'Export erstellt.');
+                    : 'Export erstellt.', warning ? 'info' : true);
             } catch (error) {
                 const code = error?.code || 'export_failed';
                 const message = error?.message || 'Der Balance-Zustand kann nicht als JSON exportiert werden.';
-                UIRenderer.handleError(new AppError(
+                UIRenderer.handleActionError(new AppError(
                     `Export nicht möglich [${code}]: ${message}`,
                     { originalError: error, code }
-                ));
+                ), 'balance-export');
             }
         },
 
         async handleImport(e) {
             const file = e.target.files?.[0];
             if (!file) return;
+            UIRenderer.clearActionError('balance-import');
             const uiSnapshot = captureInputUiState(dom.inputs);
             let replaceReceipt = null;
             let rollbackSucceeded = false;
@@ -1428,11 +1442,12 @@ export function createImportExportHandlers({ dom, debouncedUpdate, update }) {
                     }
                 }
                 restoreInputUiState(dom.inputs, uiSnapshot);
-                UIRenderer.handleError(asSafeImportError(err, {
+                await previewRestoredInputs();
+                UIRenderer.handleActionError(asSafeImportError(err, {
                     replaceReceipt,
                     rollbackSucceeded,
                     rollbackFailed
-                }));
+                }), 'balance-import');
             } finally {
                 e.target.value = '';
             }
@@ -1441,6 +1456,7 @@ export function createImportExportHandlers({ dom, debouncedUpdate, update }) {
         async handleCsvImport(e) {
             const file = e.target.files?.[0];
             if (!file) return;
+            UIRenderer.clearActionError('market-csv-import');
             const uiSnapshot = captureInputUiState(dom.inputs);
             let previousState = null;
             let replaceReceipt = null;
@@ -1522,16 +1538,17 @@ export function createImportExportHandlers({ dom, debouncedUpdate, update }) {
                 UIReader.renderMarketDataProvenance(
                     previousState?.[ANNUAL_MARKET_DATA_META_KEY] || null
                 );
+                await previewRestoredInputs();
                 const safeError = asSafeMarketCsvImportError(err, {
                     replaceReceipt,
                     rollbackSucceeded,
                     rollbackFailed
                 });
-                UIRenderer.handleError(new AppError(`CSV-Import fehlgeschlagen: ${safeError.message}`, {
+                UIRenderer.handleActionError(new AppError(`CSV-Import fehlgeschlagen: ${safeError.message}`, {
                     originalError: safeError,
                     code: safeError.code || null,
                     details: safeError.details || null
-                }));
+                }), 'market-csv-import');
             } finally {
                 e.target.value = '';
             }

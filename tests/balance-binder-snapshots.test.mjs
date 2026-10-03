@@ -44,11 +44,11 @@ try {
 
     let errorHandled = false;
     const prevToast = UIRenderer.toast;
-    const prevHandleError = UIRenderer.handleError;
+    const prevHandleError = UIRenderer.handleActionError;
     const prevRenderSnapshots = StorageManager.renderSnapshots;
 
     UIRenderer.toast = () => {};
-    UIRenderer.handleError = () => { errorHandled = true; };
+    UIRenderer.handleActionError = () => { errorHandled = true; };
     StorageManager.renderSnapshots = async () => {};
 
     const handlers = createSnapshotHandlers({
@@ -186,7 +186,7 @@ try {
         const restoreBtn = { dataset: { key: 'broken' } };
         const event = { target: { closest: (sel) => (sel === '.restore-snapshot' ? restoreBtn : null) } };
         await handlers.handleSnapshotActions(event);
-        assert(errorHandled, 'Errors should be handled via UIRenderer.handleError');
+        assert(errorHandled, 'Errors should be handled via UIRenderer.handleActionError');
         StorageManager.restoreSnapshot = prevRestore;
     }
 
@@ -244,7 +244,7 @@ try {
     }
 
     UIRenderer.toast = prevToast;
-    UIRenderer.handleError = prevHandleError;
+    UIRenderer.handleActionError = prevHandleError;
     StorageManager.renderSnapshots = prevRenderSnapshots;
 
     console.log('✅ Balance binder snapshots tests passed');

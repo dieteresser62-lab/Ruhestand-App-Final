@@ -23,7 +23,13 @@ export function createAnnualOrchestrator({
     showUpdateResultModal,
     setLastUpdateResults
 }) {
-    const handleJahresUpdate = async ({ failOnStepError = false } = {}) => {
+    // Interne Absicherung direkter Orchestratoraufrufe, kein zusätzlicher UI-Vertrag.
+    // Beide Jahresknöpfe behalten die annualCloseInFlight-Sperre im Snapshot-Handler.
+    let inFlight = false;
+    const handleJahresUpdate = async ({ failOnStepError = false, nested = false } = {}) => {
+        if (inFlight) return { ok: false, status: 'in_flight' };
+        inFlight = true;
+        if (!nested) UIRenderer.clearActionError('annual');
         const btn = dom.controls.btnJahresUpdate;
         const originalText = btn.innerHTML;
         const startTime = Date.now();
@@ -42,7 +48,7 @@ export function createAnnualOrchestrator({
             btn.disabled = true;
             btn.innerHTML = '⏳ Lädt...';
 
-            UIRenderer.toast('Starte Jahres-Update...');
+            UIRenderer.toast('Starte Jahres-Update...', 'info');
 
             // Schritt 1: Alter um 1 Jahr erhoehen (ein Jahr ist vergangen)
             const currentAge = parseInt(dom.inputs.aktuellesAlter.value) || 0;
@@ -59,7 +65,7 @@ export function createAnnualOrchestrator({
             // Schritt 2: Inflation abrufen
             btn.innerHTML = '⏳ Inflation...';
             try {
-                results.inflation = await handleFetchInflation();
+                results.inflation = await handleFetchInflation({ nested: true });
             } catch (err) {
                 results.errors.push({ step: 'Inflation', error: err.message || 'Unbekannter Fehler' });
             }
@@ -70,7 +76,7 @@ export function createAnnualOrchestrator({
             // Schritt 3: Marktdaten via ETF abrufen und nachruecken
             btn.innerHTML = '⏳ ETF...';
             try {
-                results.etf = await handleNachrueckenMitETF();
+                results.etf = await handleNachrueckenMitETF({ nested: true });
             } catch (err) {
                 results.errors.push({ step: 'ETF & Nachrücken', error: err.message || 'Unbekannter Fehler' });
             }
@@ -78,7 +84,7 @@ export function createAnnualOrchestrator({
             // Schritt 4: CAPE automatisch aktualisieren (non-blocking)
             btn.innerHTML = '⏳ CAPE...';
             try {
-                results.cape = await handleFetchCapeAuto();
+                results.cape = await handleFetchCapeAuto({ nested: true });
                 if (results.cape?.capeFetchStatus === 'error_no_source_no_stored') {
                     const details = Array.isArray(results.cape?.errors) && results.cape.errors.length > 0
                         ? ` Details: ${results.cape.errors.join(' | ')}`
@@ -120,7 +126,7 @@ export function createAnnualOrchestrator({
                     const asOf = results.cape?.capeAsOf
                         ? new Date(results.cape.capeAsOf).toLocaleDateString('de-DE')
                         : 'unbekannt';
-                    UIRenderer.toast(`⚠️ ETF aktualisiert, CAPE aus lokalem Stand (${asOf}).`);
+                    UIRenderer.toast(`⚠️ ETF aktualisiert, CAPE aus lokalem Stand (${asOf}).`, 'info');
                 } else {
                     UIRenderer.toast('✅ Jahres-Update erfolgreich abgeschlossen.');
                 }
@@ -130,9 +136,10 @@ export function createAnnualOrchestrator({
 
         } catch (err) {
             console.error('Jahres-Update fehlgeschlagen:', err);
-            UIRenderer.handleError(new AppError('Jahres-Update fehlgeschlagen.', { originalError: err }));
+            UIRenderer.handleActionError(new AppError('Jahres-Update fehlgeschlagen.', { originalError: err }), 'annual');
             return { ok: false, error: err, results };
         } finally {
+            inFlight = false;
             btn.disabled = false;
             btn.innerHTML = originalText;
         }

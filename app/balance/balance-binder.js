@@ -145,9 +145,9 @@ export const UIBinder = {
         dom.controls.btnCsvImport.addEventListener('click', () => dom.controls.csvFileInput.click());
         dom.controls.csvFileInput.addEventListener('change', this.handleCsvImport.bind(this));
         dom.controls.jahresabschlussBtn.addEventListener('click', this.handleJahresabschluss.bind(this));
-        dom.controls.connectFolderBtn.addEventListener('click', () => {
-            try { StorageManager.connectFolder(); }
-            catch (error) { UIRenderer.handleError(error); }
+        dom.controls.connectFolderBtn.addEventListener('click', async () => {
+            try { await StorageManager.connectFolder(); }
+            catch (error) { UIRenderer.handleActionError(error, 'snapshots'); }
         });
 
         dom.outputs.snapshotList.addEventListener('click', this.handleSnapshotActions.bind(this));
@@ -197,6 +197,7 @@ export const UIBinder = {
     },
 
     handleFormInput(e) {
+        if (e?.target?.type === 'file') return;
         const targetId = e.target.id;
         if (targetId && (targetId.startsWith('depotwert') || targetId === 'goldWert')) {
             appState.pendingInputMetadata = {

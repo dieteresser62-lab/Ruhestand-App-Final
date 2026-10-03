@@ -113,6 +113,7 @@ function renderProfileRecoveryBlocker(error) {
 
 async function exportCorruptExpensesRecovery() {
     if (!state.corruption || typeof state.corruption.raw !== 'string') return;
+    UIRenderer.clearActionError('expenses-recovery');
     try {
         const recoveryDocument = createExpensesCorruptionRecoveryDocument(state.corruption, {
             backend: getBackendLabel(),
@@ -125,9 +126,9 @@ async function exportCorruptExpensesRecovery() {
         renderCorruptExpensesState();
         UIRenderer.toast('Recovery-Export der korrupten Ausgabendaten erstellt.');
     } catch {
-        UIRenderer.handleError(new Error(
+        UIRenderer.handleActionError(new Error(
             'Der Recovery-Export konnte nicht erstellt werden. Die korrupten Ausgabendaten bleiben unveraendert.'
-        ));
+        ), 'expenses-recovery');
     }
 }
 
@@ -139,6 +140,7 @@ async function resetCorruptExpensesAfterConfirmation() {
         + 'Der korrupte Rohinhalt wurde als Recovery-Datei exportiert. Erst nach dieser Bestaetigung wird der Ausgabenbereich durch einen leeren Store ersetzt.'
     );
     if (!confirmed) return;
+    UIRenderer.clearActionError('expenses-recovery');
 
     const corruption = state.corruption;
     let resetApplied = false;
@@ -168,9 +170,9 @@ async function resetCorruptExpensesAfterConfirmation() {
         }
         readExpensesStoreForUi();
         renderCorruptExpensesState();
-        UIRenderer.handleError(new Error(
+        UIRenderer.handleActionError(new Error(
             'Der Ausgaben-Check wurde nicht zurueckgesetzt. Die gespeicherten Daten muessen neu geladen und erneut exportiert werden.'
-        ));
+        ), 'expenses-recovery');
     }
 }
 
@@ -372,6 +374,7 @@ async function handleCsvImport(file, month, profileId) {
         renderCorruptExpensesState();
         return;
     }
+    UIRenderer.clearActionError('expenses-import');
     const text = await file.text();
     const categories = parseCategoryCsv(text);
 
@@ -448,7 +451,7 @@ function handleFileChange(e) {
     pendingImport = null;
 
     handleCsvImport(file, month, profileId).catch(err => {
-        UIRenderer.handleError(err);
+        UIRenderer.handleActionError(err, 'expenses-import');
     }).finally(() => {
         e.target.value = '';
     });

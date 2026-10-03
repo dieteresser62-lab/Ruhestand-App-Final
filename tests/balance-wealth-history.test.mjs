@@ -233,7 +233,7 @@ async function setup() {
 
 const previous = {
     confirm: global.confirm, location: global.location, window: global.window,
-    toast: UIRenderer.toast, error: UIRenderer.handleError, document: global.document,
+    toast: UIRenderer.toast, error: UIRenderer.handleActionError, document: global.document,
     render: StorageManager.renderSnapshots, snapshot: StorageManager.createSnapshot,
     applyInputs: UIReader.applyStoredInputs
 };
@@ -257,7 +257,7 @@ try {
     global.confirm = () => true;
     global.location = { reload() {} };
     UIRenderer.toast = recordToast;
-    UIRenderer.handleError = () => {};
+    UIRenderer.handleActionError = () => {};
     StorageManager.renderSnapshots = async () => {};
 
     function manualController(env, overrides = {}) {
@@ -489,7 +489,7 @@ try {
         refreshBalanceWealthHistory(view);
         const previousChart = view.chart.innerHTML;
         const errors = [];
-        UIRenderer.handleError = error => { errors.push(error); };
+        UIRenderer.handleActionError = error => { errors.push(error); };
         UIReader.applyStoredInputs = () => {};
         initUIBinder(env.dom, {}, request => {
             assertEqual(view.panel.classList.contains('active'), active, 'Importupdate erhält Tabaktivität');
@@ -530,7 +530,7 @@ try {
         refreshBalanceWealthHistory(view);
         if (kind === 'rollback' || kind === 'reject') assert(view.table.innerHTML.includes('01.06.2026'), 'Spätere Aktivierung zeigt Rollbackdaten');
     }
-    UIRenderer.handleError = () => {};
+    UIRenderer.handleActionError = () => {};
     UIReader.applyStoredInputs = previous.applyInputs;
 
     console.log('Reale Verbund-/Tranchenaggregation liefert die Quelle trotz abweichender Felder und Simulation');
@@ -865,7 +865,7 @@ try {
     StorageManager.createSnapshot = previous.snapshot;
     StorageManager.renderSnapshots = previous.render;
     UIRenderer.toast = previous.toast;
-    UIRenderer.handleError = previous.error;
+    UIRenderer.handleActionError = previous.error;
     UIReader.applyStoredInputs = previous.applyInputs;
     if (previous.confirm === undefined) delete global.confirm; else global.confirm = previous.confirm;
     if (previous.location === undefined) delete global.location; else global.location = previous.location;

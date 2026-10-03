@@ -148,14 +148,18 @@ function readNeeds(dom) {
 const previous = {
     localStorage: global.localStorage,
     toast: UIRenderer.toast,
-    handleError: UIRenderer.handleError,
+    clearActionError: UIRenderer.clearActionError,
+    handleError: UIRenderer.handleActionError,
     consoleError: console.error
 };
 
+const actionResets = [];
 try {
+    UIRenderer.clearActionError = scope => { actionResets.push(scope); };
     global.localStorage = createLocalStorageMock();
-    UIRenderer.toast = () => {};
-    UIRenderer.handleError = () => {};
+    const toasts = [];
+    UIRenderer.toast = (text, type = true) => { toasts.push({ text, type }); };
+    UIRenderer.handleActionError = () => {};
     console.error = () => {};
 
     console.log('Test 1: positive inflation compounds over ten annual applications');
@@ -254,7 +258,8 @@ try {
             clearTimeoutImpl: id => { cleared.push(id); }
         });
 
-        const result = await handlers.handleFetchInflation();
+        const result = await handlers.handleFetchInflation({ nested: true });
+        assertEqual(actionResets.length, 0, 'Verschachtelter Jahresschritt löscht keine Annualfehler');
         assertEqual(result.year, TARGET_YEAR, 'Inflation result should expose the exact target year');
         assertEqual(result.metric, INFLATION_RESULT_METRIC, 'Inflation result should expose the shared metric');
         assertEqual(result.fetchStatus, 'ok_primary_ecb', 'Inflation result should expose the primary fetch status');
@@ -279,7 +284,9 @@ try {
             }
         });
 
+        actionResets.length = 0;
         const result = await handlers.handleFetchInflation();
+        assertEqual(actionResets.join(','), 'annual', 'Direkter Jahresschritt bereinigt genau seinen Annualbereich');
         assertEqual(calls.length, 2, 'Wrong-year ECB data should trigger exactly one fallback');
         assertEqual(result.source, 'World Bank (CPI)', 'World Bank should resolve the rejected ECB response');
         assertEqual(result.fetchStatus, 'ok_fallback_world_bank', 'Fallback path should be explicit');
@@ -395,10 +402,39 @@ try {
             'Need mutation never relies on the update default');
     }
 
+    console.log('Interner Handlervertrag: Abrufstart und bereits angewendete Inflation sind Hinweise');
+    {
+        localStorage.clear();
+        const dom = createDom();
+        dom.controls.btnFetchInflation = { innerHTML: 'Inflation', disabled: false };
+        const handlers = createHandlers(dom, { fetchImpl: async () => createResponse(createEcbPayload()) });
+        toasts.length = 0;
+        const result = await handlers.handleFetchInflation();
+        assertEqual(toasts[0].text, 'Versuche Inflationsdaten fuer 2025 abzurufen...', 'Abrufstart bleibt wortgleich');
+        assertEqual(toasts[0].type, 'info', 'Interner Abrufstart ist Hinweis');
+        assertEqual(toasts[1].type, true, 'Bestätigter Abruf bleibt Erfolg');
+        assert(toasts[1].text.startsWith('✅ Inflation 2025:'), 'Erfolg behält sein Originalsymbol');
+        assertEqual(result.year, 2025, 'Hinweistyp ändert nicht das Ergebnis');
+
+        localStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify({
+            lastState: { cumulativeInflationFactor: 1, lastInflationAppliedAtAge: 60 }
+        }));
+        const before = localStorage.getItem(CONFIG.STORAGE.LS_KEY);
+        toasts.length = 0;
+        handlers.applyAnnualInflation();
+        assertEqual(toasts[0].text, 'Inflation fuer Alter 60 wurde bereits angewendet.', 'No-op bleibt wortgleich');
+        assertEqual(toasts[0].type, 'info', 'Bereits angewendete Inflation ist Hinweis');
+        assertEqual(localStorage.getItem(CONFIG.STORAGE.LS_KEY), before, 'No-op schreibt weiterhin keinen State');
+        dom.inputs.aktuellesAlter.value = '61';
+        handlers.applyAnnualInflation();
+        assertEqual(toasts[1].type, true, 'Bestätigte Inflationsfortschreibung bleibt Erfolg');
+    }
+
     console.log('Balance annual inflation tests passed');
 } finally {
     console.error = previous.consoleError;
-    UIRenderer.handleError = previous.handleError;
+    UIRenderer.handleActionError = previous.handleError;
+    UIRenderer.clearActionError = previous.clearActionError;
     UIRenderer.toast = previous.toast;
     if (previous.localStorage === undefined) delete global.localStorage;
     else global.localStorage = previous.localStorage;

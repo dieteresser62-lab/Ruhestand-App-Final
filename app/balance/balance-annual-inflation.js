@@ -408,11 +408,25 @@ export function createInflationHandlers({
             StorageManager.saveState(state);
             UIRenderer.toast(`Kumulierte Inflation fuer Alter ${currentAge} fortgeschrieben.`);
         } else {
-            UIRenderer.toast(`Inflation fuer Alter ${currentAge} wurde bereits angewendet.`, false);
+            UIRenderer.toast(`Inflation fuer Alter ${currentAge} wurde bereits angewendet.`, 'info');
         }
     };
 
-    const handleFetchInflation = async () => {
+    // Interne Absicherung direkter Handleraufrufe, kein zusätzlicher Balance-Nutzerpfad.
+    // Der nested-Fehler bleibt an der bestehenden Grenze des Jahresschritts.
+    let fetchInFlight = false;
+    const handleFetchInflation = async ({ nested = false } = {}) => {
+        if (fetchInFlight) {
+            if (nested) {
+                throw new AppError(
+                    'Der Inflationsdaten-Abruf läuft bereits. Der Jahresschritt kann nicht parallel ausgeführt werden.',
+                    { code: 'inflation_fetch_in_flight' }
+                );
+            }
+            return;
+        }
+        fetchInFlight = true;
+        if (!nested) UIRenderer.clearActionError('annual');
         const btn = dom.controls.btnFetchInflation;
         const originalText = btn?.innerHTML;
 
@@ -426,7 +440,7 @@ export function createInflationHandlers({
             if (!Number.isInteger(targetYear)) {
                 throw new AppError('Das Zieljahr fuer die Inflation konnte nicht bestimmt werden.');
             }
-            if (btn) UIRenderer.toast(`Versuche Inflationsdaten fuer ${targetYear} abzurufen...`);
+            if (btn) UIRenderer.toast(`Versuche Inflationsdaten fuer ${targetYear} abzurufen...`, 'info');
 
             const attempts = [];
             let validatedResult = null;
@@ -469,9 +483,10 @@ export function createInflationHandlers({
             return validatedResult;
         } catch (err) {
             console.error('Inflation API Fehler:', err);
-            UIRenderer.handleError(new AppError('Inflationsdaten-Abruf fehlgeschlagen.', { originalError: err }));
+            UIRenderer.handleActionError(new AppError('Inflationsdaten-Abruf fehlgeschlagen.', { originalError: err }), 'annual');
             throw err;
         } finally {
+            fetchInFlight = false;
             if (btn) {
                 btn.disabled = false;
                 btn.innerHTML = originalText;

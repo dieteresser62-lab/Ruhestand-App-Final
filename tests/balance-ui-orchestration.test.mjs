@@ -13,10 +13,10 @@ import {
     normalizeBalanceImportDocument
 } from '../app/balance/balance-binder-imports.js';
 import { createProfilverbundHandlers } from '../app/balance/balance-main-profilverbund.js';
-import { CONFIG, ValidationError } from '../app/balance/balance-config.js';
+import { CONFIG, ValidationError, StorageError } from '../app/balance/balance-config.js';
 import { UIReader, initUIReader } from '../app/balance/balance-reader.js';
 import { UIRenderer } from '../app/balance/balance-renderer.js';
-import { StorageManager } from '../app/balance/balance-storage.js';
+import { initStorageManager, StorageManager } from '../app/balance/balance-storage.js';
 import {
     BALANCE_UPDATE_MODE,
     BALANCE_UPDATE_STATUS,
@@ -341,7 +341,7 @@ const prevHTMLInputElement = global.HTMLInputElement;
 const prevURL = global.URL;
 const prevBlob = global.Blob;
 const prevToast = UIRenderer.toast;
-const prevHandleError = UIRenderer.handleError;
+const prevHandleError = UIRenderer.handleActionError;
 const prevLoadState = StorageManager.loadState;
 const prevSaveState = StorageManager.saveState;
 const prevResetState = StorageManager.resetState;
@@ -391,9 +391,20 @@ async function runBalanceUiOrchestrationTests() {
             'Depot-Zeitstempel wird bis zum expliziten persist_inputs-Lauf vorgemerkt');
 
         const debounceCallsBeforeFileChange = debouncedCalls;
-        dom.containers.form.listeners.change[0]({ target: { id: 'importFile', type: 'file' } });
-        assertEqual(debouncedCalls, debounceCallsBeforeFileChange,
-            'Dateiauswahl wird nur vom Import-Handler verarbeitet und plant keinen parallelen Persistenzlauf');
+        const metadataBefore = JSON.stringify(binderState.pendingInputMetadata);
+        for (const id of ['importFile', 'csvFileInput', 'expensesCsvInput', 'depotwertDatei']) {
+            for (const type of ['input', 'change']) {
+                dom.containers.form.listeners[type][0]({ target: { id, type: 'file' } });
+            }
+        }
+        assertEqual(debouncedCalls, debounceCallsBeforeFileChange, 'Alle Dateievents planen null Updates');
+        assertEqual(updateCalls, 0, 'Alle Dateievents lösen null direkte Updates aus');
+        assertEqual(JSON.stringify(binderState.pendingInputMetadata), metadataBefore,
+            'Dateievents verändern keine vorgemerkten Metadaten, auch bei Depot-ID');
+        dom.containers.form.listeners.input[0]({ target: { id: 'goldWert' } });
+        assert(Number.isFinite(binderState.pendingInputMetadata.depotLastUpdate), 'Gold behält seinen Zeitstempel');
+        assertEqual(debouncedCalls, debounceCallsBeforeFileChange + 1, 'Gold plant weiterhin sein Update');
+
     }
 
     console.log('Test 2: Profilverbund init preserves membership and excludes opted-out profiles');
@@ -1062,8 +1073,9 @@ async function runBalanceUiOrchestrationTests() {
         PersistenceFacade.resetPersistenceForTests();
 
         const errors = [];
+        const errorScopes = [];
         const toasts = [];
-        UIRenderer.handleError = error => { errors.push(error); };
+        UIRenderer.handleActionError = (error, scope) => { errors.push(error); errorScopes.push(scope); };
         UIRenderer.toast = message => { toasts.push(message); };
         StorageManager.saveState = () => {};
         StorageManager.loadState = () => ({ inputs: {} });
@@ -1096,11 +1108,13 @@ async function runBalanceUiOrchestrationTests() {
 
         StorageManager.loadState = () => ({});
         handlers.handleExport();
+        assertEqual(errorScopes[0], 'balance-export', 'Exportfehler gehört zum Exportbereich');
         assert(errors[0].message.includes('[invalid_inputs]'),
             'Ein strukturell unmöglicher Export reicht den maschinenlesbaren Fehlercode durch');
         assert(errors[0].message.includes('inputs'),
             'Ein strukturell unmöglicher Export nennt den konkreten fehlenden Bereich');
         errors.length = 0;
+        errorScopes.length = 0;
         StorageManager.loadState = () => ({ inputs: {} });
 
         let badJsonFileValue = 'C:\\fakepath\\invalid.json';
@@ -1126,13 +1140,14 @@ async function runBalanceUiOrchestrationTests() {
         };
         await handlers.handleCsvImport({ target: badCsvTarget });
 
-        assertEqual(errors.length, 2, 'Import- und CSV-Fehler werden ueber handleError gemeldet');
+        assertEqual(errors.length, 2, 'Import- und CSV-Fehler werden ueber handleActionError gemeldet');
+        assertEqual(errorScopes.join(','), 'balance-import,market-csv-import', 'Importfehler besitzen ihre jeweiligen Bereiche');
         assert(errors[0].message.includes('kein gültiges JSON'), 'JSON-Import nennt sichere Ursache und Handlungsoption');
         assert(errors[1].message.includes('CSV-Import fehlgeschlagen'), 'CSV-Import meldet nutzerfaehigen Fehlertext');
         assertEqual(badJsonTarget.value, '', 'JSON-Dateiauswahl wird nach Fehler zurueckgesetzt');
         assertEqual(badCsvTarget.value, '', 'CSV-Dateiauswahl wird nach Fehler zurueckgesetzt');
         assertEqual(replaceCalls, 0, 'Syntaxfehler veraendern keine Live-Daten');
-        assertEqual(updateCalls, 0, 'Syntaxfehler erreichen weder Dry-Run noch persistentes Update');
+        assertEqual(updateCalls, 2, 'Syntaxfehler führen nur Wiederherstellungsvorschauen aus');
 
         errors.length = 0;
         const wrongAppTarget = {
@@ -1141,7 +1156,7 @@ async function runBalanceUiOrchestrationTests() {
         };
         await handlers.handleImport({ target: wrongAppTarget });
         assertEqual(replaceCalls, 0, 'Falsche App-ID erreicht den Replace-Pfad nicht');
-        assertEqual(updateCalls, 0, 'Falsche App-ID erreicht den Engine-Dry-Run nicht');
+        assertEqual(updateCalls, 3, 'Falsche App-ID führt nur eine weitere Wiederherstellungsvorschau aus');
         assertEqual(dom.inputs.aktuellesAlter.value, '66', 'Abgewiesener Import laesst die sichtbaren Eingaben unveraendert');
         assert(errors[0].message.includes('gehört nicht zur Balance-App'), 'App-ID-Fehler enthaelt Ursache ohne Payload-Leak');
 
@@ -1151,7 +1166,7 @@ async function runBalanceUiOrchestrationTests() {
             dom,
             update: options => {
                 dryRunOptions.push(options);
-                return { ok: false, status: 'engine_error' };
+                return { ok: dryRunOptions.length !== 1, status: 'engine_error' };
             },
             debouncedUpdate: () => {}
         });
@@ -1160,7 +1175,8 @@ async function runBalanceUiOrchestrationTests() {
             value: 'selected'
         };
         await dryRunFailHandlers.handleImport({ target: dryRunFailTarget });
-        assertEqual(dryRunOptions.length, 1, 'Fehlgeschlagener Dry-Run fuehrt keinen zweiten Update-Lauf aus');
+        assertEqual(dryRunOptions.length, 2, 'Fehlgeschlagener Dry-Run berechnet den wiederhergestellten Stand erneut');
+        assertEqual(dryRunOptions[1].mode, BALANCE_UPDATE_MODE.PREVIEW, 'Wiederherstellung bleibt ohne Persistenz');
         assertEqual(dryRunOptions[0].mode, BALANCE_UPDATE_MODE.PREVIEW,
             'Erste Engine-Pruefung ist explizit nicht persistent');
         assertEqual(replaceCalls, 0, 'Fehlgeschlagener Dry-Run schreibt keine Live-Daten');
@@ -1364,7 +1380,7 @@ async function runBalanceUiOrchestrationTests() {
             dom,
             update: () => {
                 finalUpdateCall += 1;
-                return finalUpdateCall === 1
+                return finalUpdateCall !== 2
                     ? { ok: true, status: 'success' }
                     : { ok: false, status: 'engine_error' };
             },
@@ -1379,6 +1395,119 @@ async function runBalanceUiOrchestrationTests() {
         assertEqual(rollbackCalls, 1, 'Spaeter Abschlussfehler rollt den Import automatisch zurueck');
         assertEqual(dom.inputs.aktuellesAlter.value, '66', 'Rollback stellt auch die sichtbaren Eingaben wieder her');
         assert(errors[0].message.includes('automatisch wiederhergestellt'), 'Rollback-Erfolg nennt Ursache und Wiederherstellung');
+        assertEqual(finalUpdateCall, 3, 'Nach Finalfehler folgt die Wiederherstellungsvorschau');
+
+        // Echte JSON-Handler: erfolgreiche Vorschau, danach gezielte
+        // Snapshot-/Storage-, Replace-, Final- und Rollbackfehler.
+        for (const failure of ['snapshot', 'replace', 'final', 'rollback', 'preview']) {
+            dom.inputs.aktuellesAlter.value = '66';
+            dom.inputs.tagesgeld.value = '777';
+            const baseline = { age: '66', cash: '777' };
+            let rendered;
+            const modes = [];
+            const sequence = [];
+            let replacements = 0;
+            let rollbacks = 0;
+            let writes = 0;
+            StorageManager.saveState = () => { writes++; };
+            StorageManager.replaceStateFromImport = async () => {
+                replacements++;
+                sequence.push('replace');
+                if (failure === 'snapshot' || failure === 'preview') throw new StorageError('Synthetischer Snapshotfehler');
+                if (failure === 'replace') throw new Error('Synthetischer Replacefehler');
+                return { recoverySnapshotId: 'matrix-recovery' };
+            };
+            StorageManager.rollbackImportReplace = async () => {
+                rollbacks++;
+                sequence.push('rollback');
+                if (failure === 'rollback') throw new Error('Synthetischer Rollbackfehler');
+            };
+            let reported;
+            UIRenderer.handleActionError = (error, scope) => {
+                reported = error;
+                assertEqual(scope, 'balance-import', `${failure}: JSON-Bereich bleibt erhalten`);
+                sequence.push('error');
+                if (failure !== 'preview') assertEqual(JSON.stringify(rendered), JSON.stringify(baseline), `${failure}: Ergebnis ist vor dem Aktionsfehler wiederhergestellt`);
+            };
+            const matrixHandlers = createImportExportHandlers({ dom, update: async options => {
+                modes.push(options.mode);
+                sequence.push(options.mode);
+                await Promise.resolve();
+                if (options.mode === BALANCE_UPDATE_MODE.PERSIST_INPUTS) return { ok: false };
+                if (modes.length > 1 && failure === 'preview') throw new Error('Synthetischer Vorschaufehler');
+                rendered = { age: dom.inputs.aktuellesAlter.value, cash: dom.inputs.tagesgeld.value };
+                if (modes.length === 1) assert(JSON.stringify(rendered) !== JSON.stringify(baseline), `${failure}: Dry-Run zeigt andere Importdaten`);
+                return { ok: true };
+            }, debouncedUpdate: () => {} });
+            const target = { value: 'selected', files: [{ text: async () => JSON.stringify(currentDocument) }] };
+            await matrixHandlers.handleImport({ target });
+            assertEqual(modes.join(','), (failure === 'final' || failure === 'rollback') ? 'preview,persist_inputs,preview' : 'preview,preview', `${failure}: exakte Update-Modi`);
+            assertEqual(sequence.slice(-2).join(','), 'preview,error', `${failure}: abgewartete Vorschau vor Aktionsfehler`);
+            assertEqual(replacements, 1, `${failure}: genau ein Replaceversuch`);
+            assertEqual(rollbacks, (failure === 'final' || failure === 'rollback') ? 1 : 0, `${failure}: Rollbackvertrag bleibt erhalten`);
+            assertEqual(writes, 0, `${failure}: keine zusätzlichen Speicherwrites`);
+            assertEqual(dom.inputs.aktuellesAlter.value, '66', `${failure}: ursprüngliches Alter`);
+            assertEqual(dom.inputs.tagesgeld.value, '777', `${failure}: ursprüngliches Tagesgeld`);
+            assertEqual(target.value, '', `${failure}: Dateifeld wird auch bei Vorschaufehler geleert`);
+            assertEqual(reported.code, failure === 'rollback' ? 'rollback_failed' : failure === 'final' ? 'post_replace_validation_failed' : failure === 'replace' ? 'unexpected_import_error' : 'storage_failed', `${failure}: ursprünglicher Fehlercode`);
+            if (failure === 'rollback') assert(reported.message.includes('Import-Recovery-Snapshot'), 'Rollbackfehler behält Recoveryhinweis');
+        }
+
+        // Echte CSV-Handler, Fehler erst NACH erfolgreichem Dry-Run.
+        const csvBaseline = JSON.parse(staleStateBeforeImport);
+        const rejectedCsv = csvRows.map(row => row.replace(/;1(\d\d)$/, ';2$1')).join('\n');
+        for (const failure of ['replace', 'validate-before', 'validate-after', 'final', 'provenance']) {
+            let state = structuredClone(csvBaseline);
+            const beforeFields = Object.fromEntries(Object.entries(dom.inputs).map(([key, el]) => [key, el.value]));
+            dom.inputs.marketCsvExpectedAsOf.value = csvExpectedAsOf;
+            UIReader.renderMarketDataProvenance(csvBaseline[ANNUAL_MARKET_DATA_META_KEY]);
+            const beforeProvenance = dom.outputs.marketDataProvenance.textContent;
+            let rendered;
+            let replacements = 0;
+            let rollbacks = 0;
+            let writes = 0;
+            const modes = [];
+            StorageManager.saveState = () => { writes++; };
+            StorageManager.loadState = () => structuredClone(state);
+            StorageManager.replaceStateFromImport = async payload => {
+                replacements++;
+                if (failure === 'replace') throw new StorageError('Synthetischer CSV-Snapshotfehler');
+                state = structuredClone(payload);
+                return { recoverySnapshotId: 'csv-matrix-recovery' };
+            };
+            StorageManager.rollbackImportReplace = async () => { rollbacks++; state = structuredClone(csvBaseline); };
+            let reported;
+            UIRenderer.handleActionError = (error, scope) => {
+                reported = error;
+                assertEqual(scope, 'market-csv-import', `${failure}: CSV-Bereich bleibt erhalten`);
+                assertEqual(rendered, beforeFields.endeVJ, `${failure}: Ergebnis vor Fehlerausgabe wiederhergestellt`);
+                assertEqual(dom.outputs.marketDataProvenance.textContent, beforeProvenance, `${failure}: Provenienzanzeige vor Fehlerausgabe wiederhergestellt`);
+            };
+            const matrixHandlers = createImportExportHandlers({ dom, update: async options => {
+                modes.push(options.mode);
+                await Promise.resolve();
+                rendered = dom.inputs.endeVJ.value;
+                if (modes.length === 1) assert(rendered !== beforeFields.endeVJ, `${failure}: CSV-Dry-Run zeigt abweichende Daten`);
+                if (options.mode === BALANCE_UPDATE_MODE.PERSIST_INPUTS) {
+                    if (failure === 'final') return { ok: false };
+                    if (failure === 'validate-after') state.inputs.floorBedarf = -1;
+                    if (failure === 'provenance') state[ANNUAL_MARKET_DATA_META_KEY].sourceFileName = 'andere-quelle.csv';
+                }
+                return { ok: true, inputData: failure === 'validate-before' && modes.length === 1 ? { floorBedarf: -1 } : {} };
+            }, debouncedUpdate: () => {} });
+            const target = { value: 'selected', files: [{ name: 'abgelehnter-markt.csv', text: async () => rejectedCsv }] };
+            await matrixHandlers.handleCsvImport({ target });
+            const afterReplace = ['validate-after', 'final', 'provenance'].includes(failure);
+            assertEqual(modes.join(','), afterReplace ? 'preview,persist_inputs,preview' : 'preview,preview', `${failure}: CSV-Modi`);
+            assertEqual(replacements, failure === 'validate-before' ? 0 : 1, `${failure}: CSV-Replaceversuche`);
+            assertEqual(rollbacks, afterReplace ? 1 : 0, `${failure}: CSV-Rollbackversuche`);
+            assertEqual(reported.context.code, afterReplace ? 'post_replace_validation_failed' : failure === 'replace' ? 'storage_failed' : 'invalid_input_bounds', `${failure}: sicherer CSV-Fehlercode`);
+            assert(reported.message.startsWith('CSV-Import fehlgeschlagen:'), `${failure}: CSV-Aktionsfehler bleibt sichtbar`);
+            assertEqual(JSON.stringify(state), JSON.stringify(csvBaseline), `${failure}: gespeicherter CSV-Ausgangsstand`);
+            for (const field of ['endeVJ', 'endeVJ_1', 'endeVJ_2', 'endeVJ_3', 'ath', 'jahreSeitAth']) assertEqual(dom.inputs[field].value, beforeFields[field], `${failure}: ${field} wiederhergestellt`);
+            assertEqual(writes, 0, `${failure}: CSV-Vorschau ohne Write`);
+            assertEqual(target.value, '', `${failure}: CSV-Dateifeld geleert`);
+        }
     }
 
     console.log('Test 4: Balance startup renders persistence migration warnings with backend and recovery guidance');
@@ -1719,6 +1848,119 @@ async function runBalanceUiOrchestrationTests() {
         assertEqual(successResult.ok, true, 'Success-Status bleibt mit bestehendem ok-Contract kompatibel');
     }
 
+    console.log('Ordnerknopf: echter Storage-Handler erhält Fehler bis zur bestätigten Verbindung');
+    {
+        const documentRef = new MockDocument();
+        installBrowserGlobals(documentRef, createLocalStorageMock());
+        const dom = createDomRefs(documentRef);
+        const state = { snapshotHandle: { name: 'bisheriger-ordner' } };
+        const savedClear = UIRenderer.clearActionError;
+        const savedToast = UIRenderer.toast;
+        const savedError = UIRenderer.handleActionError;
+        const savedSet = StorageManager._idbHelper.set;
+        const savedRender = StorageManager.renderSnapshots;
+        const savedConnect = StorageManager.connectFolder;
+        const deferred = () => {
+            let resolve, reject;
+            const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+            return { promise, resolve, reject };
+        };
+        try {
+            StorageManager.connectFolder = prevConnectFolder;
+            initStorageManager(dom, state, UIRenderer);
+            initUIBinder(dom, state, () => {}, () => {});
+            UIBinder.bindUI();
+            const click = dom.controls.connectFolderBtn.listeners.click[0];
+            for (const outcome of ['abort', 'denied', 'storage-error', 'success']) {
+                const oldHandle = state.snapshotHandle;
+                const oldError = { message: 'Bisheriger Snapshotfehler' };
+                const foreignError = { message: 'Fremder Importfehler' };
+                const errors = new Map([['snapshots', oldError], ['balance-import', foreignError]]);
+                const clears = [], toasts = [], writes = [], renders = [];
+                const picker = deferred(), permission = deferred(), storage = deferred();
+                const permissionStarted = deferred(), storageStarted = deferred();
+                const handle = { requestPermission: options => {
+                    assertEqual(options.mode, 'readwrite', `${outcome}: bestehender Berechtigungsmodus`);
+                    permissionStarted.resolve();
+                    return permission.promise;
+                } };
+                window.showDirectoryPicker = () => picker.promise;
+                UIRenderer.clearActionError = scope => { clears.push(scope); errors.delete(scope); };
+                UIRenderer.toast = message => { toasts.push(message); };
+                UIRenderer.handleActionError = (error, scope) => { errors.set(scope, error); };
+                StorageManager._idbHelper.set = (key, value) => {
+                    writes.push({ key, value });
+                    storageStarted.resolve();
+                    return storage.promise;
+                };
+                StorageManager.renderSnapshots = (...args) => { renders.push(args); };
+                const pending = click();
+                const assertPending = phase => {
+                    assertEqual(errors.get('snapshots'), oldError, `${outcome}/${phase}: Fehleridentität erhalten`);
+                    assertEqual(clears.length, 0, `${outcome}/${phase}: kein clearActionError`);
+                    assertEqual(toasts.length, 0, `${outcome}/${phase}: keine Erfolgsmeldung`);
+                    assertEqual(state.snapshotHandle, oldHandle, `${outcome}/${phase}: altes Handle erhalten`);
+                };
+                assertPending('Dialog offen');
+                if (outcome === 'abort') {
+                    picker.reject(Object.assign(new Error('Auswahl abgebrochen'), { name: 'AbortError' }));
+                } else {
+                    picker.resolve(handle);
+                    await permissionStarted.promise;
+                    assertPending('Berechtigung offen');
+                    permission.resolve(outcome === 'denied' ? 'denied' : 'granted');
+                    if (outcome !== 'denied') {
+                        await storageStarted.promise;
+                        assertPending('Speicherung offen');
+                        if (outcome === 'storage-error') storage.reject(new Error('Handle-Speicherfehler'));
+                        else storage.resolve();
+                    }
+                }
+                assertEqual(await pending, undefined, `${outcome}: Knopfbindung behält void-Rückgabe`);
+                assertEqual(errors.get('balance-import'), foreignError, `${outcome}: fremder Bereich bleibt erhalten`);
+                if (outcome === 'success') {
+                    assertEqual(errors.has('snapshots'), false, 'Bestätigte Verbindung entfernt Snapshotfehler');
+                    assertEqual(clears.join(','), 'snapshots', 'Erfolg bereinigt ausschließlich Snapshotbereich');
+                    assertEqual(toasts.join(','), 'Snapshot-Ordner erfolgreich verbunden.', 'Bestehender Erfolgstext erhalten');
+                    assertEqual(state.snapshotHandle, handle, 'Bestätigtes Handle im State');
+                    assertEqual(renders.length, 1, 'Erfolg rendert Snapshotliste einmal');
+                    assertEqual(renders[0][0], dom.outputs.snapshotList, 'Bestehendes Listenziel');
+                    assertEqual(renders[0][1], dom.controls.snapshotStatus, 'Bestehendes Statusziel');
+                    assertEqual(renders[0][2], handle, 'Liste erhält bestätigtes Handle');
+                } else {
+                    assertEqual(clears.length, 0, `${outcome}: kein vorzeitiges Bereinigen`);
+                    assertEqual(toasts.length, 0, `${outcome}: kein Erfolg`);
+                    assertEqual(renders.length, 0, `${outcome}: keine neue Snapshotliste`);
+                    assertEqual(state.snapshotHandle, oldHandle, `${outcome}: Handle unverändert`);
+                    if (outcome === 'abort') assertEqual(errors.get('snapshots'), oldError, 'AbortError erhält identischen Fehler');
+                    else {
+                        assert(errors.get('snapshots') instanceof StorageError, `${outcome}: bestehender StorageError-Vertrag`);
+                        assertEqual(errors.get('snapshots').message, 'Ordner konnte nicht verbunden werden.', `${outcome}: bestehender Fehlertext`);
+                        assertEqual(errors.get('snapshots').context.originalError.message,
+                            outcome === 'denied' ? 'Zugriff auf den Ordner wurde nicht gewährt.' : 'Handle-Speicherfehler',
+                            `${outcome}: ursprüngliche Ursache erhalten`);
+                    }
+                }
+                assertEqual(writes.length, ['success', 'storage-error'].includes(outcome) ? 1 : 0, `${outcome}: bestehender Speicherablauf`);
+                if (writes.length) {
+                    assertEqual(writes[0].key, 'snapshotDirHandle', `${outcome}: bestehender Persistenzschlüssel`);
+                    assertEqual(writes[0].value, handle, `${outcome}: unverändertes Handle gespeichert`);
+                }
+            }
+            assertEqual(await StorageManager.connectFolder(), undefined, 'Echtes connectFolder behält Promise<void> bei Erfolg');
+            window.showDirectoryPicker = async () => { throw Object.assign(new Error('Abbruch'), { name: 'AbortError' }); };
+            assertEqual(await StorageManager.connectFolder(), undefined, 'Echtes connectFolder behält Promise<void> bei Abbruch');
+        } finally {
+            UIRenderer.clearActionError = savedClear;
+            UIRenderer.toast = savedToast;
+            UIRenderer.handleActionError = savedError;
+            StorageManager._idbHelper.set = savedSet;
+            StorageManager.renderSnapshots = savedRender;
+            StorageManager.connectFolder = savedConnect;
+            initStorageManager(null, null, null);
+        }
+    }
+
     console.log('Balance UI orchestration tests passed');
     console.log('--- Balance UI Orchestration Tests Completed ---');
 }
@@ -1744,7 +1986,7 @@ if (runRequested) {
         if (prevRollbackImportReplace === undefined) delete StorageManager.rollbackImportReplace; else StorageManager.rollbackImportReplace = prevRollbackImportReplace;
         if (prevApplyStoredInputs === undefined) delete UIReader.applyStoredInputs; else UIReader.applyStoredInputs = prevApplyStoredInputs;
         UIRenderer.toast = prevToast;
-        UIRenderer.handleError = prevHandleError;
+        UIRenderer.handleActionError = prevHandleError;
         if (prevBlob === undefined) delete global.Blob; else global.Blob = prevBlob;
         if (prevURL === undefined) delete global.URL; else global.URL = prevURL;
         if (prevHTMLInputElement === undefined) delete global.HTMLInputElement; else global.HTMLInputElement = prevHTMLInputElement;

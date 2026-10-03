@@ -202,11 +202,29 @@ async function createPage(browser, label, options = {}) {
         window.prompt = () => 'offen';
         window.__browserSmokeMessages = [];
         addEventListener('DOMContentLoaded', () => {
-            const target = document.getElementById('error-container');
-            if (!target) return;
-            new MutationObserver(() => {
-                if (target.textContent) window.__browserSmokeMessages.push(target.textContent);
-            }).observe(target, { childList: true, subtree: true, characterData: true });
+            for (const id of ['error-container', 'toast-container', 'action-error-container']) {
+                const target = document.getElementById(id);
+                if (!target) continue;
+                let previousActions = new Map();
+                new MutationObserver(() => {
+                    if (id === 'action-error-container') {
+                        const current = new Map();
+                        for (const entry of target.querySelectorAll('.action-error-entry')) {
+                            const text = entry.querySelector('.action-error-text')?.textContent;
+                            const previous = previousActions.get(entry.dataset.scope);
+                            if (text && (previous?.entry !== entry || previous?.text !== text)) {
+                                window.__browserSmokeMessages.push(text);
+                            }
+                            current.set(entry.dataset.scope, { entry, text });
+                        }
+                        previousActions = current;
+                        return;
+                    }
+                    const text = id === 'toast-container'
+                        ? target.querySelector('.toast-text')?.textContent : target.textContent;
+                    if (text) window.__browserSmokeMessages.push(text);
+                }).observe(target, { childList: true, subtree: true, characterData: true });
+            }
         });
     }, options.storage || {});
     if (options.observeWealthUpdates) {
@@ -564,7 +582,7 @@ async function runBalanceAnnualPreflight(browser, baseUrl) {
     await age.waitFor({ state: 'attached' });
     const before = await age.inputValue();
     await smoke.page.locator('#jahresabschlussBtn').click();
-    await smoke.page.locator('#error-container').filter({ hasText: 'muss fuer den Abschluss auf 2025 stehen' }).waitFor();
+    await smoke.page.locator('#action-error-container .action-error-text').filter({ hasText: 'muss fuer den Abschluss auf 2025 stehen' }).waitFor();
     assert(await age.inputValue() === before, 'Fehlgeschlagener Preflight darf das Alter nicht mutieren');
     assert(await readIndexedDb(smoke.page, 'snapshots', null) === 0, 'Fehlgeschlagener Preflight darf keinen Snapshot anlegen');
     smoke.assertNoErrors();
@@ -884,7 +902,8 @@ async function activateWealthBrowserTab(page, expanded, key = null) {
                     value: function (...args) { count(this); return original.apply(this, args); } });
             };
             for (const [object, method, counter] of [[UIReader, 'readAllInputs', 'updates'],
-                [UIRenderer, 'clearError', 'clears'], [persistenceStorage, 'setItem', 'writes']]) {
+                [UIRenderer, 'clearError', 'clears'], [UIRenderer, 'clearActionError', 'clears'],
+                [persistenceStorage, 'setItem', 'writes']]) {
                 instrument(object, method, () => { calls[counter] += 1; });
             }
             // Storage-Instanzen haben benannte Eigenschaften: Methoden am Prototyp
@@ -1288,6 +1307,20 @@ async function runBalanceWealthHistory(browser, baseUrl) {
             await page.waitForFunction(({ messageIndex, message }) => document.getElementById('importFile').value === ''
                 && window.__browserSmokeMessages.slice(messageIndex).some(text => text.includes(message)), { messageIndex, message });
             await waitForWealthBrowserIdle(page);
+            if (message === 'kein gültiges JSON' || message === 'automatisch wiederhergestellt') {
+                const visibleError = page.locator('#action-error-container .action-error-text').filter({ hasText: message });
+                await visibleError.waitFor({ state: 'visible' });
+                const text = await visibleError.textContent();
+                await page.waitForTimeout(2000);
+                assert(await visibleError.isVisible() && await visibleError.textContent() === text,
+                    `${name}: Aktionsfehler bleibt bei ${active ? 'offenem' : 'geschlossenem'} Verlauf nach 2 s sichtbar`);
+                assert((await page.evaluate(index => window.__browserSmokeMessages.slice(index), messageIndex)).includes(text),
+                    `${name}: Das Protokoll enthält den unveränderten Text ohne Schließenbeschriftung`);
+                await activateWealthBrowserTab(page, !active);
+                assert(await visibleError.isVisible() && await visibleError.textContent() === text, `${name}: Tabwechsel erhält den Fehler`);
+                await activateWealthBrowserTab(page, active);
+                assert(await visibleError.isVisible() && await visibleError.textContent() === text, `${name}: Rückwechsel erhält den Fehler`);
+            }
         };
         await runImport('synthetischer-verlauf.json', JSON.stringify(valid), 'erfolgreich');
         await assertWealthBrowserVisibility(page, active, 1);
@@ -1343,6 +1376,51 @@ async function runBalanceWealthHistory(browser, baseUrl) {
 async function runBalanceAnnualCommit(browser, baseUrl) {
     // Zwei frisch initialisierte Profile: jeweils ein echter neuer Jahresabschluss.
     for (const open of [false, true]) await runBalanceAnnualCommitScenario(browser, baseUrl, open);
+    await runBalanceAnnualCommitBeforeWealthHistory(browser, baseUrl);
+}
+
+async function assertBalanceBrowserToast(page, expectedText, expectedType) {
+    const expected = {
+        info: { label: 'Hinweis: ', icon: 'i', className: 'toast-info' },
+        success: { label: 'Erfolg: ', icon: '✓', className: 'toast-success' }
+    }[expectedType];
+    await page.waitForFunction(text => document.querySelector('#toast-container .toast-text')?.textContent === text, expectedText);
+    const toast = page.locator('#toast-container');
+    const actual = await toast.evaluate(container => ({
+        text: container.querySelector('.toast-text')?.textContent,
+        label: container.querySelector('.toast-type')?.textContent,
+        icon: container.querySelector('.toast-icon')?.textContent,
+        className: container.className
+    }));
+    assert(await toast.isVisible() && actual.text === expectedText, 'Jahresprozess zeigt den bytegleichen Originaltext');
+    assert(actual.label === expected.label && actual.icon === expected.icon && actual.className === expected.className,
+        `Jahresprozess zeigt ${expectedType} mit eigenem Typ, Symbol und Formklasse`);
+}
+
+async function runBalanceAnnualCommitBeforeWealthHistory(browser, baseUrl) {
+    const smoke = await openSmokePage(browser, baseUrl, 'Balance.html', {
+        storage: createBalanceStorage(2025), annualFixtures: { targetYear: 2025 },
+        observeWealthUpdates: true, fixedTime: '2026-01-15T12:00:00+01:00'
+    });
+    await smoke.page.locator('#profilverbund-profile-list input').waitFor({ state: 'visible' });
+    await waitForWealthBrowserIdle(smoke.page);
+    const messageIndex = await smoke.page.evaluate(() => window.__browserSmokeMessages.length);
+    await smoke.page.locator('#jahresabschlussBtn').click({ force: true });
+    const expectedText = 'Ausgaben-Check auf 2026 umgestellt.';
+    await smoke.page.waitForFunction(({ index, text }) => window.__browserSmokeMessages.slice(index).includes(text),
+        { index: messageIndex, text: expectedText });
+    const toast = smoke.page.locator('#toast-container .toast-text');
+    assert(await toast.isVisible() && await toast.textContent() === expectedText,
+        'Jahresabschluss vor 2026 bleibt sichtbar ohne Vermögenszusatz');
+    const messages = await smoke.page.evaluate(index => window.__browserSmokeMessages.slice(index), messageIndex);
+    assert(!messages.some(message => message.includes('Vermögensstand gesichert.')),
+        'Jahre vor 2026 erhalten auch im neuen Kanal keinen Vermögenszusatz');
+    const state = await readBalanceBrowserState(smoke.page);
+    assert(state.annualPeriodMetadata.lastCommittedPeriod === 'calendar-year:2025',
+        'Der Fall vor 2026 erreicht einen echten bestätigten Jahresabschluss');
+    assert(!state.wealthHistory?.entries?.length, 'Jahresabschluss vor 2026 erzeugt keinen Vermögensstand');
+    smoke.assertNoErrors();
+    await smoke.close();
 }
 
 async function runBalanceAnnualCommitScenario(browser, baseUrl, open) {
@@ -1358,14 +1436,29 @@ async function runBalanceAnnualCommitScenario(browser, baseUrl, open) {
     await assertWealthBrowserVisibility(smoke.page, false, 0);
     if (open) await activateWealthBrowserTab(smoke.page, true);
     const closeButton = smoke.page.locator('#jahresabschlussBtn');
+    let releaseInflationFetch;
+    const inflationFetchGate = new Promise(resolve => { releaseInflationFetch = resolve; });
+    await smoke.page.route(url => url.hostname === 'data-api.ecb.europa.eu', async route => {
+        await inflationFetchGate;
+        await route.fallback();
+    });
     let releaseAnnualFetch;
+    let annualFetchStarted = false;
     const annualFetchGate = new Promise(resolve => { releaseAnnualFetch = resolve; });
     await smoke.page.route(url => url.hostname === '127.0.0.1' && url.port === '8787' && url.pathname === '/chart', async route => {
+        annualFetchStarted = true;
         await annualFetchGate;
         await route.fallback();
     });
     const commitMessageIndex = await smoke.page.evaluate(() => window.__browserSmokeMessages.length);
     await closeButton.click({ force: true });
+    try {
+        // Echter Jahresprozess; der kontrollierte Inflationsabruf hält den Fortschritt sichtbar.
+        await assertBalanceBrowserToast(smoke.page, 'Starte Jahres-Update...', 'info');
+    } finally {
+        releaseInflationFetch();
+    }
+    await waitForBrowserValue(async () => annualFetchStarted, started => started, 'Kontrollierter ETF-Abruf erreicht');
     await smoke.page.waitForFunction(() => document.getElementById('captureWealthBtn').disabled);
     assert(await closeButton.isDisabled() && await smoke.page.locator('#btnJahresUpdate').isDisabled(),
         'Der laufende Abschluss sperrt beide Jahresknöpfe und die manuelle Erfassung');
@@ -1380,6 +1473,7 @@ async function runBalanceAnnualCommitScenario(browser, baseUrl, open) {
             age: document.getElementById('aktuellesAlter')?.value,
             year: document.getElementById('expensesYearSelect')?.value,
             error: document.getElementById('error-container')?.textContent,
+            actionError: document.getElementById('action-error-container')?.textContent,
             messages: window.__browserSmokeMessages
         }));
         const stateRow = await readIndexedDb(smoke.page, 'kv', BALANCE_STATE_KEY);
@@ -1392,6 +1486,16 @@ async function runBalanceAnnualCommitScenario(browser, baseUrl, open) {
     const commitMessages = await smoke.page.evaluate(index => window.__browserSmokeMessages.slice(index), commitMessageIndex);
     assert(commitMessages.filter(message => message.includes('Vermögensstand gesichert.')).length === 1,
         `Verlauf ${open ? 'aktiv' : 'inaktiv'}: neuer Abschluss bestätigt genau einmal den gesicherten Vermögensstand`);
+    const commitToast = smoke.page.locator('#toast-container .toast-text');
+    const expectedCommitText = 'Ausgaben-Check auf 2027 umgestellt. Vermögensstand gesichert.';
+    await assertBalanceBrowserToast(smoke.page, expectedCommitText, 'success');
+    // Reguläre Timer bleiben aktiv; gemessen wird die aktuelle Oberfläche, nicht das Protokoll.
+    for (const [delay, elapsed] of [[1000, 1], [2000, 3]]) {
+        await smoke.page.waitForTimeout(delay);
+        assert(await commitToast.isVisible() && await commitToast.textContent() === expectedCommitText,
+            `Verlauf ${open ? 'aktiv' : 'inaktiv'}: Abschlussbestätigung nach ${elapsed} s sichtbar und wortgleich`);
+        await assertBalanceBrowserToast(smoke.page, expectedCommitText, 'success');
+    }
     const committedAge = await smoke.page.locator('#aktuellesAlter').inputValue();
     assert(committedAge === '68', `Erfolgreicher Commit muss das Alter genau einmal erhoehen (Ist: ${committedAge})`);
     const row = await readIndexedDb(smoke.page, 'kv', BALANCE_STATE_KEY);
@@ -1427,6 +1531,7 @@ async function runBalanceAnnualCommitScenario(browser, baseUrl, open) {
     await smoke.page.waitForFunction(index => window.__browserSmokeMessages.slice(index)
         .some(message => message.includes('Die Jahresperiode 2026 wurde bereits abgeschlossen.')), repeatMessageIndex);
     await smoke.page.waitForFunction(() => !document.getElementById('captureWealthBtn').disabled);
+    await assertBalanceBrowserToast(smoke.page, 'Die Jahresperiode 2026 wurde bereits abgeschlossen.', 'info');
     assert(await smoke.page.locator('#wealthHistoryStatus').textContent() === '', 'Wiederholungs-No-op ohne neue Erfassungsbestätigung');
     const repeatMessages = await smoke.page.evaluate(index => window.__browserSmokeMessages.slice(index), repeatMessageIndex);
     assert(repeatMessages.some(message => message.includes('Die Jahresperiode 2026 wurde bereits abgeschlossen.')),
@@ -1460,11 +1565,18 @@ async function runBalanceImportReject(browser, baseUrl) {
         input.files = transfer.files;
         input.dispatchEvent(new Event('change', { bubbles: true }));
     });
-    await smoke.page.waitForTimeout(1000);
+    await smoke.page.waitForFunction(() => document.getElementById('importFile').value === ''
+        && window.__browserSmokeMessages.some(text => text.includes('kein gültiges JSON')));
+    const visibleError = smoke.page.locator('#action-error-container .action-error-text').filter({ hasText: 'kein gültiges JSON' });
+    await visibleError.waitFor({ state: 'visible' });
+    const errorBeforeWait = await visibleError.textContent();
+    await smoke.page.waitForTimeout(2000);
+    assert(await visibleError.isVisible() && await visibleError.textContent() === errorBeforeWait,
+        'Import-Reject bleibt nach abgeschlossener Verarbeitung noch nach 2 s sichtbar');
     const messages = await smoke.page.evaluate(() => window.__browserSmokeMessages);
     const diagnostics = await smoke.page.evaluate(() => ({
         files: Array.from(document.getElementById('importFile')?.files || []).map(file => file.name),
-        error: document.getElementById('error-container')?.textContent
+        error: document.getElementById('action-error-container')?.textContent
     }));
     assert(
         messages.some(message => message.includes('kein gültiges JSON')),
@@ -1487,6 +1599,407 @@ async function runBalanceImportReject(browser, baseUrl) {
     assert(await readIndexedDb(smoke.page, 'snapshots', null) === 0, 'Abgelehnter Import darf keinen Recovery-Snapshot erzeugen');
     smoke.assertNoErrors();
     await smoke.close();
+}
+
+async function runBalanceMessagePresentation(browser, baseUrl) {
+    const smoke = await openSmokePage(browser, baseUrl, 'Balance.html', {
+        storage: createBalanceStorage(2025), observeWealthUpdates: true
+    });
+    const { page } = smoke;
+    const list = page.locator('#action-error-container');
+    const button = scope => list.locator(`[data-scope="${scope}"] button`);
+    const assertFocus = async locator => assert(await locator.evaluate(el => el === document.activeElement
+        && document.activeElement !== document.body), 'Fokus bleibt auf dem erwarteten sichtbaren Knopf');
+    const assertDescriptions = async () => {
+        const valid = await list.evaluate(container => [...container.children].every(entry => {
+            const text = entry.querySelector('.action-error-text');
+            const close = entry.querySelector('button');
+            return text.id && document.querySelectorAll(`[id="${text.id}"]`).length === 1
+                && close.getAttribute('aria-label') === 'Fehlermeldung schließen'
+                && document.getElementById(close.getAttribute('aria-describedby')) === text;
+        }));
+        assert(valid, 'Jeder Knopf hat den exakten Namen und eine eindeutige vorhandene Beschreibung');
+    };
+    const assertEmptyTabOrder = async () => {
+        assert(await list.evaluate(el => el.children.length === 0 && el.tabIndex === -1
+            && !el.hasAttribute('aria-label')), 'Leere Fehlerliste ist unbeschriftet und außerhalb der Tab-Reihenfolge');
+        await page.locator('#openDiagnosisBtn').focus();
+        await page.keyboard.press('Tab');
+        assert(await page.evaluate(() => document.activeElement !== document.getElementById('action-error-container')
+            && document.activeElement !== document.getElementById('openDiagnosisBtn')),
+        'Tab vom Diagnoseknopf vor der leeren Liste überspringt den Fehlercontainer');
+    };
+    try {
+        await page.locator('#profilverbund-profile-list input').waitFor({ state: 'visible' });
+        await waitForWealthBrowserIdle(page);
+        await assertEmptyTabOrder();
+        await page.evaluate(async () => {
+            const { UIRenderer } = await import('./app/balance/balance-renderer.js');
+            UIRenderer.handleError(new Error('Berechnungsrahmen unverändert'));
+            for (const scope of ['focus-a', 'focus-b', 'focus-c']) {
+                UIRenderer.handleActionError(new Error(`Synthetischer Fehler ${scope}`), scope);
+            }
+        });
+        await assertDescriptions();
+        await page.locator('#openDiagnosisBtn').focus();
+        await page.keyboard.press('Tab');
+        assert(await list.evaluate(el => el === document.activeElement && el.tabIndex === 0),
+            'Befüllte Fehlerliste ist vom vorherigen Diagnoseknopf per Tab erreichbar');
+        assert(await page.getByRole('button', { name: 'Fehlermeldung schließen', exact: true }).count() === 3,
+            'Alle drei Knöpfe besitzen denselben kurzen zugänglichen Namen');
+        const calculationFrame = await page.locator('#error-container').evaluate(el => {
+            const css = getComputedStyle(el);
+            return [css.borderTopWidth, css.borderTopStyle, css.borderTopColor];
+        });
+        assert(JSON.stringify(calculationFrame) === JSON.stringify(['1px', 'solid', 'rgb(254, 178, 178)']),
+            'Der Berechnungsfehler behält seinen bisherigen Rahmen');
+        assert(await list.evaluate(el => [...el.children].every(entry =>
+            getComputedStyle(entry).borderTopWidth === '2px'
+            && getComputedStyle(entry.querySelector('.action-error-text')).borderTopWidth === '0px')),
+        'Aktionsfehler haben jeweils nur einen sichtbaren Rahmen');
+
+        const oldId = await list.locator('[data-scope="focus-b"] .action-error-text').getAttribute('id');
+        await page.locator('#openDiagnosisBtn').focus();
+        await page.evaluate(async () => {
+            const { UIRenderer } = await import('./app/balance/balance-renderer.js');
+            window.__staleMessageClose = document.querySelector('[data-scope="focus-b"] button');
+            UIRenderer.handleActionError(new Error('Ersatzfehler'), 'focus-b');
+            window.__staleMessageClose.click();
+        });
+        await assertFocus(page.locator('#openDiagnosisBtn'));
+        assert(await page.locator(`[id="${oldId}"]`).count() === 0, 'Ersetzter Fehlertext bleibt nicht als verwaiste ID bestehen');
+        await assertDescriptions();
+        // Reihenfolge nach Ersatz: A, C, B. Mitte -> nächster, Ende -> Nachbar, letzter -> Diagnose.
+        await button('focus-c').focus();
+        await page.keyboard.press('Enter');
+        await assertFocus(button('focus-b'));
+        await page.keyboard.press('Space');
+        await assertFocus(button('focus-a'));
+        await page.keyboard.press('Enter');
+        await assertFocus(page.locator('#openDiagnosisBtn'));
+        assert(await list.locator('[aria-describedby]').count() === 0, 'Leere Liste hat keine verwaisten Beschreibungsbezüge');
+        await assertEmptyTabOrder();
+        await page.locator('#openDiagnosisBtn').focus();
+        await page.evaluate(async () => {
+            const { UIRenderer } = await import('./app/balance/balance-renderer.js');
+            UIRenderer.handleActionError(new Error('Automatisch bereinigt'), 'automatic');
+            UIRenderer.clearActionError('automatic');
+            window.__staleMessageClose.click();
+            delete window.__staleMessageClose;
+        });
+        await assertFocus(page.locator('#openDiagnosisBtn'));
+        await assertEmptyTabOrder();
+
+        for (const type of [true, 'info', false]) {
+            await page.evaluate(async type => {
+                const { UIRenderer } = await import('./app/balance/balance-renderer.js');
+                UIRenderer.toast('Synthetische Kontrastprüfung', type);
+            }, type);
+            const colors = await page.locator('#toast-container').evaluate(el => {
+                const foreground = getComputedStyle(el.querySelector('.toast-text')).color;
+                const background = getComputedStyle(el).backgroundColor;
+                const parse = color => color.match(/[\d.]+/g).map(Number);
+                const luminance = color => parse(color).slice(0, 3).map(value => {
+                    const srgb = value / 255;
+                    return srgb <= 0.04045 ? srgb / 12.92 : ((srgb + 0.055) / 1.055) ** 2.4;
+                }).reduce((sum, value, i) => sum + value * [0.2126, 0.7152, 0.0722][i], 0);
+                const fg = luminance(foreground), bg = luminance(background);
+                return { foreground, background, opaque: (parse(background)[3] ?? 1) === 1,
+                    contrast: (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05) };
+            });
+            assert(colors.opaque && colors.contrast >= 4.5,
+                `Toast ${type}: errechneter Textkontrast mindestens 4,5:1: ${JSON.stringify(colors)}`);
+        }
+
+        for (const viewport of [{ width: 1366, height: 900 }, { width: 375, height: 700 }]) {
+            await page.setViewportSize(viewport);
+            const expectedText = await page.evaluate(async () => {
+                const { UIRenderer } = await import('./app/balance/balance-renderer.js');
+                const message = `${'Langer synthetischer Fehlertext mit vollständigen Details. '.repeat(35)}${'X'.repeat(150)}`;
+                for (let i = 0; i < 4; i++) UIRenderer.handleActionError(new Error(message), `layout-${i}`);
+                UIRenderer.toast('X'.repeat(150), 'info');
+                return message;
+            });
+            await assertDescriptions();
+            const layout = await list.evaluate(el => ({
+                height: el.getBoundingClientRect().height,
+                limit: Math.min(16 * parseFloat(getComputedStyle(document.documentElement).fontSize), innerHeight * 0.3),
+                scrollHeight: el.scrollHeight, clientHeight: el.clientHeight,
+                scrollWidth: el.scrollWidth, clientWidth: el.clientWidth,
+                pageWidth: document.documentElement.scrollWidth, viewportWidth: innerWidth
+            }));
+            assert(layout.height <= layout.limit + 1 && layout.scrollHeight > layout.clientHeight,
+                `${viewport.width}px: lange Fehlerliste hält die maximale Höhe ein und scrollt: ${JSON.stringify(layout)}`);
+            assert(layout.scrollWidth <= layout.clientWidth + 1 && layout.pageWidth <= layout.viewportWidth + 1,
+                `${viewport.width}px: kein horizontaler Überlauf: ${JSON.stringify(layout)}`);
+            for (const text of await list.locator('.action-error-text').allTextContents()) {
+                assert(text.includes(expectedText), 'Lange Meldung wird vollständig ohne Kürzung gerendert');
+            }
+            await list.focus();
+            await page.keyboard.press('Home');
+            await page.waitForFunction(() => document.getElementById('action-error-container').scrollTop <= 1);
+            await page.keyboard.press('End');
+            await page.waitForFunction(() => {
+                const el = document.getElementById('action-error-container');
+                return el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+            });
+            assert(await list.evaluate(el => {
+                const bounds = el.getBoundingClientRect();
+                return el.lastElementChild.getBoundingClientRect().bottom <= bounds.bottom + 1;
+            }), 'Listenende mit vollständigem letztem Text ist per Tastatur erreichbar');
+            await list.focus();
+            for (let i = 0; i < 4; i++) {
+                await page.keyboard.press('Tab');
+                const reachable = await list.evaluate((el, i) => {
+                    const close = el.children[i].querySelector('button');
+                    const bounds = el.getBoundingClientRect(), rect = close.getBoundingClientRect();
+                    return document.activeElement === close && rect.top >= bounds.top - 1 && rect.bottom <= bounds.bottom + 1;
+                }, i);
+                assert(reachable, `Knopf ${i + 1} ist bei ${viewport.width}px durch Tab sichtbar erreichbar`);
+            }
+        }
+        await page.emulateMedia({ media: 'print' });
+        assert(await list.evaluate(el => getComputedStyle(el).display === 'none')
+            && await page.locator('#toast-container').evaluate(el => getComputedStyle(el).display === 'none'),
+        'Aktionsfehler und nichtleerer Toast bleiben im Druck ausgeblendet');
+        await page.emulateMedia({ media: 'screen' });
+        assert(JSON.stringify(await page.locator('#error-container').evaluate(el => {
+            const css = getComputedStyle(el);
+            return [css.borderTopWidth, css.borderTopStyle, css.borderTopColor];
+        })) === JSON.stringify(calculationFrame), 'Meldungsaktionen verändern den Berechnungsfehlerrahmen nicht');
+        smoke.assertNoErrors();
+    } finally { await smoke.close(); }
+}
+
+async function runBalanceFolderAbort(browser, baseUrl) {
+    const smoke = await openSmokePage(browser, baseUrl, 'Balance.html', {
+        storage: createBalanceStorage(2025), observeWealthUpdates: true
+    });
+    const { page } = smoke;
+    try {
+        await page.locator('#profilverbund-profile-list input').waitFor({ state: 'visible' });
+        await waitForWealthBrowserIdle(page);
+        await page.locator('.tab-btn[data-tab="settings"]').click();
+        await page.locator('#snapshot-management').evaluate(element => {
+            element.open = true;
+            element.querySelector('details').open = true;
+        });
+        await page.evaluate(async () => {
+            const { UIRenderer } = await import('./app/balance/balance-renderer.js');
+            const { StorageManager } = await import('./app/balance/balance-storage.js');
+            const picker = window.showDirectoryPicker;
+            const connect = StorageManager.connectFolder;
+            const clear = UIRenderer.clearActionError;
+            const toast = UIRenderer.toast;
+            UIRenderer.handleActionError(new Error('Snapshotfehler vor Ordnerwahl'), 'snapshots');
+            UIRenderer.handleActionError(new Error('Unabhängiger Importfehler'), 'balance-import');
+            const observer = window.__folderAbort = {
+                opened: false, settled: false, completed: false, clears: [], toasts: [],
+                entry: document.querySelector('#action-error-container [data-scope="snapshots"]'),
+                foreign: document.querySelector('#action-error-container [data-scope="balance-import"]')
+            };
+            observer.text = observer.entry.textContent;
+            observer.restore = () => {
+                if (picker === undefined) delete window.showDirectoryPicker;
+                else window.showDirectoryPicker = picker;
+                StorageManager.connectFolder = connect;
+                UIRenderer.clearActionError = clear;
+                UIRenderer.toast = toast;
+                delete window.__folderAbort;
+            };
+            // Nur den Betriebssystemdialog ersetzen; Knopf und Storage-Ablauf bleiben echt.
+            window.showDirectoryPicker = () => {
+                observer.opened = true;
+                return new Promise((_, reject) => {
+                    observer.abort = () => {
+                        observer.settled = true;
+                        reject(new DOMException('Ordnerwahl abgebrochen', 'AbortError'));
+                    };
+                });
+            };
+            StorageManager.connectFolder = async function (...args) {
+                try { return await connect.apply(this, args); }
+                finally { observer.completed = true; }
+            };
+            UIRenderer.clearActionError = function (scope) {
+                observer.clears.push(scope);
+                return clear.call(this, scope);
+            };
+            UIRenderer.toast = function (...args) {
+                observer.toasts.push(args);
+                return toast.apply(this, args);
+            };
+        });
+        await page.locator('#connectFolderBtn').click();
+        await page.waitForFunction(() => window.__folderAbort.opened);
+        const unchanged = () => {
+            const observer = window.__folderAbort;
+            return document.querySelector('#action-error-container [data-scope="snapshots"]') === observer.entry
+                && observer.entry.textContent === observer.text
+                && document.querySelector('#action-error-container [data-scope="balance-import"]') === observer.foreign
+                && observer.clears.length === 0 && observer.toasts.length === 0;
+        };
+        assert(await page.evaluate(unchanged), 'Offener Ordnerdialog erhält identische Meldungen ohne Bereinigung oder Erfolg');
+        const messageIndex = await page.evaluate(() => {
+            const index = window.__browserSmokeMessages.length;
+            window.__folderAbort.abort();
+            return index;
+        });
+        await page.waitForFunction(() => window.__folderAbort.settled && window.__folderAbort.completed);
+        await page.waitForFunction(unchanged);
+        await page.locator('#action-error-container [data-scope="snapshots"]').waitFor({ state: 'visible' });
+        assert(await page.evaluate(unchanged), 'Abgeschlossener AbortError erhält Meldungsidentität und fremde Bereiche');
+        assert(await page.evaluate(index => window.__browserSmokeMessages.length === index, messageIndex),
+            'Abbruch erzeugt weder neue Fehlermeldung noch Erfolgsmeldung');
+        smoke.assertNoErrors();
+    } finally {
+        await page.evaluate(() => window.__folderAbort?.restore());
+        await smoke.close();
+    }
+}
+
+// Ohne Modul-Closure auch direkt über page.evaluate verwendbar.
+function readBalanceImportResults() {
+    return Object.fromEntries(['displayDepotwert', 'monatlicheEntnahme', 'miniSummary', 'handlungContent']
+        .map(id => [id, document.getElementById(id)?.textContent]));
+}
+
+async function runBalanceImportRestoration(browser, baseUrl) {
+    const smoke = await openSmokePage(browser, baseUrl, 'Balance.html', {
+        storage: createBalanceStorage(2025), observeWealthUpdates: true,
+        fixedTime: '2026-10-03T12:00:00+02:00'
+    });
+    const { page } = smoke;
+    try {
+        await page.locator('#profilverbund-profile-list input').waitFor({ state: 'visible' });
+        await waitForWealthBrowserIdle(page);
+        const valid = await page.evaluate(async () => (await import('./app/balance/balance-main.js')).update({ mode: 'preview' }).ok);
+        assert(valid, 'Importregression startet mit gültiger Baseline');
+
+        // Gesonderte Dateievents: echte Formbindung, kein Importhandlerstart.
+        const protection = await page.evaluate(async debounceMs => {
+            const { UIReader } = await import('./app/balance/balance-reader.js');
+            const { UIRenderer } = await import('./app/balance/balance-renderer.js');
+            const { ValidationError } = await import('./app/balance/balance-config.js');
+            UIRenderer.handleError(new ValidationError([{ fieldId: 'minimumFlexAnnual', message: 'Synthetischer bestehender Berechnungsfehler' }]));
+            const before = document.getElementById('error-container').textContent;
+            const marks = () => [...document.querySelectorAll('.input-error')].map(el => el.id).sort();
+            const markedBefore = marks();
+            const calls = { updates: 0, clears: 0, scheduled: 0 };
+            const read = UIReader.readAllInputs;
+            const clear = UIRenderer.clearError;
+            const timerDescriptor = Object.getOwnPropertyDescriptor(window, 'setTimeout');
+            const schedule = window.setTimeout;
+            const temporary = document.createElement('input');
+            temporary.type = 'file';
+            document.querySelector('.form-column').appendChild(temporary);
+            try {
+                UIReader.readAllInputs = function (...args) { calls.updates++; return read.apply(this, args); };
+                UIRenderer.clearError = function (...args) { calls.clears++; return clear.apply(this, args); };
+                Object.defineProperty(window, 'setTimeout', { configurable: true, writable: true,
+                    value: (callback, delay, ...args) => {
+                        if (delay === debounceMs) calls.scheduled++;
+                        return schedule(callback, delay, ...args);
+                    } });
+                temporary.dispatchEvent(new Event('input', { bubbles: true }));
+                temporary.dispatchEvent(new Event('change', { bubbles: true }));
+                for (const id of ['importFile', 'csvFileInput', 'expensesCsvInput']) {
+                    document.getElementById(id).dispatchEvent(new Event('input', { bubbles: true }));
+                }
+                await new Promise(resolve => schedule(resolve, debounceMs + 50));
+                return { calls, before, after: document.getElementById('error-container').textContent,
+                    markedBefore, markedAfter: marks() };
+            } finally {
+                temporary.remove();
+                UIReader.readAllInputs = read;
+                UIRenderer.clearError = clear;
+                Object.defineProperty(window, 'setTimeout', timerDescriptor);
+            }
+        }, BALANCE_UPDATE_DEBOUNCE_MS);
+        assert(Object.values(protection.calls).every(count => count === 0), `Dateievents: null Updates, clearError und entprellte Vormerkungen: ${JSON.stringify(protection.calls)}`);
+        assert(protection.before === protection.after && protection.markedBefore.includes('minimumFlexAnnual')
+            && JSON.stringify(protection.markedBefore) === JSON.stringify(protection.markedAfter), 'Dateievents erhalten Fehler und Feldmarkierungen exakt');
+        await page.evaluate(async () => (await import('./app/balance/balance-main.js')).update({ mode: 'preview' }));
+
+        await page.locator('#marketCsvMode').evaluate(el => { el.closest('details').open = true; });
+        // Direkte Belegung vermeidet zusätzliche fachfremde Formupdates vor dem Import.
+        await page.evaluate(() => {
+            for (const [id, value] of Object.entries({ marketCsvMode: 'current', marketCsvTargetYear: '2025',
+                marketCsvExpectedAsOf: '2025-12-30', marketCsvInstrument: 'VWCE.DE' })) document.getElementById(id).value = value;
+        });
+
+        for (const failure of ['json-replace', 'json-final', 'csv-replace']) {
+            await waitForWealthBrowserIdle(page);
+            const baseline = await page.evaluate(readBalanceImportResults);
+            const beforeState = await readBalanceBrowserState(page);
+            const fields = await page.evaluate(() => Object.fromEntries(['floorBedarf', 'endeVJ', 'ath', 'minimumFlexAnnual']
+                .map(id => [id, document.getElementById(id).value])));
+            const provenance = await page.locator('#marketDataProvenance').textContent();
+            const messageIndex = await page.evaluate(() => window.__browserSmokeMessages.length);
+            const document = await page.evaluate(async () => {
+                const { StorageManager } = await import('./app/balance/balance-storage.js');
+                const { createBalanceExportDocument } = await import('./app/balance/balance-binder-imports.js');
+                const doc = createBalanceExportDocument(StorageManager.loadState());
+                doc.payload.inputs.floorBedarf = 32000;
+                doc.payload.inputs.endeVJ = 500;
+                return doc;
+            });
+            await page.evaluate(async ({ failure, baseline }) => {
+                const { StorageManager } = await import('./app/balance/balance-storage.js');
+                const { StorageError } = await import('./app/balance/balance-config.js');
+                const { UIRenderer } = await import('./app/balance/balance-renderer.js');
+                const replace = StorageManager.replaceStateFromImport;
+                const actionError = UIRenderer.handleActionError;
+                const read = () => Object.fromEntries(['displayDepotwert', 'monatlicheEntnahme', 'miniSummary', 'handlungContent']
+                    .map(id => [id, document.getElementById(id)?.textContent]));
+                const observation = window.__importFailureObservation = {};
+                window.__restoreImportFailureHooks = () => {
+                    StorageManager.replaceStateFromImport = replace;
+                    UIRenderer.handleActionError = actionError;
+                    delete window.__restoreImportFailureHooks;
+                    delete window.__importFailureObservation;
+                };
+                StorageManager.replaceStateFromImport = async function (...args) {
+                    observation.dryDiffers = JSON.stringify(read()) !== JSON.stringify(baseline);
+                    if (failure !== 'json-final') throw new StorageError('Synthetischer Import-Snapshotfehler');
+                    const receipt = await replace.apply(this, args);
+                    document.getElementById('minimumFlexAnnual').value = '-1';
+                    return receipt;
+                };
+                UIRenderer.handleActionError = function (error, scope) {
+                    observation.beforeError = read();
+                    observation.code = error.code || error.context?.code;
+                    observation.scope = scope;
+                    return actionError.call(this, error, scope);
+                };
+            }, { failure, baseline });
+            try {
+                const isCsv = failure === 'csv-replace';
+                const id = isCsv ? 'csvFileInput' : 'importFile';
+                const content = isCsv ? 'Datum;Schluss\n30.12.2022;1000\n30.12.2023;1200\n30.12.2024;900\n30.12.2025;500' : JSON.stringify(document);
+                const expectedText = failure === 'json-final' ? 'automatisch wiederhergestellt' : 'Speicherung konnte nicht bestätigt werden';
+                await page.locator(`#${id}`).setInputFiles({ name: isCsv ? 'synthetischer-markt.csv' : 'synthetischer-import.json',
+                    mimeType: isCsv ? 'text/csv' : 'application/json', buffer: Buffer.from(content) });
+                await page.waitForFunction(({ id, index, text }) => document.getElementById(id).value === ''
+                    && window.__browserSmokeMessages.slice(index).some(message => message.includes(text)),
+                { id, index: messageIndex, text: expectedText });
+                await waitForWealthBrowserIdle(page);
+                const observation = await page.evaluate(() => window.__importFailureObservation);
+                assert(observation.dryDiffers, `${failure}: erfolgreicher Dry-Run zeigt abweichende Ergebnisse`);
+                assert(JSON.stringify(observation.beforeError) === JSON.stringify(baseline), `${failure}: KPI und Handlung bereits vor dem Aktionsfehler wiederhergestellt`);
+                assert(observation.code === (failure === 'json-final' ? 'post_replace_validation_failed' : 'storage_failed'), `${failure}: ursprünglicher sicherer Fehlercode`);
+                assert(JSON.stringify(await page.evaluate(readBalanceImportResults)) === JSON.stringify(baseline), `${failure}: Ergebnisse entsprechen gültiger Baseline`);
+                assert(JSON.stringify(await readBalanceBrowserState(page)) === JSON.stringify(beforeState), `${failure}: gespeicherter Ausgangsstand erhalten`);
+                for (const [id, value] of Object.entries(fields)) assert(await page.locator(`#${id}`).inputValue() === value, `${failure}: ${id} wiederhergestellt`);
+                assert(await page.locator('#marketDataProvenance').textContent() === provenance, `${failure}: Provenienzanzeige erhalten`);
+                const error = page.locator(`#action-error-container [data-scope="${isCsv ? 'market-csv-import' : 'balance-import'}"] .action-error-text`);
+                assert(await error.isVisible(), `${failure}: neuer Aktionsfehler sichtbar`);
+                assert((await page.evaluate(index => window.__browserSmokeMessages.slice(index), messageIndex)).includes(await error.textContent()), `${failure}: neuer Aktionsfehler protokolliert`);
+                assert(await page.locator('.input-error').count() === 0 && await page.locator('#error-container').textContent() === '', `${failure}: verworfene Berechnungsfehler und Markierungen entfernt`);
+            } finally { await page.evaluate(() => window.__restoreImportFailureHooks?.()); }
+        }
+        smoke.assertNoErrors(['Synthetischer bestehender Berechnungsfehler', 'Update-Fehler: ValidationError']);
+    } finally { await smoke.close(); }
 }
 
 async function runBalanceCsvImportRoundtrip(browser, baseUrl) {
@@ -1518,12 +2031,13 @@ async function runBalanceCsvImportRoundtrip(browser, baseUrl) {
         `30.12.${csvTargetYear - 1};120`,
         `30.12.${csvTargetYear};130`
     ].join('\n');
+    const csvMessageIndex = await page.evaluate(() => window.__browserSmokeMessages.length);
     await page.locator('#csvFileInput').setInputFiles({
         name: csvSourceFileName,
         mimeType: 'text/csv',
         buffer: Buffer.from(csv, 'utf8')
     });
-    const csvImportStatus = page.locator('#error-container')
+    const csvImportStatus = page.locator('#toast-container .toast-text')
         .filter({ hasText: 'CSV importiert' });
     await csvImportStatus.waitFor({
         state: 'visible',
@@ -1534,6 +2048,11 @@ async function runBalanceCsvImportRoundtrip(browser, baseUrl) {
         csvImportStatusText.includes('CSV importiert'),
         `CSV-Roundtrip muss erfolgreich abschliessen; Status war: ${csvImportStatusText}`
     );
+    await page.waitForFunction(({ index, text }) => window.__browserSmokeMessages.slice(index).includes(text),
+        { index: csvMessageIndex, text: csvImportStatusText });
+    assert(await page.evaluate(({ index, text }) => window.__browserSmokeMessages.slice(index).includes(text),
+        { index: csvMessageIndex, text: csvImportStatusText }),
+    'Der Markt-CSV-Erfolg erzeugt seit der Aktion einen neuen wortgleichen Protokolleintrag');
 
     const row = await readIndexedDb(page, 'kv', BALANCE_STATE_KEY);
     const imported = JSON.parse(row.value);
@@ -3797,6 +4316,9 @@ async function main() {
             ['Simulator ghost profile context', runSimulatorGhostProfileContextSmoke],
             ['Handbuch.html', runManualSmoke],
             ['Balance import reject', runBalanceImportReject],
+            ['Balance message presentation', runBalanceMessagePresentation],
+            ['Balance folder abort', runBalanceFolderAbort],
+            ['Balance import restoration', runBalanceImportRestoration],
             ['Balance CSV import roundtrip', runBalanceCsvImportRoundtrip],
             ['Balance annual commit', runBalanceAnnualCommit]
         ];

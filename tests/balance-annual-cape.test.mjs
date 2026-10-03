@@ -2,6 +2,7 @@ import { createMarketdataHandlers } from '../app/balance/balance-annual-marketda
 import { CONFIG } from '../app/balance/balance-config.js';
 
 console.log('--- Balance Annual CAPE Tests ---');
+// Interne CAPE-Handlerprüfung; Nutzerpfad und Toasttyp prüft der UI-Jahresabschluss separat.
 
 function createLocalStorageMock() {
     const store = new Map();

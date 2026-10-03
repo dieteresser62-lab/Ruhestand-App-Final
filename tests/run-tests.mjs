@@ -81,6 +81,10 @@ export const TEST_EXECUTION_POLICY = Object.freeze({
         mode: 'isolated',
         reason: 'Installs a complete Balance DOM and browser-global smoke fixture.'
     }),
+    'balance-messages.test.mjs': Object.freeze({
+        mode: 'isolated',
+        reason: 'Installiert DOM- und Timer-Globals für den echten Balance-Renderer.'
+    }),
     'balance-ui-orchestration.test.mjs': Object.freeze({
         mode: 'isolated',
         reason: 'Installs extensive DOM and browser-global mocks.'

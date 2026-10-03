@@ -1,4 +1,6 @@
 import { createAnnualOrchestrator } from '../app/balance/balance-annual-orchestrator.js';
+import { createInflationHandlers } from '../app/balance/balance-annual-inflation.js';
+import { createMarketdataHandlers } from '../app/balance/balance-annual-marketdata.js';
 import {
     ANNUAL_PERIOD_METADATA_KEY,
     createSnapshotHandlers
@@ -67,11 +69,13 @@ function createAnnualDom() {
 }
 
 const previous = {
+    fetch: global.fetch,
     localStorage: global.localStorage,
     confirm: global.confirm,
     setTimeout: global.setTimeout,
     toast: UIRenderer.toast,
-    handleError: UIRenderer.handleError,
+    handleError: UIRenderer.handleActionError,
+    clearActionError: UIRenderer.clearActionError,
     createSnapshot: StorageManager.createSnapshot,
     renderSnapshots: StorageManager.renderSnapshots,
     listSnapshots: SnapshotArchive.listSnapshots,
@@ -99,7 +103,7 @@ try {
         localStorage.setItem('depot_tranchen', confirmedTranches);
         global.setTimeout = (fn, delay) => { calls.push(`timeout:${delay}`); fn(); return 0; };
         UIRenderer.toast = () => {};
-        UIRenderer.handleError = error => { throw error; };
+        UIRenderer.handleActionError = error => { throw error; };
         const dom = createAnnualDom();
         const inflationContract = {
             rate: 2.1,
@@ -122,7 +126,10 @@ try {
             setLastUpdateResults: () => {}
         });
 
+        const resets = [];
+        UIRenderer.clearActionError = scope => { resets.push(scope); };
         const result = await orchestrator.handleJahresUpdate({ failOnStepError: true });
+        assertEqual(resets.join(','), 'annual', 'Direkter Jahresupdate bereinigt nur einmal den Annualbereich');
         assertEqual(result.ok, false, 'Fehlerhafter Teilschritt liefert explizit ok=false');
         assertEqual(dom.inputs.aktuellesAlter.value, '68', 'Jahresupdate erhoeht das Alter genau einmal');
         assertEqual(localStorage.getItem(PROFILE_VALUE_KEYS.alter), '68', 'Jahresupdate persistiert das neue Alter vor dem Profil-Sync');
@@ -132,6 +139,11 @@ try {
         assertEqual(dom.controls.btnJahresUpdate.disabled, false, 'Button-Sperre wird im finally geloest');
         assertEqual(localStorage.getItem('depot_tranchen'), confirmedTranches,
             'Beratendes Jahresupdate darf den realen Tranchenbestand nicht veraendern');
+        resets.length = 0;
+        await orchestrator.handleJahresUpdate({ failOnStepError: true, nested: true });
+        assertEqual(resets.length, 0, 'Verschachtelter Jahresupdate bereinigt keine bereits entstandenen Jahresfehler');
+        UIRenderer.clearActionError = previous.clearActionError;
+
     }
 
     console.log('Test 2: successful commit follows preflight, snapshot, writes, validation and completion');
@@ -141,8 +153,9 @@ try {
         global.localStorage = createLocalStorageMock();
         seedBalanceState();
         global.confirm = () => true;
-        UIRenderer.toast = message => { calls.push(`toast:${message}`); };
-        UIRenderer.handleError = error => { throw error; };
+        const toasts = [];
+        UIRenderer.toast = (text, type = true) => { calls.push(`toast:${text}`); toasts.push({ text, type }); };
+        UIRenderer.handleActionError = error => { throw error; };
         SnapshotArchive.listSnapshots = async () => [];
         SnapshotArchive.readSnapshot = async id => ({ id, records: { balance: '{}' } });
         StorageManager.createSnapshot = async () => { calls.push('snapshot'); return { id: `snapshot-${TARGET_YEAR}` }; };
@@ -197,8 +210,13 @@ try {
             'Fachlicher Candidate wird erst nach den Jahreswrites periodengebunden committed'
         );
         assertEqual(calls[calls.length - 1], 'render', 'Snapshot-Liste wird erst nach erfolgreichem Commit gerendert');
+        assert(toasts.some(toast => toast.text.includes('Jahresabschluss-Snapshot') && toast.type === true),
+            'Bestätigter Recovery-Snapshot bleibt Erfolg');
+        assertEqual(toasts.at(-1).type, true, 'Bestätigter Jahresabschluss bleibt Erfolg');
 
         const duplicate = await handlers.handleJahresabschluss();
+        assertEqual(toasts.at(-1).text, `Die Jahresperiode ${TARGET_YEAR} wurde bereits abgeschlossen.`, 'Perioden-No-op bleibt wortgleich');
+        assertEqual(toasts.at(-1).type, 'info', 'Perioden-No-op ist Hinweis');
         assertEqual(duplicate.status, 'already_committed', 'Wiederholung derselben Periode ist idempotent');
         assertEqual(calls.filter(call => call === 'wealth-confirmed').length, 1, 'Nur neuer bestätigter Jahresstand meldet Erfolg');
         assertEqual(calls.filter(call => call === 'snapshot').length, 1, 'Wiederholung erzeugt keinen zweiten Snapshot');
@@ -212,7 +230,7 @@ try {
         seedBalanceState();
         global.confirm = () => true;
         UIRenderer.toast = () => {};
-        UIRenderer.handleError = () => {};
+        UIRenderer.handleActionError = () => {};
         StorageManager.createSnapshot = async () => { calls.push('snapshot'); return { id: 'unexpected' }; };
         const handlers = createSnapshotHandlers({
             dom: createAnnualDom(),
@@ -240,7 +258,7 @@ try {
         seedBalanceState();
         global.confirm = () => true;
         UIRenderer.toast = () => {};
-        UIRenderer.handleError = () => {};
+        UIRenderer.handleActionError = () => {};
         SnapshotArchive.listSnapshots = async () => [];
         StorageManager.createSnapshot = async () => { calls.push('snapshot'); throw new Error('QuotaExceededError'); };
         const handlers = createSnapshotHandlers({
@@ -270,7 +288,7 @@ try {
         seedBalanceState();
         global.confirm = () => true;
         UIRenderer.toast = () => {};
-        UIRenderer.handleError = () => {};
+        UIRenderer.handleActionError = () => {};
         SnapshotArchive.listSnapshots = async () => [];
         SnapshotArchive.readSnapshot = async id => ({ id, records: { balance: '{}' } });
         StorageManager.createSnapshot = async () => { calls.push('snapshot'); return { id: 'snapshot-recovery' }; };
@@ -303,18 +321,20 @@ try {
         assertEqual(calls.filter(call => call === 'snapshot').length, 1, 'Recovery-Sperre erzeugt keinen weiteren Snapshot');
     }
 
-    console.log('Test 6: in-flight guard rejects a double click');
+    console.log('Test 6: UI-Jahresabschluss weist Doppelklick ab');
     {
         global.localStorage = createLocalStorageMock();
         seedBalanceState();
         global.confirm = () => true;
-        UIRenderer.toast = () => {};
-        UIRenderer.handleError = () => {};
+        const toasts = [];
+        UIRenderer.toast = (text, type = true) => { toasts.push({ text, type }); };
+        UIRenderer.handleActionError = () => {};
         SnapshotArchive.listSnapshots = async () => [];
         SnapshotArchive.readSnapshot = async id => ({ id, records: { balance: '{}' } });
         StorageManager.createSnapshot = async () => ({ id: 'snapshot-in-flight' });
         StorageManager.renderSnapshots = async () => {};
         let releaseUpdate;
+        let commitCount = 0;
         const updateGate = new Promise(resolve => { releaseUpdate = resolve; });
         const dom = createAnnualDom();
         const handlers = createSnapshotHandlers({
@@ -332,15 +352,167 @@ try {
             applyAnnualInflation: () => {},
             rollExpensesYearFn: () => NEXT_YEAR,
             flushLiveState: async () => {},
-            commitLiveState: async () => COMMIT_RESULT
+            commitLiveState: async () => { commitCount++; return COMMIT_RESULT; }
         });
         const first = handlers.handleJahresabschluss();
         await Promise.resolve();
         await Promise.resolve();
         const second = await handlers.handleJahresabschluss();
         assertEqual(second.status, 'in_flight', 'Doppelklick wird waehrend laufendem Commit abgewiesen');
+        assertEqual(toasts.at(-1).text, 'Der Jahresprozess laeuft bereits.', 'Doppelklickhinweis bleibt wortgleich');
+        assertEqual(toasts.at(-1).type, 'info', 'Laufender UI-Jahresabschluss meldet Hinweis');
         releaseUpdate();
         await first;
+        assertEqual(commitCount, 1, 'Doppelklick führt genau einen Jahrescommit aus');
+    }
+
+    console.log('Test 7: interne Direktabrufe werden im verschachtelten Jahresupdate als Schrittfehler erfasst');
+    for (const step of ['Inflation', 'ETF & Nachrücken']) {
+        global.localStorage = createLocalStorageMock();
+        seedBalanceState();
+        const state = StorageManager.loadState();
+        state[ANNUAL_PERIOD_METADATA_KEY] = {
+            schemaVersion: 1,
+            lastCommittedPeriod: null,
+            pendingCommit: {
+                periodId: 'calendar-year:2025',
+                phase: 'writes_started',
+                snapshotId: 'snapshot-2025'
+            }
+        };
+        StorageManager.saveState(state);
+        // Nur die UX-Pause überspringen; der zurückgehaltene ETF-Fetch behält seinen echten Timeout.
+        global.setTimeout = (fn, delay, ...args) => {
+            if (delay === 500) { fn(...args); return 0; }
+            return previous.setTimeout(fn, delay, ...args);
+        };
+        UIRenderer.toast = () => {};
+        let annualError = null;
+        const resets = [];
+        UIRenderer.clearActionError = scope => { resets.push(scope); annualError = null; };
+        UIRenderer.handleActionError = error => { annualError = error.message; };
+
+        const dom = createAnnualDom();
+        for (const [key, value] of Object.entries({
+            inflation: '2', floorBedarf: '1000',
+            endeVJ: '120', endeVJ_1: '110', endeVJ_2: '100', endeVJ_3: '90',
+            ath: '150', jahreSeitAth: '2'
+        })) dom.inputs[key] = { value };
+        dom.controls.btnFetchInflation = { disabled: false, innerHTML: 'Inflation abrufen' };
+        dom.controls.btnNachrueckenMitETF = { disabled: false, innerHTML: 'ETF abrufen' };
+        dom.controls.btnUndoNachruecken = { style: { display: 'none' } };
+
+        let releaseFetch;
+        const fetchGate = new Promise(resolve => { releaseFetch = resolve; });
+        let fetchCalls = 0;
+        const fetchImpl = () => { fetchCalls += 1; return fetchGate; };
+        global.fetch = fetchImpl;
+        const inflation = createInflationHandlers({
+            dom, update: () => {}, debouncedUpdate: () => {}, fetchImpl,
+            now: () => new Date('2026-07-14T10:00:00Z'),
+            setTimeoutImpl: () => 1, clearTimeoutImpl: () => {}
+        });
+        const marketdata = createMarketdataHandlers({
+            dom, appState: {}, debouncedUpdate: () => {}, applyAnnualInflation: () => {}
+        });
+        const isInflation = step === 'Inflation';
+        const directHandler = isInflation ? inflation.handleFetchInflation : marketdata.handleNachrueckenMitETF;
+        const button = isInflation ? dom.controls.btnFetchInflation : dom.controls.btnNachrueckenMitETF;
+        const originalText = button.innerHTML;
+        const orchestrator = createAnnualOrchestrator({
+            dom, debouncedUpdate: () => {},
+            handleFetchInflation: isInflation ? directHandler : async () => ({ rate: 2, year: 2025 }),
+            handleNachrueckenMitETF: isInflation ? async () => ({ price: 140 }) : directHandler,
+            handleFetchCapeAuto: async () => ({ capeFetchStatus: 'ok_primary' }),
+            showUpdateResultModal: () => {}, setLastUpdateResults: () => {}
+        });
+
+        const first = directHandler();
+        try {
+            assertEqual(fetchCalls, 1, `${step}: Direktabruf läuft mit genau einem Fetch`);
+            assertEqual(resets.join(','), 'annual', `${step}: Nur der erste Direktabruf bereinigt den Annualbereich`);
+            annualError = 'Bestehender Annualfehler';
+            assertEqual(await directHandler(), undefined, `${step}: Interne Sperre behält ihre leere Rückgabe`);
+            let nestedError;
+            try { await directHandler({ nested: true }); } catch (error) { nestedError = error; }
+            assertEqual(nestedError?.context?.code, isInflation ? 'inflation_fetch_in_flight' : 'etf_fetch_in_flight',
+                `${step}: Interner nested-Fehler behält seinen Code`);
+            assertEqual(fetchCalls, 1, `${step}: Paralleler interner Direktaufruf startet keinen zweiten Fetch`);
+            assertEqual(annualError, 'Bestehender Annualfehler', `${step}: Paralleler interner Direktaufruf erhält den Annualfehler`);
+
+            const result = await orchestrator.handleJahresUpdate({ failOnStepError: true, nested: true });
+            assertEqual(result.ok, false, `${step}: Laufender Direktabruf verhindert ein erfolgreiches Jahresupdate`);
+            assertEqual(result.results.errors.length, 1, `${step}: Genau der blockierte Schritt wird als Fehler erfasst`);
+            assertEqual(result.results.errors[0].step, step, `${step}: Fehlerprotokoll benennt den blockierten Schritt`);
+            assert(result.results.errors[0].error.includes('Abruf läuft bereits'), `${step}: Schrittfehler benennt den laufenden Abruf`);
+            assertEqual(result.results[isInflation ? 'inflation' : 'etf'], null, `${step}: Blockierter Schritt liefert kein scheinbares Ergebnis`);
+            assertEqual(annualError, 'Bestehender Annualfehler', `${step}: Verschachtelter Aufruf erhält den Annualfehler`);
+            assertEqual(resets.length, 1, `${step}: Jahresupdate bereinigt den Fehler nicht erneut`);
+            await directHandler();
+            assertEqual(fetchCalls, 1, `${step}: Abgewiesener Jahresschritt löst die Direktabrufsperre nicht`);
+            assertEqual(button.disabled, true, `${step}: Direktabruf bleibt bis zum Fetch-Ende gesperrt`);
+            assertEqual(dom.inputs.floorBedarf.value, '1000', `${step}: Zurückgehaltener Abruf ändert keinen Bedarf`);
+            assertEqual(dom.inputs.endeVJ.value, '120', `${step}: Zurückgehaltener Abruf rückt keine Kurse nach`);
+        } finally {
+            const payload = isInflation ? {
+                header: { prepared: '2026-01-30T11:15:00Z' },
+                structure: { dimensions: {
+                    series: Object.entries({
+                        FREQ: 'A', REF_AREA: 'DE', ADJUSTMENT: 'N',
+                        ICP_ITEM: '000000', DATA_PROVIDER: '4D0', ICP_SUFFIX: 'AVR'
+                    }).map(([id, value]) => ({ id, values: [{ id: value }] })),
+                    observation: [{ id: 'TIME_PERIOD', values: [{ id: '2025' }] }]
+                } },
+                dataSets: [{ series: { '0:0:0:0:0:0': { observations: { 0: [2.2] } } } }]
+            } : {
+                chart: { result: [{
+                    timestamp: [Date.parse('2025-12-30T16:30:00Z') / 1000],
+                    indicators: { quote: [{ close: [140.4] }] }
+                }] }
+            };
+            releaseFetch({ ok: true, headers: { get: () => null }, json: async () => payload });
+            const directResult = await first;
+            assertEqual(directResult[isInflation ? 'year' : 'targetYear'], 2025, `${step}: Ursprünglicher Direktabruf liefert sein gültiges Ergebnis`);
+        }
+        assertEqual(button.disabled, false, `${step}: Erst der beendete Direktabruf löst die Knopfsperre`);
+        assertEqual(button.innerHTML, originalText, `${step}: Knopfbeschriftung wird wiederhergestellt`);
+        await directHandler();
+        assertEqual(fetchCalls, 2, `${step}: Nach Abschluss ist ein neuer Direktabruf möglich`);
+        assertEqual(resets.length, 2, `${step}: Neuer ausführbarer Direktabruf bereinigt seinen Fehlerbereich`);
+    }
+
+    console.log('Interner Orchestratorvertrag: Start, CAPE-Warnung, Erfolg und Reentranz');
+    for (const capeFetchStatus of ['ok_primary', 'ok_fallback_mirror', 'ok_fallback_stored', 'warn_stale_source', '']) {
+        global.localStorage = createLocalStorageMock();
+        seedBalanceState();
+        global.setTimeout = fn => { fn(); return 0; };
+        const toasts = [];
+        UIRenderer.toast = (text, type = true) => { toasts.push({ text, type }); };
+        let releaseInflation;
+        const gate = new Promise(resolve => { releaseInflation = resolve; });
+        const orchestrator = createAnnualOrchestrator({
+            dom: createAnnualDom(), debouncedUpdate: () => {},
+            handleFetchInflation: () => gate,
+            handleNachrueckenMitETF: async () => ({ price: 140 }),
+            handleFetchCapeAuto: async () => ({ capeFetchStatus, capeAsOf: '2026-12-31' }),
+            showUpdateResultModal: () => { throw new Error('Unerwartetes Fehlermodal'); },
+            setLastUpdateResults: () => {}
+        });
+        const first = orchestrator.handleJahresUpdate();
+        assertEqual(toasts[0].text, 'Starte Jahres-Update...', 'Start bleibt wortgleich');
+        assertEqual(toasts[0].type, 'info', 'Jahresupdate-Start ist Hinweis');
+        const duplicate = await orchestrator.handleJahresUpdate();
+        assertEqual(JSON.stringify(duplicate), JSON.stringify({ ok: false, status: 'in_flight' }),
+            'Interne Orchestratorsperre behält ihre Rückgabe');
+        assertEqual(toasts.length, 1, 'Abgewiesener interner Aufruf erzeugt keinen zusätzlichen Toast');
+        releaseInflation({ rate: 2 });
+        assertEqual((await first).ok, true, 'Hinweistyp ändert nicht das Jahresupdate-Ergebnis');
+        const warning = capeFetchStatus === 'ok_fallback_stored' || capeFetchStatus === 'warn_stale_source';
+        const expectedText = warning
+            ? `⚠️ ETF aktualisiert, CAPE aus lokalem Stand (${new Date('2026-12-31').toLocaleDateString('de-DE')}).`
+            : capeFetchStatus ? '✅ ETF + CAPE aktualisiert.' : '✅ Jahres-Update erfolgreich abgeschlossen.';
+        assertEqual(toasts.at(-1).text, expectedText, 'CAPE-Abschluss behält Originaltext samt Symbol');
+        assertEqual(toasts.at(-1).type, warning ? 'info' : true, 'Nur CAPE-Warnung wird Hinweis');
     }
 
     console.log('Balance annual workflow contract tests passed');
@@ -349,8 +521,10 @@ try {
     StorageManager.renderSnapshots = previous.renderSnapshots;
     SnapshotArchive.listSnapshots = previous.listSnapshots;
     SnapshotArchive.readSnapshot = previous.readSnapshot;
-    UIRenderer.handleError = previous.handleError;
+    UIRenderer.handleActionError = previous.handleError;
+    UIRenderer.clearActionError = previous.clearActionError;
     UIRenderer.toast = previous.toast;
+    if (previous.fetch === undefined) delete global.fetch; else global.fetch = previous.fetch;
     if (previous.setTimeout === undefined) delete global.setTimeout; else global.setTimeout = previous.setTimeout;
     if (previous.confirm === undefined) delete global.confirm; else global.confirm = previous.confirm;
     if (previous.localStorage === undefined) delete global.localStorage; else global.localStorage = previous.localStorage;
