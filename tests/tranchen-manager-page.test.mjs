@@ -2,6 +2,7 @@ import path from 'node:path';
 import { fileURLToPath, URL as NodeURL } from 'node:url';
 import { describeLegacyTaxMigration, initTranchenManagerPage } from '../app/tranches/tranchen-manager-page.js';
 import { PersistenceFacade, persistenceStorage } from '../app/shared/persistence-facade.js';
+import { loadTranchesFromStorage } from '../app/tranches/tranchen-manager-state.js';
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -360,7 +361,7 @@ async function runTranchenManagerPageTests() {
         const initialTranches = [
             {
                 trancheId: 'eur-a', name: 'EUR A', ticker: 'SAME.DE', shares: 2,
-                purchasePrice: 100, currentPrice: 100, category: 'equity', type: 'aktien_neu', tqf: 0.3
+                purchasePrice: 100, currentPrice: 125, asOf: now - 1000, category: 'equity', type: 'aktien_neu', tqf: 0.3
             },
             {
                 trancheId: 'eur-b', name: 'EUR B', ticker: 'SAME.DE', shares: 3,
@@ -368,7 +369,7 @@ async function runTranchenManagerPageTests() {
             },
             {
                 trancheId: 'usd', name: 'USD Lot', ticker: 'USD.DE', shares: 1,
-                purchasePrice: 80, currentPrice: 80, category: 'equity', type: 'aktien_neu', tqf: 0.3
+                purchasePrice: 80, currentPrice: 80, asOf: now - 2000, category: 'equity', type: 'aktien_neu', tqf: 0.3
             }
         ];
         const adapterStore = new Map([['depot_tranchen', JSON.stringify(initialTranches)]]);
@@ -444,6 +445,20 @@ async function runTranchenManagerPageTests() {
         assertEqual(window.tranchen.find(item => item.trancheId === 'eur-b').currentPrice, 125, 'Second EUR lot should share result');
         assertEqual(window.tranchen.find(item => item.trancheId === 'usd').currentPrice, 80, 'Rejected USD lot must retain old price');
         assertEqual(trancheWriteBatches, 1, 'Mixed successful batch should persist tranche state exactly once');
+        const confirmed = JSON.parse(adapterStore.get('rs_profiles_v1')).profiles.default.data.depot_tranchen;
+        const registryTranches = JSON.parse(confirmed);
+        const reloaded = loadTranchesFromStorage({ getItem: key => adapterStore.get(key) ?? null }).tranches;
+        for (const collection of [window.tranchen, JSON.parse(persistenceStorage.getItem('depot_tranchen')),
+            registryTranches, reloaded]) {
+            for (const id of ['eur-a', 'eur-b']) {
+                const lot = collection.find(item => item.trancheId === id);
+                assertEqual(lot.asOf, now, 'Auch gleicher Preis und geteiltes Symbol erhalten exakt quote.asOf');
+                assertEqual(lot.currentPrice, 125, 'Preis bleibt an Kurszeit gebunden');
+                assertEqual(lot.ticker, 'SAME.DE', 'Aufgelöster Ticker wird mitgespeichert');
+            }
+            assertEqual(collection.find(item => item.trancheId === 'usd').asOf, now - 2000,
+                'Teilfehler erhält den alten Kurszeitpunkt');
+        }
         assertEqual(JSON.parse(adapterStore.get('depot_tranchen')).find(item => item.trancheId === 'usd').currentPrice, 80, 'Persisted rejected lot should retain old price');
         const batchStatus = doc.getElementById('priceUpdateStatus').textContent;
         assert(batchStatus.startsWith('Kurse teilweise aktualisiert (2 von 3).'), 'Mixed outcome should remain concise and unambiguous');
@@ -500,10 +515,80 @@ async function runTranchenManagerPageTests() {
 
         assertEqual(window.tranchen.length, 0, 'Late result must not repopulate the newly selected empty profile');
         assertEqual(JSON.parse(persistenceStorage.getItem('depot_tranchen'))[0].currentPrice, 100, 'Late result must not persist into the previous profile state');
+        assert(!('asOf' in JSON.parse(persistenceStorage.getItem('depot_tranchen'))[0]),
+            'Abbruch und Profilwechsel dürfen keine Kurszeit persistieren');
         assertEqual(doc.getElementById('priceUpdateStatus').textContent, '', 'Late result must not overwrite the new profile status');
         assertEqual(doc.getElementById('updatePricesBtn').disabled, false, 'Profile switch should release quote-batch controls');
     }
     console.log('✓ late quote invalidation OK');
+
+    console.log('Test 4b: Kursflush-Rollback, Retry und echte Formlistener erhalten Preisprovenienz');
+    {
+        const now = Math.floor(Date.now() / 1000);
+        const initialRaw = JSON.stringify([{
+            schemaVersion: 2, trancheId: 'dated', name: 'ETF', isin: 'DE000TEST001', ticker: '',
+            shares: 2, purchasePrice: 100, currentPrice: 120, category: 'equity', type: 'aktien_neu',
+            tqf: 0.3, taxExempt: false, asOf: now - 1000
+        }]);
+        const adapterStore = new Map([['depot_tranchen', initialRaw]]);
+        let failSave = false;
+        const adapter = {
+            name: 'quote-rollback-memory', async open() {},
+            async loadAll() { return Object.fromEntries(adapterStore); },
+            async saveBatch(batch) {
+                if (failSave) throw new Error('offline');
+                batch.deletes.forEach(key => adapterStore.delete(key));
+                batch.upserts.forEach(([key, value]) => adapterStore.set(key, String(value)));
+            }
+        };
+        const doc = createTranchenPageDom();
+        installGlobals(doc, createLocalStorageMock());
+        PersistenceFacade.resetPersistenceForTests(adapter);
+        await PersistenceFacade.init();
+        await initTranchenManagerPage({ profileId: 'default' });
+        await PersistenceFacade.flush();
+        const oldRegistry = adapterStore.get('rs_profiles_v1');
+        failSave = true;
+        const previousFetch = global.fetch;
+        global.fetch = async url => ({ ok: true, status: 200,
+            json: async () => new NodeURL(String(url)).pathname === '/search'
+                ? { quotes: [{ symbol: 'RESOLVED.DE' }] }
+                : { symbol: 'RESOLVED.DE', price: 120, currency: 'EUR', asOf: now, source: 'yahoo-chart' }
+        });
+        try { await doc.getElementById('updatePricesBtn').click(); }
+        finally { if (previousFetch === undefined) delete global.fetch; else global.fetch = previousFetch; }
+        assertEqual(window.tranchen[0].asOf, now - 1000, 'Fehlgeschlagener Flush zeigt nur die bestätigte Kurszeit');
+        assertEqual(persistenceStorage.getItem('depot_tranchen'), initialRaw, 'Live-Store wird bytegleich zurückgesetzt');
+        assertEqual(adapterStore.get('depot_tranchen'), initialRaw, 'Adapter erhält keinen falschen Kurszeitpunkt');
+        assertEqual(persistenceStorage.getItem('rs_profiles_v1'), oldRegistry, 'Registry-Rollback erhält bestätigte Kopie');
+        assertEqual(adapterStore.get('rs_profiles_v1'), oldRegistry, 'Adapterregistry bleibt unverändert');
+
+        failSave = false;
+        await doc.getElementById('retryTrancheSaveBtn').click();
+        assertEqual(window.tranchen[0].asOf, now, 'Erfolgreicher Retry übernimmt die ursprüngliche Quotezeit');
+        assertEqual(window.tranchen[0].ticker, 'RESOLVED.DE', 'Aufgelöster Ticker wird gemeinsam übernommen');
+        const edit = async changes => {
+            const target = new MockElement('edit', 'button');
+            target.dataset = { action: 'edit-tranche', index: '0' };
+            doc.getElementById('tranchenTable').listeners.click[0]({ target });
+            for (const field of ['currentPrice', 'tqf']) {
+                doc.getElementById(field).value = String(doc.getElementById(field).value);
+            }
+            for (const [field, value] of Object.entries(changes)) {
+                if (field === 'taxExempt') doc.getElementById(field).checked = value;
+                else doc.getElementById(field).value = value;
+            }
+            await doc.getElementById('trancheForm').listeners.submit[0]({ preventDefault() {} });
+        };
+        await edit({ shares: '3', notes: 'Notiz', taxExempt: true });
+        assertEqual(window.tranchen[0].asOf, now, 'Reale Anteils-/Notiz-/Steuerlistener erhalten die Kurszeit');
+        await edit({ currentPrice: '130' });
+        assert(!('asOf' in window.tranchen[0]), 'Manuelle Preisänderung löscht Kursprovenienz');
+        await edit({ currentPrice: '120' });
+        assert(!('asOf' in window.tranchen[0]), 'Früherer Preis bringt keine alte Kurszeit zurück');
+        const loaded = loadTranchesFromStorage({ getItem: key => adapterStore.get(key) ?? null }).tranches[0];
+        assert(!('asOf' in loaded), 'Persistierter manuell geänderter Kurs lädt undatiert');
+    }
 
     console.log('Test 5: corrupt storage remains untouched until explicit recovery');
     {

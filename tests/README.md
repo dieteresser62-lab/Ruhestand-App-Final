@@ -24,6 +24,18 @@ npm test
 
 `npm test` fuehrt die schnelle Node-Standardsuite ueber `node tests/run-tests.mjs` aus. Die Suite enthaelt DOM-freie Engine-, Balance-, Simulator-, Profil-, Tranchen-, Persistenz-, Worker- und Tauri-Contract-Tests. Browser-Smokes und echte Tauri-Builds sind separate Gates.
 
+Die optionale Tranchenkurszeit `asOf` wird in `tranche-contract.test.mjs` und
+`tranchen-manager-state.test.mjs` auf V0-/V1-/V2-Kompatibilität, strikte UTC-Sekunden
+und Save/Load geprüft. Modal- und Pagetests decken Zeitverlust bei manueller
+Kurs-/Instrumentänderung, Erhalt bei Notiz-/Anteils-/Steueränderung, Kaufpreis-Fallback,
+Wiedereintragen früherer Preise sowie den echten Kurslistener mit gleichem Preis,
+geteiltem Symbol, Teilfehler, Profilwechsel/Abbruch und Flush-Rollback/Retry ab.
+Profil-/Persistenztests sichern Bundle-/Vollbackup-Roundtrips, Profilwechsel und
+Importablehnung vor Writes einschließlich inaktiver Profile. Profilverbundtests
+erhalten reale Preis-/Zeit-/Eigentümerzuordnung und undatierte synthetische Aggregate.
+Der externe Tranchen-Browser-Smoke prüft die exakte Quotezeit im bestätigten
+IndexedDB-/Registrystand, Notizänderung, Reload und manuelle Preisänderung.
+
 Das statische Architektur-/Fachkonzept-Evidenzgate ist Teil dieser Suite und
 kann zusätzlich fokussiert ausgeführt werden:
 

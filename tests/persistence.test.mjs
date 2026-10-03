@@ -54,6 +54,7 @@ import {
     readReconciliationHistory
 } from '../app/tranches/tranche-reconciliation.js';
 import { loadTranchesFromStorage } from '../app/tranches/tranchen-manager-state.js';
+import { switchProfile } from '../app/profile/profile-storage.js';
 
 console.log('--- Persistence Tests ---');
 
@@ -744,6 +745,61 @@ try {
         assertEqual(readWealthHistory(JSON.parse(getItemSync(CONFIG.STORAGE.LS_KEY))).entries.length, 0, 'Legacy-Replace übernimmt keinen bisherigen Live-Verlauf');
         const cleared = JSON.parse(getItemSync(PROFILE_STORAGE_KEYS.registry));
         assertEqual(readWealthHistory(JSON.parse(cleared.profiles.b.data[CONFIG.STORAGE.LS_KEY])).entries.length, 0, 'Legacy-Replace leert auch den bisher inaktiven Verlauf');
+    }
+
+    console.log('Test: Vollbackup erhält Kurszeiten und validiert vor Importwrites');
+    {
+        const state = JSON.stringify({ inputs: {}, wealthHistory: { schemaVersion: 1, entries: [
+            { id: 'manual:2026-01-02', asOf: '2026-01-02', reason: 'manual', periodId: null,
+                tagesgeld: 0, geldmarktEtf: 0, depotwertAlt: 0, depotwertNeu: 0, aktienEtf: 0, total: 0 }
+        ] } });
+        const dated = [{ schemaVersion: 2, trancheId: 'dated', name: 'ETF', shares: 2,
+            purchasePrice: 100, currentPrice: 120, category: 'equity', type: 'aktien_neu',
+            tqf: 0.3, taxExempt: false, asOf: 1700000000 }];
+        const undated = dated.map(({ asOf, ...lot }) => lot);
+        const registry = { version: 1, profiles: {
+            a: { meta: { id: 'a', name: 'A' }, data: { depot_tranchen: JSON.stringify(dated), [CONFIG.STORAGE.LS_KEY]: state } },
+            b: { meta: { id: 'b', name: 'B' }, data: { depot_tranchen: JSON.stringify(undated), [CONFIG.STORAGE.LS_KEY]: state } }
+        } };
+        const source = createMemoryAdapter({ depot_tranchen: JSON.stringify(dated),
+            [CONFIG.STORAGE.LS_KEY]: state,
+            balance_expenses_v1: JSON.stringify({ version: 1, activeYear: 2026, years: { '2026': { months: {} } } }),
+            [PROFILE_STORAGE_KEYS.registry]: JSON.stringify(registry),
+            [PROFILE_STORAGE_KEYS.current]: 'a', [PROFILE_STORAGE_KEYS.active]: 'a' });
+        resetPersistenceForTests(source);
+        await init();
+        const backup = JSON.parse(JSON.stringify(buildFullPersistenceBackup()));
+        assertEqual(JSON.parse(backup.records.depot_tranchen)[0].asOf, dated[0].asOf, 'Vollbackup exportiert exakt die Kurszeit');
+        const destination = createMemoryAdapter({ sim_previous: 'alt', ui_theme: 'fremder Zustand' });
+        resetPersistenceForTests(destination);
+        await init();
+        assertEqual((await importFullPersistenceBackup(backup)).ok, true, 'Exportiertes Vollbackup importiert erfolgreich');
+        assertEqual(loadTranchesFromStorage(persistenceStorage).tranches[0].asOf, dated[0].asOf, 'Live-Import erhält Kurszeit');
+        assertEqual(switchProfile('b'), true, 'Importiertes inaktives Profil kann geladen werden');
+        assert(!('asOf' in loadTranchesFromStorage(persistenceStorage).tranches[0]), 'Importierte Altdaten bleiben undatiert');
+        assertEqual(switchProfile('a'), true, 'Rückwechsel auf datiertes Profil gelingt');
+        await flush();
+        assertEqual(loadTranchesFromStorage(persistenceStorage).tranches[0].asOf, dated[0].asOf, 'Profilwechsel erhält Zeit');
+        const before = JSON.stringify(exportAllSync().records);
+        const batches = destination.batches.length;
+        const snapshots = destination.snapshots.size;
+        for (const target of ['live', 'active', 'inactive']) {
+            for (const asOf of ['', '1700000000', 0, -1, 1.5, 8640000000001]) {
+                const records = { ...backup.records };
+                const raw = JSON.stringify([{ ...dated[0], asOf }]);
+                if (target === 'live') records.depot_tranchen = raw;
+                else {
+                    const corruptRegistry = JSON.parse(records[PROFILE_STORAGE_KEYS.registry]);
+                    corruptRegistry.profiles[target === 'active' ? 'a' : 'b'].data.depot_tranchen = raw;
+                    records[PROFILE_STORAGE_KEYS.registry] = JSON.stringify(corruptRegistry);
+                }
+                assertEqual((await importFullPersistenceBackup(createFullBackupPayload(records))).ok, false,
+                    'Ungültige Live-/Profilkurszeit verhindert Vollimport');
+                assertEqual(destination.batches.length, batches, 'Preflight schreibt keine Batches');
+                assertEqual(destination.snapshots.size, snapshots, 'Preflight erzeugt keinen Recovery-Snapshot');
+                assertEqual(JSON.stringify(exportAllSync().records), before, 'Alle bestehenden Records bleiben bytegleich');
+            }
+        }
     }
 
     console.log('Test 11b: full backup import UI creates recovery backup before replacing records');

@@ -379,5 +379,15 @@ export function readTrancheFromForm(existingId = null, doc = document, options =
         taxExempt: byId(doc, 'taxExempt')?.checked === true,
         notes: byId(doc, 'notes').value
     });
-    return normalizeTranche(derived, { mode: 'persisted' });
+    const normalized = normalizeTranche(derived, { mode: 'persisted' });
+    const previous = options.existingTranche;
+    if (previous && previous.trancheId === existingId && currentPriceInput !== '') {
+        const canonicalPrevious = normalizeTranche(previous, { mode: 'persisted' });
+        const quoteFields = ['currentPrice', 'isin', 'ticker', 'category', 'type'];
+        if (canonicalPrevious.asOf !== undefined
+            && quoteFields.every(field => normalized[field] === canonicalPrevious[field])) {
+            normalized.asOf = canonicalPrevious.asOf;
+        }
+    }
+    return normalized;
 }

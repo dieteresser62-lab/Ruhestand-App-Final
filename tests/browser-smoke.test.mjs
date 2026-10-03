@@ -3276,7 +3276,10 @@ async function runTranchesSmoke(browser, baseUrl) {
         [profileA]: { name: 'Browserprofil A', tranchesRaw: '[]' },
         [profileB]: { name: 'Browserprofil B', tranchesRaw: '[]', belongsToHousehold: false }
     }, profileB);
-    const smoke = await openSmokePage(browser, baseUrl, 'index.html', { storage, quoteFixtures: true });
+    const quoteAsOf = Math.floor(Date.now() / 1000) - 60;
+    const smoke = await openSmokePage(browser, baseUrl, 'index.html', {
+        storage, quoteFixtures: { default: { asOf: quoteAsOf } }
+    });
     const { page } = smoke;
     await page.locator('#profileSelect').waitFor({ state: 'visible' });
     await page.locator('#profileSelect').selectOption(profileA);
@@ -3334,6 +3337,8 @@ async function runTranchesSmoke(browser, baseUrl) {
         'Aktientranche muss kanonisch klassifiziert sein');
     assert(await row.locator('[data-action="edit-tranche"]').getAttribute('aria-label'), 'Edit-Icon benötigt einen zugänglichen Namen');
     assert(await row.locator('[data-action="delete-tranche"]').getAttribute('aria-label'), 'Delete-Icon benötigt einen zugänglichen Namen');
+    const createdTranche = JSON.parse((await readIndexedDb(page, 'kv', 'depot_tranchen')).value)[0];
+    assert(!('asOf' in createdTranche), 'Manuelle Neuanlage erhält keinen Kurszeitpunkt');
 
     await page.locator('#updatePricesBtn').click();
     await page.locator('#priceUpdateStatus').filter({ hasText: 'Kurse erfolgreich aktualisiert.' }).waitFor();
@@ -3345,6 +3350,21 @@ async function runTranchesSmoke(browser, baseUrl) {
     const quotedTranche = JSON.parse(quotedRow.value)[0];
     assert(quotedTranche.currentPrice === 105 && quotedTranche.marketValue === 210,
         'Validierter Kurs-/Wertpfad muss Kurs und abgeleiteten Marktwert gemeinsam persistieren');
+    assert(quotedTranche.asOf === quoteAsOf, 'Kurslistener persistiert exakt quote.asOf');
+    const quotedRegistry = JSON.parse((await readIndexedDb(page, 'kv', 'rs_profiles_v1')).value);
+    assert(JSON.parse(quotedRegistry.profiles[profileA].data.depot_tranchen)[0].asOf === quoteAsOf,
+        'Bestätigte Registrykopie erhält dieselbe Kurszeit');
+
+    await row.locator('[data-action="edit-tranche"]').click();
+    await page.locator('#notes').fill('Nur eine Notiz');
+    await page.locator('#trancheForm button[type="submit"]').click();
+    await page.locator('#trancheModal.active').waitFor({ state: 'hidden' });
+    assert(JSON.parse((await readIndexedDb(page, 'kv', 'depot_tranchen')).value)[0].asOf === quoteAsOf,
+        'Reine Notizänderung bewahrt Kursprovenienz');
+    await page.reload({ waitUntil: 'load' });
+    await row.waitFor({ state: 'visible' });
+    assert(await page.evaluate(() => window.tranchen[0].asOf) === quoteAsOf,
+        'Reload lädt den bestätigten Kurszeitpunkt');
 
     const beforeEditRow = await readIndexedDb(page, 'kv', 'depot_tranchen');
     const beforeEditId = JSON.parse(beforeEditRow.value)[0].trancheId;
@@ -3355,6 +3375,7 @@ async function runTranchesSmoke(browser, baseUrl) {
     const afterEditRow = await readIndexedDb(page, 'kv', 'depot_tranchen');
     const afterEditId = JSON.parse(afterEditRow.value)[0].trancheId;
     assert(afterEditId === beforeEditId, 'Editieren muss die Tranche-ID stabil halten');
+    assert(!('asOf' in JSON.parse(afterEditRow.value)[0]), 'Manuelle Kursänderung entfernt die Zeitprovenienz');
 
     await page.reload({ waitUntil: 'load' });
     await page.locator('.tranche-row').filter({ hasText: 'Synthetische Browser-Tranche' }).waitFor({ state: 'visible' });

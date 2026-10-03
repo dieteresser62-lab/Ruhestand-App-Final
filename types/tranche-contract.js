@@ -22,7 +22,7 @@ export const TRANCHE_CATEGORY_TYPES = Object.freeze({
 export const TRANCHE_FIELD_GROUPS = Object.freeze({
     persisted: Object.freeze([
         'schemaVersion', 'trancheId', 'name', 'isin', 'ticker', 'shares',
-        'purchasePrice', 'currentPrice', 'purchaseDate', 'category', 'type',
+        'purchasePrice', 'currentPrice', 'asOf', 'purchaseDate', 'category', 'type',
         'tqf', 'taxExempt', 'notes'
     ]),
     derived: Object.freeze(['marketValue', 'costBasis', 'instrumentId']),
@@ -122,6 +122,21 @@ function normalizeDate(value, errors, context) {
         ));
     }
     return normalized;
+}
+
+function readQuoteTimestamp(raw, errors, context) {
+    const value = raw.asOf;
+    if (value === undefined || value === null) return undefined;
+    // Structural validation only: age is evaluated by the freshness gate.
+    if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0
+        || !Number.isFinite(new Date(value * 1000).getTime())) {
+        errors.push(fieldError(
+            'TRANCHE_AS_OF_INVALID', 'asOf', context.index, context.trancheId,
+            'asOf muss ein positiver, als Datum darstellbarer UTC-Sekundenwert sein.', value
+        ));
+        return undefined;
+    }
+    return value;
 }
 
 function readSchemaVersion(raw, errors, context) {
@@ -296,6 +311,7 @@ function normalizeOne(raw, options = {}) {
     }
 
     const context = { index, trancheId };
+    const asOf = readQuoteTimestamp(raw, errors, context);
     const { category, type } = normalizeClassification(raw, errors, context, allowLegacy, {
         migrateLegacyPersistedType: mode === 'persisted'
     });
@@ -438,6 +454,8 @@ function normalizeOne(raw, options = {}) {
     };
     delete value.id;
     delete value.kind;
+    if (asOf === undefined) delete value.asOf;
+    else value.asOf = asOf;
     if (shares === null) delete value.shares;
     if (purchasePrice === null) delete value.purchasePrice;
     if (currentPrice === null) delete value.currentPrice;

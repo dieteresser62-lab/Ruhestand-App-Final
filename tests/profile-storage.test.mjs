@@ -938,8 +938,54 @@ try {
         assertEqual(restored.length, 2, 'Import sollte alle Tranchen wiederherstellen');
         assertEqual(restored[0].trancheId, 't1', 'Erste Tranche sollte erhalten bleiben');
         assertEqual(restored[1].type, 'gold', 'Gold-Tranche sollte erhalten bleiben');
+        assert(restored.every(lot => !('asOf' in lot)), 'Ältere Profilbundle-Tranchen bleiben undatiert');
     }
     console.log('✓ Export/Import preserves current profile tranches OK');
+
+    console.log('Test 21d: Profilbundle erhält Kurszeiten und prüft sie vor Importwrites');
+    {
+        localStorage.clear();
+        ensureProfileRegistry();
+        const dated = [{ schemaVersion: 2, trancheId: 'dated', name: 'ETF', shares: 2,
+            purchasePrice: 100, currentPrice: 120, category: 'equity', type: 'aktien_neu',
+            tqf: 0.3, taxExempt: false, asOf: 1700000000 }];
+        const undated = dated.map(({ asOf, ...lot }) => lot);
+        const inactive = createProfile('Undatiert');
+        updateProfileData(inactive.id, { depot_tranchen: JSON.stringify(undated) });
+        localStorage.setItem('depot_tranchen', JSON.stringify(dated));
+        localStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify({ inputs: {}, wealthHistory: {
+            schemaVersion: 1, entries: [{ id: 'manual:2026-01-02', asOf: '2026-01-02', reason: 'manual', periodId: null,
+                tagesgeld: 0, geldmarktEtf: 0, depotwertAlt: 0, depotwertNeu: 0, aktienEtf: 0, total: 0 }]
+        } }));
+        localStorage.setItem('balance_expenses_v1', JSON.stringify({ version: 1, activeYear: 2026, years: { '2026': { months: {} } } }));
+        localStorage.setItem('unrelated_live_key', 'unverändert');
+        const bundle = JSON.parse(JSON.stringify(exportProfilesBundle()));
+        const currentId = bundle.currentProfileId;
+        assertEqual(JSON.parse(bundle.registry.profiles[currentId].data.depot_tranchen)[0].asOf,
+            dated[0].asOf, 'Export erhält den Kurszeitpunkt, nicht den Exportzeitpunkt');
+        assertEqual(importProfilesBundle(bundle).ok, true, 'Serialisiertes Bundle importiert erfolgreich');
+        assertEqual(loadTranchesFromStorage(localStorage).tranches[0].asOf, dated[0].asOf, 'Import erhält UTC-Sekunden');
+        assertEqual(switchProfile(inactive.id), true, 'Wechsel ins undatierte Profil gelingt');
+        assert(!('asOf' in loadTranchesFromStorage(localStorage).tranches[0]), 'Altdatenimport bleibt undatiert');
+        assertEqual(switchProfile(currentId), true, 'Rückwechsel gelingt');
+        assertEqual(loadTranchesFromStorage(localStorage).tranches[0].asOf, dated[0].asOf, 'Zeit bleibt nach Profilwechsel erhalten');
+
+        const before = serializeStorage(localStorage);
+        const originalSetItem = localStorage.setItem;
+        let writes = 0;
+        localStorage.setItem = (...args) => { writes += 1; return originalSetItem(...args); };
+        try {
+            for (const target of [currentId, inactive.id]) {
+                for (const asOf of ['', '1700000000', 0, -1, 1.5, 8640000000001]) {
+                    const invalid = JSON.parse(JSON.stringify(bundle));
+                    invalid.registry.profiles[target].data.depot_tranchen = JSON.stringify([{ ...dated[0], asOf }]);
+                    assertEqual(importProfilesBundle(invalid).ok, false, 'Ungültige Kurszeit im aktiven oder inaktiven Profil blockiert Import');
+                    assertEqual(writes, 0, 'Domainprüfung erfolgt vor sämtlichen Writes');
+                    assertEqual(serializeStorage(localStorage), before, 'Abweisung lässt alle Daten bytegleich');
+                }
+            }
+        } finally { localStorage.setItem = originalSetItem; }
+    }
 
     // Test 22: Import invalid registry
     console.log('Test 22: Import invalid registry');

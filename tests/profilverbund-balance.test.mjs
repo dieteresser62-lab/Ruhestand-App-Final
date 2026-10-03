@@ -496,8 +496,8 @@ global.localStorage = createLocalStorageMock();
         costBasis: 200
     };
     const profileInputs = [
-        { profileId: 'profile-a', name: 'Profile A', inputs: {}, tranches: [{ ...sharedTranche }] },
-        { profileId: 'profile-b', name: 'Profile B', inputs: {}, tranches: [{ ...sharedTranche }] }
+        { profileId: 'profile-a', name: 'Profile A', inputs: {}, tranches: [{ ...sharedTranche, asOf: 1700000000 }] },
+        { profileId: 'profile-b', name: 'Profile B', inputs: {}, tranches: [{ ...sharedTranche, currentPrice: 130, asOf: 1700000100 }] }
     ];
 
     const summary = buildProfilverbundAssetSummary(profileInputs);
@@ -505,6 +505,11 @@ global.localStorage = createLocalStorageMock();
     assertEqual(summary.mergedTranches[1].trancheId, 'profile-b:shared-lot', 'Second profile should own a distinct runtime tranche ID');
     const normalized = normalizeTrancheCollection(summary.mergedTranches, { mode: 'engine' });
     assertEqual(normalized.length, 2, 'Engine validation should accept both profile-owned copies');
+    for (const [index, asOf, price, owner] of [[0, 1700000000, 120, 'profile-a'], [1, 1700000100, 130, 'profile-b']]) {
+        assertEqual(normalized[index].asOf, asOf, 'Profilverbund erhält die reale Kurszeit je Tranche');
+        assertEqual(normalized[index].currentPrice, price, 'Preis bleibt mit seinem Zeitnachweis verbunden');
+        assertEqual(normalized[index].sourceProfileId, owner, 'Kursprovenienz bleibt dem Eigentümer zugeordnet');
+    }
     assertEqual(profileInputs[0].tranches[0].trancheId, 'shared-lot', 'First stored tranche ID must remain unchanged');
     assertEqual(profileInputs[1].tranches[0].trancheId, 'shared-lot', 'Second stored tranche ID must remain unchanged');
 }
@@ -527,6 +532,8 @@ global.localStorage = createLocalStorageMock();
             goldSteuerfrei: true,
             geldmarktEtf: 30
         },
+        updatedAt: '2026-10-01T00:00:00.000Z',
+        balanceState: { annualMarketDataMeta: { asOf: 1700000200 } },
         tranches: []
     };
     const owned = buildProfileOwnedTranches(entry);
@@ -540,6 +547,7 @@ global.localStorage = createLocalStorageMock();
     assertEqual(gold?.taxExempt, true, 'Synthetic gold should preserve the explicit profile exemption');
     const normalized = normalizeTrancheCollection(owned, { mode: 'engine' });
     assertEqual(normalized.length, 4, 'Strict engine normalization should accept every synthetic fallback tranche');
+    assert(normalized.every(tranche => !('asOf' in tranche)), 'Positive Aggregate und synthetische Bestände bleiben trotz Metadaten undatiert');
 }
 
 // --- TEST 9: Household need counts shared spending and all income exactly once ---
@@ -898,6 +906,32 @@ global.localStorage = createLocalStorageMock();
         assertEqual(result.remaining, 1000, `${mode} should retain unfinanceable household need`);
         assertEqual(result.items.reduce((sum, item) => sum + item.withdrawalAmount, 0), 0, `${mode} should not invent allocations`);
     });
+}
+
+console.log('Test 18: Produktiver Profilverbundloader trennt Kurs- und Strategiezeit');
+{
+    localStorage.clear();
+    ensureProfileRegistry();
+    const datedProfile = createProfile('Kurszeit');
+    const undatedProfile = createProfile('Ohne Kurszeit');
+    const lot = { schemaVersion: 2, trancheId: 'real', name: 'ETF', shares: 2,
+        purchasePrice: 100, currentPrice: 120, category: 'equity', type: 'aktien_neu', tqf: 0.3, taxExempt: false };
+    for (const [profile, tranches] of [[datedProfile, [{ ...lot, asOf: 1700000000 }]], [undatedProfile, [lot]]]) {
+        updateProfileData(profile.id, { depot_tranchen: JSON.stringify(tranches),
+            [CONFIG.STORAGE.LS_KEY]: JSON.stringify({ inputs: {}, annualMarketDataMeta: {
+                etf: { asOf: '2026-09-30', value: 999, ticker: 'STRATEGY.DE' }
+            } }) });
+    }
+    const loaded = loadProfilverbundProfiles();
+    const summary = buildProfilverbundAssetSummary(loaded);
+    const normalized = normalizeTrancheCollection(summary.mergedTranches, { mode: 'engine' });
+    const dated = normalized.find(item => item.sourceProfileId === datedProfile.id);
+    const undated = normalized.find(item => item.sourceProfileId === undatedProfile.id);
+    assertEqual(dated.asOf, 1700000000, 'Realer Profilbestand behält seine eigene Kurszeit durch Loader und Engineprojektion');
+    assertEqual(dated.currentPrice, 120, 'Strategiepreis überschreibt keinen realen Tranchepreis');
+    assert(!('asOf' in undated), 'Aktualisierte Profil-/Strategiemetadaten datieren unbekannte Tranche nicht');
+    assertEqual(JSON.parse(localStorage.getItem('rs_profiles_v1')).profiles[datedProfile.id].data.depot_tranchen,
+        JSON.stringify([{ ...lot, asOf: 1700000000 }]), 'Projektion lässt gespeicherten Detailbestand bytegleich');
 }
 
 global.localStorage = prevLocalStorage;

@@ -1898,7 +1898,13 @@
                     </ul>
                     <p style="color: var(--text-light); margin-top: 0.75rem;">„Kurse aktualisieren“ ist optional.
                         Gültige EUR-Teilerfolge werden gemeinsam gespeichert; fehlgeschlagene Lots behalten ihren alten
-                        Kurs. Ohne gültigen Quote erfolgt kein Write. Verwenden Sie für Sicherung und Recovery das
+                        Kurs samt bisherigem Kurszeitpunkt. Erfolgreiche Abrufe speichern den vom Kursdienst gelieferten
+                        Zeitpunkt zusammen mit dem Preis, auch wenn der Preis gleich bleibt. Alte oder manuell
+                        angelegte Bestände ohne Zeitnachweis bleiben undatiert. Notiz-, Anteils- und Steueränderungen
+                        bewahren den Zeitnachweis eines unveränderten Kurses; eine manuelle Kurs- oder
+                        Instrumentänderung entfernt ihn. Auch ein leeres Kursfeld mit Kaufpreis-Fallback ist undatiert.
+                        Profilbundle und Komplettbackup erhalten vorhandene Kurszeitpunkte.
+                        Ohne gültigen Quote erfolgt kein Write. Verwenden Sie für Sicherung und Recovery das
                         zentrale Komplettbackup unter „Profile &gt; Erweitert“; es gibt keinen separaten
                         Tranchen-Teilimport oder -export.</p>
                     <div class="warning-box"

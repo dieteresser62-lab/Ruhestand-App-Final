@@ -296,6 +296,25 @@ Validierung: `wealth-history-contract.test.mjs`, `balance-wealth-history.test.mj
 
 ### Empfehlung und realer Tranchenbestand
 
+Der Schema-2-Tranchenvertrag enthält additiv das optionale persistierte Feld
+`asOf`: positive ganzzahlige UTC-Sekunden innerhalb des darstellbaren Date-Bereichs.
+V0-/V1-/V2-Daten ohne Feld oder mit `null` bleiben gültig und werden ohne das Feld
+normalisiert. Vorhandene Strings, 0, negative, gebrochene, nicht endliche oder
+nicht darstellbare Werte erzeugen `TRANCHE_AS_OF_INVALID` mit Feld-/Tranchekontext.
+Die Strukturprüfung bewertet kein Alter; alte gültige Zeitpunkte bleiben erhalten.
+Der Manager übernimmt exakt `quote.asOf` gemeinsam mit Preis und aufgelöstem Ticker,
+auch bei unverändertem Preis und mehreren Lots desselben Symbols. Erst der erfolgreiche
+Flush bestätigt Livebestand und Registrykopie; ein Fehlschlag stellt beide zurück.
+Formänderungen an Notiz, Anteilen oder Steuerstatus bewahren den Zeitnachweis des
+gleichen Kurses und Instruments. Änderungen an Preis, ISIN, Ticker, Kategorie oder
+Typ sowie Kaufpreis-Fallback entfernen ihn; Neuanlagen sind undatiert.
+Profilbundle und Vollbackup erhalten die Zeit und prüfen ungültige vorhandene Werte
+vor Importwrites auch in inaktiven Profilen. Die Profilverbund-/Engineprojektion
+bewahrt Preis, Zeit und Eigentümer je realer Tranche. Synthetische Bestände und
+Aggregate ohne Tranchenprovenienz bleiben undatiert; Profil-`updatedAt`,
+Strategie-ETF-`annualMarketDataMeta` und Exportzeitpunkt ersetzen keine Kurszeit.
+Engine-, Steuer-, Bewertungs-, Ausgaben- und Verlaufssemantik bleiben unverändert.
+
 Balance- und Simulatorergebnisse sind beratende Rechenergebnisse. Berechnung,
 Rendering, Seitenwechsel und Jahres-Update schreiben niemals Verkaufsempfehlungen
 in `depot_tranchen` zurueck. `Balance.html` verweist deshalb nach einer tatsaechlichen

@@ -477,6 +477,7 @@ Kernlogik für den Profilverbund (Multi-Profil-Modus).
   Verlustverrechnung zu suggerieren.
 
 **Tranchen-/Cash-Contract:**
+- Reale Detailtranchen behalten den optionalen Kurszeitpunkt `asOf` (positive ganzzahlige UTC-Sekunden) zusammen mit `currentPrice` und ihrer Profilherkunft. Fehlt der Zeitnachweis oder ist er `null`, bleibt der Bestand undatiert. Synthetische Fallbacks und ETF-Aggregate erhalten kein Datum aus Profil-`updatedAt` oder Strategie-ETF-`annualMarketDataMeta`. Der Zeitnachweis verändert weder Bewertung noch Steuersemantik; sein Alter wird getrennt im Frischegate bewertet.
 - Entnahmen nutzen zuerst Tagesgeld und Geldmarkt, bevor ein Verkauf aus Detailtranchen geplant wird.
 - Vorhandene Detailtranchen werden ohne Mutation mit Profilherkunft kopiert. Fehlen Detailtranchen, entstehen profilmarkierte synthetische Fallback-Tranchen aus den aggregierten Werten.
 - Detailtranchen ersetzen in Asset-Summaries die aggregierten Depot-/Gold-/Geldmarktwerte, damit Werte nicht doppelt gezählt werden. Bonds behalten ihre Assetklasse und fliessen fuer Legacy-Kompatibilitaet zugleich in die Depotaggregate ein.

@@ -322,4 +322,32 @@ console.log('Test 10: derived-value helper is strict and mutation-free');
     assertEqual('marketValue' in input, false, 'Derived helper does not mutate input');
 }
 
+console.log('Test 11: optionale Kurszeit ist strukturell strikt und altersunabhängig');
+{
+    assert(TRANCHE_FIELD_GROUPS.persisted.includes('asOf'), 'Kurszeit gehört zum Persistenzvertrag');
+    for (const schemaVersion of [0, 1, 2]) {
+        for (const asOf of [undefined, null]) {
+            const result = normalizeTranche(validTranche({ schemaVersion, asOf }));
+            assert(!('asOf' in result), 'Altdaten erhalten kein erfundenes Datum');
+        }
+        for (const asOf of [1, 1700000000, 8640000000000]) {
+            const input = validTranche({ schemaVersion, asOf });
+            const result = normalizeTranche(input);
+            assertEqual(normalizeTranche(result).asOf, asOf, 'Wiederholte Normalisierung erhält UTC-Sekunden');
+            assertEqual(normalizeTranche(result, { mode: 'engine' }).asOf, asOf, 'Engineprojektion erhält Kurszeit');
+            assertEqual(input.asOf, asOf, 'Normalisierung mutiert die Eingabe nicht');
+        }
+        for (const asOf of ['1700000000', '', 0, -1, 1.5, NaN, Infinity, -Infinity, 8640000000001]) {
+            for (const mode of ['persisted', 'engine']) {
+                const error = captureValidationError(
+                    () => normalizeTranche(validTranche({ schemaVersion, asOf }), { mode }), 'Ungültige Kurszeit'
+                );
+                assert(error.errors.some(item => item.field === 'asOf'
+                    && item.code === 'TRANCHE_AS_OF_INVALID' && item.trancheId === 'lot-1'),
+                'Kurszeitfehler enthält Feld und Tranche');
+            }
+        }
+    }
+}
+
 console.log('--- Tranche Contract Tests Completed ---');

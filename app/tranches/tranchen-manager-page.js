@@ -998,7 +998,8 @@ async function saveTranche(event) {
     let tranche;
     try {
         tranche = readTrancheFromForm(existingId, document, {
-            existingIds: state.tranchen.map(item => item.trancheId)
+            existingIds: state.tranchen.map(item => item.trancheId),
+            existingTranche: state.tranchen[state.editingIndex]
         });
     } catch (error) {
         showTrancheFormError(error);
@@ -1164,7 +1165,8 @@ async function executePriceBatch(batchId, controller) {
                     Object.assign(tranche, calculateTrancheDerivedValues({
                         ...tranche,
                         ticker: quote.symbol,
-                        currentPrice: quote.price
+                        currentPrice: quote.price,
+                        asOf: quote.asOf
                     }));
                 }
             } catch (error) {
