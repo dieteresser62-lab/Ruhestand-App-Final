@@ -9,15 +9,71 @@ import { StorageManager } from '../app/balance/balance-storage.js';
 import { UIRenderer } from '../app/balance/balance-renderer.js';
 import { UIReader } from '../app/balance/balance-reader.js';
 import { createBalanceExportDocument } from '../app/balance/balance-binder-imports.js';
-import { refreshBalanceWealthHistory, toggleBalanceWealthHistory } from '../app/balance/balance-wealth-history-renderer.js';
+import { refreshBalanceWealthHistory } from '../app/balance/balance-wealth-history-renderer.js';
 import { PROFILE_STORAGE_KEYS } from '../app/profile/profile-state.js';
 import {
     PersistenceFacade, persistenceStorage, resetPersistenceForTests,
     resetPersistenceRuntimeForTests
 } from '../app/shared/persistence-facade.js';
 import { createManualWealthHistoryEntry } from '../types/wealth-history-contract.js';
+import { runInNewContext } from 'node:vm';
+import { installWealthBrowserUpdateObserver } from './browser-smoke.test.mjs';
 
 console.log('--- Vermögensverlauf: Persistenz und Jahresabschluss ---');
+
+// addInitScript serialisiert den Hook in jedes neue Seitendokument. Ein bereits
+// beim Start geplanter Timer muss vor der späteren Idle-/Tabprüfung sichtbar sein.
+for (const phase of ['Start', 'Reload']) {
+    const scheduled = new Map();
+    let nextId = 0;
+    const window = {
+        setTimeout(callback, delay, ...args) {
+            const id = ++nextId;
+            scheduled.set(id, () => callback(...args));
+            return id;
+        },
+        clearTimeout(id) { scheduled.delete(id); }
+    };
+    const install = () => runInNewContext(`(${installWealthBrowserUpdateObserver.toString()})()`, { window });
+    const fire = id => {
+        const callback = scheduled.get(id);
+        scheduled.delete(id);
+        callback();
+    };
+    install();
+    let updates = 0;
+    const startup = window.setTimeout(() => { updates += 1; }, 250);
+    const hook = window.setTimeout;
+    install();
+    assertEqual(window.setTimeout, hook, `${phase}: erneute Installation verschachtelt keinen Hook`);
+    assert(window.__wealthPendingUpdates.has(startup), `${phase}: vor Idle geplanter Startupdate ist ausstehend`);
+    assertEqual(updates, 0, `${phase}: Beobachtung führt Startupdate nicht vorzeitig aus`);
+    window.clearTimeout(startup);
+    assertEqual(window.__wealthPendingUpdates.size, 0, `${phase}: Abbruch entfernt den Starttimer`);
+    assert(!scheduled.has(startup), `${phase}: Abbruch erreicht den ursprünglichen Scheduler`);
+    let followup;
+    const replacement = window.setTimeout(amount => {
+        updates += amount;
+        assert(window.__wealthPendingUpdates.has(replacement), `${phase}: laufender Callback bleibt ausstehend`);
+        followup = window.setTimeout(() => { updates += 1; }, 250);
+    }, 250, 2);
+    fire(replacement);
+    assertEqual(updates, 2, `${phase}: Callbackargumente bleiben erhalten`);
+    assertEqual(window.__wealthPendingUpdates.size, 1, `${phase}: Folgeupdate verhindert vorzeitiges Idle`);
+    assert(window.__wealthPendingUpdates.has(followup), `${phase}: Folgeupdate bleibt beobachtet`);
+    fire(followup);
+    assertEqual(updates, 3, `${phase}: Folgeupdate ausgeführt`);
+    assertEqual(window.__wealthPendingUpdates.size, 0, `${phase}: Idle erst nach letztem Callback`);
+    const unrelated = window.setTimeout(() => {}, 3500);
+    assertEqual(window.__wealthPendingUpdates.size, 0, `${phase}: Meldungstimer blockiert Idle nicht`);
+    fire(unrelated);
+    const failure = window.setTimeout(() => { throw new Error('Startupdate fehlgeschlagen'); }, 250);
+    let error;
+    try { fire(failure); } catch (caught) { error = caught; }
+    assertEqual(error?.message, 'Startupdate fehlgeschlagen', `${phase}: Callbackfehler bleibt sichtbar`);
+    assertEqual(window.__wealthPendingUpdates.size, 0, `${phase}: fehlerhafter Callback hinterlässt keinen Timer`);
+}
+
 const STATE = CONFIG.STORAGE.LS_KEY;
 const REGISTRY = PROFILE_STORAGE_KEYS.registry;
 const SOURCE = { tagesgeld: 12000, geldmarktEtf: 23000, depotwertAlt: 34000, depotwertNeu: 45000 };
@@ -27,8 +83,9 @@ const reference = new Date(2027, 0, 15, 12);
 
 function historyDom(open = false) {
     return {
-        details: { hidden: !open },
-        toggle: { textContent: '', setAttribute() {} },
+        panel: { classList: { contains: name => name === 'active' && open,
+            add: () => { open = true; }, remove: () => { open = false; } } },
+        date: { textContent: '' },
         count: { textContent: '' }, chart: { innerHTML: '' }, table: { innerHTML: '' },
         hint: { textContent: '' }, status: { textContent: '' }
     };
@@ -235,6 +292,24 @@ try {
         else if (fault !== 'pending') assertEqual(persistenceStorage.getItem(STATE), rawBefore, `${fault}: bisheriger Stand unverändert`);
     }
 
+    for (const active of [false, true]) for (const fault of ['write', 'readback']) {
+        const env = await setup();
+        env.faults.manual = true;
+        env.faults[fault] = true;
+        const view = historyDom(active);
+        refreshBalanceWealthHistory(view);
+        const chartBefore = view.chart.innerHTML;
+        const tableBefore = view.table.innerHTML;
+        const ui = manualController(env, { status: view.status, refresh: () => refreshBalanceWealthHistory(view) });
+        assertEqual((await ui.controller.capture()).status, 'failed', `${fault}: Erfassung im aktuellen Tab scheitert ohne Bestätigung`);
+        assertEqual(view.panel.classList.contains('active'), active, 'Speicherfehler erhält Tabaktivität');
+        assertEqual(view.date.textContent, 'Zuletzt erfasst am 01.06.2026', 'Speicherfehler erhält bestätigtes Datum');
+        assertEqual(view.chart.innerHTML, chartBefore, 'Speicherfehler erhält gültiges Diagramm beziehungsweise leeren inaktiven Container');
+        assertEqual(view.table.innerHTML, tableBefore, 'Speicherfehler erhält gültige Tabelle beziehungsweise leeren inaktiven Container');
+        assertEqual(ui.calls.toast, 0, 'Kein Erfolg bei Speicherfehler');
+        assert(view.status.textContent.includes('Stand nicht bestätigt'), 'Speicherfehler im Panel gemeldet');
+    }
+
     console.log('Profilwechsel im manuellen Readback und laufender Jahresprozess verhindern fremde/vorläufige Bestätigung');
     {
         const env = await setup();
@@ -275,7 +350,7 @@ try {
         const dom = {
             ...env.dom,
             controls: Object.fromEntries(['resetBtn', 'copyAction', 'btnJahresUpdate', 'btnNachruecken', 'btnUndoNachruecken', 'btnCsvImport', 'csvFileInput', 'jahresabschlussBtn', 'connectFolderBtn', 'captureWealthBtn'].map(key => [key, element()])),
-            wealthHistory: { ...historyDom(), toggle: { ...element(), setAttribute() {} } },
+            wealthHistory: historyDom(),
             outputs: { snapshotList: element() },
             containers: { form: element(), tabButtons: element(), bedarfAnpassung: element() },
             diagnosis: Object.fromEntries(['drawer', 'overlay', 'openBtn', 'closeBtn', 'copyBtn', 'filterToggle'].map(key => [key, element()]))
@@ -288,13 +363,30 @@ try {
         initialize(); UIBinder.bindUI(); UIBinder.bindUI();
         initialize(); UIBinder.bindUI();
         assertEqual(dom.controls.captureWealthBtn.listeners.click.length, 1, 'Genau ein Capture-Listener trotz erneuter Bindung');
-        assertEqual(dom.wealthHistory.toggle.listeners.click.length, 1, 'Genau ein Toggle-Listener trotz erneuter Bindung');
-        const persistedBeforeToggle = env.store.get(STATE);
-        dom.wealthHistory.toggle.listeners.click[0]();
-        dom.wealthHistory.toggle.listeners.click[0]();
-        assert(dom.wealthHistory.details.hidden, 'Zweiter Klick schließt');
-        assertEqual(previews, 0, 'Umschalten startet kein Engineupdate');
-        assertEqual(env.store.get(STATE), persistedBeforeToggle, 'Umschalten ohne Write');
+        assertEqual(dom.containers.tabButtons.listeners.click.length, 1, 'Genau ein Tablistener trotz erneuter Bindung');
+        const persistedBeforeTab = env.store.get(STATE);
+        const registryBeforeTab = env.store.get(REGISTRY);
+        const buttons = ['update', 'settings', 'ausgaben', 'wealth'].map(tab => ({ dataset: { tab },
+            classList: historyDom(tab === 'update').panel.classList }));
+        const panels = buttons.map(button => button.dataset.tab === 'wealth' ? dom.wealthHistory.panel : historyDom(button.dataset.tab === 'update').panel);
+        dom.containers.tabPanels = panels;
+        dom.containers.tabButtons.querySelector = () => buttons.find(button => button.classList.contains('active'));
+        global.document.getElementById = id => panels[['tab-update', 'tab-settings', 'tab-ausgaben', 'tab-wealth'].indexOf(id)];
+        const clearError = UIRenderer.clearError;
+        let clears = 0;
+        UIRenderer.clearError = () => { clears += 1; };
+        try {
+            for (const index of [3, 0, 3, 2, 3]) {
+                dom.containers.tabButtons.listeners.click[0]({ target: { closest: () => buttons[index] } });
+                assertEqual(dom.wealthHistory.panel.classList.contains('active'), index === 3, 'Tabaktivität aus bestehender Mechanik');
+                assertEqual(Boolean(dom.wealthHistory.chart.innerHTML), index === 3, 'Aktivierung zeichnet, Verlassen leert');
+            }
+            assertEqual(clears, 0, 'Tabwechsel ohne Fehlerbereinigung');
+        } finally { UIRenderer.clearError = clearError; }
+        assertEqual(previews, 0, 'Tabwechsel startet kein Engineupdate');
+        assertEqual(debounceResumed, 0, 'Tabwechsel plant keinen Inputwrite');
+        assertEqual(env.store.get(STATE), persistedBeforeTab, 'Tabwechsel ohne Statewrite oder Erfassung');
+        assertEqual(env.store.get(REGISTRY), registryBeforeTab, 'Tabwechsel ohne Registrywrite');
         binderState.debounceTimer = setTimeout(() => { throw new Error('Der alte Timer darf nicht laufen'); }, 10000);
         await dom.controls.captureWealthBtn.listeners.click[0]();
         assertEqual(previews, 1, 'Ein Klick erzeugt nur eine Erfassung');
@@ -302,22 +394,22 @@ try {
         assertEqual(debounceResumed, 1, 'Inputpersistenz nach bestätigter Erfassung wieder eingeplant');
     }
 
-    console.log('Reale Importe schließen vor dem Lesen, auch bei Ablehnung und Rollback');
-    for (const kind of ['legacy', 'history', 'reject', 'rollback']) {
+    console.log('Reale Importe erhalten aktiven und inaktiven Tab bei Erfolg, Ablehnung, Legacy und Rollback');
+    for (const active of [false, true]) for (const kind of ['legacy', 'history', 'reject', 'rollback']) {
         const env = await setup();
-        env.dom.wealthHistory = historyDom(true);
-        refreshBalanceWealthHistory(env.dom.wealthHistory);
-        const previousChart = env.dom.wealthHistory.chart.innerHTML;
+        const view = env.dom.wealthHistory = historyDom(active);
+        refreshBalanceWealthHistory(view);
+        const previousChart = view.chart.innerHTML;
         const errors = [];
         UIRenderer.handleError = error => { errors.push(error); };
         UIReader.applyStoredInputs = () => {};
         initUIBinder(env.dom, {}, request => {
-            assert(env.dom.wealthHistory.details.hidden, 'Importupdate erhält geschlossene Ansicht');
-            refreshBalanceWealthHistory(env.dom.wealthHistory);
+            assertEqual(view.panel.classList.contains('active'), active, 'Importupdate erhält Tabaktivität');
+            refreshBalanceWealthHistory(view);
             return kind === 'rollback' && request.mode === BALANCE_UPDATE_MODE.PERSIST_INPUTS ? { ok: false } : RESULT;
         }, () => {});
         await UIBinder.handleImport({ target: { files: [] } });
-        assert(!env.dom.wealthHistory.details.hidden, 'Dateidialog ohne Auswahl wirkungslos');
+        assertEqual(view.panel.classList.contains('active'), active, 'Dateidialog ohne Auswahl wirkungslos');
         const imported = createManualWealthHistoryEntry({ ...SOURCE, tagesgeld: 42 }, '2026-08-01');
         const doc = createBalanceExportDocument({
             inputs: { aktuellesAlter: 67, floorBedarf: 24000, flexBedarf: 12000, ...SOURCE },
@@ -325,27 +417,30 @@ try {
             ...(kind === 'history' ? { wealthHistory: { schemaVersion: 1, entries: [imported] } } : {})
         });
         await UIBinder.handleImport({ target: { value: 'datei', files: [{ text: async () => {
-            assert(env.dom.wealthHistory.details.hidden, 'Vor erstem Dateilesen geschlossen');
+            assertEqual(view.panel.classList.contains('active'), active, 'Dateilesen ohne Tabwechsel');
             return kind === 'reject' ? '{ungueltig' : JSON.stringify(doc);
         } }] } });
-        assert(env.dom.wealthHistory.details.hidden, 'Import bleibt bei jedem Ergebnis geschlossen');
-        assertEqual(env.dom.wealthHistory.chart.innerHTML + env.dom.wealthHistory.table.innerHTML, '', 'Import hinterlässt keine alten Inhalte');
-        assertEqual(env.dom.wealthHistory.status.textContent, '', 'Vorherige Erfassungsbestätigung entfernt');
+        assertEqual(view.panel.classList.contains('active'), active, 'Jedes Importergebnis erhält Tabaktivität');
+        assertEqual(view.status.textContent, '', 'Vorherige Erfassungsbestätigung entfernt');
+        if (!active) assertEqual(view.chart.innerHTML + view.table.innerHTML, '', 'Inaktiver Import erzeugt keine Inhalte');
         if (kind === 'rollback' || kind === 'reject') {
             assertEqual(StorageManager.loadState().wealthHistory.entries.length, 1, 'Fehler bewahrt bisherigen Verlauf');
             assert(errors.length > 0, 'Importfehler bleibt gemeldet');
-            toggleBalanceWealthHistory(env.dom.wealthHistory);
-            assertEqual(env.dom.wealthHistory.chart.innerHTML, previousChart, 'Wiederöffnen zeigt endgültige Rollbackdaten');
+            assertEqual(view.chart.innerHTML, previousChart, 'Darstellung entspricht endgültigen Rollbackdaten');
+            assertEqual(view.date.textContent, 'Zuletzt erfasst am 01.06.2026', 'Fehler bewahrt bestätigtes Datum');
         } else if (kind === 'history') {
-            assertEqual(env.dom.wealthHistory.count.textContent, '1 Stand', 'Importierte Anzahl aktualisiert');
-            toggleBalanceWealthHistory(env.dom.wealthHistory);
-            assert(env.dom.wealthHistory.table.innerHTML.includes('01.08.2026'), 'Wiederöffnen zeigt nur importierte Historie');
+            assertEqual(view.count.textContent, '1 Stand', 'Importierte Anzahl aktualisiert');
+            assertEqual(view.date.textContent, 'Zuletzt erfasst am 01.08.2026', 'Importdatum unmittelbar aktualisiert');
+            if (active) assert(view.table.innerHTML.includes('01.08.2026'), 'Aktive Tabelle zeigt nur importierte Historie');
             assertEqual(JSON.stringify(StorageManager.loadState().wealthHistory.entries), JSON.stringify([imported]), 'Replace übernimmt exakt den Import');
         } else {
             assert(!Object.hasOwn(StorageManager.loadState(), 'wealthHistory'), 'Legacy mischt keine alte Historie bei');
-            toggleBalanceWealthHistory(env.dom.wealthHistory);
-            assert(env.dom.wealthHistory.hint.textContent.includes('Noch keine Stände'), 'Legacy-Leerhinweis nach Öffnen');
+            assertEqual(view.date.textContent, 'Noch keine Stände erfasst', 'Legacy ersetzt Datum mit Leertext');
+            if (active) assert(view.hint.textContent.includes('Noch keine Stände'), 'Aktiver Legacy-Leerhinweis');
         }
+        view.panel.classList.add('active');
+        refreshBalanceWealthHistory(view);
+        if (kind === 'rollback' || kind === 'reject') assert(view.table.innerHTML.includes('01.06.2026'), 'Spätere Aktivierung zeigt Rollbackdaten');
     }
     UIRenderer.handleError = () => {};
     UIReader.applyStoredInputs = previous.applyInputs;
@@ -547,7 +642,7 @@ try {
         assertEqual(persistenceStorage.getItem(STATE), foreign, 'Manueller Write lässt fremden Live-State unverändert');
     }
 
-    console.log('Offene und geschlossene Erfassung aktualisieren die bestätigte Datenbasis ohne Zustandswechsel');
+    console.log('Aktive und inaktive Erfassung aktualisieren die bestätigte Datenbasis ohne Zustandswechsel');
     for (const open of [false, true]) {
         const env = await setup();
         const view = historyDom(open);
@@ -561,10 +656,11 @@ try {
             current = { ...SOURCE, tagesgeld: amount };
             await ui.controller.capture();
             assertEqual(view.status.textContent, 'Stand gesichert', 'Kurze Bestätigung nach Readback');
-            assertEqual(view.details.hidden, !open, 'Erfassung erhält Sichtbarkeit');
+            assertEqual(view.panel.classList.contains('active'), open, 'Erfassung erhält Sichtbarkeit');
             assertEqual(view.count.textContent, '2 Stände', 'Tagesersetzung zählt nicht doppelt');
-            if (open) assert(view.table.innerHTML.includes(amount.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })), 'Offene Tabelle zeigt neuen Tageswert');
-            else assertEqual(view.chart.innerHTML + view.table.innerHTML, '', 'Geschlossene Erfassung ohne Inhalte');
+            assertEqual(view.date.textContent, 'Zuletzt erfasst am 31.12.2026', 'Erfassung aktualisiert Datum unmittelbar');
+            if (open) assert(view.table.innerHTML.includes(amount.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })), 'Aktive Tabelle zeigt neuen Tageswert');
+            else assertEqual(view.chart.innerHTML + view.table.innerHTML, '', 'Inaktive Erfassung ohne Inhalte');
         }
         const tomorrow = manualController(env, { now: () => new Date(2027, 0, 1), refresh: () => refreshBalanceWealthHistory(view) });
         await tomorrow.controller.capture();
@@ -573,10 +669,11 @@ try {
             view.status.textContent = 'Stand gesichert';
         } });
         await ui.controller.withAnnual(() => annual.handleJahresabschluss());
-        assertEqual(view.details.hidden, !open, 'Jahresabschluss erhält Sichtbarkeit');
+        assertEqual(view.panel.classList.contains('active'), open, 'Jahresabschluss erhält Sichtbarkeit');
         assertEqual(view.count.textContent, '4 Stände', 'Zusätzlicher Tag und Jahresstand gezählt');
-        if (open) assert(view.chart.innerHTML.includes('Jahresabschluss') && view.table.innerHTML.includes('01.01.2027'), 'Offene Darstellung zeigt Tag und Jahresstand');
-        else assertEqual(view.chart.innerHTML + view.table.innerHTML, '', 'Geschlossener Jahresabschluss ohne Inhalte');
+        assertEqual(view.date.textContent, 'Zuletzt erfasst am 01.01.2027', 'Älterer Jahresstichtag vermindert Datum nicht');
+        if (open) assert(view.chart.innerHTML.includes('Jahresabschluss') && view.table.innerHTML.includes('01.01.2027'), 'Aktive Darstellung zeigt Tag und Jahresstand');
+        else assertEqual(view.chart.innerHTML + view.table.innerHTML, '', 'Inaktiver Jahresabschluss ohne Inhalte');
         await ui.controller.withAnnual(() => annual.handleJahresabschluss());
         assertEqual(view.status.textContent, '', 'Jahres-No-op ohne neue Erfolgsmeldung');
     }

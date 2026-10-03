@@ -43,43 +43,17 @@ function clearDetails(dom) {
     if (dom.hint) dom.hint.textContent = '';
 }
 
-function setExpanded(dom, expanded) {
-    if (dom.details) dom.details.hidden = !expanded;
-    if (dom.toggle) {
-        dom.toggle.textContent = expanded ? 'Verlauf ausblenden' : 'Verlauf anzeigen';
-        dom.toggle.setAttribute('aria-expanded', String(expanded));
-    }
-}
-
-export function closeBalanceWealthHistory(dom) {
-    if (!dom) return;
-    const focused = dom.details?.ownerDocument?.activeElement;
-    if (focused && dom.details.contains(focused)) dom.toggle?.focus();
-    setExpanded(dom, false);
-    clearDetails(dom);
-}
-
 export function initializeBalanceWealthHistory(dom, loadState = () => StorageManager.loadState()) {
-    closeBalanceWealthHistory(dom);
     if (dom?.status) dom.status.textContent = '';
     return refreshBalanceWealthHistory(dom, loadState);
 }
 
-export function toggleBalanceWealthHistory(dom, loadState = () => StorageManager.loadState()) {
-    if (!dom?.details) return false;
-    if (!dom.details.hidden) {
-        closeBalanceWealthHistory(dom);
-        return true;
-    }
-    setExpanded(dom, true);
-    return refreshBalanceWealthHistory(dom, loadState);
-}
-
-/** Geschlossen nur validieren/zählen; offen jede Datenbasis vollständig ersetzen. */
+/** Inaktiv nur validieren/zählen/datieren; aktiv jede Datenbasis vollständig ersetzen. */
 export function renderBalanceWealthHistory(dom, state, error = null) {
     if (!dom) return false;
     clearDetails(dom);
     if (dom.count) dom.count.textContent = '';
+    if (dom.date) dom.date.textContent = '';
     if (dom.status && dom.status.textContent === displayErrors.get(dom)) dom.status.textContent = '';
     displayErrors.delete(dom);
     try {
@@ -87,7 +61,10 @@ export function renderBalanceWealthHistory(dom, state, error = null) {
         const history = readWealthHistory(state);
         if (dom.count) dom.count.textContent = history.entries.length
             ? `${history.entries.length} ${history.entries.length === 1 ? 'Stand' : 'Stände'}` : '';
-        if (dom.details?.hidden) return true;
+        const latest = history.entries.reduce((max, entry) => entry.asOf > max ? entry.asOf : max, '');
+        if (dom.date) dom.date.textContent = latest
+            ? `Zuletzt erfasst am ${dateLabel(latest)}` : 'Noch keine Stände erfasst';
+        if (!dom.panel?.classList.contains('active')) return true;
         const rows = prepareWealthHistoryMetrics(state);
         if (dom.hint) dom.hint.textContent = rows.length ? '' : EMPTY;
         if (rows.length) {
@@ -97,6 +74,8 @@ export function renderBalanceWealthHistory(dom, state, error = null) {
         return true;
     } catch (failure) {
         clearDetails(dom);
+        if (dom.count) dom.count.textContent = '';
+        if (dom.date) dom.date.textContent = '';
         const text = `Vermögensverlauf kann nicht angezeigt werden: ${failure.message || failure}`;
         if (dom.status) dom.status.textContent = text;
         else if (dom.hint) dom.hint.textContent = text;

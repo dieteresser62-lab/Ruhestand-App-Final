@@ -131,8 +131,8 @@ const dom = {
         keyParams: document.getElementById('diag-key-params')
     },
     wealthHistory: {
-        details: document.getElementById('wealthHistoryDetails'),
-        toggle: document.getElementById('toggleWealthHistoryBtn'),
+        panel: document.getElementById('tab-wealth'),
+        date: document.getElementById('wealthHistoryDate'),
         count: document.getElementById('wealthHistoryCount'),
         chart: document.getElementById('wealthHistoryChart'),
         table: document.getElementById('wealthHistoryTable'),
