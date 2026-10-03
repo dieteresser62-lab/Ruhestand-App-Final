@@ -1,5 +1,17 @@
+import { initTranchenManagerPage } from '../app/tranches/tranchen-manager-page.js';
+import { loadTranchesFromStorage } from '../app/tranches/tranchen-manager-state.js';
+import { PersistenceFacade, persistenceStorage } from '../app/shared/persistence-facade.js';
+import { createBalanceWealthHistoryService, createManualWealthHistoryController } from '../app/balance/balance-wealth-history.js';
+import { createExpensesWealthCaptureController, readExpensesWealthQuoteEvidence, evaluateExpensesWealthQuoteFreshness } from '../app/balance/balance-expenses-wealth-capture.js';
+import { UIReader, initUIReader } from '../app/balance/balance-reader.js';
+import { createProfilverbundHandlers } from '../app/balance/balance-main-profilverbund.js';
+import { loadProfilverbundProfiles } from '../app/profile/profilverbund-balance.js';
+import { CONFIG } from '../app/balance/balance-config.js';
+import { EngineAPI } from '../engine/index.mjs';
 import { UIRenderer } from '../app/balance/balance-renderer.js';
+import { UIUtils } from '../app/balance/balance-utils.js';
 import { initExpensesTab, updateExpensesBudget, rollExpensesYear } from '../app/balance/balance-expenses.js';
+import { refreshBalanceExpensesHistory } from '../app/balance/balance-expenses-history-renderer.js';
 import {
     EXPENSE_CSV_IMPORT_SUMMARY,
     ExpenseCsvImportError,
@@ -7,7 +19,7 @@ import {
     parseExpenseAmount,
     splitCsvLine
 } from '../app/balance/balance-expenses-csv.js';
-import { computeSpent, computeYearStats } from '../app/balance/balance-expenses-metrics.js';
+import { computeSpent, computeYearStats, sumMonthProfiles } from '../app/balance/balance-expenses-metrics.js';
 import {
     createEmptyExpensesStore,
     createExpensesCorruptionRecoveryDocument,
@@ -238,6 +250,9 @@ class MockElement {
 }
 
 class MockDocument {
+    constructor() { this.elements = new Map(); }
+    getElementById(id) { return this.elements.get(id) || null; }
+    addEventListener() {}
     createElement(tagName) {
         return new MockElement(tagName);
     }
@@ -377,6 +392,23 @@ try {
     assertEqual(stats.ytdBudget, 2000, 'YTD-Budget sollte nur Datenmonate berücksichtigen');
     assertClose(stats.annualForecast, 12240, 1e-9, 'Forecast sollte ab 2 Monaten den Median nutzen');
 
+    const multiProfileMonth = { profiles: {
+        selected: { categories: { Ausgabe: -100, Erstattung: 20 } },
+        hidden: { categories: { Ausgabe: 30 } }
+    } };
+    const multiProfileStats = computeYearStats({
+        yearData: { months: { '1': multiProfileMonth, '2': { profiles: {
+            hidden: { categories: { Ausgabe: -10, Erstattung: 10 } }
+        } } } }, annualBudget: 1200, monthlyBudget: 100
+    });
+    assertEqual(sumMonthProfiles(multiProfileMonth), 110, 'Auch ausgeblendete Profile zählen; Betrag wird je Profil gebildet');
+    assertEqual(multiProfileStats.annualUsed, 110, 'Profilsummen werden nicht vor Betragsbildung verrechnet');
+    assertEqual(multiProfileStats.monthsWithData, 1, 'Zwei Profile im selben Monat zählen einmal, Nullimport nicht');
+    assertEqual(multiProfileStats.avgMonthly, 110, 'Durchschnitt berücksichtigt denselben einen Datenmonat');
+    assertEqual(multiProfileStats.ytdBudget, 100, 'YTD-Soll behält die bestehende Datenmonatssemantik');
+    assertEqual(multiProfileStats.ytdDelta, 10, 'Bestehende Abweichungsberechnung bleibt unverändert');
+    assertEqual(multiProfileStats.annualForecast, 1320, 'Ein Datenmonat verwendet weiterhin den Durchschnitt für die Prognose');
+
     global.localStorage = new MockLocalStorage();
     global.window = { localStorage: global.localStorage };
     global.document = new MockDocument();
@@ -432,10 +464,23 @@ try {
     assertEqual(JSON.parse(global.localStorage.getItem(STORAGE_KEY)).activeYear, 2026, 'Expliziter Reset erzeugt erst nach Recovery-Freigabe einen leeren Store');
 
     writeStore({ version: 1, activeYear: 2026, years: { '2026': { months: {} } } });
-    seedMonth(2026, 1, { 'Miete': -1000 });
+    seedMonth(2026, 1, { 'Miete': -1000, 'Erstattung': 30 });
+    const withHiddenProfile = readStore();
+    withHiddenProfile.years['2026'].months['1'].profiles.hidden = { categories: { Ausgabe: 30 } };
+    writeStore(withHiddenProfile);
 
     const dom = createDomRefs();
-    initExpensesTab(dom);
+    let overviewActive = false, changeCalls = 0, completeChange;
+    const overview = { panel: { classList: { contains: () => overviewActive } },
+        chart: { innerHTML: '' }, table: { innerHTML: '' }, hint: { textContent: '' } };
+    const refreshOverview = () => refreshBalanceExpensesHistory(overview, {
+        storage: global.localStorage, now: () => new Date(2026, 9, 3)
+    });
+    const onChange = () => { changeCalls++; refreshOverview(); completeChange?.(); };
+    initExpensesTab(dom, { onChange });
+    assertEqual(changeCalls, 0, 'Initialisierung ist kein Datenänderungsrückruf');
+    refreshOverview();
+    assertEqual(overview.chart.innerHTML + overview.table.innerHTML, '', 'Gefüllte Übersicht bleibt initial inaktiv leer');
     updateExpensesBudget({ monthlyBudget: 1000, annualBudget: 12000 });
 
     // 1) Performance: refreshTableValues darf nur einmal auf STORAGE lesen
@@ -453,6 +498,8 @@ try {
     assert(dom.expenses.forecastSub.textContent.includes('Ø/Monat'), 'Forecast sollte bei 1 Datenmonat mit Durchschnitt arbeiten');
     assert(dom.expenses.forecastSub.textContent.includes('Datenmonate: 1/12'), 'Forecast-Unterzeile sollte 1 Datenmonat anzeigen');
     const janTotal = dom.expenses.table.querySelector('[data-month-total="1"] [data-role="total"]');
+    assertEqual(dom.expenses.table.querySelector('[data-month="1"][data-profile="hidden"]'), null,
+        'Gespeichertes Fremdprofil hat keine sichtbare Profilspalte');
     assert(janTotal && janTotal.classList.contains('budget-ok'), 'Januar-Gesamt sollte bei Budgettreffer als OK markiert sein');
     assert(dom.expenses.ytdValue.classList.contains('budget-ok'), 'YTD sollte bei exaktem Soll als OK markiert sein');
 
@@ -477,13 +524,14 @@ try {
     });
     assertEqual(dom.expenses.csvInput.clickCount, 1, 'Import-Klick sollte CSV-Input öffnen');
 
+    let releaseText;
     const file = {
-        text: async () => [
+        text: () => new Promise(resolve => { releaseText = () => resolve([
             'Kategorie;Betrag',
             'Versicherungen;-1.200,50',
             'Versicherungen;-300',
             'Krankenkasse;-99,50'
-        ].join('\n')
+        ].join('\n')); })
     };
     dom.expenses.csvInput.value = 'selected.csv';
     dom.expenses.csvInput.trigger('change', {
@@ -492,7 +540,16 @@ try {
             value: 'selected.csv'
         }
     });
-    await new Promise(resolve => setTimeout(resolve, 0));
+    assertEqual(changeCalls, 0, 'Offenes Dateilesen benachrichtigt noch nicht');
+    overviewActive = true;
+    refreshOverview();
+    const changed = new Promise(resolve => { completeChange = resolve; });
+    await Promise.resolve();
+    releaseText();
+    await changed;
+    completeChange = null;
+    assertEqual(changeCalls, 1, 'Ein realer Import benachrichtigt genau einmal nach Speicherung');
+    assert(overview.table.innerHTML.includes(UIUtils.formatCurrency(3640)), 'Aktive Übersicht zeigt importierte Jahressumme ohne Tabwechsel');
 
     const importedStore = readStore();
     const marchCategories = importedStore.years['2026'].months['3'].profiles.default.categories;
@@ -517,6 +574,9 @@ try {
     });
     assertEqual(confirmMessage, 'Monatsdaten für März löschen?', 'Delete-Confirm sollte den Monatstext exakt anzeigen');
     const afterDeleteStore = readStore();
+    assertEqual(changeCalls, 2, 'Löschung benachrichtigt genau einmal');
+    assert(overview.table.innerHTML.includes(UIUtils.formatCurrency(2040))
+        && !overview.table.innerHTML.includes(UIUtils.formatCurrency(3640)), 'Löschung entfernt alte Jahreswerte unmittelbar');
     assertEqual(afterDeleteStore.years['2026'].months['3'].profiles.default, undefined, 'Delete sollte den Profileintrag entfernen');
     const marchCell = dom.expenses.table.querySelector('[data-month="3"][data-profile="default"] [data-role="value"]');
     assertEqual(marchCell?.textContent, '—', 'Delete sollte die Tabellenzelle neu rendern');
@@ -537,6 +597,7 @@ try {
     });
     const afterNoOp = JSON.stringify(readStore());
     assertEqual(afterNoOp, beforeNoOp, 'Delete ohne vorhandenen Eintrag muss No-Op sein');
+    assertEqual(changeCalls, 2, 'Wirkungslose Löschung benachrichtigt nicht');
 
     // 5) Jahresabschluss: neues Jahr aktiv, Historie bleibt
     const newYear = rollExpensesYear();
@@ -548,6 +609,13 @@ try {
     assertEqual(Object.keys(rolledStore.years['2027'].months || {}).length, 0, 'Folgejahr sollte ohne Monatsdaten starten');
     assertEqual(dom.expenses.yearSelect.value, '2027', 'Jahr-Select sollte nach Roll auf Folgejahr springen');
     assertEqual(dom.expenses.ytdSub.textContent, 'Soll: —', 'YTD-Soll sollte im leeren Folgejahr nicht auf Kalender, sondern Datenmonate basieren');
+    assertEqual(changeCalls, 3, 'Jahreswechsel benachrichtigt genau einmal');
+    assert(overview.table.innerHTML.includes('2026 – laufendes Teiljahr') && !overview.table.innerHTML.includes('2027'), 'Auswahljahr ändert Kalenderjahrmarkierung und importierte Jahresliste nicht');
+    overviewActive = false;
+    refreshOverview();
+    dom.expenses.yearSelect.trigger('change', { target: { value: '2026' } });
+    assertEqual(changeCalls, 4, 'Jahresauswahl benachrichtigt');
+    assertEqual(overview.chart.innerHTML + overview.table.innerHTML, '', 'Jahresauswahl zeichnet inaktiv keine Inhalte');
 
     // 6) Recovery-UI: Bereich/Backend und sichere Optionen; kein Reset ohne Export+Bestaetigung.
     global.localStorage.setItem(STORAGE_KEY, corruptRaw);
@@ -579,7 +647,11 @@ try {
     let failResetFlush = true;
     const resetPrompts = [];
     const recoveryDom = createDomRefs();
+    overviewActive = true;
+    refreshOverview();
+    const beforeResetCalls = changeCalls;
     initExpensesTab(recoveryDom, {
+        onChange,
         storage: global.localStorage,
         getPersistenceStatus: () => ({ backend: 'IndexedDB-Test' }),
         downloadRecovery: async (document, filename) => {
@@ -627,6 +699,7 @@ try {
     );
 
     assertEqual(actionErrors.at(-1)?.scope, 'expenses-recovery', 'Fehlgeschlagener Reset gehört zum Recoverybereich');
+    assertEqual(changeCalls, beforeResetCalls, 'Gesperrter, abgebrochener oder fehlgeschlagener Reset benachrichtigt nicht');
     assert(actionErrors.at(-1)?.error.message.includes('nicht zurueckgesetzt'), 'Recoveryfehler behält seinen sicheren Wortlaut');
     failResetFlush = false;
     recoveryDom.expenses.table.querySelector('[data-action="expenses-recovery-reset"]').click();
@@ -635,12 +708,212 @@ try {
     assertEqual(resetPrompts.length, 3, 'Jeder Reset-Versuch nutzt einen eigenen Bestaetigungsschritt');
     assertEqual(resetStore.version, 1, 'Bestaetigter Reset erzeugt einen gueltigen Ausgabenstore');
     assertEqual(Object.keys(resetStore.years).length, 0, 'Bestaetigter Reset startet ohne erfundene Finanzdaten');
+    assertEqual(changeCalls, beforeResetCalls + 1, 'Nur bestätigter und geflushter Reset benachrichtigt');
+    assertEqual(overview.chart.innerHTML + overview.table.innerHTML, '', 'Reset entfernt alte Übersichtsinhalte');
+    assertEqual(overview.hint.textContent, 'Noch keine Ausgabendaten vorhanden.', 'Reset ersetzt Korruptionshinweis durch Leerzustand');
     assertEqual(
         recoveryDom.expenses.table.querySelector('[data-expenses-recovery="corrupt"]'),
         null,
         'Nach bestaetigtem Reset wird der gesperrte Recovery-Bereich verlassen'
     );
 
+    // 7) Produktive Kette: undatierte Altdaten -> echter Kurslistener -> bestätigter
+    // Speicher/Reload -> echte Eingabeprojektion/Engine-PREVIEW -> CSV-Listener.
+    {
+        const key = CONFIG.STORAGE.LS_KEY;
+        const savedInputs = { aktuellesAlter: 67, floorBedarf: 12000, flexBedarf: 24000,
+            minimumFlexAnnual: 0, tagesgeld: 100000, geldmarktEtf: 0, depotwertAlt: 0, depotwertNeu: 0,
+            inflation: 2, endeVJ: 100, endeVJ_1: 95, endeVJ_2: 90, endeVJ_3: 85,
+            ath: 105, jahreSeitAth: 1, marketCapeRatio: 25, capeRatio: 25 };
+        const balanceRaw = JSON.stringify({ inputs: savedInputs, lastState: { cumulativeInflationFactor: 1 },
+            annualPeriodMetadata: { schemaVersion: 1, lastCommittedPeriod: null, pendingCommit: null } });
+        const trancheRaw = JSON.stringify([{ schemaVersion: 2, trancheId: 'quote-integration',
+            name: 'ETF', ticker: 'FLOW.DE', shares: 1000, purchasePrice: 80, currentPrice: 100,
+            purchaseDate: '2020-01-01', category: 'equity', type: 'aktien_neu', tqf: 0.3, taxExempt: false }]);
+        const meta = id => ({ id, name: id, createdAt: '2026-01-01T00:00:00Z',
+            updatedAt: new Date().toISOString(), belongsToHousehold: true });
+        const backend = new Map([[key, balanceRaw], ['depot_tranchen', trancheRaw],
+            ['profile_tagesgeld', '100000'], ['profile_aktuelles_alter', '67'],
+            ['rs_current_profile', 'default'], ['rs_active_profile', 'default'],
+            ['rs_profiles_v1', JSON.stringify({ version: 1, profiles: {
+                default: { meta: meta('default'), data: { [key]: balanceRaw, depot_tranchen: trancheRaw,
+                    profile_tagesgeld: '100000', profile_aktuelles_alter: '67' } }
+            } })], [STORAGE_KEY, JSON.stringify({ version: 1, activeYear: 2025, years: {} })]]);
+        let fault = '', failExpenseFlush = false, historyBatches = 0;
+        const adapter = { name: 'import-quote-memory', async open() {},
+            async loadAll() { return Object.fromEntries(backend); },
+            async saveBatch(batch) {
+                if (failExpenseFlush && batch.upserts.some(([k]) => k === STORAGE_KEY)) throw new Error('Importflush fehlgeschlagen');
+                if (fault === 'write' && batch.upserts.some(([k]) => k === key)) throw new Error('Verlaufwrite fehlgeschlagen');
+                if (batch.upserts.some(([k, v]) => k === key && JSON.parse(v).wealthHistory)) historyBatches++;
+                batch.deletes.forEach(k => backend.delete(k));
+                batch.upserts.forEach(([k, v]) => backend.set(k, String(v)));
+            } };
+        PersistenceFacade.resetPersistenceForTests(adapter);
+        await PersistenceFacade.init();
+        const documentRef = new MockDocument();
+        for (const id of ['updatePricesBtn', 'priceUpdateStatus', 'tranchePersistenceStatus', 'stats', 'tranchenTable']) {
+            const element = new MockElement(id === 'updatePricesBtn' ? 'button' : 'div');
+            element.id = id; documentRef.elements.set(id, element);
+        }
+        global.document = documentRef;
+        global.window = { localStorage: global.localStorage, EngineAPI };
+        const refs = createDomRefs();
+        refs.inputs = Object.fromEntries(Object.entries(savedInputs).map(([id, value]) => {
+            const element = new MockElement('input'); element.value = String(value); return [id, element];
+        }));
+        initUIReader(refs);
+        const profileHandlers = createProfilverbundHandlers({ dom: refs, PROFILVERBUND_STORAGE_KEYS: { mode: 'profilverbund_mode' } });
+        let previews = 0, attempts = 0;
+        const update = options => {
+            previews++;
+            assertEqual(options.mode, 'preview', 'Echter Import fordert eine PREVIEW an');
+            if (fault === 'preview') throw new Error('Vorschau fehlgeschlagen');
+            const inputData = UIReader.readAllInputs();
+            profileHandlers.updateProfilverbundGlobals(loadProfilverbundProfiles(), inputData);
+            const modelResult = EngineAPI.simulateSingleYear(inputData, { cumulativeInflationFactor: 1 });
+            if (modelResult.error) throw modelResult.error;
+            return { ok: true, inputData, modelResult };
+        };
+        const service = createBalanceWealthHistoryService();
+        const originalCapture = service.captureManual;
+        service.captureManual = options => { attempts++; return originalCapture(options); };
+        const messages = [], errors = [];
+        const originalToast = UIRenderer.toast;
+        UIRenderer.toast = (text, type) => { messages.push({ text, type }); };
+        const controller = createExpensesWealthCaptureController({ service, update,
+            toast: (text, type) => UIRenderer.toast(text, type),
+            reportError: (error, scope) => errors.push({ error, scope }) });
+        const initImport = extra => initExpensesTab(refs, { storage: persistenceStorage,
+            onImportSuccess: () => controller.afterImport(), ...extra });
+        const choose = month => refs.expenses.table.listeners.click[0]({ target: {
+            closest: () => ({ dataset: { action: 'import', month: String(month), profile: 'default' } }) } });
+        const importCsv = async (month, text = 'Kategorie;Betrag\nAusgabe;-250') => {
+            choose(month);
+            return refs.expenses.csvInput.listeners.change.at(-1)({ target: {
+                files: [{ text: async () => text }], value: 'ausgaben.csv' } });
+        };
+        try {
+            const before = update({ mode: 'preview' }).inputData;
+            assertEqual(evaluateExpensesWealthQuoteFreshness(readExpensesWealthQuoteEvidence(before), new Date()).status,
+                'unknown', 'Produktiver Leser erkennt undatierte Manager-Altdaten');
+            initImport();
+            await importCsv(1);
+            assertEqual(attempts, 0, 'Undatierter Bestand verhindert produktiv die Sicherung');
+            assertEqual(messages.at(-1).type, 'info', 'Unbekannter realer Kurs meldet info');
+            const quoteAsOf = Math.floor(Date.now() / 1000);
+            const oldFetch = global.fetch;
+            global.fetch = async () => ({ ok: true, status: 200,
+                json: async () => ({ symbol: 'FLOW.DE', price: 120, currency: 'EUR', asOf: quoteAsOf, source: 'yahoo-chart' }) });
+            try {
+                await initTranchenManagerPage({ profileId: 'default' });
+                await documentRef.getElementById('updatePricesBtn').listeners.click[0]();
+            } finally { if (oldFetch === undefined) delete global.fetch; else global.fetch = oldFetch; }
+            assertEqual(JSON.parse(backend.get('depot_tranchen'))[0].asOf, quoteAsOf, 'Managerlistener bestätigt quote.asOf im Backend');
+            assertEqual(JSON.parse(JSON.parse(backend.get('rs_profiles_v1')).profiles.default.data.depot_tranchen)[0].currentPrice,
+                120, 'Managerpreis ist in aktiver Registry bestätigt');
+            assertEqual(loadTranchesFromStorage(persistenceStorage).tranches[0].asOf, quoteAsOf, 'Reload erhält Preiszeit');
+            const previewBefore = previews;
+            const messageIndex = messages.length;
+            await importCsv(2);
+            assertEqual(previews - previewBefore, 1, 'Erfolgreicher realer Import fährt genau eine PREVIEW');
+            assertEqual(attempts, 1, 'Frischer Managerkurs gibt genau einen Versuch frei');
+            assertEqual(historyBatches, 1, 'Genau eine bestätigte Verlaufstransaktion');
+            const captured = JSON.parse(backend.get(key)).wealthHistory.entries[0];
+            assertEqual(captured.depotwertNeu, 120000, 'Erfassung verwendet den produktiv gespeicherten Managerpreis');
+            assertEqual(captured.reason, 'manual', 'Unverändertes Legacy-Speicherformat');
+            assertEqual(captured.periodId, null, 'Kein Periodencommit beim Import');
+            assertEqual(messages[messageIndex].text, 'CSV importiert.', 'Importbestätigung kommt vor Sicherung');
+            assertEqual(errors.length, 0, `Kein Sicherungsfehler: ${errors.at(-1)?.error?.message}`);
+            assert(messages[messageIndex + 1].text.startsWith('Vermögensstand gesichert (Kurse vom'), 'Gespeicherter Kurs erzeugt Erfolg');
+            assert(JSON.parse(backend.get(STORAGE_KEY)).years['2025'].months['2'].profiles.default, 'Import bleibt unabhängig gespeichert');
+            const manual = createManualWealthHistoryController({ service, update, refresh: () => {} });
+            await manual.capture();
+            assertEqual(JSON.stringify(JSON.parse(backend.get(key)).wealthHistory.entries[0]), JSON.stringify(captured),
+                'Manuelle und automatische echte Vorschau erzeugen identische Komponenten');
+            assertEqual(JSON.parse(backend.get('rs_profiles_v1')).profiles.default.data[key], backend.get(key), 'Readback hält Live-State und Registry synchron');
+            const stable = backend.get(key);
+            const baseAttempts = attempts;
+            // Ablehnungen starten keinerlei Sicherung.
+            await importCsv(3, 'Kategorie;Betrag\nAusgabe;ungueltig');
+            choose(3); await refs.expenses.csvInput.listeners.change.at(-1)({ target: { files: [], value: '' } });
+            choose(3); await refs.expenses.csvInput.listeners.change.at(-1)({ target: { files: [{ text: async () => { throw new Error('Lesefehler'); } }], value: '' } });
+            let failStore = false;
+            initImport({ storage: { getItem: k => persistenceStorage.getItem(k), setItem: (k, v) => { if (failStore) throw new Error('Storefehler'); persistenceStorage.setItem(k, v); } } });
+            failStore = true;
+            await importCsv(3);
+            initImport();
+            failExpenseFlush = true;
+            await importCsv(3);
+            failExpenseFlush = false;
+            await PersistenceFacade.flush();
+            assertEqual(attempts, baseAttempts, 'Parser-, Datei-, Store- und Flushfehler sowie leere Auswahl ohne Sicherungsversuch');
+            // Optionale Vorschau-/Schreibfehler bestätigen den Import weiterhin.
+            for (const optionalFault of ['preview', 'write']) {
+                fault = optionalFault;
+                const index = messages.length;
+                await importCsv(4);
+                assertEqual(messages[index].text, 'CSV importiert.', 'Optionaler Fehler erhält Importbestätigung');
+                assertEqual(errors.at(-1).scope, 'expenses-wealth', 'Optionaler Fehler ist kein CSV-Importfehler');
+                assertEqual(backend.get(key), stable, 'Optionaler Fehler bewahrt bestätigten Verlauf');
+                assert(JSON.parse(backend.get(STORAGE_KEY)).years['2025'].months['4'].profiles.default, 'Import trotz Sicherungsfehler gespeichert');
+                fault = '';
+            }
+            // Mehrere reale Verbundprofile: frisch im aktiven Profil reicht nicht.
+            const registry = JSON.parse(persistenceStorage.getItem('rs_profiles_v1'));
+            registry.profiles.partner = { meta: meta('partner'), data: { [key]: balanceRaw, depot_tranchen: trancheRaw } };
+            persistenceStorage.setItem('rs_profiles_v1', JSON.stringify(registry)); await PersistenceFacade.flush();
+            let data = update({ mode: 'preview' }).inputData;
+            assertEqual(data.detailledTranches.length, 2, 'Reale PREVIEW enthält beide beitragenden Profile');
+            assertEqual(evaluateExpensesWealthQuoteFreshness(readExpensesWealthQuoteEvidence(data), new Date()).status,
+                'unknown', 'Undatierter beitragender Partner blockiert trotz frischem aktiven Kurs');
+            const beforePartnerAttempts = attempts;
+            await importCsv(5);
+            assertEqual(attempts, beforePartnerAttempts, 'Realer Import mit undatiertem Partner startet keinen Sicherungsversuch');
+            const partnerLots = JSON.parse(trancheRaw); partnerLots[0].asOf = quoteAsOf - 604801;
+            registry.profiles.partner.data.depot_tranchen = JSON.stringify(partnerLots);
+            persistenceStorage.setItem('rs_profiles_v1', JSON.stringify(registry)); await PersistenceFacade.flush();
+            data = update({ mode: 'preview' }).inputData;
+            assertEqual(evaluateExpensesWealthQuoteFreshness(readExpensesWealthQuoteEvidence(data), new Date()).status,
+                'old', 'Alter beitragender Partnerkurs blockiert produktiv');
+            await importCsv(5);
+            assertEqual(attempts, beforePartnerAttempts, 'Realer Import mit altem Partner startet keinen Sicherungsversuch');
+            partnerLots[0].asOf = quoteAsOf;
+            registry.profiles.partner.data.depot_tranchen = JSON.stringify(partnerLots);
+            persistenceStorage.setItem('rs_profiles_v1', JSON.stringify(registry)); await PersistenceFacade.flush();
+            await importCsv(5);
+            assertEqual(JSON.parse(backend.get(key)).wealthHistory.entries[0].depotwertNeu, 220000, 'Alle frisch bewerteten Verbundbestände werden erfasst');
+            registry.profiles.default.data.depot_tranchen = '[]';
+            registry.profiles.partner.data.depot_tranchen = '[]';
+            // Aktive Registrykopie darf nicht auf den alten Stand vor Erfassung zurückgesetzt werden.
+            registry.profiles.default.data[key] = persistenceStorage.getItem(key);
+            persistenceStorage.setItem('depot_tranchen', '[]');
+            persistenceStorage.setItem('rs_profiles_v1', JSON.stringify(registry)); await PersistenceFacade.flush();
+            await importCsv(6);
+            assertEqual(messages.at(-1).text, 'Vermögensstand gesichert (keine kursabhängigen Bestände).',
+                'Produktiver Import ohne ETF-Bestände wird direkt bestätigt');
+            assertEqual(JSON.parse(backend.get(key)).wealthHistory.entries[0].aktienEtf, 0, 'Produktive kursfreie Vorschau erfasst keine ETF-Werte');
+
+            const beforeRecoveryAttempts = attempts;
+            const expensesRaw = persistenceStorage.getItem(STORAGE_KEY);
+            persistenceStorage.setItem(STORAGE_KEY, '{korrupt'); await PersistenceFacade.flush();
+            initImport(); await importCsv(6);
+            assertEqual(attempts, beforeRecoveryAttempts, 'Reale Recovery-Sperre startet null Sicherungsversuche');
+            persistenceStorage.setItem(STORAGE_KEY, expensesRaw); await PersistenceFacade.flush();
+            initImport();
+            // Auch zwei unmittelbar gestartete Dateivorgänge werden bestätigt je einmal bearbeitet.
+            const beforeQuick = attempts;
+            await Promise.all([importCsv(7), importCsv(8)]);
+            assertEqual(attempts - beforeQuick, 2, 'Zwei schnelle reale Imports verlieren keine Erfassung');
+            assert(JSON.parse(backend.get(STORAGE_KEY)).years['2025'].months['7'].profiles.default
+                && JSON.parse(backend.get(STORAGE_KEY)).years['2025'].months['8'].profiles.default,
+                'Beide schnellen Imports bleiben gespeichert');
+
+        } finally {
+            UIRenderer.toast = originalToast;
+            PersistenceFacade.resetPersistenceForTests();
+        }
+    }
     console.log('✅ Balance expenses tests passed');
 } finally {
     UIRenderer.handleActionError = prevActionError;

@@ -45,7 +45,7 @@
                 <button class="tab-btn active" data-tab="update">Jahres-Update</button>
                 <button class="tab-btn" data-tab="settings">Einstellungen & Strategie</button>
                 <button class="tab-btn" data-tab="ausgaben">Ausgaben-Check</button>
-                <button class="tab-btn" data-tab="wealth">Vermögensverlauf</button>
+                <button class="tab-btn" data-tab="wealth">Auswertung</button>
             </div>
 
             <div class="tab-content">
@@ -517,29 +517,42 @@
                         <div id="expensesDetailBody" class="expenses-dialog-body"></div>
                     </dialog>
                 </div>
-                <section id="tab-wealth" class="tab-panel wealth-history" aria-labelledby="wealthHistoryTitle">
-                    <h3 id="wealthHistoryTitle">Vermögensverlauf</h3>
-                    <div class="wealth-actions">
-                        <button id="captureWealthBtn" type="button" class="btn btn-primary">Stand jetzt erfassen</button>
-                        <span id="wealthHistoryCount"></span>
-                        <span id="wealthHistoryDate" aria-live="polite"></span>
-                    </div>
-                    <p id="wealthHistoryStatus" role="status" aria-live="polite"></p>
-                    <div>
-                        <p>Die Stände gehören zum aktiven Profil, auch bei angezeigtem Profilverbund.
-                            Enthalten sind Tagesgeld, Geldmarkt-ETF und Aktien-ETF (Alt- und Neu-Depot).
-                            Gold und separate Anleihen gehören nicht zu dieser Summe.</p>
-                        <p id="wealthHistoryHint" aria-live="polite"></p>
-                        <ul class="wealth-legend" aria-label="Vermögensgruppen">
-                            <li><span class="wealth-swatch wealth-tagesgeld" aria-hidden="true"></span>Liquidität (Tagesgeld)</li>
-                            <li><span class="wealth-swatch wealth-geldmarktEtf" aria-hidden="true"></span>Geldmarkt-ETF</li>
-                            <li><span class="wealth-swatch wealth-aktienEtf" aria-hidden="true"></span>Aktien-ETF</li>
-                        </ul>
-                        <p>■ Jahresabschluss: durchgezogener Rahmen · ◇ Manuell: gestrichelter Rahmen.
-                            Unregelmäßig erfasste Stände werden ohne Zwischenwerte dargestellt.</p>
-                        <div id="wealthHistoryChart" class="wealth-scroll" tabindex="0" role="region" aria-label="Vermögensdiagramm"></div>
-                        <div id="wealthHistoryTable" class="wealth-scroll" tabindex="0" role="region" aria-label="Tabelle der Vermögensstände"></div>
-                    </div>
+                <section id="tab-wealth" class="tab-panel wealth-history" aria-labelledby="evaluationTitle">
+                    <h3 id="evaluationTitle">Auswertung</h3>
+                    <section aria-labelledby="wealthHistoryTitle">
+                        <h4 id="wealthHistoryTitle">Vermögensverlauf</h4>
+                        <div class="wealth-actions">
+                            <button id="captureWealthBtn" type="button" class="btn btn-primary">Stand jetzt erfassen</button>
+                            <span id="wealthHistoryCount"></span>
+                            <span id="wealthHistoryDate" aria-live="polite"></span>
+                        </div>
+                        <p id="wealthHistoryStatus" role="status" aria-live="polite"></p>
+                        <div>
+                            <p>Die Stände gehören zum aktiven Profil, auch bei angezeigtem Profilverbund.
+                                Enthalten sind Tagesgeld, Geldmarkt-ETF und Aktien-ETF (Alt- und Neu-Depot).
+                                Gold und separate Anleihen gehören nicht zu dieser Summe.</p>
+                            <p id="wealthHistoryHint" aria-live="polite"></p>
+                            <ul class="wealth-legend" aria-label="Vermögensgruppen">
+                                <li><span class="wealth-swatch wealth-tagesgeld" aria-hidden="true"></span>Liquidität (Tagesgeld)</li>
+                                <li><span class="wealth-swatch wealth-geldmarktEtf" aria-hidden="true"></span>Geldmarkt-ETF</li>
+                                <li><span class="wealth-swatch wealth-aktienEtf" aria-hidden="true"></span>Aktien-ETF</li>
+                            </ul>
+                            <p>■ Jahresabschluss: durchgezogener Rahmen · ◇ Unterjährig: gestrichelter Rahmen.
+                                Unregelmäßig erfasste Stände werden ohne Zwischenwerte dargestellt.</p>
+                            <div id="wealthHistoryChart" class="wealth-scroll" tabindex="0" role="region" aria-label="Vermögensdiagramm"></div>
+                            <div id="wealthHistoryTable" class="wealth-scroll" tabindex="0" role="region" aria-label="Tabelle der Vermögensstände"></div>
+                        </div>
+                    </section>
+                    <section class="expenses-history" aria-labelledby="expensesHistoryTitle">
+                        <h4 id="expensesHistoryTitle">Ausgaben je Jahr</h4>
+                        <p>Die Übersicht zeigt tatsächliche Ausgaben aller gespeicherten Profile, unabhängig von der aktuellen Profilauswahl.
+                            Jahresbudgets werden nicht historisch gespeichert und lassen sich für vergangene Jahre nicht verlässlich rekonstruieren.</p>
+                        <p>„Monate mit Daten“ zählt Monate mit Ausgaben; importierte Nullmonate zählen nicht.
+                            Vergleichen Sie unvollständige Jahre anhand von Ø pro Monat, ohne Hochrechnung auf ein Volljahr.</p>
+                        <p id="expensesHistoryHint" role="status" aria-live="polite"></p>
+                        <div id="expensesHistoryChart" class="wealth-scroll" tabindex="0" role="region" aria-label="Diagramm der Jahresausgaben"></div>
+                        <div id="expensesHistoryTable" class="wealth-scroll" tabindex="0" role="region" aria-label="Tabelle der Jahresausgaben"></div>
+                    </section>
                 </section>
             </div>
         </div>

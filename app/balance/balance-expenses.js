@@ -45,6 +45,14 @@ const state = {
 };
 let pendingImport = null;
 let recoveryOptions = null;
+let onChange = null;
+let onImportSuccess = null;
+let importTail = Promise.resolve();
+
+function notifyExpensesChange() {
+    // Die lesende Darstellung darf erfolgreiche Speicheraktionen nicht rückgängig machen.
+    try { onChange?.(); } catch { /* Der Ausgaben-Check bleibt bedienbar. */ }
+}
 
 function createDefaultRecoveryOptions(options = {}) {
     return {
@@ -159,6 +167,7 @@ async function resetCorruptExpensesAfterConfirmation() {
         if (dom?.expenses?.yearSelect) dom.expenses.yearSelect.disabled = false;
         renderYearSelect();
         renderTable();
+        notifyExpensesChange();
         UIRenderer.toast('Der Ausgaben-Check wurde nach bestaetigtem Recovery-Export zurueckgesetzt.');
     } catch {
         if (resetApplied && typeof corruption.raw === 'string') {
@@ -341,6 +350,7 @@ function setYear(year) {
         setExpensesActiveYear(year, recoveryOptions?.storage);
         renderYearSelect();
         renderTable();
+        notifyExpensesChange();
     } catch {
         readExpensesStoreForUi();
         renderCorruptExpensesState();
@@ -369,7 +379,7 @@ function openDetails(month, profileId) {
     });
 }
 
-async function handleCsvImport(file, month, profileId) {
+async function handleCsvImport(file, month, profileId, year, options, afterImport) {
     if (state.corruption) {
         renderCorruptExpensesState();
         return;
@@ -383,16 +393,30 @@ async function handleCsvImport(file, month, profileId) {
         renderCorruptExpensesState();
         return;
     }
-    const yearData = getExpensesYearData(store, state.year);
+    const yearData = getExpensesYearData(store, year);
     const monthData = getExpensesMonthData(yearData, month);
     monthData.profiles[profileId] = {
         categories,
         updatedAt: new Date().toISOString()
     };
-    saveExpensesStore(store, recoveryOptions?.storage);
+    saveExpensesStore(store, options.storage);
+    await options.flush();
 
-    refreshTableValues();
-    UIRenderer.toast('CSV importiert.');
+    // Importbestätigung gehört vor den optionalen Schritt. UI-/Sicherungsfehler
+    // machen die bereits bestätigten Ausgaben nicht zu einem CSV-Fehler.
+    try { UIRenderer.toast('CSV importiert.'); } catch { /* Bestätigter Import bleibt gültig. */ }
+    let capture, captureError;
+    // Kontext und Tag an der bestätigten Grenze erfassen, vor UI-Rückrufen.
+    try { capture = afterImport?.(); } catch (error) { captureError = error; }
+    try { refreshTableValues(); } catch { /* Bestätigter Import bleibt gültig. */ }
+    notifyExpensesChange();
+    try {
+        if (captureError) throw captureError;
+        await capture;
+    }
+    catch (error) {
+        UIRenderer.handleActionError(new Error(`Ausgaben importiert; Vermögensstand nicht bestätigt: ${error.message || error}`), 'expenses-wealth');
+    }
 }
 
 function deleteMonthData(month, profileId) {
@@ -411,6 +435,7 @@ function deleteMonthData(month, profileId) {
     delete monthData.profiles[profileId];
     saveExpensesStore(store, recoveryOptions?.storage);
     refreshTableValues();
+    notifyExpensesChange();
     UIRenderer.toast('Monatsdaten gelöscht.');
     return true;
 }
@@ -450,11 +475,15 @@ function handleFileChange(e) {
     const { month, profileId } = pendingImport;
     pendingImport = null;
 
-    handleCsvImport(file, month, profileId).catch(err => {
+    const year = state.year, options = recoveryOptions, afterImport = onImportSuccess;
+    const operation = importTail.then(() => handleCsvImport(file, month, profileId, year, options, afterImport));
+    const completed = operation.catch(err => {
         UIRenderer.handleActionError(err, 'expenses-import');
     }).finally(() => {
         e.target.value = '';
     });
+    importTail = completed;
+    return completed;
 }
 
 function bindEvents() {
@@ -483,6 +512,8 @@ function bindEvents() {
 export function initExpensesTab(domRefs, options = {}) {
     dom = domRefs;
     recoveryOptions = createDefaultRecoveryOptions(options);
+    onChange = typeof options.onChange === 'function' ? options.onChange : null;
+    onImportSuccess = typeof options.onImportSuccess === 'function' ? options.onImportSuccess : null;
     pendingImport = null;
     state.profileIds = [];
     state.recoveryExported = false;

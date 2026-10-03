@@ -1,10 +1,10 @@
 # Balance-App – Modulübersicht
 
-Die Balance-App besteht aus 39 ES6-Modulen unter `app/balance/`. Das folgende Dokument fasst Verantwortung, Exporte und wichtige Abhängigkeiten zusammen.
+Die Balance-App besteht aus 41 ES6-Modulen unter `app/balance/`. Das folgende Dokument fasst Verantwortung, Exporte und wichtige Abhängigkeiten zusammen.
 Dateinamen werden unten kurz ohne Präfix genannt; tatsächlicher Pfad ist in der Regel `app/balance/<datei>.js`.
 Ausnahmen: Profilverbund-Module liegen unter `app/profile/`, Shared-Formatter unter `app/shared/`.
 
-**Stand:** 2026-10-02
+**Stand:** 2026-10-03
 
 ## Vollstaendige Datei-Inventur
 
@@ -31,9 +31,11 @@ Die folgende Inventur ist gegen den fertigen Stand von `app/balance/` abgegliche
 | `balance-diagnosis-keyparams.js` | Schluesselparameter und VPW-/Mindest-Flex-Diagnose |
 | `balance-diagnosis-transaction.js` | Transaktionsdiagnostik und Blockgruende |
 | `balance-expenses-csv.js` | Parser fuer kategorisierte Ausgaben-CSV |
+| `balance-expenses-history-renderer.js` | Lesende Jahresauswertung mit SVG, zugänglicher Datentabelle sowie Leer- und Korruptionshinweis |
 | `balance-expenses-metrics.js` | DOM-freie Ausgabenkennzahlen und Forecasts |
 | `balance-expenses-renderer.js` | Ausgabentabelle, Summary und Detaildialog |
 | `balance-expenses-storage.js` | Ausgabenstore und Jahres-/Monatscontainer |
+| `balance-expenses-wealth-capture.js` | Importkoordination, Preiszeit-/Bewertungsnachweis und exaktes Sieben-Tage-Gate |
 | `balance-expenses.js` | Controller/Fassade des Ausgaben-Checks |
 | `balance-guardrail-reset.js` | Reset-Entscheidung bei relevanten Inputaenderungen |
 | `balance-health-bucket.js` | DOM-freie Pflegebucket-Diagnose |
@@ -50,9 +52,9 @@ Die folgende Inventur ist gegen den fertigen Stand von `app/balance/` abgegliche
 | `balance-utils.js` | Zahlen-/Waehrungsformatierung und UI-Hilfen |
 | `balance-wealth-history-metrics.js` | Unverändernde Verlaufssortierung, drei Stapelgruppen, Anlass und Teildepotwerte |
 | `balance-wealth-history-renderer.js` | Flüchtige Anzeigensteuerung, Anzahl, SVG, zugängliche Datentabelle sowie vollständiger Leer-/Fehler-Replace |
-| `balance-wealth-history.js` | Manuelle und jährliche Erfassung mit Profil-Recheck, gemeinsamer Schreibkoordination und bestätigtem State-/Registry-Replace |
+| `balance-wealth-history.js` | Gemeinsame unterjährige und jährliche Erfassung mit Profil-Recheck, gemeinsamer Schreibkoordination und bestätigtem State-/Registry-Replace |
 
-**Inventurergebnis:** 39 von 39 Dateien erfasst. Der DOM-freie Datenvertrag liegt zusätzlich unter `types/wealth-history-contract.js`.
+**Inventurergebnis:** 41 von 41 Dateien erfasst. Der DOM-freie Datenvertrag liegt zusätzlich unter `types/wealth-history-contract.js`.
 
 ---
 
@@ -232,14 +234,22 @@ Event-Hub der Anwendung.
 
 ---
 
-## 6a. Vermögensverlauf
+## 6a. Auswertung: Vermögensverlauf und Ausgaben je Jahr
 
 **Module und Exporte:**
-- `balance-wealth-history.js`: `createBalanceWealthHistoryService()` mit `captureContext()`, `assertContext()`, `runAnnual()`, `finalizeAnnual()` und `captureManual()`; `createManualWealthHistoryController()` mit `capture()` und `withAnnual()`.
+- `balance-expenses-metrics.js`: `prepareExpensesHistoryMetrics(store, currentYear)` projiziert die Jahresausgaben DOM-/storagefrei und ohne Mutation; `computeYearStats()` liefert dieselben Istkennzahlen wie im Ausgaben-Check.
+- `balance-expenses-history-renderer.js`: `renderBalanceExpensesHistory()` und `refreshBalanceExpensesHistory()` verbinden die Projektion mit den eigenen aktiven SVG-/Tabellenregionen; `loadExpensesStoreResult()` aus `balance-expenses-storage.js` liefert den geprüften Ladezustand.
+- `balance-wealth-history.js`: `createBalanceWealthHistoryService()` mit `captureContext()`, `assertContext()`, `assertManualReady()`, `runAnnual()`, `finalizeAnnual()` und `captureManual()`; `previewWealthHistory()` liefert die gemeinsame PREVIEW. `createManualWealthHistoryController()` bietet `capture()` und `withAnnual()`.
 - `balance-wealth-history-metrics.js`: `prepareWealthHistoryMetrics()` validiert und sortiert ohne Mutation; Alt-/Neu-Depot bilden eine einzige Aktiengruppe.
 - `balance-wealth-history-renderer.js`: `initializeBalanceWealthHistory()`, `renderBalanceWealthHistory()` und `refreshBalanceWealthHistory()` validieren, zählen und datieren die aktuelle Historie. Ausschließlich `dom.panel.classList.contains('active')` erlaubt SVG-/Tabellenaufbereitung. Inaktive Refreshs und Deaktivierung leeren dynamische Inhalte; aktive Refreshs ersetzen sie auch bei leerem/fehlerhaftem State vollständig. Das Datum stammt aus dem größten validierten `asOf`: „Zuletzt erfasst am TT.MM.JJJJ“, fehlend/leer exakt „Noch keine Stände erfasst“, beschädigt ohne alten Datumstext. Datums-/Euro-Skala, drei Gruppen und Anlass als Text/Symbol/Rahmen ergänzen die per Tab erreichbare Tabelle mit Summe und beiden Teildepots; Einzel- und Nullstände bleiben gültig, schmale Ansichten scrollen intern. Keine Interpolation ungemessener Zwischenwerte.
 
-**Bedienung:** „Vermögensverlauf“ ist in `Balance.html` der vierte Haupttab (`tab-wealth`), mit genau einer Capturetaste; die Ergebnisspalte enthält keinen Verlauf mehr. Start/Reload/Profilnavigation aktivieren ausschließlich „Jahres-Update“. `UIBinder.handleTabClick()` nutzt die bestehende Tabmechanik und liest den Verlauf frisch, ohne Engineupdate, Erfassung, Fehlerbereinigung oder Write. Toggle-/hidden-Steuerung entfällt. Allgemeine Updates, Snapshotaktionen, Erfassungen und ausgewählte Balance-Importe erhalten die Tabaktivität, auch bei Ablehnung/Rollback; der Import aktualisiert im `finally` die bestätigte Datenbasis. Keine Dateiauswahl bleibt wirkungslos. Anzahl, Datum, Status und Leerhinweis gehören ins Verlaufspanel. Inaktiv wird validiert, aber nicht gezeichnet; aktiv erscheinen bestätigte Änderungen unmittelbar. Die Aktivität bleibt ausschließlich im DOM, ohne Persistenz/Export. Inaktive Regionen fehlen aus Tab-Reihenfolge/Zugänglichkeitsbaum; aktiv folgen auf Capture direkt Diagramm und Tabelle. Native Tabs/Capture unterstützen Klick/Enter/Leertaste; die vier Tabs umbrechen in schmalen Ansichten.
+**Bedienung:** „Auswertung“ ist in `Balance.html` der vierte Haupttab (`tab-wealth`) nach „Jahres-Update“, „Einstellungen & Strategie“ und „Ausgaben-Check“, mit zwei benannten Abschnitten: „Vermögensverlauf“ und darunter „Ausgaben je Jahr“. Es gibt genau eine Capturetaste; die Ergebnisspalte enthält keinen Verlauf mehr. Start/Reload/Profilnavigation aktivieren ausschließlich „Jahres-Update“. `UIBinder.handleTabClick()` nutzt die bestehende Tabmechanik und liest beide Auswertungsabschnitte frisch, ohne Engineupdate, Erfassung, Fehlerbereinigung oder Write. Toggle-/hidden-Steuerung entfällt. Allgemeine Updates, Snapshotaktionen, Erfassungen und ausgewählte Balance-Importe erhalten die Tabaktivität, auch bei Ablehnung/Rollback; der Import aktualisiert im `finally` die bestätigte Datenbasis. Keine Dateiauswahl bleibt wirkungslos. Anzahl, Datum, Status und Leerhinweis gehören ins Verlaufspanel. Inaktiv wird validiert, aber nicht gezeichnet; aktiv erscheinen bestätigte Änderungen unmittelbar. Die Aktivität bleibt ausschließlich im DOM, ohne Persistenz/Export. Inaktive Regionen fehlen aus Tab-Reihenfolge/Zugänglichkeitsbaum; aktiv folgen auf Capture die beiden Vermögensregionen und danach die beiden Jahresausgabenregionen. Native Tabs/Capture unterstützen Klick/Enter/Leertaste; die vier Tabs umbrechen in schmalen Ansichten.
+
+**Automatische Importerfassung:** `balance-expenses-wealth-capture.js` exportiert `EXPENSES_WEALTH_QUOTE_MAX_AGE_MS` (604800000), `readExpensesWealthQuoteEvidence()`, `evaluateExpensesWealthQuoteFreshness()` und `createExpensesWealthCaptureController()`. Ein separater `onImportSuccess`-Rückruf startet erst nach Storewrite und bestätigtem Flush; „CSV importiert.“ bleibt vor Erfolg/Hinweis/Fehler nachweisbar. Lokaler Importtag und Profilkontext werden vor jedem weiteren Warten fixiert. Jeder gültige Vorgang wird seriell einmal verarbeitet. Automatik und manuelle Taste teilen `previewWealthHistory()` und die `captureManual()`-Transaktion, einschließlich State-/Registry-Readback und Tagesersetzung. Gespeichert bleibt `manual` beim aktiven Profil; alle PREVIEW-Bestände der Verbundprofile werden geprüft. Der Import wird bei optionalem Fehler nicht zurückgenommen.
+
+Das Gate verwendet nur das am bewerteten Tranchenkurs gespeicherte `asOf` (UTC-Sekunden), verlangt vollständige Bewertungszuordnung und akzeptiert exakt sieben Tage. Fehlende/ungültige/zukünftige Zeit oder positive Aggregate ohne Nachweis bleiben unbekannt; ein alter beitragender Kurs genügt zum Blockieren. „Kurse aktualisieren“ in `app/tranches/tranchen-manager-page.js` speichert exakt `quote.asOf` aus `tranchen-price-service.js` zusammen mit Preis und Ticker. Erst bestätigter Flush von Livebestand und Registrykopie gibt den Zeitnachweis für Rückkehr zur Balance und Reload frei. Altdaten ohne Datum und manuell geänderte Preise bleiben unbekannt; nur vollständig frische beitragende Aktien-/Geldmarkt-ETFs erlauben die Automatik. Kaufdatum, Profiländerung und `annualMarketDataMeta` genügen nicht. Tagesgeld wird nicht auf Aktualität geprüft, Gold/separate Anleihen sind kein ETF-Frischegate. Ohne kursabhängige Bestände wird direkt gesichert. Hinweise verwenden `'info'`, Erfolg `true`; echte Fehler bleiben in `expenses-wealth`. Pending-/laufender Jahresabschluss, Profil- und Vorschauquellenwechsel blockieren ohne fremde Writes. Nach jedem Ergebnis werden beide Auswertungsabschnitte aus bestätigten Daten aktualisiert, ohne Navigation.
+
+**Jahresausgaben:** `balance-expenses-history-renderer.js` exportiert `renderBalanceExpensesHistory()` und `refreshBalanceExpensesHistory()`. Der Loader `loadExpensesStoreResult()` und eine injizierbare lokale Uhr liefern die Datenbasis. Untercontainer werden lesend geprüft; Fehler nennen Datenbereich/Backend und Recovery im Ausgaben-Check ohne Rohdaten, Reset oder Seitenabbruch. Erst im aktiven `tab-wealth` entstehen SVG und Tabelle aus `prepareExpensesHistoryMetrics()`. Diese reine Projektion umfasst alle gespeicherten Profile unabhängig von der Verbundauswahl; nur importierte Jahre erscheinen, einschließlich Nullimportjahren. Jahressumme, Monate mit positiven Ausgaben und Ø pro Monat entsprechen dem Ausgaben-Check. Jeder Kalendermonat zählt einmal, auch bei mehreren Profilimporten; Ø pro Monat ist die Jahressumme geteilt durch diese Monatszahl, bei null Datenmonaten 0. Nur das aktuelle Kalenderjahr mit weniger als zwölf Datenmonaten wird als „laufendes Teiljahr“ markiert, Ø pro Monat dient dem Vergleich ohne Hochrechnung. Historische Jahresbudgets fehlen im Store und sind nicht verlässlich rekonstruierbar; deshalb keine Budget- oder Abweichungsspalten. Eigene eindeutige SVG-Titel-/Beschreibungs-IDs und zwei zusätzliche fokussierbare Scrollregionen ergänzen die beiden Vermögensregionen. `initExpensesTab({ ... }, { onChange })` benachrichtigt nach Import, Jahresauswahl/Wechsel, Löschung und bestätigtem geflushtem Reset; die lesende Reaktion erfasst keinen Vermögensstand. Der sichtbare Vermögensanlass heißt „Unterjährig“, gespeichert weiterhin `manual` mit Raute und gestricheltem Rahmen.
 
 **Bestätigung:** „Stand gesichert“ folgt manueller Speicherung bzw. neuer jährlicher Finalisierung erst nach Readback von Balance-State und aktiver Registrykopie. Im Snapshothandler wird das pro Aufruf zunächst falsche Flag `annualWealthSaved` ausschließlich unmittelbar nach erfolgreichem `await wealthHistory.finalizeAnnual(...)` gesetzt. Nach `completedResult` folgt zuerst die Kurzmeldung, bei gesetztem Flag exakt `Ausgaben-Check auf ${nextYear} umgestellt. Vermögensstand gesichert.`, sonst unverändert ohne Zusatz. Erst danach folgt bei gesetztem Flag `onAnnualWealthSaved` (wirkungsloser Standard), ohne erneute Jahresschwellenprüfung. Dies gilt bei aktivem und inaktivem Verlauf. Wiederholungs-No-op, fehlgeschlagene Finalisierung und Jahre vor 2026 bestätigen keinen neuen Stand. Fehler in Rückruf, Toast oder Snapshot-Rendering lassen den bestätigten Abschluss und leeren Pendingmarker bestehen und erlauben keinen zweiten Commit; bei defektem Toast ist keine sichtbare Ausgabe garantiert.
 
@@ -249,13 +259,17 @@ Event-Hub der Anwendung.
 
 **Persistenz und Recovery:** Gemeinsame Warteschlange, Flush sowie Profil-/State-Rechecks verhindern fremde oder veraltete Writes. Der transaktionale Replace umfasst ausschließlich den vorhandenen Balance-State-Key und `rs_profiles_v1`; Readback bestätigt Live-State und aktive Registrykopie. Jahresrecord und `annualPeriodMetadata.lastCommittedPeriod` werden gemeinsam finalisiert, Wiederholung ist ein No-op. Fehler bewahren vorherigen Verlauf und Pending-/Recoveryzustand; `incomplete_recovery` blockiert weitere Jahresläufe und manuelle Zwischenstände bis zum Snapshot-Restore, ohne direkten Resume. Der Verlauf gehört ausschließlich zum aktiven Profil, auch bei angezeigtem Verbund; andere Profile erhalten keine Kopie und spätere Verbundänderungen ändern frühere Stände nicht.
 
-**Layout und Druck:** Ab 1440 px Fensterbreite liegen die vier vollständigen Tabtitel in einer Zeile; schmaler dürfen sie als ganze Tabs umbrechen. Capturetaste, Anzahl und das nicht fokussierbare Inline-Datum mit unveränderter Live-Ankündigung bilden `wealth-actions`, auf schmalen Ansichten mit kontrolliertem Umbruch. Status bleibt eine eigene Region. `contain: inline-size` auf `.wealth-scroll` begrenzt die intrinsische Breite der intern scrollenden Regionen; `.form-column` erhält keine zusätzliche `min-width: 0`-Regel. Die Ausgabentabelle behält 720 px Mindestbreite. Bestehendes Drawer-Verhalten und Druck-CSS bleiben erhalten; beim Drucken wird der Vermögensverlauf zusammen mit der Formularspalte ausgeblendet.
+**Layout und Druck:** Ab 1366 CSS-Pixeln Fensterbreite liegen die vier vollständigen Tabtitel in einer Zeile; schmaler dürfen sie als ganze Tabs umbrechen. Capturetaste, Anzahl und das nicht fokussierbare Inline-Datum mit unveränderter Live-Ankündigung bilden `wealth-actions`, auf schmalen Ansichten mit kontrolliertem Umbruch. Status bleibt eine eigene Region. `contain: inline-size` auf `.wealth-scroll` begrenzt die intrinsische Breite der intern scrollenden Regionen; `.form-column` erhält keine zusätzliche `min-width: 0`-Regel. Die Ausgabentabelle behält 720 px Mindestbreite. Bestehendes Drawer-Verhalten und Druck-CSS bleiben erhalten; beim Drucken wird die gesamte Auswertung zusammen mit der Formularspalte ausgeblendet.
 
 **Transport:** Balance-JSON, Profilbundle, Komplettbackup und Standard-Snapshots erhalten das Feld ohne neue Keys oder äußere Schema-Version. Ein unterstützter Replace ohne Feld leert den Verlauf; Restore stellt den damaligen Verlauf wieder her, ohne append-only-Garantie über Restore/Replace hinweg. Die State-/Import-/Profil-/Backupgrenzen prüfen auch inaktive Profilverläufe. Einzelheiten und Summen-Toleranz stehen in `TECHNICAL.md`, gezielte Tests und separates Browsergate in `tests/README.md`.
 
 **Testbeobachtung:** Produkt und Tests teilen die DOM-freie Konstante `BALANCE_UPDATE_DEBOUNCE_MS = 250` aus `balance-config.js`. `tests/wealth-browser-update-observer.mjs` kapselt den unabhängig importierbaren Init-Hook; Browser und VM übergeben die Entprellzeit ausdrücklich, sodass die serialisierte Funktion ohne Modul-Closure läuft. Accessors erhalten die Beobachtung bei nachträglicher Timerzuweisung durch `page.clock`. Die Tabprüfung vergleicht nach beobachtetem Idle sortierte Schlüssel und vollständige Schlüssel/Wert-Paare von `localStorage` und `sessionStorage`, zählt deren `setItem`-/`removeItem`-/`clear`-Aufrufe mit Sollwert null und baut alle Hooks im `finally` zurück. Die volle Node-Suite fährt im orchestrierten Lauf der Orchestrator; die gesteuerte Sitzung fährt das Browsergate vor dem Merge.
 
 **Dependencies:** `balance-storage.js`, `balance-update-pipeline.js`, `balance-utils.js`, `app/shared/persistence-facade.js`, Profilregistry/-state und `types/wealth-history-contract.js`. Integration durch `balance-binder.js`/`balance-main.js`; Jahresfinalisierung durch `balance-binder-snapshots.js`.
+
+**Prüfzuordnung:** `tests/balance-expenses-history.test.mjs` sichert unveränderliche Projektion, Profil-/Monatszählung, Nulljahre, Budgetabwesenheit und aktive/inaktive Darstellung. `tests/balance-expenses-wealth-capture.test.mjs` prüft synthetisch Frischegrenzen und Koordinationsfehler; `tests/balance-expenses.test.mjs` durchläuft dagegen den echten Managerkurslistener, Backend-/Registry-Readback, Reload, CSV-Dateilistener und Engine-PREVIEW mit kontrollierter Quote. Die Meldungen bleiben auf den bestehenden APIs `UIRenderer.toast(text, true | 'info')`, `UIRenderer.handleActionError(error, 'expenses-wealth')` und `UIRenderer.clearActionError('expenses-wealth')`; `tests/balance-messages.test.mjs` und `tests/balance-ui-orchestration.test.mjs` sichern Darstellung und Binderkoordination zusätzlich ab. Die Ausgaben-/Verlaufsformate bleiben unverändert.
+
+Nach dieser Dokumentations-Slice führt der Orchestrator `npm test` aus. Das separate externe `npm run test:browser` umfasst `Balance expenses history`, `Balance automatic expenses capture` und die Verlaufs-Layoutmatrix. Vor lokalem Merge bestätigt die gesteuerte Sitzung insbesondere die ausgegebenen `Balance wealth layout SOURCE`-Messwerte: vier vollständige Tabtitel in einer Zeile ab 1366 CSS-Pixeln, interne Scrollregionen und unverändertes Drawer-Verhalten bei 375 CSS-Pixeln sowie Druckausblendung der Auswertung. Diese Beschreibung ist kein grüner Browsernachweis aus der Agentensandbox; synthetische Frischetests ersetzen den produktiven Managerpfad nicht.
 
 ---
 
@@ -297,6 +311,7 @@ Ausgaben-Check für monatliche CSV-Importe und Budgettracking.
 - `balance-expenses-csv.js` – CSV-Parser mit Delimiter-Erkennung (`;`, `,`, `Tab`) und Betragsnormalisierung.
 - `balance-expenses-metrics.js` – Monats-, Jahres-, Median-, Forecast- und Soll/Ist-Kennzahlen ohne DOM/localStorage.
 - `balance-expenses-renderer.js` – Year-Select, Tabelle, Summary-Karten und Detaildialog.
+- `balance-expenses-history-renderer.js` – lesende Jahresauswertung mit eigener SVG-/Tabellenausgabe, Leer- und Korruptionshinweis, ausschließlich im aktiven Auswertungstab.
 
 **Funktionen:**
 - Monatliche Ablage pro Profil und Jahr ueber die Persistenz-Facade (`balance_expenses_v1`).
@@ -474,6 +489,7 @@ Kernlogik für den Profilverbund (Multi-Profil-Modus).
   Verlustverrechnung zu suggerieren.
 
 **Tranchen-/Cash-Contract:**
+- Reale Detailtranchen behalten den optionalen Kurszeitpunkt `asOf` (positive ganzzahlige UTC-Sekunden) zusammen mit `currentPrice` und ihrer Profilherkunft. Fehlt der Zeitnachweis oder ist er `null`, bleibt der Bestand undatiert. Synthetische Fallbacks und ETF-Aggregate erhalten kein Datum aus Profil-`updatedAt` oder Strategie-ETF-`annualMarketDataMeta`. Der Zeitnachweis verändert weder Bewertung noch Steuersemantik; sein Alter wird getrennt im Frischegate bewertet.
 - Entnahmen nutzen zuerst Tagesgeld und Geldmarkt, bevor ein Verkauf aus Detailtranchen geplant wird.
 - Vorhandene Detailtranchen werden ohne Mutation mit Profilherkunft kopiert. Fehlen Detailtranchen, entstehen profilmarkierte synthetische Fallback-Tranchen aus den aggregierten Werten.
 - Detailtranchen ersetzen in Asset-Summaries die aggregierten Depot-/Gold-/Geldmarktwerte, damit Werte nicht doppelt gezählt werden. Bonds behalten ihre Assetklasse und fliessen fuer Legacy-Kompatibilitaet zugleich in die Depotaggregate ein.

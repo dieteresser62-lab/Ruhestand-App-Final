@@ -178,3 +178,25 @@ console.log('Test 6: reconciliation registry load is explicit and raw-preserving
     assertEqual(unavailable.status, 'unavailable', 'Storage rejection should stay distinct from corrupt data');
 }
 console.log('✓ reconciliation registry load contract OK');
+
+console.log('Test 7: Kurszeit überlebt Save/Load ohne Datumserfindung oder Teilwrite');
+{
+    const storage = createLocalStorageMock();
+    const asOf = 1700000000;
+    saveTranchesToStorage([validLegacyTranche({ asOf })], storage);
+    assertEqual(loadTranchesFromStorage(storage).tranches[0].asOf, asOf, 'Save/Load erhält exakt die Kurszeit');
+    const before = storage.getItem('depot_tranchen');
+    const writes = storage.setCalls;
+    for (const invalid of ['', '1700000000', 0, -1, 1.5, Infinity, 8640000000001]) {
+        let error;
+        try { saveTranchesToStorage([validLegacyTranche({ asOf: invalid })], storage); }
+        catch (caught) { error = caught; }
+        assert(error instanceof TrancheValidationError, 'Ungültige Zeit blockiert Speichern');
+        assertEqual(storage.setCalls, writes, 'Validierung erfolgt vor dem Write');
+        assertEqual(storage.getItem('depot_tranchen'), before, 'Bestätigter Bestand bleibt bytegleich');
+    }
+    for (const asOf of [null, undefined]) {
+        saveTranchesToStorage([validLegacyTranche({ asOf })], storage);
+        assert(!('asOf' in loadTranchesFromStorage(storage).tranches[0]), 'Unbekannte Kurszeit bleibt undatiert');
+    }
+}

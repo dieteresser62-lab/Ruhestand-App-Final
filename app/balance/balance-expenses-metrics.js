@@ -69,9 +69,44 @@ export function computeYearStats({ yearData, annualBudget = 0, monthlyBudget = 0
     };
 }
 
+/**
+ * Lesende Jahresprojektion aller gespeicherten Profile, unabhängig von activeYear.
+ * currentYear ist das vom Aufrufer bestimmte lokale Kalenderjahr; kein Uhr-/Storagezugriff.
+ * Nullimporte bleiben sichtbar, reine Auswahlcontainer werden ausgelassen.
+ */
+export function prepareExpensesHistoryMetrics(store, currentYear) {
+    const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+    if (!isRecord(store?.years)) return [];
+
+    return Object.entries(store.years)
+        .filter(([key, yearData]) => {
+            const year = Number(key);
+            if (!Number.isSafeInteger(year) || year <= 0 || String(year) !== key
+                || !isRecord(yearData) || !isRecord(yearData.months)) return false;
+            // Nur die zwölf Kalendermonate können einen importierten Eintrag belegen.
+            for (let month = 1; month <= 12; month++) {
+                const profiles = yearData.months[String(month)]?.profiles;
+                if (isRecord(profiles) && Object.values(profiles).some(entry =>
+                    isRecord(entry) && isRecord(entry.categories))) return true;
+            }
+            return false;
+        })
+        .sort(([a], [b]) => Number(a) - Number(b))
+        .map(([key, yearData]) => {
+            const year = Number(key);
+            const { annualUsed, monthsWithData, avgMonthly } = computeYearStats({ yearData });
+            return {
+                year,
+                annualUsed,
+                monthsWithData,
+                avgMonthly,
+                isCurrentPartialYear: year === currentYear && monthsWithData < 12
+            };
+        });
+}
+
 export function sortExpenseEntries(categories) {
     return Object.entries(categories || {})
         .map(([name, value]) => ({ name, value: Number(value) || 0 }))
         .sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
 }
-

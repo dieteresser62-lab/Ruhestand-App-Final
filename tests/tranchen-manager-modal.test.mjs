@@ -286,3 +286,41 @@ console.log('Test 11: cash dialog shows immutable evidence and reads explicit co
     assertEqual(correction.correctionReason, 'Zahlendreher', 'Correction should read the mandatory reason');
 }
 console.log('✓ cash dialog evidence contract OK');
+
+console.log('Test 12: Formular erhält ausschließlich unveränderte Kursprovenienz');
+{
+    const original = {
+        schemaVersion: 2, trancheId: 'dated', name: 'ETF', isin: 'DE000TEST001', ticker: 'TEST.DE',
+        shares: 2, purchasePrice: 100, currentPrice: 120, purchaseDate: '',
+        category: 'equity', type: 'aktien_neu', tqf: 0.3, taxExempt: false, notes: '', asOf: 1700000000
+    };
+    const read = (changes, previous = original) => {
+        const doc = createDocumentMock();
+        openEditTrancheModal(previous, doc);
+        for (const field of ['currentPrice', 'purchasePrice', 'shares', 'tqf']) {
+            doc.getElementById(field).value = String(doc.getElementById(field).value);
+        }
+        for (const [field, value] of Object.entries(changes)) {
+            if (field === 'taxExempt') doc.getElementById(field).checked = value;
+            else doc.getElementById(field).value = value;
+        }
+        return readTrancheFromForm(previous.trancheId, doc, { existingTranche: previous });
+    };
+    for (const changes of [{ notes: 'Notiz' }, { shares: '3' }, { tqf: '0.2' }, { taxExempt: true },
+        { purchasePrice: '90' }, { ticker: ' test.de ' }]) {
+        assertEqual(read(changes).asOf, original.asOf, 'Unveränderter Kurs behält seine Zeit');
+    }
+    for (const changes of [{ currentPrice: '130' }, { isin: 'DE000TEST002' }, { ticker: 'OTHER.DE' },
+        { category: 'bonds', type: 'anleihe', tqf: '0' }, { type: 'aktien_alt' }, { currentPrice: '' }]) {
+        assert(!('asOf' in read(changes)), 'Manuelle Kurs-/Instrumentänderung oder Kaufpreis-Fallback entfernt Zeit');
+    }
+    const changed = read({ currentPrice: '130' });
+    assert(!('asOf' in read({ currentPrice: '120' }, changed)), 'Wiedereintragen des früheren Preises erfindet keine Zeit');
+    const fallback = read({ currentPrice: '' });
+    assertEqual(fallback.currentPrice, 100, 'Leeres Kursfeld nutzt weiter den Kaufpreis');
+    const doc = createDocumentMock();
+    openEditTrancheModal(original, doc);
+    doc.getElementById('currentPrice').value = '120';
+    doc.getElementById('tqf').value = '0.3';
+    assert(!('asOf' in readTrancheFromForm(null, doc, { idFactory: () => 'new' })), 'Neuanlage ist undatiert');
+}
