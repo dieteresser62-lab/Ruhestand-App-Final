@@ -7,7 +7,7 @@ import {
     parseExpenseAmount,
     splitCsvLine
 } from '../app/balance/balance-expenses-csv.js';
-import { computeSpent, computeYearStats } from '../app/balance/balance-expenses-metrics.js';
+import { computeSpent, computeYearStats, sumMonthProfiles } from '../app/balance/balance-expenses-metrics.js';
 import {
     createEmptyExpensesStore,
     createExpensesCorruptionRecoveryDocument,
@@ -377,6 +377,23 @@ try {
     assertEqual(stats.ytdBudget, 2000, 'YTD-Budget sollte nur Datenmonate berücksichtigen');
     assertClose(stats.annualForecast, 12240, 1e-9, 'Forecast sollte ab 2 Monaten den Median nutzen');
 
+    const multiProfileMonth = { profiles: {
+        selected: { categories: { Ausgabe: -100, Erstattung: 20 } },
+        hidden: { categories: { Ausgabe: 30 } }
+    } };
+    const multiProfileStats = computeYearStats({
+        yearData: { months: { '1': multiProfileMonth, '2': { profiles: {
+            hidden: { categories: { Ausgabe: -10, Erstattung: 10 } }
+        } } } }, annualBudget: 1200, monthlyBudget: 100
+    });
+    assertEqual(sumMonthProfiles(multiProfileMonth), 110, 'Auch ausgeblendete Profile zählen; Betrag wird je Profil gebildet');
+    assertEqual(multiProfileStats.annualUsed, 110, 'Profilsummen werden nicht vor Betragsbildung verrechnet');
+    assertEqual(multiProfileStats.monthsWithData, 1, 'Zwei Profile im selben Monat zählen einmal, Nullimport nicht');
+    assertEqual(multiProfileStats.avgMonthly, 110, 'Durchschnitt berücksichtigt denselben einen Datenmonat');
+    assertEqual(multiProfileStats.ytdBudget, 100, 'YTD-Soll behält die bestehende Datenmonatssemantik');
+    assertEqual(multiProfileStats.ytdDelta, 10, 'Bestehende Abweichungsberechnung bleibt unverändert');
+    assertEqual(multiProfileStats.annualForecast, 1320, 'Ein Datenmonat verwendet weiterhin den Durchschnitt für die Prognose');
+
     global.localStorage = new MockLocalStorage();
     global.window = { localStorage: global.localStorage };
     global.document = new MockDocument();
@@ -432,7 +449,10 @@ try {
     assertEqual(JSON.parse(global.localStorage.getItem(STORAGE_KEY)).activeYear, 2026, 'Expliziter Reset erzeugt erst nach Recovery-Freigabe einen leeren Store');
 
     writeStore({ version: 1, activeYear: 2026, years: { '2026': { months: {} } } });
-    seedMonth(2026, 1, { 'Miete': -1000 });
+    seedMonth(2026, 1, { 'Miete': -1000, 'Erstattung': 30 });
+    const withHiddenProfile = readStore();
+    withHiddenProfile.years['2026'].months['1'].profiles.hidden = { categories: { Ausgabe: 30 } };
+    writeStore(withHiddenProfile);
 
     const dom = createDomRefs();
     initExpensesTab(dom);
@@ -453,6 +473,8 @@ try {
     assert(dom.expenses.forecastSub.textContent.includes('Ø/Monat'), 'Forecast sollte bei 1 Datenmonat mit Durchschnitt arbeiten');
     assert(dom.expenses.forecastSub.textContent.includes('Datenmonate: 1/12'), 'Forecast-Unterzeile sollte 1 Datenmonat anzeigen');
     const janTotal = dom.expenses.table.querySelector('[data-month-total="1"] [data-role="total"]');
+    assertEqual(dom.expenses.table.querySelector('[data-month="1"][data-profile="hidden"]'), null,
+        'Gespeichertes Fremdprofil hat keine sichtbare Profilspalte');
     assert(janTotal && janTotal.classList.contains('budget-ok'), 'Januar-Gesamt sollte bei Budgettreffer als OK markiert sein');
     assert(dom.expenses.ytdValue.classList.contains('budget-ok'), 'YTD sollte bei exaktem Soll als OK markiert sein');
 
