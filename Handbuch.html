@@ -1418,8 +1418,9 @@
                             öffnen immer „Jahres-Update“. Aktivieren zeigt Beschreibung, Legende, Diagramm und Tabelle
                             aus den aktuellen gespeicherten Daten, ohne einen Stand zu erfassen. Verlassen entfernt
                             die dynamischen Inhalte. Auch eine leere Historie zeigt beim Öffnen einen erklärenden Hinweis.</p>
-                        <p>Im Verlaufstab stehen „Stand jetzt erfassen“, die Anzahl und das Datum
-                            <strong>„Zuletzt erfasst am TT.MM.JJJJ“</strong> des größten gespeicherten Stichtags.
+                        <p>Im Verlaufstab bilden „Stand jetzt erfassen“, die Anzahl und das Datum eine gemeinsame
+                            Aktionszeile, die auf schmalen Ansichten umbrechen darf. Das Datum lautet
+                            <strong>„Zuletzt erfasst am TT.MM.JJJJ“</strong> für den größten gespeicherten Stichtag.
                             Fehlende oder leere Historie zeigt exakt <strong>„Noch keine Stände erfasst“</strong>.
                             Das Datum folgt dem Stichtag, nicht der letzten Bedienung; eine spätere Erfassung mit älterem
                             Stichtag verringert es nicht. Beschädigte Historie hinterlässt kein altes Datum.</p>
@@ -1432,8 +1433,11 @@
                             Die Tabaktivität wird weder gespeichert noch exportiert.</p>
                         <p>Tabs und Capturetaste lassen sich mit Klick, Enter und Leertaste bedienen. Inaktive Regionen
                             fehlen aus Tab-Reihenfolge und Zugänglichkeitsbaum; im aktiven Verlauf folgen Diagramm und
-                            Tabelle direkt auf die Capturetaste und scrollen intern. Bei schmalen Ansichten umbrechen
-                            die vier Haupttabs und die Capturetaste bleibt erreichbar.</p>
+                            Tabelle direkt auf die Capturetaste und scrollen intern, ohne die Formularspalte zu verbreitern.
+                            Im zweispaltigen Desktoplayout über 1250 px stehen alle vier Haupttabs vollständig in einer Zeile.
+                            Bei schmalen Ansichten dürfen sie umbrechen; die Capturetaste bleibt erreichbar.
+                            Die Ausgabentabelle behält ihre Mindestbreite von 720 px.</p>
+                        <p>Beim Drucken der Balance-Seite wird der Vermögensverlauf nicht ausgegeben.</p>
                         <p>Im Verlaufstab speichert <strong>„Stand jetzt erfassen“</strong> die aktuellen,
                             frisch geprüften Balance-Bestände. Ein erneuter Klick am selben lokalen Kalendertag
                             ersetzt den manuellen Stand; an einem anderen Tag kommt ein Stand hinzu. Normale

@@ -15,6 +15,15 @@ assertEqual((html.match(/id="captureWealthBtn"/g) || []).length, 1, 'Genau eine 
 assert(html.indexOf('id="tab-wealth"') < html.indexOf('id="captureWealthBtn"') && html.indexOf('id="captureWealthBtn"') < html.indexOf('class="results-column'), 'Capture im vierten Panel vor Ergebnisspalte');
 assert(!html.slice(html.indexOf('class="results-column')).includes('wealth-history'), 'Kein Verlauf in Ergebnisspalte');
 assert(!html.includes('toggleWealthHistoryBtn'), 'Kein Toggle im Markup');
+const actions = html.match(/<div class="wealth-actions">([\s\S]*?)<\/div>/)?.[1] || '';
+for (const id of ['captureWealthBtn', 'wealthHistoryCount', 'wealthHistoryDate']) {
+    assert(actions.includes(`id="${id}"`), `${id} gehört zum gemeinsamen Aktionscontainer`);
+    assertEqual((html.match(new RegExp(`id="${id}"`, 'g')) || []).length, 1, `${id} bleibt eindeutig`);
+}
+const dateElement = actions.match(/<span\b[^>]*id="wealthHistoryDate"[^>]*>/)?.[0] || '';
+assert(dateElement.includes('aria-live="polite"'), 'Datum bleibt eine höfliche Live-Ankündigung');
+assert(!/\btabindex\s*=/.test(dateElement), 'Inline-Datum bleibt außerhalb der Fokusfolge');
+assert(!actions.includes('id="wealthHistoryStatus"') && /<p id="wealthHistoryStatus" role="status" aria-live="polite">/.test(html), 'Status bleibt eine eigene Region');
 function panel(active = false) {
     return { classList: { contains: name => name === 'active' && active,
         add: () => { active = true; }, remove: () => { active = false; } } };

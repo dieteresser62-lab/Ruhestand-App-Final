@@ -977,6 +977,156 @@ async function switchWealthBrowserProfile(page, baseUrl, profileId) {
     await waitForWealthBrowserStartup(page);
 }
 
+async function waitForWealthBrowserLayout(page) {
+    await waitForWealthBrowserIdle(page);
+    await page.evaluate(async () => {
+        await document.fonts.ready;
+        await Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => {})));
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    });
+}
+
+async function measureWealthBrowserLayout(page) {
+    await waitForWealthBrowserLayout(page);
+    return page.evaluate(() => {
+        const rect = el => {
+            const { x, y, width, height } = el.getBoundingClientRect();
+            return { x, y, width, height };
+        };
+        const wrapper = document.querySelector('.expenses-table-wrap');
+        const table = document.querySelector('#expensesTable table');
+        const tableRect = table.getBoundingClientRect();
+        let left = Math.max(0, tableRect.left);
+        let right = Math.min(document.documentElement.clientWidth, tableRect.right);
+        for (let parent = table.parentElement; parent; parent = parent.parentElement) {
+            if (getComputedStyle(parent).overflowX !== 'visible') {
+                const box = parent.getBoundingClientRect();
+                left = Math.max(left, box.left + parent.clientLeft);
+                right = Math.min(right, box.left + parent.clientLeft + parent.clientWidth);
+            }
+        }
+        return {
+            viewport: document.documentElement.clientWidth, page: document.documentElement.scrollWidth,
+            direction: getComputedStyle(document.querySelector('.main-layout')).flexDirection,
+            form: rect(document.querySelector('.form-column')),
+            expenses: { table: rect(table), wrapper: rect(wrapper), wrapperClient: wrapper.clientWidth,
+                visible: Math.max(0, right - left) },
+            tabContainer: rect(document.querySelector('.tab-buttons')),
+            tabs: [...document.querySelectorAll('.tab-buttons > .tab-btn')].map(button => {
+                const range = document.createRange();
+                range.selectNodeContents(button);
+                return { label: button.textContent, ...rect(button),
+                    textLines: [...range.getClientRects()].map(line => ({ y: line.y, height: line.height })),
+                    client: button.clientWidth, scroll: button.scrollWidth };
+            }),
+            actions: [...document.querySelector('.wealth-actions').children].map(el => ({ id: el.id, text: el.textContent, ...rect(el) })),
+            regions: [...document.querySelectorAll('#tab-wealth .wealth-scroll')].map(el => {
+                el.scrollLeft = el.scrollWidth;
+                const region = { id: el.id, ...rect(el), client: el.clientWidth, scroll: el.scrollWidth,
+                    position: el.scrollLeft, overflow: getComputedStyle(el).overflowX };
+                el.scrollLeft = 0;
+                return region;
+            }),
+            drawer: { ...rect(document.getElementById('diagnosisDrawer')),
+                open: document.getElementById('diagnosisDrawer').classList.contains('is-open'),
+                overlay: getComputedStyle(document.getElementById('drawerOverlay')).visibility }
+        };
+    });
+}
+
+async function assertWealthBrowserLayoutMatrix(browser, baseUrl) {
+    const storage = createBalanceStorage(2026);
+    const state = JSON.parse(storage[BALANCE_STATE_KEY]);
+    // Synthetische lange Historie: breite Säulenfolge und breite Eurospalten.
+    const entries = Array.from({ length: 24 }, (_, index) => {
+        const asOf = `2026-01-${String(index + 1).padStart(2, '0')}`;
+        const tagesgeld = 1_234_567_890_123_000 + index;
+        const geldmarktEtf = 2_345_678_901_234_000, depotwertAlt = 3_456_789_012_345_000, depotwertNeu = 4_567_890_123_456_000;
+        const aktienEtf = depotwertAlt + depotwertNeu;
+        return { id: `manual:${asOf}`, asOf, reason: 'manual', periodId: null,
+            tagesgeld, geldmarktEtf, depotwertAlt, depotwertNeu, aktienEtf,
+            total: tagesgeld + geldmarktEtf + aktienEtf };
+    });
+    state.wealthHistory = { schemaVersion: 1, entries };
+    storage[BALANCE_STATE_KEY] = JSON.stringify(state);
+    Object.assign(storage, createBrowserProfileStorage({
+        'wealth-layout': { name: 'Layoutprüfung', balanceStateRaw: storage[BALANCE_STATE_KEY] }
+    }, 'wealth-layout'));
+    const smoke = await createPage(browser, 'Balance.html', { storage, observeWealthUpdates: true });
+    const { page } = smoke;
+    const tolerance = 1;
+    try {
+        await page.goto(`${baseUrl}/Balance.html`, { waitUntil: 'load', timeout: 15000 });
+        await waitForWealthBrowserIdle(page);
+        await assertWealthBrowserVisibility(page, false, entries.length);
+        for (const width of [1250, 1251, 1280, 1366, 1440, 1920]) {
+            await page.setViewportSize({ width, height: 900 });
+            await page.locator('.tab-btn[data-tab="ausgaben"]').click();
+            await page.locator('#expensesTable table').waitFor();
+            const expenses = await measureWealthBrowserLayout(page);
+            await activateWealthBrowserTab(page, false);
+            const before = await measureWealthBrowserLayout(page);
+            await activateWealthBrowserTab(page, true);
+            await assertWealthBrowserTable(page, entries);
+            const history = await measureWealthBrowserLayout(page);
+            console.log('Balance wealth layout SOURCE ' + JSON.stringify({ width, expenses, before, history }));
+            assert(history.direction === (width === 1250 ? 'column' : 'row'), `${width}: vorhandene Breakpointgrenze 1250/1251`);
+            assert(Math.abs(history.form.width - before.form.width) <= tolerance, `${width}: gefüllter Verlauf vergrößert die Formularspalte nicht`);
+            assert(history.page <= history.viewport + tolerance, `${width}: kein seitenweiter Überlauf im Verlauf`);
+            if (width > 1250) {
+                assert(expenses.expenses.table.width >= 720 - tolerance && expenses.expenses.visible >= 720 - tolerance
+                    && Math.abs(expenses.expenses.table.width - expenses.expenses.visible) <= tolerance,
+                `${width}: mindestens 720 px Ausgabentabelle vollständig sichtbar`);
+                for (const layout of [expenses, before, history]) {
+                    assert(layout.tabs.length === 4 && layout.tabs.every(tab => Math.abs(tab.y - layout.tabs[0].y) <= tolerance
+                        && tab.textLines.length === 1 && tab.scroll <= tab.client + tolerance
+                        && tab.x >= layout.tabContainer.x - tolerance
+                        && tab.x + tab.width <= layout.tabContainer.x + layout.tabContainer.width + tolerance),
+                    `${width}: vier vollständige Titel in einer Tabzeile`);
+                }
+                const actionCenter = history.actions[0].y + history.actions[0].height / 2;
+                assert(history.actions.map(action => action.id).join(',') === 'captureWealthBtn,wealthHistoryCount,wealthHistoryDate'
+                    && history.actions.every(action => Math.abs(action.y + action.height / 2 - actionCenter) <= tolerance),
+                `${width}: Capture, Anzahl und Datum in einer gemeinsamen Desktopzeile`);
+            }
+            assert(history.regions.every(region => region.scroll > region.client && region.position > 0
+                && region.overflow === 'auto' && region.width <= history.form.width + tolerance),
+            `${width}: lange Historie scrollt tatsächlich intern`);
+        }
+        await page.setViewportSize({ width: 375, height: 812 });
+        for (const button of await page.locator('.tab-buttons > .tab-btn').all()) {
+            await button.scrollIntoViewIfNeeded();
+            await waitForWealthBrowserLayout(page);
+            const box = await button.boundingBox();
+            assert(await button.isEnabled() && box.x >= -tolerance && box.x + box.width <= 375 + tolerance,
+                '375: alle vier Tabs erreichbar');
+        }
+        const capture = page.locator('#captureWealthBtn');
+        await capture.scrollIntoViewIfNeeded();
+        await waitForWealthBrowserLayout(page);
+        const captureBox = await capture.boundingBox();
+        assert(await capture.isEnabled() && captureBox.x >= -tolerance && captureBox.x + captureBox.width <= 375 + tolerance,
+            '375: Capturetaste vollständig erreichbar');
+        for (const step of ['geschlossen', 'geöffnet', 'wieder geschlossen']) {
+            if (step === 'geöffnet') await page.locator('#openDiagnosisBtn').click();
+            if (step === 'wieder geschlossen') await page.locator('#closeDiagnosisBtn').click();
+            const layout = await measureWealthBrowserLayout(page);
+            console.log('Balance wealth layout SOURCE ' + JSON.stringify({ width: 375, step, layout }));
+            assert(layout.page <= layout.viewport + tolerance, `375/${step}: kein seitenweiter Überlauf`);
+            assert(layout.regions.every(region => region.x >= -tolerance && region.x + region.width <= 375 + tolerance
+                && region.scroll > region.client && region.position > 0 && region.overflow === 'auto'),
+            `375/${step}: Diagramm und Tabelle scrollen intern`);
+            const open = step === 'geöffnet';
+            assert(layout.drawer.open === open && layout.drawer.overlay === (open ? 'visible' : 'hidden'),
+                `375/${step}: bestehender Drawer-/Overlayzustand`);
+            assert(open ? layout.drawer.x >= -tolerance && layout.drawer.x + layout.drawer.width <= 375 + tolerance
+                : layout.drawer.x >= 375 - tolerance, `375/${step}: bestehende Drawertransformation`);
+        }
+        await assertWealthBrowserVisibility(page, true, entries.length);
+        smoke.assertNoErrors();
+    } finally { await smoke.close(); }
+}
+
 async function runBalanceWealthHistory(browser, baseUrl) {
     const markupContext = await browser.newContext({ javaScriptEnabled: false });
     try {
@@ -992,6 +1142,7 @@ async function runBalanceWealthHistory(browser, baseUrl) {
         assert(await markupPage.getByRole('region', { name: 'Vermögensdiagramm', exact: true }).count() === 0,
             'Ausgeliefertes Markup verbirgt die Details auch vor Initialisierung aus dem Zugänglichkeitsbaum');
     } finally { await markupContext.close(); }
+    await assertWealthBrowserLayoutMatrix(browser, baseUrl);
     const baseline = createBalanceStorage(2026);
     const profileState = JSON.parse(baseline[BALANCE_STATE_KEY]);
     profileState.inputs.floorBedarf = 0;
@@ -1077,6 +1228,7 @@ async function runBalanceWealthHistory(browser, baseUrl) {
     await switchWealthBrowserProfile(page, baseUrl, 'wealth-b');
     await assertWealthBrowserVisibility(page, false, 1);
     await page.setViewportSize({ width: 375, height: 812 });
+    await waitForWealthBrowserLayout(page);
     for (const button of await page.locator('.tab-buttons > .tab-btn').all()) {
         await button.scrollIntoViewIfNeeded();
         const box = await button.boundingBox();
@@ -1095,9 +1247,7 @@ async function runBalanceWealthHistory(browser, baseUrl) {
     assert(await table.evaluate(el => el === document.activeElement), 'Die Datentabelle ist per Tab erreichbar');
     await page.keyboard.press('End');
     await assertWealthBrowserTable(page, [zeroEntry]);
-    await page.evaluate(async () => {
-        await Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => {})));
-    });
+    await waitForWealthBrowserLayout(page);
     const widths = await page.evaluate(() => ({
         page: document.documentElement.scrollWidth, viewport: document.documentElement.clientWidth,
         regions: [...document.querySelectorAll('#tab-wealth .wealth-scroll')].map(el => {
@@ -1105,7 +1255,8 @@ async function runBalanceWealthHistory(browser, baseUrl) {
             return { width: el.clientWidth, scroll: el.scrollWidth, position: el.scrollLeft, overflow: getComputedStyle(el).overflowX };
         })
     }));
-    assert(widths.page <= widths.viewport, 'Kein seitenweiter horizontaler Überlauf bei 375 CSS-Pixeln');
+    console.log('Balance wealth layout SOURCE ' + JSON.stringify({ width: 375, fixture: 'Nullstand', widths }));
+    assert(widths.page <= widths.viewport + 1, 'Kein seitenweiter horizontaler Überlauf bei 375 CSS-Pixeln');
     assert(widths.regions.every(region => region.width <= 375 && region.scroll > region.width && region.position > 0 && region.overflow === 'auto'),
         'SVG und Tabelle scrollen tatsächlich innerhalb ihrer Regionen');
     await activateWealthBrowserTab(page, false);

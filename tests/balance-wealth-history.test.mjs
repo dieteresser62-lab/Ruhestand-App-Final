@@ -121,9 +121,11 @@ const manual = createManualWealthHistoryEntry(SOURCE, '2026-06-01');
 const reference = new Date(2027, 0, 15, 12);
 
 function historyDom(open = false) {
+    const tabCalls = { add: 0, remove: 0 };
     return {
+        tabCalls,
         panel: { classList: { contains: name => name === 'active' && open,
-            add: () => { open = true; }, remove: () => { open = false; } } },
+            add: () => { tabCalls.add += 1; open = true; }, remove: () => { tabCalls.remove += 1; open = false; } } },
         date: { textContent: '' },
         count: { textContent: '' }, chart: { innerHTML: '' }, table: { innerHTML: '' },
         hint: { textContent: '' }, status: { textContent: '' }
@@ -183,7 +185,7 @@ async function setup() {
             if (faults.flush) { faults.flush = false; throw new Error('flush failed'); }
             const isFinal = upserts.some(([key, raw]) => key === STATE &&
                 (JSON.parse(raw).annualPeriodMetadata?.lastCommittedPeriod === 'calendar-year:2026'
-                    || (faults.manual && JSON.parse(raw).wealthHistory?.entries.some(entry => entry.id === 'manual:2026-12-31'))));
+                    || (faults.manual && JSON.parse(raw).wealthHistory?.entries.some(entry => entry.id === `manual:${faults.manualAsOf || '2026-12-31'}`))));
             if (isFinal && faults.write) { faults.write = false; throw new Error('write failed'); }
             deletes.forEach(key => store.delete(key));
             upserts.forEach(([key, value]) => store.set(key, value));
@@ -362,6 +364,7 @@ try {
         const ui = manualController(env, { status: view.status, refresh: () => refreshBalanceWealthHistory(view) });
         assertEqual((await ui.controller.capture()).status, 'failed', `${fault}: Erfassung im aktuellen Tab scheitert ohne Bestätigung`);
         assertEqual(view.panel.classList.contains('active'), active, 'Speicherfehler erhält Tabaktivität');
+        assertEqual(JSON.stringify(view.tabCalls), '{"add":0,"remove":0}', 'Fehlerhafte Capture aktiviert oder deaktiviert keinen Tab');
         assertEqual(view.date.textContent, 'Zuletzt erfasst am 01.06.2026', 'Speicherfehler erhält bestätigtes Datum');
         assertEqual(view.chart.innerHTML, chartBefore, 'Speicherfehler erhält gültiges Diagramm beziehungsweise leeren inaktiven Container');
         assertEqual(view.table.innerHTML, tableBefore, 'Speicherfehler erhält gültige Tabelle beziehungsweise leeren inaktiven Container');
@@ -416,9 +419,10 @@ try {
         };
         global.document = { addEventListener() {}, querySelectorAll: () => [] };
         let previews = 0;
+        let invalidPreview = false;
         let debounceResumed = 0;
         const binderState = {};
-        const initialize = () => initUIBinder(dom, binderState, request => { assertEqual(request.mode, BALANCE_UPDATE_MODE.PREVIEW, 'Binder nutzt PREVIEW'); previews += 1; return RESULT; }, () => { debounceResumed += 1; });
+        const initialize = () => initUIBinder(dom, binderState, request => { assertEqual(request.mode, BALANCE_UPDATE_MODE.PREVIEW, 'Binder nutzt PREVIEW'); previews += 1; return invalidPreview ? { ok: false, error: new Error('Ungültige Eingaben') } : RESULT; }, () => { debounceResumed += 1; });
         initialize(); UIBinder.bindUI(); UIBinder.bindUI();
         initialize(); UIBinder.bindUI();
         assertEqual(dom.controls.captureWealthBtn.listeners.click.length, 1, 'Genau ein Capture-Listener trotz erneuter Bindung');
@@ -452,10 +456,30 @@ try {
         assertEqual(env.store.get(STATE), persistedBeforeTab, 'Tabwechsel ohne Statewrite oder Erfassung');
         assertEqual(env.store.get(REGISTRY), registryBeforeTab, 'Tabwechsel ohne Registrywrite');
         binderState.debounceTimer = setTimeout(() => { throw new Error('Der alte Timer darf nicht laufen'); }, 10000);
+        const tabState = () => JSON.stringify({
+            buttons: buttons.map(button => button.classList.contains('active')),
+            panels: panels.map(panel => panel.classList.contains('active')),
+            calls: dom.wealthHistory.tabCalls
+        });
+        const beforeCapture = tabState();
         await dom.controls.captureWealthBtn.listeners.click[0]();
+        assertEqual(tabState(), beforeCapture, 'Gebundene Capture öffnet den inaktiven Verlauf nicht');
         assertEqual(previews, 1, 'Ein Klick erzeugt nur eine Erfassung');
         assertEqual(binderState.debounceTimer, null, 'Ausstehender Inputwrite während Transaktion angehalten');
         assertEqual(debounceResumed, 1, 'Inputpersistenz nach bestätigter Erfassung wieder eingeplant');
+        for (const index of [0, 1, 2, 3]) for (const fault of [null, 'write', 'readback', 'validation']) {
+            dom.containers.tabButtons.listeners.click[0]({ target: { closest: () => buttons[index] } });
+            env.faults.manual = true;
+            const today = new Date();
+            env.faults.manualAsOf = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, '0'), String(today.getDate()).padStart(2, '0')].join('-');
+            env.faults.write = fault === 'write';
+            env.faults.readback = fault === 'readback';
+            invalidPreview = fault === 'validation';
+            const before = tabState();
+            await dom.controls.captureWealthBtn.listeners.click[0]();
+            assertEqual(tabState(), before, `${buttons[index].dataset.tab}/${fault || 'Erfolg'}: gebundene Capture wechselt keinen Button oder Panel und öffnet keinen Tab`);
+            assertEqual(dom.wealthHistory.status.textContent.includes('Stand nicht bestätigt'), Boolean(fault), 'Clicklistener durchläuft den angeforderten Erfolgs- oder Fehlerpfad');
+        }
     }
 
     console.log('Reale Importe erhalten aktiven und inaktiven Tab bei Erfolg, Ablehnung, Legacy und Rollback');
@@ -757,6 +781,7 @@ try {
             await ui.controller.capture();
             assertEqual(view.status.textContent, 'Stand gesichert', 'Kurze Bestätigung nach Readback');
             assertEqual(view.panel.classList.contains('active'), open, 'Erfassung erhält Sichtbarkeit');
+            assertEqual(JSON.stringify(view.tabCalls), '{"add":0,"remove":0}', 'Capture öffnet oder wechselt bei aktivem/inaktivem Verlauf keinen Tab');
             assertEqual(view.count.textContent, '2 Stände', 'Tagesersetzung zählt nicht doppelt');
             assertEqual(view.date.textContent, 'Zuletzt erfasst am 31.12.2026', 'Erfassung aktualisiert Datum unmittelbar');
             if (open) assert(view.table.innerHTML.includes(amount.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })), 'Aktive Tabelle zeigt neuen Tageswert');
@@ -764,6 +789,8 @@ try {
         }
         const tomorrow = manualController(env, { now: () => new Date(2027, 0, 1), refresh: () => refreshBalanceWealthHistory(view) });
         await tomorrow.controller.capture();
+        assertEqual(view.panel.classList.contains('active'), open, 'Capture am neuen Tag erhält den aktiven/inaktiven Tab');
+        assertEqual(JSON.stringify(view.tabCalls), '{"add":0,"remove":0}', 'Capture am neuen Tag ohne Tabaktivierung');
         const annualIndex = messages.length;
         const annual = env.createHandlers({ onAnnualWealthSaved: () => {
             env.counts.confirmations += 1;
