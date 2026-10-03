@@ -9,9 +9,13 @@
 # toolchain_read_roots; ein Node unter dem Home-Verzeichnis (etwa nvm) ist in
 # seiner Sandbox unsichtbar, dort laufen /usr/bin/node und /usr/bin/npm
 # (gemessen am 02.10.2026 mit codex sandbox und dem erzeugten Rechteprofil).
-# Abschluss: bewusst Standard (merge_completed_branch = true). Nach befundfreier
-# Abnahme merged der Orchestrator lokal nach main und startet danach den lokalen
-# post-merge-Hook (Grenze 600 s). Gepusht wird nie.
+# Abschluss: merge_completed_branch = false (Operatorentscheidung 03.10.2026).
+# Nach befundfreier Abnahme bleibt der Zielbranch ungemergt. Die gesteuerte
+# Sitzung fuehrt danach den Browser-Smoke ausserhalb der Sandbox aus und merged
+# erst dann lokal nach main; der post-merge-Hook baut dabei die EXE. Grund: Der
+# Implementierer kann in seiner Sandbox weder Server noch Browser starten, eine
+# Browser-Pruefregel im Orchestrator konvergiert deshalb nicht (Orchestrator-
+# Backlog 153). Gepusht wird nie.
 
 [repository]
 base_branch = "main"
@@ -34,18 +38,8 @@ generated = [
 default_command = ["npm", "test"]
 default_timeout_seconds = 1200
 
-# Browser-Smoke (Playwright/Chromium) als zusaetzliche Pruefung ausserhalb der
-# Agenten-Sandbox: laeuft, sobald ein Arbeitspaket Oberflaeche, Logik oder den
-# Smoke selbst aendert. In der Sandbox scheitert er am Serverstart (listen EPERM).
-[[validation.rules]]
-patterns = [
-    "app/**", "engine/**", "workers/**", "types/**", "css/**", "assets/**",
-    "*.html", "*.js", "*.mjs", "tests/browser-smoke.test.mjs", "package.json",
-]
-command = ["npm", "run", "test:browser"]
-timeout_seconds = 900
-
 [workflow]
+merge_completed_branch = false
 plan_gate = false
 test_change_gate = false
 manual_slice_gate = false
