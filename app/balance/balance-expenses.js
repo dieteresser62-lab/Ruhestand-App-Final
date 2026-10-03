@@ -45,6 +45,12 @@ const state = {
 };
 let pendingImport = null;
 let recoveryOptions = null;
+let onChange = null;
+
+function notifyExpensesChange() {
+    // Die lesende Darstellung darf erfolgreiche Speicheraktionen nicht rückgängig machen.
+    try { onChange?.(); } catch { /* Der Ausgaben-Check bleibt bedienbar. */ }
+}
 
 function createDefaultRecoveryOptions(options = {}) {
     return {
@@ -159,6 +165,7 @@ async function resetCorruptExpensesAfterConfirmation() {
         if (dom?.expenses?.yearSelect) dom.expenses.yearSelect.disabled = false;
         renderYearSelect();
         renderTable();
+        notifyExpensesChange();
         UIRenderer.toast('Der Ausgaben-Check wurde nach bestaetigtem Recovery-Export zurueckgesetzt.');
     } catch {
         if (resetApplied && typeof corruption.raw === 'string') {
@@ -341,6 +348,7 @@ function setYear(year) {
         setExpensesActiveYear(year, recoveryOptions?.storage);
         renderYearSelect();
         renderTable();
+        notifyExpensesChange();
     } catch {
         readExpensesStoreForUi();
         renderCorruptExpensesState();
@@ -392,6 +400,7 @@ async function handleCsvImport(file, month, profileId) {
     saveExpensesStore(store, recoveryOptions?.storage);
 
     refreshTableValues();
+    notifyExpensesChange();
     UIRenderer.toast('CSV importiert.');
 }
 
@@ -411,6 +420,7 @@ function deleteMonthData(month, profileId) {
     delete monthData.profiles[profileId];
     saveExpensesStore(store, recoveryOptions?.storage);
     refreshTableValues();
+    notifyExpensesChange();
     UIRenderer.toast('Monatsdaten gelöscht.');
     return true;
 }
@@ -483,6 +493,7 @@ function bindEvents() {
 export function initExpensesTab(domRefs, options = {}) {
     dom = domRefs;
     recoveryOptions = createDefaultRecoveryOptions(options);
+    onChange = typeof options.onChange === 'function' ? options.onChange : null;
     pendingImport = null;
     state.profileIds = [];
     state.recoveryExported = false;

@@ -30,6 +30,7 @@ import { getPersistenceStatus, init as initPersistence } from '../shared/persist
 import { PROFILE_VALUE_KEYS } from '../profile/profile-state.js';
 import { postprocessBalanceAction } from './balance-action-postprocessor.js';
 import { ANNUAL_MARKET_DATA_META_KEY } from './balance-annual-marketdata.js';
+import { refreshBalanceExpensesHistory } from './balance-expenses-history-renderer.js';
 import { initializeBalanceWealthHistory, refreshBalanceWealthHistory } from './balance-wealth-history-renderer.js';
 import {
     BALANCE_UPDATE_MODE,
@@ -141,6 +142,12 @@ const dom = {
         hint: document.getElementById('wealthHistoryHint'),
         status: document.getElementById('wealthHistoryStatus')
     },
+    expensesHistory: {
+        panel: document.getElementById('tab-wealth'),
+        chart: document.getElementById('expensesHistoryChart'),
+        table: document.getElementById('expensesHistoryTable'),
+        hint: document.getElementById('expensesHistoryHint')
+    },
     expenses: {
         annualBudget: document.getElementById('expensesAnnualBudget'),
         monthlyBudget: document.getElementById('expensesMonthlyBudget'),
@@ -191,6 +198,7 @@ const profileSyncHandlers = createProfileSyncHandlers({
  */
 export function update(options = {}) {
     refreshBalanceWealthHistory(dom.wealthHistory);
+    refreshBalanceExpensesHistory(dom.expensesHistory);
     let phase = 'update_contract';
     try {
         const request = resolveBalanceUpdateRequest(options);
@@ -498,6 +506,7 @@ export async function init() {
     });
 
     initializeBalanceWealthHistory(dom.wealthHistory);
+    refreshBalanceExpensesHistory(dom.expensesHistory);
 
     // 4. Initialize all modules with their dependencies
     // Dependency Injection Pattern: Jedes Modul erhält seine Abhängigkeiten
@@ -505,7 +514,7 @@ export async function init() {
     initStorageManager(dom, appState, UIRenderer);
     initUIRenderer(dom, StorageManager);
     initUIBinder(dom, appState, update, debouncedUpdate);
-    initExpensesTab(dom);
+    initExpensesTab(dom, { onChange: () => refreshBalanceExpensesHistory(dom.expensesHistory) });
 
     // 5. Set version info
     // Zeigt UI- und Engine-Version im Print-Footer
@@ -514,6 +523,7 @@ export async function init() {
     // 6. Load and apply saved state
     // Lädt letzten Zustand aus localStorage und wendet ihn auf die Formular-Felder an
     refreshBalanceWealthHistory(dom.wealthHistory);
+    refreshBalanceExpensesHistory(dom.expensesHistory);
     let persistentState;
     try { persistentState = StorageManager.loadState(); }
     catch (error) {

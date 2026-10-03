@@ -9,7 +9,7 @@ export function prepareWealthHistoryMetrics(state) {
             || a.id.localeCompare(b.id))
         .map(entry => ({
             ...entry,
-            label: entry.reason === 'annual_close' ? 'Jahresabschluss' : 'Manuell',
+            label: entry.reason === 'annual_close' ? 'Jahresabschluss' : 'Unterjährig',
             marker: entry.reason === 'annual_close' ? '■' : '◇',
             segments: [
                 { key: 'tagesgeld', label: 'Liquidität (Tagesgeld)', value: entry.tagesgeld, lower: 0, upper: entry.tagesgeld },

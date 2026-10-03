@@ -6,6 +6,7 @@ import { runMonteCarloBrowserRegression } from './simulator-monte-carlo-browser.
 import { SNAPSHOT_KINDS } from '../app/shared/snapshot-archive.js';
 import { formatCurrency } from '../app/shared/shared-formatting.js';
 import { BALANCE_UPDATE_DEBOUNCE_MS } from '../app/balance/balance-config.js';
+import { prepareExpensesHistoryMetrics } from '../app/balance/balance-expenses-metrics.js';
 import { installWealthBrowserUpdateObserver } from './wealth-browser-update-observer.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -776,7 +777,7 @@ async function captureWealthBrowserStand(page, keyboard = false) {
 async function assertWealthBrowserVisibility(page, expanded, count = null) {
     const buttons = page.locator('.tab-buttons > .tab-btn');
     assert(JSON.stringify(await buttons.allTextContents()) === JSON.stringify([
-        'Jahres-Update', 'Einstellungen & Strategie', 'Ausgaben-Check', 'Vermögensverlauf'
+        'Jahres-Update', 'Einstellungen & Strategie', 'Ausgaben-Check', 'Auswertung'
     ]), 'Genau vier Haupttabs in bisheriger Reihenfolge');
     assert(await page.locator('#tab-wealth').isVisible() === expanded, 'Tatsächliche Tabaktivität');
     assert(await page.locator('.tab-btn[data-tab="wealth"]').evaluate(el => el.classList.contains('active')) === expanded,
@@ -798,12 +799,21 @@ async function assertWealthBrowserVisibility(page, expanded, count = null) {
             'Aktuelle Anzahl bleibt außerhalb der Details sichtbar');
     }
     if (!expanded) {
-        assert(await page.locator('#wealthHistoryChart svg, #wealthHistoryTable table').count() === 0, 'Geschlossen keine erzeugten Inhalte');
+        assert(await page.locator('#tab-wealth svg, #tab-wealth table').count() === 0, 'Geschlossen keine erzeugten Inhalte');
         assert(await page.getByRole('region', { name: 'Vermögensdiagramm', exact: true }).count() === 0
             && await page.getByRole('region', { name: 'Tabelle der Vermögensstände', exact: true }).count() === 0,
         'Geschlossene Details fehlen aus dem Zugänglichkeitsbaum');
         await page.locator('#wealthHistoryChart').evaluate(el => el.focus());
         assert(await page.locator('#wealthHistoryChart').evaluate(el => el !== document.activeElement), 'Verborgene Region nicht fokussierbar');
+        for (const id of ['expensesHistoryChart', 'expensesHistoryTable']) {
+            const region = page.locator(`#${id}`);
+            assert(await region.getAttribute('tabindex') === '0', 'Ausgabenregion behält native Tastaturbedienung');
+            await region.evaluate(el => el.focus());
+            assert(await region.evaluate(el => el !== document.activeElement), 'Inaktive Ausgabenregion nicht fokussierbar');
+        }
+        assert(await page.getByRole('region', { name: 'Diagramm der Jahresausgaben', exact: true }).count() === 0
+            && await page.getByRole('region', { name: 'Tabelle der Jahresausgaben', exact: true }).count() === 0,
+        'Inaktive Ausgabenregionen fehlen aus dem Zugänglichkeitsbaum');
     } else {
         const chart = page.getByRole('region', { name: 'Vermögensdiagramm', exact: true });
         const table = page.getByRole('region', { name: 'Tabelle der Vermögensstände', exact: true });
@@ -826,6 +836,139 @@ async function assertWealthBrowserVisibility(page, expanded, count = null) {
                 'Gefüllte offene Regionen mit bisherigen Namen sichtbar');
         }
     }
+}
+
+async function assertExpensesBrowserTable(page, store, currentYear = 2026) {
+    const expected = prepareExpensesHistoryMetrics(store, currentYear);
+    const table = page.locator('#expensesHistoryTable tbody tr');
+    await page.waitForFunction(count => document.querySelectorAll('#expensesHistoryTable tbody tr').length === count, expected.length);
+    assert(await table.count() === expected.length, 'Jahresübersicht enthält exakt die importierten Jahre');
+    if (!expected.length) {
+        assert(await page.locator('#expensesHistoryHint').textContent() === 'Noch keine Ausgabendaten vorhanden.', 'Sichtbarer Leerhinweis');
+        assert(await page.locator('#expensesHistoryChart svg, #expensesHistoryTable table').count() === 0, 'Leerzustand erzeugt keine Inhalte');
+        return;
+    }
+    const chart = page.getByRole('img', { name: 'Ausgaben je Jahr in nominalen Euro', exact: true });
+    assert(await chart.count() === 1 && await chart.getAttribute('aria-labelledby') === 'expensesChartTitle'
+        && await chart.getAttribute('aria-describedby') === 'expensesChartDesc', 'Ausgaben-SVG hat einen eindeutigen Namen und getrennte Beschreibung');
+    assert((await chart.locator('#expensesChartDesc').textContent()).includes('Ø pro Monat'), 'Beschreibung erklärt den Teiljahresvergleich');
+    assert(await chart.locator('g').count() === expected.length, 'Eine Jahressäule je Tabellenzeile');
+    for (const [index, row] of expected.entries()) {
+        const cells = await table.nth(index).locator('th, td').allTextContents();
+        assert(JSON.stringify(cells) === JSON.stringify([
+            String(row.year) + (row.isCurrentPartialYear ? ' – laufendes Teiljahr' : ''),
+            formatCurrency(row.annualUsed), String(row.monthsWithData), formatCurrency(row.avgMonthly)
+        ]), `${row.year}: Jahreswerte und Status entsprechen Slice 1`);
+        const title = await chart.locator('g > title').nth(index).textContent();
+        assert(title.includes(formatCurrency(row.annualUsed)) && title.includes(formatCurrency(row.avgMonthly))
+            && title.includes(`${row.monthsWithData} Monate mit Daten`), 'SVG und Tabelle haben dieselbe Datenbasis');
+    }
+}
+
+async function runBalanceExpensesHistory(browser, baseUrl) {
+    const storage = createBalanceStorage(2026);
+    const store = { version: 1, activeYear: 2026, years: {
+        '2023': { months: { '1': { profiles: { A: { categories: { Nullimport: 0 } } } } } },
+        '2025': { months: Object.fromEntries(Array.from({ length: 12 }, (_, i) =>
+            [String(i + 1), { profiles: { A: { categories: { Ausgabe: -100 } } } }])) },
+        '2026': { months: { '1': { profiles: {
+            A: { categories: { Ausgabe: -100, Erstattung: 20 } },
+            hidden: { categories: { Ausgabe: 30 } }
+        } } } },
+        '2027': { months: {} }
+    } };
+    storage[EXPENSES_KEY] = JSON.stringify(store);
+    // Der beobachtete Haushalts-Startupvertrag gilt für zwei Profile.
+    Object.assign(storage, createBrowserProfileStorage({
+        'expenses-a': { name: 'Ausgaben A', balanceStateRaw: storage[BALANCE_STATE_KEY] },
+        'expenses-b': { name: 'Ausgaben B', balanceStateRaw: storage[BALANCE_STATE_KEY] }
+    }, 'expenses-a'));
+    const smoke = await createPage(browser, 'Balance expenses history', {
+        storage, observeWealthUpdates: true, fixedTime: '2026-10-03T12:00:00+02:00'
+    });
+    const { page } = smoke;
+    try {
+        await page.goto(`${baseUrl}/Balance.html`, { waitUntil: 'load' });
+        await waitForWealthBrowserStartup(page);
+        await assertWealthBrowserVisibility(page, false, 0);
+        await activateWealthBrowserTab(page, true);
+        await assertExpensesBrowserTable(page, store);
+        assert((await page.locator('.expenses-history').textContent()).includes('Jahresbudgets werden nicht historisch gespeichert'), 'Budgetgrenze sichtbar erläutert');
+        for (const id of ['wealthHistoryChart', 'wealthHistoryTable', 'expensesHistoryChart', 'expensesHistoryTable']) {
+            await page.locator(`#${id}`).focus();
+            assert(await page.locator(`#${id}`).evaluate(el => el === document.activeElement), 'Alle vier aktiven Scrollregionen fokussierbar');
+        }
+        await page.emulateMedia({ media: 'print' });
+        assert(await page.locator('.form-column').evaluate(el => getComputedStyle(el).display) === 'none', 'Bestehender Druckvertrag blendet Auswertung aus');
+        await page.emulateMedia({ media: 'screen' });
+        await activateWealthBrowserTab(page, false);
+        await page.locator('.tab-btn[data-tab="ausgaben"]').click();
+        // Beobachtbar offenes Dateilesen; die Leseübersicht erhält keinen Importknopf.
+        await page.evaluate(() => {
+            const descriptor = Object.getOwnPropertyDescriptor(File.prototype, 'text');
+            const original = File.prototype.text;
+            window.__restoreExpensesFileText = () => {
+                if (descriptor) Object.defineProperty(File.prototype, 'text', descriptor);
+                else delete File.prototype.text;
+            };
+            File.prototype.text = function () {
+                window.__expensesFileReadStarted = true;
+                return new Promise((resolve, reject) => {
+                    window.__releaseExpensesFileText = () => original.call(this).then(resolve, reject);
+                });
+            };
+        });
+        const importButton = page.locator('#expensesTable button[data-action="import"][data-month="3"]').first();
+        const profileId = await importButton.getAttribute('data-profile');
+        const messageIndex = await page.evaluate(() => window.__browserSmokeMessages.length);
+        const beforeImport = (await readBalanceBrowserState(page)).wealthHistory;
+        const chooser = page.waitForEvent('filechooser');
+        await importButton.click();
+        await (await chooser).setFiles({ name: 'ausgaben.csv', mimeType: 'text/csv', buffer: Buffer.from('Kategorie;Betrag\nAusgabe;-250') });
+        await page.waitForFunction(() => window.__expensesFileReadStarted);
+        await activateWealthBrowserTab(page, true);
+        await assertExpensesBrowserTable(page, store);
+        await page.evaluate(() => { window.__releaseExpensesFileText(); window.__restoreExpensesFileText(); });
+        store.years['2026'].months['3'] = { profiles: { [profileId]: { categories: { Ausgabe: -250 } } } };
+        await page.waitForFunction(index => window.__browserSmokeMessages.slice(index).includes('CSV importiert.'), messageIndex);
+        await assertExpensesBrowserTable(page, store);
+        assert(await page.locator('#tab-wealth').isVisible(), 'Importabschluss erhält aktive Auswertung');
+        assert(JSON.stringify((await readBalanceBrowserState(page)).wealthHistory) === JSON.stringify(beforeImport), 'Lesende Integration erfasst beim Import noch keinen Vermögensstand');
+        await page.reload({ waitUntil: 'load' });
+        await waitForWealthBrowserStartup(page);
+        await assertWealthBrowserVisibility(page, false, 0);
+        await activateWealthBrowserTab(page, true);
+        await assertExpensesBrowserTable(page, store);
+        await switchWealthBrowserProfile(page, baseUrl, 'expenses-b');
+        await assertWealthBrowserVisibility(page, false, 0);
+        await activateWealthBrowserTab(page, true);
+        await assertExpensesBrowserTable(page, store);
+        // Datenstrukturen und JSON-Fehler werden unabhängig vom Vermögensabschnitt angezeigt.
+        for (const raw of ['{private-rohdaten', JSON.stringify({ version: 1, years: [] }),
+            JSON.stringify({ version: 1, years: { '2026': { months: [] } } })]) {
+            await page.evaluate(async raw => {
+                const { persistenceStorage, PersistenceFacade } = await import('./app/shared/persistence-facade.js');
+                persistenceStorage.setItem('balance_expenses_v1', raw);
+                await PersistenceFacade.flush();
+            }, raw);
+            await activateWealthBrowserTab(page, false);
+            await activateWealthBrowserTab(page, true);
+            const hint = await page.locator('#expensesHistoryHint').textContent();
+            assert(hint.includes('Backend:') && hint.includes('Recovery im Ausgaben-Check') && !hint.includes('private-rohdaten'), 'Sichere Korruptionsdiagnose ohne Rohinhalt');
+            assert(await page.locator('#expensesHistoryChart svg, #expensesHistoryTable table').count() === 0, 'Korruption entfernt alte Ausgabenwerte');
+            assert(await page.locator('#captureWealthBtn').isEnabled(), 'Ausgabenfehler lässt Vermögensabschnitt bedienbar');
+            assert((await readIndexedDb(page, 'kv', EXPENSES_KEY)).value === raw, 'Lesen setzt korrupte Daten nicht zurück');
+        }
+        await page.evaluate(async () => {
+            const { persistenceStorage, PersistenceFacade } = await import('./app/shared/persistence-facade.js');
+            persistenceStorage.setItem('balance_expenses_v1', JSON.stringify({ version: 1, activeYear: 2026, years: {} }));
+            await PersistenceFacade.flush();
+        });
+        await activateWealthBrowserTab(page, false);
+        await activateWealthBrowserTab(page, true);
+        await assertExpensesBrowserTable(page, { years: {} });
+        smoke.assertNoErrors();
+    } finally { await smoke.close(); }
 }
 
 async function waitForBrowserValue(read, predicate, message, timeoutMs = 10000) {
@@ -959,7 +1102,7 @@ async function assertWealthBrowserTable(page, entries) {
     for (const [index, entry] of entries.entries()) {
         const cells = await rows.nth(index).locator('th, td').allTextContents();
         assert(cells[0] === entry.asOf.split('-').reverse().join('.'), 'Die Tabelle zeigt den gespeicherten Stichtag');
-        assert(cells[1].includes(entry.reason === 'manual' ? '◇ Manuell' : '■ Jahresabschluss'),
+        assert(cells[1].includes(entry.reason === 'manual' ? '◇ Unterjährig' : '■ Jahresabschluss'),
             'Der Anlass ist als Text und Form zugänglich');
         const amounts = ['tagesgeld', 'geldmarktEtf', 'aktienEtf', 'depotwertAlt', 'depotwertNeu', 'total'];
         assert(JSON.stringify(cells.slice(2)) === JSON.stringify(amounts.map(key => formatCurrency(entry[key]))),
@@ -971,7 +1114,7 @@ async function assertWealthBrowserTable(page, entries) {
     assert(await chart.getAttribute('aria-describedby') === 'wealthChartDesc', 'Die Beschreibung ist separat zugeordnet');
     const description = chart.locator('desc[id="wealthChartDesc"]');
     assert(await description.count() === 1, 'Das SVG besitzt genau ein referenziertes Beschreibungselement');
-    assert(await description.textContent() === 'Gestapelte Säulen für Liquidität, Geldmarkt-ETF und Aktien-ETF. Jahresabschluss: Quadrat und durchgezogener Rahmen. Manuell: Raute und gestrichelter Rahmen. Alle Werte und beide Teildepots stehen in der folgenden Tabelle.',
+    assert(await description.textContent() === 'Gestapelte Säulen für Liquidität, Geldmarkt-ETF und Aktien-ETF. Jahresabschluss: Quadrat und durchgezogener Rahmen. Unterjährig: Raute und gestrichelter Rahmen. Alle Werte und beide Teildepots stehen in der folgenden Tabelle.',
         'Die vollständige Langbeschreibung ist erhalten');
     assert(await chart.locator('g').count() === entries.length, 'Jeder Stand besitzt eine eigene Säule');
     for (const [index, entry] of entries.entries()) {
@@ -1053,7 +1196,7 @@ async function measureWealthBrowserLayout(page) {
     });
 }
 
-const WEALTH_TAB_SINGLE_ROW_MIN_WIDTH = 1440;
+const WEALTH_TAB_SINGLE_ROW_MIN_WIDTH = 1366;
 
 async function assertWealthBrowserLayoutMatrix(browser, baseUrl) {
     const storage = createBalanceStorage(2026);
@@ -1069,6 +1212,10 @@ async function assertWealthBrowserLayoutMatrix(browser, baseUrl) {
             total: tagesgeld + geldmarktEtf + aktienEtf };
     });
     state.wealthHistory = { schemaVersion: 1, entries };
+    storage[EXPENSES_KEY] = JSON.stringify({ version: 1, activeYear: 2027, years: Object.fromEntries(
+        Array.from({ length: 24 }, (_, index) => [String(2003 + index), { months: { '1': { profiles: {
+            A: { categories: { Ausgabe: -1e100 } }
+        } } } }])) });
     storage[BALANCE_STATE_KEY] = JSON.stringify(state);
     Object.assign(storage, createBrowserProfileStorage({
         'wealth-layout': { name: 'Layoutprüfung', balanceStateRaw: storage[BALANCE_STATE_KEY] }
@@ -1098,8 +1245,8 @@ async function assertWealthBrowserLayoutMatrix(browser, baseUrl) {
                 assert(expenses.expenses.table.width >= 720 - tolerance && expenses.expenses.visible >= 720 - tolerance
                     && Math.abs(expenses.expenses.table.width - expenses.expenses.visible) <= tolerance,
                 `${width}: mindestens 720 px Ausgabentabelle vollständig sichtbar`);
-                // Gemessen (Linux-Chromium, Arial-Metrik): Die vier Titel brauchen 638 px; einzeilig ab etwa 1382 px.
-                // Gefordert ist 1440 px (668 px Platz, rund 30 px Reserve für abweichende Schriftmetriken).
+                // Die kürzere Beschriftung „Auswertung“ muss die vollständige gemeinsame Tabzeile
+                // bereits bei 1366 CSS-Pixeln ermöglichen; Rechtecke und Textzeilen werden gemessen.
                 const singleRow = width >= WEALTH_TAB_SINGLE_ROW_MIN_WIDTH;
                 for (const layout of [expenses, before, history]) {
                     assert(layout.tabs.length === 4 && layout.tabs.every(tab => tab.textLines.length === 1
@@ -1115,7 +1262,7 @@ async function assertWealthBrowserLayoutMatrix(browser, baseUrl) {
                     && history.actions.every(action => Math.abs(action.y + action.height / 2 - actionCenter) <= tolerance),
                 `${width}: Capture, Anzahl und Datum in einer gemeinsamen Desktopzeile`);
             }
-            assert(history.regions.every(region => region.scroll > region.client && region.position > 0
+            assert(history.regions.length === 4 && history.regions.every(region => region.scroll > region.client && region.position > 0
                 && region.overflow === 'auto' && region.width <= history.form.width + tolerance),
             `${width}: lange Historie scrollt tatsächlich intern`);
         }
@@ -1139,7 +1286,7 @@ async function assertWealthBrowserLayoutMatrix(browser, baseUrl) {
             const layout = await measureWealthBrowserLayout(page);
             console.log('Balance wealth layout SOURCE ' + JSON.stringify({ width: 375, step, layout }));
             assert(layout.page <= layout.viewport + tolerance, `375/${step}: kein seitenweiter Überlauf`);
-            assert(layout.regions.every(region => region.x >= -tolerance && region.x + region.width <= 375 + tolerance
+            assert(layout.regions.length === 4 && layout.regions.every(region => region.x >= -tolerance && region.x + region.width <= 375 + tolerance
                 && region.scroll > region.client && region.position > 0 && region.overflow === 'auto'),
             `375/${step}: Diagramm und Tabelle scrollen intern`);
             const open = step === 'geöffnet';
@@ -1276,7 +1423,7 @@ async function runBalanceWealthHistory(browser, baseUrl) {
     await waitForWealthBrowserLayout(page);
     const widths = await page.evaluate(() => ({
         page: document.documentElement.scrollWidth, viewport: document.documentElement.clientWidth,
-        regions: [...document.querySelectorAll('#tab-wealth .wealth-scroll')].map(el => {
+        regions: [...document.querySelectorAll('#wealthHistoryChart, #wealthHistoryTable')].map(el => {
             el.scrollLeft = el.scrollWidth;
             return { width: el.clientWidth, scroll: el.scrollWidth, position: el.scrollLeft, overflow: getComputedStyle(el).overflowX };
         })
@@ -4293,6 +4440,7 @@ async function main() {
             ['Balance.html', runBalanceSmoke],
             ['Balance membership reload', runBalanceMembershipReload],
             ['Balance wealth history', runBalanceWealthHistory],
+            ['Balance expenses history', runBalanceExpensesHistory],
             ['Balance shared tranche ids', runBalanceSharedTrancheIds],
             ['Balance engine gate', runBalanceEngineGate],
             ['Balance annual preflight', runBalanceAnnualPreflight],

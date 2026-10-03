@@ -353,6 +353,72 @@ const prevApplyStoredInputs = UIReader.applyStoredInputs;
 async function runBalanceUiOrchestrationTests() {
     console.log('--- Balance UI Orchestration Tests ---');
 
+    console.log('Auswertung: echter Tablistener aktualisiert beide Abschnitte ausschließlich lesend');
+    {
+        const documentRef = new MockDocument();
+        const localStorageRef = createLocalStorageMock();
+        installBrowserGlobals(documentRef, localStorageRef);
+        PersistenceFacade.resetPersistenceForTests();
+        const dom = createDomRefs(documentRef);
+        const updatePanel = documentRef.register(new MockElement('tab-update'));
+        updatePanel.classList.add('active');
+        const evaluationPanel = documentRef.register(new MockElement('tab-wealth'));
+        dom.containers.tabPanels = [updatePanel, evaluationPanel];
+        const updateButton = dom.containers.tabButtons.children[0];
+        updateButton.classList.add('tab-btn');
+        updateButton.dataset.tab = 'update';
+        const evaluationButton = new MockElement('evaluation-button', 'button');
+        evaluationButton.classList.add('tab-btn');
+        evaluationButton.dataset.tab = 'wealth';
+        dom.containers.tabButtons.appendChild(evaluationButton);
+        let generated = 0;
+        for (const section of ['wealthHistory', 'expensesHistory']) {
+            dom[section] = { panel: evaluationPanel, hint: { textContent: '' }, date: { textContent: '' } };
+            for (const key of ['chart', 'table']) {
+                let markup = '';
+                dom[section][key] = { get innerHTML() { return markup; }, set innerHTML(value) {
+                    assert(evaluationPanel.classList.contains('active') || value === '', 'Inaktiv keine Markuperzeugung durch Binder');
+                    if (value) generated++;
+                    markup = value;
+                } };
+            }
+        }
+        const entry = { id: 'manual:2026-10-03', asOf: '2026-10-03', reason: 'manual', periodId: null,
+            tagesgeld: 12, geldmarktEtf: 23, depotwertAlt: 34, depotwertNeu: 45, aktienEtf: 79, total: 114 };
+        let currentState = { inputs: {}, wealthHistory: { schemaVersion: 1, entries: [entry] } };
+        StorageManager.loadState = () => currentState;
+        localStorageRef.setItem('balance_expenses_v1', JSON.stringify({ version: 1, years: {
+            '2025': { months: { '1': { profiles: { A: { categories: { Ausgabe: -100 } } } } } }
+        } }));
+        let updates = 0, writes = 0, clears = 0;
+        const originalWrite = localStorageRef.setItem;
+        const originalClear = UIRenderer.clearError, originalActionClear = UIRenderer.clearActionError;
+        localStorageRef.setItem = (...args) => { writes++; return originalWrite(...args); };
+        UIRenderer.clearError = UIRenderer.clearActionError = () => { clears++; };
+        try {
+            initUIBinder(dom, { pendingInputMetadata: {} }, () => { updates++; }, () => { updates++; });
+            UIBinder.bindUI();
+            assert(updatePanel.classList.contains('active') && !evaluationPanel.classList.contains('active'), 'Initialisierung erhält Jahres-Update');
+            const click = dom.containers.tabButtons.listeners.click[0];
+            click({ target: evaluationButton });
+            assertEqual(generated, 4, 'Öffnen zeichnet beide SVGs und Tabellen');
+            assert(dom.expensesHistory.table.innerHTML.includes('2025') && dom.wealthHistory.table.innerHTML.includes('Unterjährig'), 'Beide Abschnitte benutzen aktuelle Werte');
+            click({ target: updateButton });
+            assertEqual(generated, 4, 'Verlassen erzeugt keine dynamischen Inhalte');
+            assertEqual(dom.wealthHistory.chart.innerHTML + dom.wealthHistory.table.innerHTML
+                + dom.expensesHistory.chart.innerHTML + dom.expensesHistory.table.innerHTML, '', 'Alle vier Container nach Verlassen leer');
+            currentState = { inputs: {} };
+            click({ target: evaluationButton });
+            assertEqual(dom.wealthHistory.chart.innerHTML, '', 'Wiederöffnung liest frische Vermögensdaten');
+            assert(dom.expensesHistory.table.innerHTML.includes('2025'), 'Ausgabenabschnitt bleibt unabhängig bedienbar');
+            assertEqual(updates + writes + clears, 0, 'Tablistener berechnet, erfasst, schreibt und bereinigt keine Fehler');
+        } finally {
+            localStorageRef.setItem = originalWrite;
+            UIRenderer.clearError = originalClear;
+            UIRenderer.clearActionError = originalActionClear;
+        }
+    }
+
     console.log('Test 1: UIBinder binds controls only once and tolerates optional import/export controls');
     {
         const documentRef = new MockDocument();

@@ -1448,12 +1448,12 @@
                     </div>
                     <div class="detail-block" id="balance-vermoegensverlauf">
                         <h3>Vermögensverlauf</h3>
-                        <p><strong>„Vermögensverlauf“ ist der vierte Haupttab</strong> nach „Jahres-Update“,
-                            „Einstellungen &amp; Strategie“ und „Ausgaben-Check“. Start, Reload und Profilwechsel
+                        <p><strong>„Auswertung“ ist der vierte Haupttab</strong> nach „Jahres-Update“,
+                            „Einstellungen &amp; Strategie“ und „Ausgaben-Check“. Er enthält zuerst „Vermögensverlauf“ und darunter „Ausgaben je Jahr“. Start, Reload und Profilwechsel
                             öffnen immer „Jahres-Update“. Aktivieren zeigt Beschreibung, Legende, Diagramm und Tabelle
                             aus den aktuellen gespeicherten Daten, ohne einen Stand zu erfassen. Verlassen entfernt
                             die dynamischen Inhalte. Auch eine leere Historie zeigt beim Öffnen einen erklärenden Hinweis.</p>
-                        <p>Im Verlaufstab bilden „Stand jetzt erfassen“, die Anzahl und das Datum eine gemeinsame
+                        <p>Im Tab „Auswertung“ bilden „Stand jetzt erfassen“, die Anzahl und das Datum eine gemeinsame
                             Aktionszeile, die auf schmalen Ansichten umbrechen darf. Das Datum lautet
                             <strong>„Zuletzt erfasst am TT.MM.JJJJ“</strong> für den größten gespeicherten Stichtag.
                             Fehlende oder leere Historie zeigt exakt <strong>„Noch keine Stände erfasst“</strong>.
@@ -1470,11 +1470,24 @@
                         <p>Tabs und Capturetaste lassen sich mit Klick, Enter und Leertaste bedienen. Inaktive Regionen
                             fehlen aus Tab-Reihenfolge und Zugänglichkeitsbaum; im aktiven Verlauf folgen Diagramm und
                             Tabelle direkt auf die Capturetaste und scrollen intern, ohne die Formularspalte zu verbreitern.
-                            Ab 1440 px Fensterbreite stehen alle vier Haupttabs vollständig in einer Zeile; in schmaleren Fenstern
+                            Ab 1366 px Fensterbreite stehen alle vier Haupttabs vollständig in einer Zeile; in schmaleren Fenstern
                             umbrechen sie als ganze Tabs, und die Capturetaste bleibt erreichbar.
                             Die Ausgabentabelle behält ihre Mindestbreite von 720 px.</p>
-                        <p>Beim Drucken der Balance-Seite wird der Vermögensverlauf nicht ausgegeben.</p>
-                        <p>Im Verlaufstab speichert <strong>„Stand jetzt erfassen“</strong> die aktuellen,
+                        <p><strong>Ausgaben je Jahr:</strong> Die lesende Übersicht zeigt Jahressumme,
+                            Monate mit Daten und Ø pro Monat über alle gespeicherten Profile, unabhängig von der
+                            aktuellen Verbundauswahl. Monate mit Daten sind Monate mit positiven Ausgaben;
+                            Nullimporte zählen nicht, bleiben aber als Nulljahr sichtbar. Reine Auswahljahre
+                            ohne Importe erscheinen nicht. Das laufende Teiljahr ist textlich markiert.
+                            Vergleichen Sie unvollständige Jahre anhand von Ø pro Monat, ohne Hochrechnung.
+                            Historische Jahresbudgets werden nicht gespeichert und sind nicht verlässlich
+                            rekonstruierbar; deshalb gibt es keine Budget- oder Abweichungsspalten.</p>
+                        <p>Diagramm und Tabelle der Jahresausgaben sind eigene benannte, per Tastatur erreichbare
+                            Scrollregionen unterhalb des Vermögensverlaufs. CSV-Import, Jahresauswahl, Löschung
+                            und bestätigter Recovery-Reset aktualisieren die aktive Übersicht sofort. Inaktiv bleiben
+                            alle vier dynamischen Container leer. Beschädigte Ausgabendaten zeigen einen Hinweis
+                            auf Recovery im Ausgaben-Check, ohne Rohdaten oder automatisches Zurücksetzen.</p>
+                        <p>Beim Drucken der Balance-Seite wird die Auswertung nicht ausgegeben.</p>
+                        <p>Im Tab „Auswertung“ speichert <strong>„Stand jetzt erfassen“</strong> die aktuellen,
                             frisch geprüften Balance-Bestände. Ein erneuter Klick am selben lokalen Kalendertag
                             ersetzt den manuellen Stand; an einem anderen Tag kommt ein Stand hinzu. Normale
                             Eingabeänderungen und Vorschauen erfassen nichts automatisch. Die Erfassung führt
@@ -1484,7 +1497,7 @@
                             nicht dazu. Der Pflegebucket ist eine Zweckbindung innerhalb der Bestände und wird
                             weder zusätzlich addiert noch pauschal abgezogen. Gestapelte Säulen zeigen die drei
                             Gruppen ohne interpolierte Zwischenwerte. Die per Tab erreichbare Tabelle nennt
-                            außerdem beide Teildepots, Summe und Anlass. Jahresabschluss und manuell sind durch
+                            außerdem beide Teildepots, Summe und Anlass. Jahresabschluss und „Unterjährig“ (gespeichert als <code>manual</code>) sind durch
                             Text, Symbol und Rahmen erkennbar; auf schmalen Ansichten scrollen die Bereiche intern.</p>
                         <p><strong>Profilzuordnung:</strong> Jeder Stand gehört ausschließlich zum aktiven Profil,
                             auch bei einem angezeigten Profilverbund. Andere Profile erhalten keine Verlaufskopie;

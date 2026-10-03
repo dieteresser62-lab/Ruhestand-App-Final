@@ -1,5 +1,7 @@
 import { UIRenderer } from '../app/balance/balance-renderer.js';
+import { UIUtils } from '../app/balance/balance-utils.js';
 import { initExpensesTab, updateExpensesBudget, rollExpensesYear } from '../app/balance/balance-expenses.js';
+import { refreshBalanceExpensesHistory } from '../app/balance/balance-expenses-history-renderer.js';
 import {
     EXPENSE_CSV_IMPORT_SUMMARY,
     ExpenseCsvImportError,
@@ -455,7 +457,17 @@ try {
     writeStore(withHiddenProfile);
 
     const dom = createDomRefs();
-    initExpensesTab(dom);
+    let overviewActive = false, changeCalls = 0, completeChange;
+    const overview = { panel: { classList: { contains: () => overviewActive } },
+        chart: { innerHTML: '' }, table: { innerHTML: '' }, hint: { textContent: '' } };
+    const refreshOverview = () => refreshBalanceExpensesHistory(overview, {
+        storage: global.localStorage, now: () => new Date(2026, 9, 3)
+    });
+    const onChange = () => { changeCalls++; refreshOverview(); completeChange?.(); };
+    initExpensesTab(dom, { onChange });
+    assertEqual(changeCalls, 0, 'Initialisierung ist kein Datenänderungsrückruf');
+    refreshOverview();
+    assertEqual(overview.chart.innerHTML + overview.table.innerHTML, '', 'Gefüllte Übersicht bleibt initial inaktiv leer');
     updateExpensesBudget({ monthlyBudget: 1000, annualBudget: 12000 });
 
     // 1) Performance: refreshTableValues darf nur einmal auf STORAGE lesen
@@ -499,13 +511,14 @@ try {
     });
     assertEqual(dom.expenses.csvInput.clickCount, 1, 'Import-Klick sollte CSV-Input öffnen');
 
+    let releaseText;
     const file = {
-        text: async () => [
+        text: () => new Promise(resolve => { releaseText = () => resolve([
             'Kategorie;Betrag',
             'Versicherungen;-1.200,50',
             'Versicherungen;-300',
             'Krankenkasse;-99,50'
-        ].join('\n')
+        ].join('\n')); })
     };
     dom.expenses.csvInput.value = 'selected.csv';
     dom.expenses.csvInput.trigger('change', {
@@ -514,7 +527,15 @@ try {
             value: 'selected.csv'
         }
     });
-    await new Promise(resolve => setTimeout(resolve, 0));
+    assertEqual(changeCalls, 0, 'Offenes Dateilesen benachrichtigt noch nicht');
+    overviewActive = true;
+    refreshOverview();
+    const changed = new Promise(resolve => { completeChange = resolve; });
+    releaseText();
+    await changed;
+    completeChange = null;
+    assertEqual(changeCalls, 1, 'Ein realer Import benachrichtigt genau einmal nach Speicherung');
+    assert(overview.table.innerHTML.includes(UIUtils.formatCurrency(3640)), 'Aktive Übersicht zeigt importierte Jahressumme ohne Tabwechsel');
 
     const importedStore = readStore();
     const marchCategories = importedStore.years['2026'].months['3'].profiles.default.categories;
@@ -539,6 +560,9 @@ try {
     });
     assertEqual(confirmMessage, 'Monatsdaten für März löschen?', 'Delete-Confirm sollte den Monatstext exakt anzeigen');
     const afterDeleteStore = readStore();
+    assertEqual(changeCalls, 2, 'Löschung benachrichtigt genau einmal');
+    assert(overview.table.innerHTML.includes(UIUtils.formatCurrency(2040))
+        && !overview.table.innerHTML.includes(UIUtils.formatCurrency(3640)), 'Löschung entfernt alte Jahreswerte unmittelbar');
     assertEqual(afterDeleteStore.years['2026'].months['3'].profiles.default, undefined, 'Delete sollte den Profileintrag entfernen');
     const marchCell = dom.expenses.table.querySelector('[data-month="3"][data-profile="default"] [data-role="value"]');
     assertEqual(marchCell?.textContent, '—', 'Delete sollte die Tabellenzelle neu rendern');
@@ -559,6 +583,7 @@ try {
     });
     const afterNoOp = JSON.stringify(readStore());
     assertEqual(afterNoOp, beforeNoOp, 'Delete ohne vorhandenen Eintrag muss No-Op sein');
+    assertEqual(changeCalls, 2, 'Wirkungslose Löschung benachrichtigt nicht');
 
     // 5) Jahresabschluss: neues Jahr aktiv, Historie bleibt
     const newYear = rollExpensesYear();
@@ -570,6 +595,13 @@ try {
     assertEqual(Object.keys(rolledStore.years['2027'].months || {}).length, 0, 'Folgejahr sollte ohne Monatsdaten starten');
     assertEqual(dom.expenses.yearSelect.value, '2027', 'Jahr-Select sollte nach Roll auf Folgejahr springen');
     assertEqual(dom.expenses.ytdSub.textContent, 'Soll: —', 'YTD-Soll sollte im leeren Folgejahr nicht auf Kalender, sondern Datenmonate basieren');
+    assertEqual(changeCalls, 3, 'Jahreswechsel benachrichtigt genau einmal');
+    assert(overview.table.innerHTML.includes('2026 – laufendes Teiljahr') && !overview.table.innerHTML.includes('2027'), 'Auswahljahr ändert Kalenderjahrmarkierung und importierte Jahresliste nicht');
+    overviewActive = false;
+    refreshOverview();
+    dom.expenses.yearSelect.trigger('change', { target: { value: '2026' } });
+    assertEqual(changeCalls, 4, 'Jahresauswahl benachrichtigt');
+    assertEqual(overview.chart.innerHTML + overview.table.innerHTML, '', 'Jahresauswahl zeichnet inaktiv keine Inhalte');
 
     // 6) Recovery-UI: Bereich/Backend und sichere Optionen; kein Reset ohne Export+Bestaetigung.
     global.localStorage.setItem(STORAGE_KEY, corruptRaw);
@@ -601,7 +633,11 @@ try {
     let failResetFlush = true;
     const resetPrompts = [];
     const recoveryDom = createDomRefs();
+    overviewActive = true;
+    refreshOverview();
+    const beforeResetCalls = changeCalls;
     initExpensesTab(recoveryDom, {
+        onChange,
         storage: global.localStorage,
         getPersistenceStatus: () => ({ backend: 'IndexedDB-Test' }),
         downloadRecovery: async (document, filename) => {
@@ -649,6 +685,7 @@ try {
     );
 
     assertEqual(actionErrors.at(-1)?.scope, 'expenses-recovery', 'Fehlgeschlagener Reset gehört zum Recoverybereich');
+    assertEqual(changeCalls, beforeResetCalls, 'Gesperrter, abgebrochener oder fehlgeschlagener Reset benachrichtigt nicht');
     assert(actionErrors.at(-1)?.error.message.includes('nicht zurueckgesetzt'), 'Recoveryfehler behält seinen sicheren Wortlaut');
     failResetFlush = false;
     recoveryDom.expenses.table.querySelector('[data-action="expenses-recovery-reset"]').click();
@@ -657,6 +694,9 @@ try {
     assertEqual(resetPrompts.length, 3, 'Jeder Reset-Versuch nutzt einen eigenen Bestaetigungsschritt');
     assertEqual(resetStore.version, 1, 'Bestaetigter Reset erzeugt einen gueltigen Ausgabenstore');
     assertEqual(Object.keys(resetStore.years).length, 0, 'Bestaetigter Reset startet ohne erfundene Finanzdaten');
+    assertEqual(changeCalls, beforeResetCalls + 1, 'Nur bestätigter und geflushter Reset benachrichtigt');
+    assertEqual(overview.chart.innerHTML + overview.table.innerHTML, '', 'Reset entfernt alte Übersichtsinhalte');
+    assertEqual(overview.hint.textContent, 'Noch keine Ausgabendaten vorhanden.', 'Reset ersetzt Korruptionshinweis durch Leerzustand');
     assertEqual(
         recoveryDom.expenses.table.querySelector('[data-expenses-recovery="corrupt"]'),
         null,

@@ -24,6 +24,7 @@ import { createSnapshotHandlers } from './balance-binder-snapshots.js';
 import { PersistenceFacade } from '../shared/persistence-facade.js';
 import { BALANCE_UPDATE_MODE } from './balance-update-pipeline.js';
 import { createBalanceWealthHistoryService, createManualWealthHistoryController } from './balance-wealth-history.js';
+import { refreshBalanceExpensesHistory } from './balance-expenses-history-renderer.js';
 import { refreshBalanceWealthHistory } from './balance-wealth-history-renderer.js';
 
 // Module-level references
@@ -222,6 +223,7 @@ export const UIBinder = {
         dom.containers.tabPanels.forEach(panel => panel.classList.remove('active'));
         document.getElementById('tab-' + clickedButton.dataset.tab).classList.add('active');
         refreshBalanceWealthHistory(dom.wealthHistory);
+        refreshBalanceExpensesHistory(dom.expensesHistory);
     },
 
     handleReset() {
@@ -255,6 +257,7 @@ export const UIBinder = {
         finally {
             if (dom.wealthHistory?.status) dom.wealthHistory.status.textContent = '';
             refreshBalanceWealthHistory(dom.wealthHistory);
+            refreshBalanceExpensesHistory(dom.expensesHistory);
         }
     },
 
@@ -314,7 +317,10 @@ export const UIBinder = {
 
     async handleSnapshotActions(e) {
         try { return await handlers.snapshots.handleSnapshotActions(e); }
-        finally { refreshBalanceWealthHistory(dom.wealthHistory); }
+        finally {
+            refreshBalanceWealthHistory(dom.wealthHistory);
+            refreshBalanceExpensesHistory(dom.expensesHistory);
+        }
     },
 
     handleCopyDiagnosis() {

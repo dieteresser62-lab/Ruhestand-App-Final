@@ -21,6 +21,8 @@
 
 /* Base Layout */
 .wealth-history { min-width: 0; }
+.expenses-history { margin-top: 28px; border-top: 1px solid var(--border-color); padding-top: 16px; }
+.expenses-year-bar { fill: #357963; }
 .wealth-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .wealth-actions .btn { max-width: 100%; white-space: normal; }
 .wealth-history p { font-size: .9rem; line-height: 1.5; }

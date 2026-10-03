@@ -8,9 +8,16 @@ console.log('--- Vermögensverlauf: Aufbereitung und SVG ---');
 const html = readFileSync(new URL('../Balance.html', import.meta.url), 'utf8');
 const tabs = [...html.matchAll(/<button class="tab-btn(?: active)?" data-tab="([^"]+)">([^<]+)<\/button>/g)];
 assertEqual(tabs.map(tab => tab[1]).join(','), 'update,settings,ausgaben,wealth', 'Genau vier Tabs in bisheriger Reihenfolge');
-assertEqual(tabs[3][2], 'Vermögensverlauf', 'Vierter Tab korrekt benannt');
+assertEqual(tabs[3][2], 'Auswertung', 'Vierter Tab korrekt benannt');
 assert(/id="tab-update" class="tab-panel active"/.test(html), 'Nur Jahres-Update startet aktiv');
 assert(/id="tab-wealth" class="tab-panel wealth-history"/.test(html), 'Verlaufspanel initial inaktiv');
+assert(html.includes('aria-labelledby="evaluationTitle"'), 'Auswertung hat eine eigene Gesamtbenennung');
+assert(html.indexOf('id="wealthHistoryTitle"') < html.indexOf('id="expensesHistoryTitle"'), 'Vermögensverlauf steht vor Ausgaben je Jahr');
+for (const id of ['wealthHistoryChart', 'wealthHistoryTable', 'expensesHistoryChart', 'expensesHistoryTable']) {
+    const element = html.match(new RegExp(`<div id="${id}"[^>]+>`))?.[0] || '';
+    assert(element.includes('tabindex="0"') && element.includes('role="region"') && element.includes('aria-label='), `${id}: benannte Tastaturregion`);
+}
+assert(html.includes('Jahresbudgets werden nicht historisch gespeichert') && html.includes('Ø pro Monat'), 'Budgetgrenze und Teiljahresvergleich sind sichtbar erklärt');
 assertEqual((html.match(/id="captureWealthBtn"/g) || []).length, 1, 'Genau eine Capturetaste');
 assert(html.indexOf('id="tab-wealth"') < html.indexOf('id="captureWealthBtn"') && html.indexOf('id="captureWealthBtn"') < html.indexOf('class="results-column'), 'Capture im vierten Panel vor Ergebnisspalte');
 assert(!html.slice(html.indexOf('class="results-column')).includes('wealth-history'), 'Kein Verlauf in Ergebnisspalte');
@@ -34,7 +41,7 @@ const manual = createManualWealthHistoryEntry(source, '2026-12-31');
 const earlier = createManualWealthHistoryEntry({ ...source, tagesgeld: 1 }, '2026-06-01');
 const state = { wealthHistory: { schemaVersion: 1, entries: [manual, annual, earlier] } };
 const original = JSON.stringify(state);
-const chartDescription = 'Gestapelte Säulen für Liquidität, Geldmarkt-ETF und Aktien-ETF. Jahresabschluss: Quadrat und durchgezogener Rahmen. Manuell: Raute und gestrichelter Rahmen. Alle Werte und beide Teildepots stehen in der folgenden Tabelle.';
+const chartDescription = 'Gestapelte Säulen für Liquidität, Geldmarkt-ETF und Aktien-ETF. Jahresabschluss: Quadrat und durchgezogener Rahmen. Unterjährig: Raute und gestrichelter Rahmen. Alle Werte und beide Teildepots stehen in der folgenden Tabelle.';
 
 function assertChartAccessibility(svg) {
     const openingTag = svg.match(/^<svg\b[^>]*>/)?.[0] || '';
@@ -50,6 +57,8 @@ function assertChartAccessibility(svg) {
 }
 
 const rows = prepareWealthHistoryMetrics(state);
+assertEqual(rows[0].label, 'Unterjährig', 'Sichtbarer Anlass ist Unterjährig');
+assertEqual(rows[0].reason, 'manual', 'Gespeicherter Anlass bleibt manual');
 assertEqual(rows.map(row => row.id).join(','), 'manual:2026-06-01,annual:2026,manual:2026-12-31', 'Chronologisch; Jahresabschluss vor manuell am gleichen Tag');
 assertEqual(JSON.stringify(state), original, 'Aufbereitung verändert keine gespeicherten Werte oder Reihenfolgen');
 assertEqual(rows[1].segments.length, 3, 'Genau drei Stapelgruppen');
@@ -66,7 +75,7 @@ assertChartAccessibility(svg);
 assert(svg.includes('Euro (€)') && svg.includes('31.12.2026'), 'Datum und Euro-Skala sichtbar');
 assertEqual((svg.match(/class="wealth-tagesgeld"/g) || []).length, 3, 'Pro Stand genau ein Liquiditätssegment');
 assertEqual((svg.match(/class="wealth-aktienEtf"/g) || []).length, 3, 'Teildepots nicht zusätzlich gestapelt');
-assert(svg.includes('■ Jahresabschluss') && svg.includes('◇ Manuell') && svg.includes('stroke-dasharray="4 3"'), 'Anlass mit Text, Form und Rahmen');
+assert(svg.includes('■ Jahresabschluss') && svg.includes('◇ Unterjährig') && svg.includes('stroke-dasharray="4 3"'), 'Anlass mit Text, Form und Rahmen');
 assert(dom.table.innerHTML.includes('<caption>') && dom.table.innerHTML.includes('scope="col"') && dom.table.innerHTML.includes('scope="row"'), 'Datentabelle hat Caption und semantische Überschriften');
 for (const value of [12000, 23000, 34000, 45000, 79000, 114000]) {
     assert(dom.table.innerHTML.includes(UIUtils.formatCurrency(value)), `Quellwert ${value} in zugänglicher Tabelle`);
