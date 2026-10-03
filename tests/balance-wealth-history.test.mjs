@@ -160,7 +160,7 @@ async function setup() {
     };
     const store = new Map(Object.entries(initial));
     const snapshots = new Map();
-    const faults = { write: false, readback: false, flush: false, readGate: null, manual: false };
+    const faults = { write: false, readback: false, flush: false, readGate: null, annualReadGate: null, manual: false };
     let corruptNextRead = false;
     const adapter = {
         name: 'wealth-test-memory',
@@ -188,6 +188,10 @@ async function setup() {
             deletes.forEach(key => store.delete(key));
             upserts.forEach(([key, value]) => store.set(key, value));
             if (isFinal && faults.readback) { faults.readback = false; corruptNextRead = true; }
+            if (isFinal && faults.annualReadGate) {
+                faults.readGate = faults.annualReadGate;
+                faults.annualReadGate = null;
+            }
         },
         async listSnapshots() { return [...snapshots.values()].map(({ records, ...entry }) => entry); },
         async readSnapshot(id) { return structuredClone(snapshots.get(id)); },
@@ -231,10 +235,26 @@ const previous = {
     render: StorageManager.renderSnapshots, snapshot: StorageManager.createSnapshot,
     applyInputs: UIReader.applyStoredInputs
 };
+const messages = [];
+const recordToast = text => { messages.push(text); };
+const annualConfirmationsSince = index => messages.slice(index).filter(text => text.includes('Vermögensstand gesichert.'));
+
+function assertFinalizedAnnual(env, label) {
+    const state = StorageManager.loadState();
+    assertEqual(state.annualPeriodMetadata.lastCommittedPeriod, 'calendar-year:2026', `${label}: finale Periode`);
+    assertEqual(state.annualPeriodMetadata.pendingCommit, null, `${label}: kein Recoverymarker`);
+    assertEqual(state.wealthHistory.entries.length, 2, `${label}: vorheriger Stand und bestätigter Jahresrecord bleiben erhalten`);
+    const entries = state.wealthHistory.entries.filter(entry => entry.id === 'annual:2026');
+    assertEqual(entries.length, 1, `${label}: genau ein Jahresrecord`);
+    assertEqual(entries[0].total, 114000, `${label}: bestätigte fachliche Bestände`);
+    assertEqual(env.store.get(STATE), JSON.stringify(state), `${label}: Cache und dauerhaft gespeicherter State gleich`);
+    assertEqual(env.store.get(STATE), JSON.parse(env.store.get(REGISTRY)).profiles.a.data[STATE], `${label}: aktive Registrykopie gleich`);
+    assertEqual(persistenceStorage.getItem(REGISTRY), env.store.get(REGISTRY), `${label}: Registrycache ebenfalls bestätigt`);
+}
 try {
     global.confirm = () => true;
     global.location = { reload() {} };
-    UIRenderer.toast = () => {};
+    UIRenderer.toast = recordToast;
     UIRenderer.handleError = () => {};
     StorageManager.renderSnapshots = async () => {};
 
@@ -549,6 +569,36 @@ try {
         } finally { global.Date = SystemDate; }
     }
 
+    console.log('Jahresbestätigung folgt erst freigegebenem Readback, danach bleibt derselbe Handler ein No-op');
+    {
+        const env = await setup();
+        const gate = { entered: deferred(), release: deferred() };
+        const handler = env.createHandlers({ commitLiveState: async () => {
+            env.counts.commits += 1;
+            env.faults.annualReadGate = gate;
+            return RESULT;
+        } });
+        const messageIndex = messages.length;
+        const running = handler.handleJahresabschluss();
+        await gate.entered.promise;
+        assertEqual(annualConfirmationsSince(messageIndex).length, 0, 'Während blockiertem Jahres-Readback kein Zusatz');
+        assertEqual(env.counts.confirmations, 0, 'Während blockiertem Readback kein UI-Rückruf');
+        assertEqual(JSON.parse(env.store.get(STATE)).annualPeriodMetadata.lastCommittedPeriod, 'calendar-year:2026', 'Gate blockiert den Readback nach dem finalen Backendwrite');
+        gate.release.resolve();
+        assertEqual((await running).status, 'already_committed', 'Abschluss nach freigegebenem Readback');
+        assertEqual(annualConfirmationsSince(messageIndex).length, 1, 'Genau ein Zusatz nach Readbackfreigabe');
+        assertEqual(annualConfirmationsSince(messageIndex)[0], 'Ausgaben-Check auf 2027 umgestellt. Vermögensstand gesichert.', 'Exakte neue Kurzmeldung');
+        assertEqual(env.counts.confirmations, 1, 'Genau ein UI-Rückruf nach Readbackfreigabe');
+        assertFinalizedAnnual(env, 'Freigegebener Readback');
+        const repeatIndex = messages.length;
+        assertEqual((await handler.handleJahresabschluss()).status, 'already_committed', 'Derselbe Handler erkennt die abgeschlossene Periode');
+        assert(messages.slice(repeatIndex).includes('Die Jahresperiode 2026 wurde bereits abgeschlossen.'), 'Wiederholung erreicht den fachlichen No-op');
+        assertEqual(annualConfirmationsSince(repeatIndex).length, 0, 'No-op ohne neuen Zusatz');
+        assertEqual(env.counts.confirmations, 1, 'No-op ohne weiteren UI-Rückruf');
+        assertEqual(env.counts.commits, 1, 'No-op ohne weiteren Engine-Commit');
+        assertFinalizedAnnual(env, 'No-op nach Readback');
+    }
+
     console.log('Finale Write-/Readback-/Flushfehler erhalten Historie und Recovery; echter Restore erlaubt einen Abschluss');
     for (const fault of ['write', 'readback', 'flush']) {
         const env = await setup();
@@ -561,14 +611,18 @@ try {
                 return RESULT;
             }
         });
+        const messageIndex = messages.length;
         const failed = await handler.handleJahresabschluss();
         assertEqual(failed.status, 'incomplete_recovery', `${fault}: kein falscher Erfolg`);
+        assertEqual(annualConfirmationsSince(messageIndex).length, 0, `${fault}: kein Zusatz nach fehlgeschlagener Finalisierung`);
         assertEqual(env.counts.confirmations, 0, 'Fehlgeschlagener Abschluss bestätigt keinen Stand');
         const state = StorageManager.loadState();
         assertEqual(JSON.stringify(state.wealthHistory), JSON.stringify(env.initialState.wealthHistory), `${fault}: vorheriger Verlauf erhalten`);
         assertEqual(state.annualPeriodMetadata.lastCommittedPeriod, null, `${fault}: kein finaler Periodenmarker`);
         assertEqual(state.annualPeriodMetadata.pendingCommit.phase, 'validating', `${fault}: Pending-Recovery erhalten`);
+        const repeatIndex = messages.length;
         assertEqual((await handler.handleJahresabschluss()).status, 'incomplete_recovery', `${fault}: Wiederholung bleibt blockiert`);
+        assertEqual(annualConfirmationsSince(repeatIndex).length, 0, `${fault}: blockierte Wiederholung ohne Zusatz`);
         assertEqual(env.counts.commits, 1, `${fault}: kein weiterer Engine-Commit`);
         const id = state.annualPeriodMetadata.pendingCommit.snapshotId;
         assert(env.snapshots.has(id), `${fault}: tatsächlicher Recovery-Snapshot vorhanden`);
@@ -579,7 +633,9 @@ try {
         // ausführen. Eigene Labels trennen die Fixtures ohne Wartezeit oder Echtzeituhr.
         env.dom.inputs.profilName.value = `A-Wiederholung-${fault}`;
         const restoredHandler = env.createHandlers();
+        const restoredIndex = messages.length;
         assertEqual((await restoredHandler.handleJahresabschluss()).status, 'already_committed', `${fault}: Abschluss nach Restore erfolgreich`);
+        assertEqual(annualConfirmationsSince(restoredIndex).length, 1, `${fault}: neuer Abschluss nach Restore bestätigt genau einmal`);
         assertEqual(env.snapshots.size, 2, `${fault}: Wiederholung erzeugt einen eigenen Recovery-Snapshot`);
         assertEqual(JSON.stringify(env.snapshots.get(id)), recoveryBefore, `${fault}: ursprünglicher Recovery-Snapshot bleibt unverändert`);
         const entries = StorageManager.loadState().wealthHistory.entries;
@@ -708,48 +764,74 @@ try {
         }
         const tomorrow = manualController(env, { now: () => new Date(2027, 0, 1), refresh: () => refreshBalanceWealthHistory(view) });
         await tomorrow.controller.capture();
+        const annualIndex = messages.length;
         const annual = env.createHandlers({ onAnnualWealthSaved: () => {
+            env.counts.confirmations += 1;
+            assertEqual(annualConfirmationsSince(annualIndex).length, 1, 'Kurzmeldung bereits vor UI-Rückruf ausgegeben');
             assertEqual(env.store.get(STATE), JSON.parse(env.store.get(REGISTRY)).profiles.a.data[STATE], 'Bestätigung erst nach State-/Registry-Readback');
             view.status.textContent = 'Stand gesichert';
         } });
         await ui.controller.withAnnual(() => annual.handleJahresabschluss());
+        assertEqual(annualConfirmationsSince(annualIndex).length, 1, `Verlauf ${open ? 'aktiv' : 'inaktiv'}: neuer Abschluss genau einmal bestätigt`);
         assertEqual(view.panel.classList.contains('active'), open, 'Jahresabschluss erhält Sichtbarkeit');
         assertEqual(view.count.textContent, '4 Stände', 'Zusätzlicher Tag und Jahresstand gezählt');
         assertEqual(view.date.textContent, 'Zuletzt erfasst am 01.01.2027', 'Älterer Jahresstichtag vermindert Datum nicht');
         if (open) assert(view.chart.innerHTML.includes('Jahresabschluss') && view.table.innerHTML.includes('01.01.2027'), 'Aktive Darstellung zeigt Tag und Jahresstand');
         else assertEqual(view.chart.innerHTML + view.table.innerHTML, '', 'Inaktiver Jahresabschluss ohne Inhalte');
+        const repeatIndex = messages.length;
         await ui.controller.withAnnual(() => annual.handleJahresabschluss());
         assertEqual(view.status.textContent, '', 'Jahres-No-op ohne neue Erfolgsmeldung');
-    }
-    {
-        const env = await setup();
-        const handler = env.createHandlers({ onAnnualWealthSaved: () => { throw new Error('UI-Rückruf fehlgeschlagen'); } });
-        assertEqual((await handler.handleJahresabschluss()).status, 'already_committed', 'UI-Rückruffehler nach Readback bleibt abgeschlossener Commit');
-        assertEqual(StorageManager.loadState().annualPeriodMetadata.pendingCommit, null, 'Kein falscher Recoverymarker');
-        assertEqual((await handler.handleJahresabschluss()).status, 'already_committed', 'Wiederholung bleibt No-op');
-        assertEqual(env.counts.commits, 1, 'Kein zweiter Commit nach UI-Rückruffehler');
+        assertEqual(annualConfirmationsSince(repeatIndex).length, 0, 'Aktiver/inaktiver Jahres-No-op ohne neuen Zusatz');
+        assertEqual(env.counts.confirmations, 1, 'Aktiver/inaktiver Jahres-No-op ohne weiteren UI-Rückruf');
+        assertEqual(env.counts.commits, 1, 'Aktiver/inaktiver Jahres-No-op ohne zweiten Engine-Commit');
     }
 
-    console.log('Abschluss vor 2026 behält seinen Vertrag ohne Record; Renderfehler ändern bestätigten Erfolg nicht');
+    console.log('Abschluss vor 2026 behält seinen Vertrag ohne Record und ohne Vermögensbestätigung');
     {
         const env = await setup();
         const handler = env.createHandlers({
             getReferenceDate: () => new Date(2026, 0, 15), getTargetYear: () => 2025,
             rollExpensesYearFn: () => 2026
         });
+        const messageIndex = messages.length;
         assertEqual((await handler.handleJahresabschluss()).status, 'already_committed', 'Legacy-Jahr weiterhin abschließbar');
+        assert(messages.slice(messageIndex).includes('Ausgaben-Check auf 2026 umgestellt.'), 'Legacy-Jahr behält bisherige Kurzmeldung');
+        assertEqual(annualConfirmationsSince(messageIndex).length, 0, 'Abschluss 2025 ohne Vermögenszusatz');
         assertEqual(env.counts.confirmations, 0, 'Vor 2026 keine Verlaufsbestätigung');
         assertEqual(StorageManager.loadState().wealthHistory.entries.length, 1, 'Vor 2026 kein Jahresrecord');
         assertEqual(StorageManager.loadState().annualPeriodMetadata.lastCommittedPeriod, 'calendar-year:2025', 'Legacy-Periodenvertrag erhalten');
     }
-    {
+    console.log('UI-Rückruf-, Render- und Toastfehler ändern bestätigten Abschluss und No-op nicht');
+    for (const fault of ['callback', 'render', 'toast']) {
         const env = await setup();
-        StorageManager.renderSnapshots = async () => { throw new Error('render failed'); };
-        const handler = env.createHandlers();
-        assertEqual((await handler.handleJahresabschluss()).status, 'already_committed', 'Renderfehler meldet keinen falschen Persistenzfehler');
-        assertEqual((await handler.handleJahresabschluss()).status, 'already_committed', 'Renderfehler erlaubt keinen zweiten Abschluss');
-        assertEqual(env.counts.commits, 1, 'Nach Renderfehler nur ein Engine-Commit');
-        assertEqual(StorageManager.loadState().wealthHistory.entries.length, 2, 'Bestätigter Jahresrecord bleibt erhalten');
+        const messageIndex = messages.length;
+        let uiFailures = 0;
+        const failUi = () => { uiFailures += 1; throw new Error(`${fault} failed`); };
+        const handler = env.createHandlers({ onAnnualWealthSaved: () => {
+            env.counts.confirmations += 1;
+            assertEqual(annualConfirmationsSince(messageIndex).length, 1, `${fault}: Bestätigung vor Rückruf`);
+            if (fault === 'callback') failUi();
+        } });
+        if (fault === 'render') StorageManager.renderSnapshots = async () => {
+            assertEqual(annualConfirmationsSince(messageIndex).length, 1, 'Bestätigung vor Snapshot-Renderfehler');
+            failUi();
+        };
+        if (fault === 'toast') UIRenderer.toast = text => {
+            if (text.includes('Ausgaben-Check auf')) failUi();
+            recordToast(text);
+        };
+        assertEqual((await handler.handleJahresabschluss()).status, 'already_committed', `${fault}: UI-Fehler meldet keinen falschen Persistenzfehler`);
+        assertEqual(uiFailures, 1, `${fault}: injizierter Fehler tatsächlich erreicht`);
+        assertEqual(annualConfirmationsSince(messageIndex).length, fault === 'toast' ? 0 : 1, `${fault}: Zusatz vor nachgelagertem UI-Fehler, außer beim defekten Toast selbst`);
+        assertFinalizedAnnual(env, `${fault}: nach UI-Fehler`);
+        const repeatIndex = messages.length;
+        assertEqual((await handler.handleJahresabschluss()).status, 'already_committed', `${fault}: Wiederholung bleibt abgeschlossen`);
+        assert(messages.slice(repeatIndex).includes('Die Jahresperiode 2026 wurde bereits abgeschlossen.'), `${fault}: fachlicher No-op nach UI-Fehler`);
+        assertEqual(annualConfirmationsSince(repeatIndex).length, 0, `${fault}: kein Zusatz bei Wiederholung`);
+        assertEqual(env.counts.confirmations, fault === 'toast' ? 0 : 1, `${fault}: kein erneuter UI-Rückruf`);
+        assertEqual(env.counts.commits, 1, `${fault}: kein zweiter Engine-Commit`);
+        assertFinalizedAnnual(env, `${fault}: nach Wiederholung`);
+        UIRenderer.toast = recordToast;
         StorageManager.renderSnapshots = async () => {};
     }
 } finally {

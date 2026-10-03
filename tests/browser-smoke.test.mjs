@@ -1206,6 +1206,7 @@ async function runBalanceAnnualCommitScenario(browser, baseUrl, open) {
         await annualFetchGate;
         await route.fallback();
     });
+    const commitMessageIndex = await smoke.page.evaluate(() => window.__browserSmokeMessages.length);
     await closeButton.click({ force: true });
     await smoke.page.waitForFunction(() => document.getElementById('captureWealthBtn').disabled);
     assert(await closeButton.isDisabled() && await smoke.page.locator('#btnJahresUpdate').isDisabled(),
@@ -1228,6 +1229,11 @@ async function runBalanceAnnualCommitScenario(browser, baseUrl, open) {
         details.snapshots = await readIndexedDb(smoke.page, 'snapshots', null);
         throw new Error(`Jahresabschluss erreichte den Commit nicht: ${JSON.stringify(details)}`, { cause: error });
     }
+    await smoke.page.waitForFunction(index => window.__browserSmokeMessages.slice(index)
+        .some(message => message === 'Ausgaben-Check auf 2027 umgestellt. Vermögensstand gesichert.'), commitMessageIndex);
+    const commitMessages = await smoke.page.evaluate(index => window.__browserSmokeMessages.slice(index), commitMessageIndex);
+    assert(commitMessages.filter(message => message.includes('Vermögensstand gesichert.')).length === 1,
+        `Verlauf ${open ? 'aktiv' : 'inaktiv'}: neuer Abschluss bestätigt genau einmal den gesicherten Vermögensstand`);
     const committedAge = await smoke.page.locator('#aktuellesAlter').inputValue();
     assert(committedAge === '68', `Erfolgreicher Commit muss das Alter genau einmal erhoehen (Ist: ${committedAge})`);
     const row = await readIndexedDb(smoke.page, 'kv', BALANCE_STATE_KEY);
@@ -1258,12 +1264,17 @@ async function runBalanceAnnualCommitScenario(browser, baseUrl, open) {
     await smoke.page.getByRole('button', { name: 'Ausgaben-Check', exact: true }).click();
     await smoke.page.locator('#expensesYearSelect').selectOption('2026');
     await smoke.page.getByRole('button', { name: 'Jahres-Update', exact: true }).click();
+    const repeatMessageIndex = await smoke.page.evaluate(() => window.__browserSmokeMessages.length);
     await smoke.page.locator('#btnJahresUpdate').click();
+    await smoke.page.waitForFunction(index => window.__browserSmokeMessages.slice(index)
+        .some(message => message.includes('Die Jahresperiode 2026 wurde bereits abgeschlossen.')), repeatMessageIndex);
     await smoke.page.waitForFunction(() => !document.getElementById('captureWealthBtn').disabled);
     assert(await smoke.page.locator('#wealthHistoryStatus').textContent() === '', 'Wiederholungs-No-op ohne neue Erfassungsbestätigung');
-    const repeatMessages = await smoke.page.evaluate(() => window.__browserSmokeMessages);
+    const repeatMessages = await smoke.page.evaluate(index => window.__browserSmokeMessages.slice(index), repeatMessageIndex);
     assert(repeatMessages.some(message => message.includes('Die Jahresperiode 2026 wurde bereits abgeschlossen.')),
         'Die Wiederholung erreicht den fachlichen No-op statt an einer Vorprüfung zu scheitern');
+    assert(!repeatMessages.some(message => message.includes('Vermögensstand gesichert.')),
+        `Verlauf ${open ? 'aktiv' : 'inaktiv'}: fachlicher No-op ohne erneuten Vermögenszusatz`);
     assert(JSON.stringify((await readBalanceBrowserState(smoke.page)).wealthHistory.entries) === JSON.stringify(entries),
         'Der zweite Jahresknopf verändert einen bereits abgeschlossenen Jahresstand nicht');
     assert(await readIndexedDb(smoke.page, 'snapshots', null) === 1, 'Wiederholung erzeugt keinen zweiten Recovery-Snapshot');
