@@ -1359,7 +1359,8 @@
                         <p><strong>Anzeige nach gescheitertem Import:</strong> Bei Balance-JSON und Markt-CSV stellt
                             die App die Eingabefelder, beim CSV auch die Datenquellenanzeige, wieder her und wartet
                             vor dem Aktionsfehler eine neue Vorschau ab. KPIs und Handlungsschritte beziehen sich
-                            wieder auf die wiederhergestellten Eingaben. Diese Vorschau speichert nichts und ersetzt
+                            wieder auf die wiederhergestellten Eingaben, sofern diese gültig sind. War schon vor dem Import ein
+                            Eingabefeld ungültig, zuerst den markierten Wert korrigieren; erst dann stimmen die Ergebnisse wieder. Diese Vorschau speichert nichts und ersetzt
                             keinen Commit. Berechnungsfehler verworfener Importdaten werden bereinigt; echte Fehler
                             des wiederhergestellten Standes können weiterhin erscheinen. Auch wenn die Vorschau
                             scheitert, bleibt der ursprüngliche Import-/Recoveryfehler erhalten. Bei fehlgeschlagenem
