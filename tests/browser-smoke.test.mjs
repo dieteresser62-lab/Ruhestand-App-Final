@@ -1601,6 +1601,176 @@ async function runBalanceImportReject(browser, baseUrl) {
     await smoke.close();
 }
 
+async function runBalanceMessagePresentation(browser, baseUrl) {
+    const smoke = await openSmokePage(browser, baseUrl, 'Balance.html', {
+        storage: createBalanceStorage(2025), observeWealthUpdates: true
+    });
+    const { page } = smoke;
+    const list = page.locator('#action-error-container');
+    const button = scope => list.locator(`[data-scope="${scope}"] button`);
+    const assertFocus = async locator => assert(await locator.evaluate(el => el === document.activeElement
+        && document.activeElement !== document.body), 'Fokus bleibt auf dem erwarteten sichtbaren Knopf');
+    const assertDescriptions = async () => {
+        const valid = await list.evaluate(container => [...container.children].every(entry => {
+            const text = entry.querySelector('.action-error-text');
+            const close = entry.querySelector('button');
+            return text.id && document.querySelectorAll(`[id="${text.id}"]`).length === 1
+                && close.getAttribute('aria-label') === 'Fehlermeldung schließen'
+                && document.getElementById(close.getAttribute('aria-describedby')) === text;
+        }));
+        assert(valid, 'Jeder Knopf hat den exakten Namen und eine eindeutige vorhandene Beschreibung');
+    };
+    const assertEmptyTabOrder = async () => {
+        assert(await list.evaluate(el => el.children.length === 0 && el.tabIndex === -1
+            && !el.hasAttribute('aria-label')), 'Leere Fehlerliste ist unbeschriftet und außerhalb der Tab-Reihenfolge');
+        await page.locator('#openDiagnosisBtn').focus();
+        await page.keyboard.press('Tab');
+        assert(await page.evaluate(() => document.activeElement !== document.getElementById('action-error-container')
+            && document.activeElement !== document.getElementById('openDiagnosisBtn')),
+        'Tab vom Diagnoseknopf vor der leeren Liste überspringt den Fehlercontainer');
+    };
+    try {
+        await page.locator('#profilverbund-profile-list input').waitFor({ state: 'visible' });
+        await waitForWealthBrowserIdle(page);
+        await assertEmptyTabOrder();
+        await page.evaluate(async () => {
+            const { UIRenderer } = await import('./app/balance/balance-renderer.js');
+            UIRenderer.handleError(new Error('Berechnungsrahmen unverändert'));
+            for (const scope of ['focus-a', 'focus-b', 'focus-c']) {
+                UIRenderer.handleActionError(new Error(`Synthetischer Fehler ${scope}`), scope);
+            }
+        });
+        await assertDescriptions();
+        await page.locator('#openDiagnosisBtn').focus();
+        await page.keyboard.press('Tab');
+        assert(await list.evaluate(el => el === document.activeElement && el.tabIndex === 0),
+            'Befüllte Fehlerliste ist vom vorherigen Diagnoseknopf per Tab erreichbar');
+        assert(await page.getByRole('button', { name: 'Fehlermeldung schließen', exact: true }).count() === 3,
+            'Alle drei Knöpfe besitzen denselben kurzen zugänglichen Namen');
+        const calculationFrame = await page.locator('#error-container').evaluate(el => {
+            const css = getComputedStyle(el);
+            return [css.borderTopWidth, css.borderTopStyle, css.borderTopColor];
+        });
+        assert(JSON.stringify(calculationFrame) === JSON.stringify(['1px', 'solid', 'rgb(254, 178, 178)']),
+            'Der Berechnungsfehler behält seinen bisherigen Rahmen');
+        assert(await list.evaluate(el => [...el.children].every(entry =>
+            getComputedStyle(entry).borderTopWidth === '2px'
+            && getComputedStyle(entry.querySelector('.action-error-text')).borderTopWidth === '0px')),
+        'Aktionsfehler haben jeweils nur einen sichtbaren Rahmen');
+
+        const oldId = await list.locator('[data-scope="focus-b"] .action-error-text').getAttribute('id');
+        await page.locator('#openDiagnosisBtn').focus();
+        await page.evaluate(async () => {
+            const { UIRenderer } = await import('./app/balance/balance-renderer.js');
+            window.__staleMessageClose = document.querySelector('[data-scope="focus-b"] button');
+            UIRenderer.handleActionError(new Error('Ersatzfehler'), 'focus-b');
+            window.__staleMessageClose.click();
+        });
+        await assertFocus(page.locator('#openDiagnosisBtn'));
+        assert(await page.locator(`[id="${oldId}"]`).count() === 0, 'Ersetzter Fehlertext bleibt nicht als verwaiste ID bestehen');
+        await assertDescriptions();
+        // Reihenfolge nach Ersatz: A, C, B. Mitte -> nächster, Ende -> Nachbar, letzter -> Diagnose.
+        await button('focus-c').focus();
+        await page.keyboard.press('Enter');
+        await assertFocus(button('focus-b'));
+        await page.keyboard.press('Space');
+        await assertFocus(button('focus-a'));
+        await page.keyboard.press('Enter');
+        await assertFocus(page.locator('#openDiagnosisBtn'));
+        assert(await list.locator('[aria-describedby]').count() === 0, 'Leere Liste hat keine verwaisten Beschreibungsbezüge');
+        await assertEmptyTabOrder();
+        await page.locator('#openDiagnosisBtn').focus();
+        await page.evaluate(async () => {
+            const { UIRenderer } = await import('./app/balance/balance-renderer.js');
+            UIRenderer.handleActionError(new Error('Automatisch bereinigt'), 'automatic');
+            UIRenderer.clearActionError('automatic');
+            window.__staleMessageClose.click();
+            delete window.__staleMessageClose;
+        });
+        await assertFocus(page.locator('#openDiagnosisBtn'));
+        await assertEmptyTabOrder();
+
+        for (const type of [true, 'info', false]) {
+            await page.evaluate(async type => {
+                const { UIRenderer } = await import('./app/balance/balance-renderer.js');
+                UIRenderer.toast('Synthetische Kontrastprüfung', type);
+            }, type);
+            const colors = await page.locator('#toast-container').evaluate(el => {
+                const foreground = getComputedStyle(el.querySelector('.toast-text')).color;
+                const background = getComputedStyle(el).backgroundColor;
+                const parse = color => color.match(/[\d.]+/g).map(Number);
+                const luminance = color => parse(color).slice(0, 3).map(value => {
+                    const srgb = value / 255;
+                    return srgb <= 0.04045 ? srgb / 12.92 : ((srgb + 0.055) / 1.055) ** 2.4;
+                }).reduce((sum, value, i) => sum + value * [0.2126, 0.7152, 0.0722][i], 0);
+                const fg = luminance(foreground), bg = luminance(background);
+                return { foreground, background, opaque: (parse(background)[3] ?? 1) === 1,
+                    contrast: (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05) };
+            });
+            assert(colors.opaque && colors.contrast >= 4.5,
+                `Toast ${type}: errechneter Textkontrast mindestens 4,5:1: ${JSON.stringify(colors)}`);
+        }
+
+        for (const viewport of [{ width: 1366, height: 900 }, { width: 375, height: 700 }]) {
+            await page.setViewportSize(viewport);
+            const expectedText = await page.evaluate(async () => {
+                const { UIRenderer } = await import('./app/balance/balance-renderer.js');
+                const message = `${'Langer synthetischer Fehlertext mit vollständigen Details. '.repeat(35)}${'X'.repeat(150)}`;
+                for (let i = 0; i < 4; i++) UIRenderer.handleActionError(new Error(message), `layout-${i}`);
+                UIRenderer.toast('X'.repeat(150), 'info');
+                return message;
+            });
+            await assertDescriptions();
+            const layout = await list.evaluate(el => ({
+                height: el.getBoundingClientRect().height,
+                limit: Math.min(16 * parseFloat(getComputedStyle(document.documentElement).fontSize), innerHeight * 0.3),
+                scrollHeight: el.scrollHeight, clientHeight: el.clientHeight,
+                scrollWidth: el.scrollWidth, clientWidth: el.clientWidth,
+                pageWidth: document.documentElement.scrollWidth, viewportWidth: innerWidth
+            }));
+            assert(layout.height <= layout.limit + 1 && layout.scrollHeight > layout.clientHeight,
+                `${viewport.width}px: lange Fehlerliste hält die maximale Höhe ein und scrollt: ${JSON.stringify(layout)}`);
+            assert(layout.scrollWidth <= layout.clientWidth + 1 && layout.pageWidth <= layout.viewportWidth + 1,
+                `${viewport.width}px: kein horizontaler Überlauf: ${JSON.stringify(layout)}`);
+            for (const text of await list.locator('.action-error-text').allTextContents()) {
+                assert(text.includes(expectedText), 'Lange Meldung wird vollständig ohne Kürzung gerendert');
+            }
+            await list.focus();
+            await page.keyboard.press('Home');
+            await page.waitForFunction(() => document.getElementById('action-error-container').scrollTop <= 1);
+            await page.keyboard.press('End');
+            await page.waitForFunction(() => {
+                const el = document.getElementById('action-error-container');
+                return el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+            });
+            assert(await list.evaluate(el => {
+                const bounds = el.getBoundingClientRect();
+                return el.lastElementChild.getBoundingClientRect().bottom <= bounds.bottom + 1;
+            }), 'Listenende mit vollständigem letztem Text ist per Tastatur erreichbar');
+            await list.focus();
+            for (let i = 0; i < 4; i++) {
+                await page.keyboard.press('Tab');
+                const reachable = await list.evaluate((el, i) => {
+                    const close = el.children[i].querySelector('button');
+                    const bounds = el.getBoundingClientRect(), rect = close.getBoundingClientRect();
+                    return document.activeElement === close && rect.top >= bounds.top - 1 && rect.bottom <= bounds.bottom + 1;
+                }, i);
+                assert(reachable, `Knopf ${i + 1} ist bei ${viewport.width}px durch Tab sichtbar erreichbar`);
+            }
+        }
+        await page.emulateMedia({ media: 'print' });
+        assert(await list.evaluate(el => getComputedStyle(el).display === 'none')
+            && await page.locator('#toast-container').evaluate(el => getComputedStyle(el).display === 'none'),
+        'Aktionsfehler und nichtleerer Toast bleiben im Druck ausgeblendet');
+        await page.emulateMedia({ media: 'screen' });
+        assert(JSON.stringify(await page.locator('#error-container').evaluate(el => {
+            const css = getComputedStyle(el);
+            return [css.borderTopWidth, css.borderTopStyle, css.borderTopColor];
+        })) === JSON.stringify(calculationFrame), 'Meldungsaktionen verändern den Berechnungsfehlerrahmen nicht');
+        smoke.assertNoErrors();
+    } finally { await smoke.close(); }
+}
+
 async function runBalanceFolderAbort(browser, baseUrl) {
     const smoke = await openSmokePage(browser, baseUrl, 'Balance.html', {
         storage: createBalanceStorage(2025), observeWealthUpdates: true
@@ -4146,6 +4316,7 @@ async function main() {
             ['Simulator ghost profile context', runSimulatorGhostProfileContextSmoke],
             ['Handbuch.html', runManualSmoke],
             ['Balance import reject', runBalanceImportReject],
+            ['Balance message presentation', runBalanceMessagePresentation],
             ['Balance folder abort', runBalanceFolderAbort],
             ['Balance import restoration', runBalanceImportRestoration],
             ['Balance CSV import roundtrip', runBalanceCsvImportRoundtrip],

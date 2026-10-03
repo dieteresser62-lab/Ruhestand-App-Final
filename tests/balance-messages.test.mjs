@@ -21,10 +21,12 @@ class Element {
     set textContent(value) { this.children = []; this.text = String(value); }
     get textContent() { return (this.text || '') + this.children.map(child => child.textContent).join(''); }
     setAttribute(name, value) { this.attributes[name] = value; }
+    removeAttribute(name) { delete this.attributes[name]; }
     appendChild(child) { child.parentNode = this; this.children.push(child); }
     remove() { if (this.parentNode) this.parentNode.children = this.parentNode.children.filter(child => child !== this); }
     addEventListener(type, callback) { this.listeners[type] = callback; }
     click() { this.listeners.click?.(); }
+    focus() { document.activeElement = this; }
     replaceChildren(...children) { this.text = ''; this.children = children; }
 }
 
@@ -62,7 +64,12 @@ const refs = () => ({ containers: { error: new Element(), toast: new Element(), 
 const toastText = dom => dom.containers.toast.children.find(child => child.className === 'toast-text')?.textContent || '';
 
 try {
-    globalThis.document = { createElement: () => new Element() };
+    const diagnosisButton = new Element();
+    globalThis.document = {
+        createElement: () => new Element(),
+        getElementById: id => id === 'openDiagnosisBtn' ? diagnosisButton : null,
+        activeElement: null
+    };
     globalThis.setTimeout = clock.setTimeout;
     globalThis.clearTimeout = clock.clearTimeout;
     const dom = refs();
@@ -72,6 +79,15 @@ try {
         'Der unabhängige atomare Statusbereich steht unmittelbar neben dem Fehlerkanal');
     assert(/id="action-error-container" role="alert" aria-live="assertive"/.test(html),
         'Aktionsfehler besitzen eine unabhängige zugängliche Meldungsregion');
+    const actionTag = html.match(/<div id="action-error-container"[^>]*>/)[0];
+    assert(actionTag.includes('tabindex="-1"') && !actionTag.includes('aria-label='),
+        'Die leere HTML-Fehlerliste erzeugt auch vor der Initialisierung keinen beschrifteten Tab-Stopp');
+    const assertEmptyActionContainer = container => {
+        assertEqual(container.children.length, 0, 'Fehlerliste ist leer');
+        assertEqual(container.attributes.tabindex, '-1', 'Leere Fehlerliste bleibt außerhalb der Tab-Reihenfolge');
+        assertEqual(container.attributes['aria-label'], undefined, 'Leere Fehlerliste besitzt keine Warnregionsbeschriftung');
+    };
+    assertEmptyActionContainer(dom.containers.actionError);
     assertEqual(getTestExecutionPolicy('balance-messages.test.mjs').mode, 'isolated', 'Die Suite isoliert DOM und Uhr');
     assert(getTestFiles(new URL('.', import.meta.url)).includes('balance-messages.test.mjs'),
         'Der bestehende Runner entdeckt die neue Testdatei');
@@ -206,6 +222,8 @@ try {
     assert(dom.containers.error.textContent.includes('Gleichzeitig'), 'Toastablauf löscht keinen gleichzeitigen Fehler');
 
     UIRenderer.handleActionError(new AppError('Import mit Recovery [rollback]'), 'balance-import');
+    assertEqual(dom.containers.actionError.attributes.tabindex, '0', 'Erster Fehler aktiviert den Tastaturzugang zur Liste');
+    assertEqual(dom.containers.actionError.attributes['aria-label'], 'Aktionsfehler', 'Befüllte Liste besitzt ihre Beschriftung');
     UIRenderer.handleActionError(new ValidationError([{ fieldId: 'field', message: 'Aktionsdetail' }]), 'annual');
     const actionContainer = dom.containers.actionError;
     assertEqual(actionContainer.children.length, 2, 'Zwei Bereiche bleiben gleichzeitig sichtbar');
@@ -223,28 +241,80 @@ try {
     assertEqual(actionContainer.children.length, 2, 'Berechnungsbereinigung und Toastablauf erhalten beide Aktionsfehler');
     const close = importEntry.children[1];
     assertEqual(close.type, 'button', 'Schließen ist ein echter Knopf ohne Formularsubmit');
-    assert(close.attributes['aria-label'].includes('Import mit Recovery'), 'Schließen besitzt einen verständlichen zugänglichen Namen');
+    assertEqual(close.attributes['aria-label'], 'Fehlermeldung schließen', 'Schließen besitzt den kurzen exakten zugänglichen Namen');
+    const assertDescriptions = container => {
+        const ids = container.children.map(entry => entry.children[0].id);
+        assertEqual(new Set(ids).size, ids.length, 'Alle aktuellen Fehlertexte haben unterschiedliche IDs');
+        for (const entry of container.children) {
+            assert(Boolean(entry.children[0].id), 'Fehlertext besitzt eine ID');
+            assertEqual(entry.children[1].attributes['aria-describedby'], entry.children[0].id,
+                'Beschreibung verweist auf den eigenen vorhandenen Fehlertext');
+        }
+    };
+    assertDescriptions(actionContainer);
+    close.focus();
     close.click();
     assertEqual(actionContainer.children.length, 1, 'Schließen entfernt genau einen Bereich');
     assertEqual(actionContainer.children[0], annualEntry, 'Anderer Bereich bleibt unverändert');
+    assertEqual(actionContainer.attributes.tabindex, '0', 'Verbleibender Fehler erhält den Tastaturzugang zur Liste');
+    assertEqual(document.activeElement, annualEntry.children[1], 'Schließen fokussiert den nächsten Knopf');
     UIRenderer.handleActionError(new Error('Neu'), 'balance-import');
     close.click();
     assertEqual(actionContainer.children.length, 2, 'Ein veralteter Schließenknopf entfernt keinen neuen Fehler');
+    assertEqual(document.activeElement, annualEntry.children[1], 'Veralteter Knopf zieht keinen Fokus ab');
+    const replacementBefore = actionContainer.children[1];
+    UIRenderer.handleActionError(new Error('Ersatz'), 'balance-import');
+    const replacement = actionContainer.children[1];
+    assert(replacement.children[0].id !== replacementBefore.children[0].id, 'Ersatzfehler erhält eine neue Text-ID');
+    assertEqual(actionContainer.attributes.tabindex, '0', 'Fehlerersatz erhält den Tastaturzugang');
+    assertDescriptions(actionContainer);
+    diagnosisButton.focus();
+    replacementBefore.children[1].click();
+    assertEqual(document.activeElement, diagnosisButton, 'Knopf des ersetzten Fehlers bleibt ohne Fokuswirkung');
+    replacement.children[1].focus();
+    replacement.children[1].click();
+    assertEqual(document.activeElement, annualEntry.children[1], 'Letzter Listeneintrag fokussiert den verbleibenden Nachbarn');
+    annualEntry.children[1].click();
+    assertEqual(document.activeElement, diagnosisButton, 'Letzter Fehler übergibt Fokus an den Diagnoseknopf');
+    assertEmptyActionContainer(actionContainer);
+    UIRenderer.handleActionError(new Error('Automatische Bereinigung'), 'automatic');
+    assertEqual(actionContainer.attributes.tabindex, '0', 'Erneuter Fehler aktiviert den Tastaturzugang wieder');
+    UIRenderer.clearActionError('automatic');
+    assertEmptyActionContainer(actionContainer);
+    UIRenderer.handleActionError(new Error('Neu'), 'balance-import');
+    UIRenderer.handleActionError(new Error('Jahr'), 'annual');
+    diagnosisButton.focus();
     UIRenderer.clearActionError('annual');
     assertEqual(actionContainer.children.length, 1, 'Gezieltes Rücksetzen lässt andere Bereiche stehen');
+    assertEqual(document.activeElement, diagnosisButton, 'Automatische Bereichsbereinigung verändert den Fokus nicht');
+    const beforeReinit = actionContainer.children[0];
 
     UIRenderer.toast('Alter DOM');
     const beforeInitId = clock.nextId;
     const newDom = refs();
+    newDom.containers.actionError.setAttribute('tabindex', '0');
+    newDom.containers.actionError.setAttribute('aria-label', 'Aktionsfehler');
+    newDom.containers.actionError.appendChild(new Element());
     initUIRenderer(newDom, null);
     assertEqual(clock.pending.size, 0, 'Neuinitialisierung storniert alte Timer');
     assertEqual(actionContainer.children.length, 0, 'Neuinitialisierung beendet den flüchtigen Aktionszustand');
+    assertEmptyActionContainer(actionContainer);
+    assertEmptyActionContainer(newDom.containers.actionError);
+    UIRenderer.handleActionError(new Error('Nach Neuinitialisierung'), 'balance-import');
+    assertEqual(newDom.containers.actionError.attributes.tabindex, '0', 'Fehler nach Neuinitialisierung aktiviert den Tastaturzugang');
+    assert(newDom.containers.actionError.children[0].children[0].id !== beforeReinit.children[0].id,
+        'Neuinitialisierung verwendet keine alte Text-ID erneut');
+    beforeReinit.children[1].click();
+    assertEqual(newDom.containers.actionError.children.length, 1, 'Alter Knopf bleibt nach Neuinitialisierung wirkungslos');
+    assertEqual(document.activeElement, diagnosisButton, 'Alter Knopf nach Neuinitialisierung verändert den Fokus nicht');
+    assertDescriptions(newDom.containers.actionError);
     assertEqual(toastText(dom), '', 'Neuinitialisierung entfernt alten Toastzustand');
     UIRenderer.toast('Neuer DOM');
     clock.callbacks.get(beforeInitId)();
     assertEqual(toastText(newDom), 'Neuer DOM', 'Alter Callback kann den neu gebundenen Container nicht löschen');
     const sameContainerId = clock.nextId;
     initUIRenderer(newDom, null);
+    assertEmptyActionContainer(newDom.containers.actionError);
     assertEqual(toastText(newDom), '', 'Neuinitialisierung desselben Containers setzt den Zustand zurück');
     UIRenderer.toast('Neue Initialisierung');
     clock.callbacks.get(sameContainerId)();

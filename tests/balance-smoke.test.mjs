@@ -6,7 +6,7 @@ import { createImportExportHandlers, createBalanceExportDocument } from '../app/
 import { createSnapshotHandlers } from '../app/balance/balance-binder-snapshots.js';
 import { StorageManager } from '../app/balance/balance-storage.js';
 import { PersistenceFacade } from '../app/shared/persistence-facade.js';
-import { ValidationError } from '../app/balance/balance-config.js';
+import { BALANCE_UPDATE_DEBOUNCE_MS, ValidationError } from '../app/balance/balance-config.js';
 import { initUIRenderer, UIRenderer } from '../app/balance/balance-renderer.js';
 import { UIReader } from '../app/balance/balance-reader.js';
 
@@ -75,6 +75,8 @@ class MockElement {
             });
         }
     }
+
+    focus() { document.activeElement = this; }
 
     querySelector(selector) { return new MockElement('dummy-child'); }
     querySelectorAll(selector) { return []; }
@@ -422,6 +424,30 @@ engineFailure = null;
 const actionContainer = document.getElementById('action-error-container');
 const scopedEntry = scope => actionContainer.children.find(entry => entry.dataset.scope === scope);
 const actionText = scope => scopedEntry(scope)?.children[0].textContent || '';
+// Manueller Abschluss mit echtem Main: kein Engineaufruf, Write oder entprelltes Update.
+{
+    UIRenderer.handleActionError(new Error('Fokusprüfung A'), 'focus-a');
+    UIRenderer.handleActionError(new Error('Fokusprüfung B'), 'focus-b');
+    const first = scopedEntry('focus-a');
+    const second = scopedEntry('focus-b');
+    // Writes des vorangegangenen echten Updates vor der Messung abschließen.
+    await PersistenceFacade.flush();
+    const callsBefore = simulateCallCount;
+    const writesBefore = storageWrites.length;
+    assertEqual(first.children[1].getAttribute('aria-label'), 'Fehlermeldung schließen', 'Echter Renderer verwendet den exakten zugänglichen Namen');
+    assertEqual(first.children[1].getAttribute('aria-describedby'), first.children[0].id, 'Echter Renderer beschreibt den Knopf mit dem eigenen Fehlertext');
+    first.children[1].focus();
+    first.children[1].dispatchEvent(new MockEvent('click'));
+    assertEqual(document.activeElement, second.children[1], 'Schließen fokussiert den nächsten echten Meldungsknopf');
+    second.children[1].dispatchEvent(new MockEvent('click'));
+    assertEqual(document.activeElement, scopedEntry('expenses-import').children[1], 'Schließen am Listenende fokussiert den verbleibenden Knopf');
+    scopedEntry('expenses-import').children[1].dispatchEvent(new MockEvent('click'));
+    assertEqual(document.activeElement, document.getElementById('openDiagnosisBtn'), 'Letzte echte Meldung fokussiert Diagnose');
+    await new Promise(resolve => setTimeout(resolve, BALANCE_UPDATE_DEBOUNCE_MS + 50));
+    assertEqual(simulateCallCount, callsBefore, 'Schließen löst auch verzögert keine Berechnung aus');
+    assertEqual(storageWrites.length, writesBefore, 'Schließen löst keinen Speicherwrite aus');
+    UIRenderer.handleActionError(new Error('Unabhängige Aktion'), 'expenses-import');
+}
 // Tatsächliche Main-/Knopfbindung mit echtem connectFolder und echtem Renderer.
 {
     const previousPicker = window.showDirectoryPicker;
@@ -710,7 +736,12 @@ try {
         StorageManager.loadState = (...args) => { storageReads++; return loadStateBeforeClose(...args); };
         localStorageMock.getItem = (...args) => { storageReads++; return getItemBeforeClose(...args); };
         try {
+            const entriesBeforeClose = actionContainer.children;
+            const closingEntry = scopedEntry('balance-import');
+            const expectedFocus = entriesBeforeClose[entriesBeforeClose.indexOf(closingEntry) + 1].children[1];
+            closingEntry.children[1].focus();
             scopedEntry('balance-import').children[1].dispatchEvent({ type: 'click' });
+            assertEqual(document.activeElement, expectedFocus, 'Echter Importfehler übergibt beim Schließen Fokus an den nächsten Bereich');
             await new Promise(resolve => setTimeout(resolve, 310));
             assertEqual(storageReads, 0, 'Schließen greift auch lesend nicht auf den Speicher zu');
         } finally {

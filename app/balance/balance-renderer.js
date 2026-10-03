@@ -28,6 +28,8 @@ let diagnosisRenderer = null;
 let toastTimer = null;
 let toastRevision = 0;
 const actionErrors = new Map();
+// Nicht bei Neuinitialisierung zurücksetzen: Auch Ersatzfehler erhalten eine neue Text-ID.
+let actionErrorRevision = 0;
 
 function renderError(container, error, markFields = false) {
     container.className = 'error-warn';
@@ -54,6 +56,14 @@ function clearToast(container) {
     container.className = '';
 }
 
+function syncActionErrorAccessibility(container) {
+    if (!container) return;
+    const hasEntries = container.children.length > 0;
+    container.setAttribute('tabindex', hasEntries ? '0' : '-1');
+    if (hasEntries) container.setAttribute('aria-label', 'Aktionsfehler');
+    else container.removeAttribute('aria-label');
+}
+
 /**
  * Initialisiert den UIRenderer mit den notwendigen Abhängigkeiten.
  *
@@ -69,6 +79,8 @@ export function initUIRenderer(domRefs, storageManager) {
     clearToast(domRefs?.containers?.toast);
     dom?.containers?.actionError?.replaceChildren();
     domRefs?.containers?.actionError?.replaceChildren();
+    syncActionErrorAccessibility(dom?.containers?.actionError);
+    syncActionErrorAccessibility(domRefs?.containers?.actionError);
     actionErrors.clear();
     dom = domRefs;
     StorageManager = storageManager;
@@ -175,25 +187,36 @@ export const UIRenderer = {
         entry.className = 'action-error-entry';
         entry.dataset.scope = scope;
         const text = document.createElement('div');
+        text.id = `balance-action-error-text-${++actionErrorRevision}`;
         renderError(text, error);
         text.classList.add('action-error-text');
         const close = document.createElement('button');
         close.type = 'button';
         close.textContent = 'Schließen';
-        close.setAttribute('aria-label', `Fehlermeldung schließen: ${text.textContent}`);
+        close.setAttribute('aria-label', 'Fehlermeldung schließen');
+        close.setAttribute('aria-describedby', text.id);
         close.addEventListener('click', () => {
-            // Ein alter Knopf darf keinen späteren Fehler desselben Bereichs entfernen.
-            if (actionErrors.get(scope) === entry) this.clearActionError(scope);
+            // Veraltete oder entfernte Knöpfe dürfen weder löschen noch Fokus abziehen.
+            if (actionErrors.get(scope) !== entry || entry.parentNode !== container) return;
+            const entries = Array.from(container.children);
+            const index = entries.indexOf(entry);
+            const neighbour = entries[index + 1] || entries[index - 1];
+            this.clearActionError(scope);
+            // Nur manuelles Schließen übergibt Fokus; automatische Bereinigung bleibt passiv.
+            const focusTarget = neighbour?.children[1] || document.getElementById('openDiagnosisBtn');
+            focusTarget?.focus();
         });
         entry.appendChild(text);
         entry.appendChild(close);
         actionErrors.set(scope, entry);
         container.appendChild(entry);
+        syncActionErrorAccessibility(container);
     },
 
     clearActionError(scope) {
         actionErrors.get(scope)?.remove();
         actionErrors.delete(scope);
+        syncActionErrorAccessibility(dom?.containers?.actionError);
     },
 
     /**
