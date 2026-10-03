@@ -514,7 +514,10 @@ export async function init() {
     initStorageManager(dom, appState, UIRenderer);
     initUIRenderer(dom, StorageManager);
     initUIBinder(dom, appState, update, debouncedUpdate);
-    initExpensesTab(dom, { onChange: () => refreshBalanceExpensesHistory(dom.expensesHistory) });
+    initExpensesTab(dom, {
+        onChange: () => refreshBalanceExpensesHistory(dom.expensesHistory),
+        onImportSuccess: () => UIBinder.handleExpensesImported()
+    });
 
     // 5. Set version info
     // Zeigt UI- und Engine-Version im Print-Footer

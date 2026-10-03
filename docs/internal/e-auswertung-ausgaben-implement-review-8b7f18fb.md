@@ -12,6 +12,10 @@ Provider-Attempts:
 | reviewer | reviewer | claude | review | opus | high | verified: ~/.local/bin/claude (`88694734fe19206de74d00d345886f58f1223377d235266d22eaa50394a25214`) |
 | implementer | implementer | codex | implementation | gpt-6.1-sol | high | verified: ~/.nvm/versions/node/v22.23.2/bin/codex (`b54337198672060af3d8dbf12f54c9b97b0b21a0f72252f03f7f32d63bbfe81d`) |
 | reviewer | reviewer | claude | review | opus | high | verified: ~/.local/bin/claude (`88694734fe19206de74d00d345886f58f1223377d235266d22eaa50394a25214`) |
+| implementer | implementer | codex | implementation | gpt-6.1-sol | high | verified: ~/.nvm/versions/node/v22.23.2/bin/codex (`b54337198672060af3d8dbf12f54c9b97b0b21a0f72252f03f7f32d63bbfe81d`) |
+| reviewer | reviewer | claude | review | opus | high | verified: ~/.local/bin/claude (`88694734fe19206de74d00d345886f58f1223377d235266d22eaa50394a25214`) |
+| implementer | implementer | codex | implementation | gpt-6.1-sol | high | verified: ~/.nvm/versions/node/v22.23.2/bin/codex (`b54337198672060af3d8dbf12f54c9b97b0b21a0f72252f03f7f32d63bbfe81d`) |
+| reviewer | reviewer | claude | review | opus | high | verified: ~/.local/bin/claude (`88694734fe19206de74d00d345886f58f1223377d235266d22eaa50394a25214`) |
 <!-- audit:meta:end -->
 
 ## Übersicht
@@ -21,8 +25,8 @@ Provider-Attempts:
 |---:|---|---|---|---:|---:|
 | 1 | Jahresausgaben als unveränderliche Projektion absichern | freigegeben | 48b2417f | 1 | 0 |
 | 2 | Auswertung mit zwei Abschnitten und frischer lesender Darstellung integrieren | freigegeben | 85b0f778 | 1 | 0 |
-| 3 | Kurszeitpunkte der bewerteten Tranchen rückwärtskompatibel speichern | freigegeben | – | 1 | 0 |
-| 4 | Automatische Erfassung nach bestätigtem Ausgabenimport absichern | ausstehend | – | 0 | 0 |
+| 3 | Kurszeitpunkte der bewerteten Tranchen rückwärtskompatibel speichern | freigegeben | 56f82d4e | 1 | 0 |
+| 4 | Automatische Erfassung nach bestätigtem Ausgabenimport absichern | freigegeben | – | 2 | 1 |
 | 5 | Bedienung und abschließende Prüfverträge dokumentieren | ausstehend | – | 0 | 0 |
 <!-- audit:overview:end -->
 
@@ -31,7 +35,7 @@ Provider-Attempts:
 <!-- audit:findings:begin -->
 | ID | Herkunft | Klasse | Stand | Titel |
 |---|---|---|---|---|
-| – | – | – | – | Keine. |
+| R-01 | Slice 4 | Befund | geschlossen | docs/reference/BALANCE_MODULES_README.md: Die Modulinventur bekommt mit… |
 <!-- audit:findings:end -->
 
 ## Halte und Entscheidungen

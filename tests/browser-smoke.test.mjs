@@ -865,6 +865,142 @@ async function assertExpensesBrowserTable(page, store, currentYear = 2026) {
     }
 }
 
+async function runBalanceExpensesWealthCapture(browser, baseUrl) {
+    const fixedTime = '2026-10-03T12:00:00.000Z';
+    const quoteAsOf = Date.parse(fixedTime) / 1000;
+    const storage = createBalanceStorage(2025);
+    const initialState = JSON.parse(storage[BALANCE_STATE_KEY]);
+    const annual = { id: 'annual:2026', asOf: '2026-12-31', reason: 'annual_close', periodId: 'calendar-year:2026',
+        tagesgeld: 1, geldmarktEtf: 0, depotwertAlt: 0, depotwertNeu: 0, aktienEtf: 0, total: 1 };
+    initialState.wealthHistory = { schemaVersion: 1, entries: [annual] };
+    storage[BALANCE_STATE_KEY] = JSON.stringify(initialState);
+    const profileId = 'import-quote';
+    Object.assign(storage, createBrowserProfileStorage({ [profileId]: { name: 'Importprofil',
+        balanceStateRaw: storage[BALANCE_STATE_KEY], tranchesRaw: createWealthBrowserTranches() },
+        'import-quote-empty': { name: 'Ohne ETF', tranchesRaw: '[]', tagesgeld: '0',
+            balanceStateRaw: JSON.stringify({ ...initialState, inputs: { ...initialState.inputs,
+                tagesgeld: 0, depotwertAlt: 0, depotwertNeu: 0, floorBedarf: 0, flexBedarf: 0 } }) }
+    }, profileId));
+    const smoke = await createPage(browser, 'Balance automatic expenses capture', {
+        storage, fixedTime, observeWealthUpdates: true, quoteFixtures: { default: { asOf: quoteAsOf, price: 105 } }
+    });
+    const { page } = smoke;
+    const importCsv = async (month, expanded, expected, text = 'Kategorie;Betrag\nAusgabe;-250') => {
+        await page.locator('.tab-btn[data-tab="ausgaben"]').click();
+        const index = await page.evaluate(() => window.__browserSmokeMessages.length);
+        // Reale Dateifeldgrenze kontrollieren, damit der Abschluss aktiv/inaktiv gemessen wird.
+        await page.evaluate(() => {
+            const original = File.prototype.text;
+            window.__importFileStarted = false;
+            File.prototype.text = function () {
+                window.__importFileStarted = true;
+                return new Promise((resolve, reject) => {
+                    window.__releaseImportFile = () => original.call(this).then(resolve, reject);
+                });
+            };
+            window.__restoreImportFile = () => { File.prototype.text = original; };
+        });
+        const button = page.locator(`#expensesTable button[data-action="import"][data-month="${month}"]`).first();
+        const chooser = page.waitForEvent('filechooser'); await button.click();
+        await (await chooser).setFiles({ name: 'ausgaben.csv', mimeType: 'text/csv', buffer: Buffer.from(text) });
+        await page.waitForFunction(() => window.__importFileStarted);
+        await page.locator(`.tab-btn[data-tab="${expanded ? 'wealth' : 'update'}"]`).click();
+        await page.evaluate(() => { window.__releaseImportFile(); window.__restoreImportFile(); });
+        await page.waitForFunction(({ index, expected }) => window.__browserSmokeMessages.slice(index).some(text => text.includes(expected)), { index, expected });
+        await waitForWealthBrowserIdle(page);
+        assert(await page.locator('#tab-wealth').isVisible() === expanded, 'Automatischer Importabschluss erhält Tabaktivität');
+        const messages = await page.evaluate(index => window.__browserSmokeMessages.slice(index), index);
+        if (!expected.includes('CSV-Import abgebrochen')) {
+            assert(messages[0] === 'CSV importiert.', 'CSV-Erfolg bleibt vor optionalem Ergebnis nachweisbar');
+            const record = JSON.parse((await readIndexedDb(page, 'kv', EXPENSES_KEY)).value);
+            assert(record.years['2025'].months[String(month)].profiles[profileId], 'Ausgabenimport ist unabhängig bestätigt');
+        }
+        return messages;
+    };
+    try {
+        await page.goto(`${baseUrl}/Balance.html`, { waitUntil: 'load' });
+        await waitForWealthBrowserStartup(page);
+        await waitForWealthBrowserIdle(page);
+        const unknown = await importCsv(1, false, 'Kursdatum unbekannt');
+        assert(unknown.length === 2, 'Undatierter Import erzeugt genau Importbestätigung und Hinweis');
+        assert((await readBalanceBrowserState(page)).wealthHistory.entries.length === 1, 'Undatierte reale ETFs erzeugen keinen Verlaufwrite');
+        await assertWealthBrowserVisibility(page, false, 1);
+        await page.locator('a[href="depot-tranchen-manager.html"]').click();
+        await page.locator('#updatePricesBtn').waitFor();
+        await page.locator('#updatePricesBtn').click();
+        await page.locator('#priceUpdateStatus').filter({ hasText: 'Kurse erfolgreich aktualisiert.' }).waitFor();
+        const priced = JSON.parse((await readIndexedDb(page, 'kv', 'depot_tranchen')).value);
+        assert(priced.length === 3 && priced.every(tranche => tranche.asOf === quoteAsOf && tranche.currentPrice === 105),
+            'Echter Managerlistener bestätigt Preis und Zeit aller beitragenden ETFs');
+        const registry = JSON.parse((await readIndexedDb(page, 'kv', 'rs_profiles_v1')).value);
+        assert(JSON.parse(registry.profiles[profileId].data.depot_tranchen).every(tranche => tranche.asOf === quoteAsOf), 'Registry trägt dieselbe bestätigte Kurszeit');
+        await page.locator('#managerBackLink').click();
+        await page.locator('a[href="Balance.html"]').click();
+        await waitForWealthBrowserStartup(page);
+        await waitForWealthBrowserIdle(page);
+        await page.evaluate(async () => {
+            const { UIReader } = await import('./app/balance/balance-reader.js');
+            const original = UIReader.readAllInputs;
+            window.__importPreviews = 0;
+            UIReader.readAllInputs = function (...args) { window.__importPreviews++; return original.apply(this, args); };
+        });
+        const success = await importCsv(2, true, 'Vermögensstand gesichert (Kurse vom 03.10.2026).');
+        assert(success.length === 2 && await page.evaluate(() => window.__importPreviews) === 1, 'Frischer produktiver Import erzeugt genau eine Vorschau und Erfolg');
+        let state = await readBalanceBrowserState(page);
+        const captured = state.wealthHistory.entries.find(entry => entry.reason === 'manual');
+        assert(captured.id === 'manual:2026-10-03' && captured.periodId === null && captured.asOf === '2026-10-03', 'Lokaler Importtag und unveränderter Unterjahresvertrag');
+        assert(captured.aktienEtf === (340 + 450) * 105 && captured.geldmarktEtf === 230 * 105, 'PREVIEW nutzt die tatsächlich gespeicherten Managerpreise');
+        assert(JSON.stringify(state.wealthHistory.entries.find(entry => entry.reason === 'annual_close')) === JSON.stringify(annual), 'Jahresstand bleibt unverändert');
+        await assertWealthBrowserVisibility(page, true, 2);
+        await assertWealthBrowserTable(page, state.wealthHistory.entries);
+        assert(await page.locator('#expensesHistoryTable tbody tr').count() === 1, 'Aktive Auswertung zeichnet auch Jahresausgaben');
+        await importCsv(3, false, 'Vermögensstand gesichert (Kurse vom 03.10.2026).');
+        state = await readBalanceBrowserState(page);
+        assert(state.wealthHistory.entries.length === 2, 'Zweiter Import desselben Tages ersetzt');
+        await assertWealthBrowserVisibility(page, false, 2);
+        const setQuoteState = async kind => {
+            await page.evaluate(async ({ kind, profileId, quoteAsOf }) => {
+                const { persistenceStorage, PersistenceFacade } = await import('./app/shared/persistence-facade.js');
+                const lots = kind === 'none' ? [] : JSON.parse(persistenceStorage.getItem('depot_tranchen'));
+                for (const lot of lots) { if (kind === 'unknown') delete lot.asOf; else lot.asOf = quoteAsOf - 604801; }
+                const raw = JSON.stringify(lots);
+                const registry = JSON.parse(persistenceStorage.getItem('rs_profiles_v1'));
+                registry.profiles[profileId].data.depot_tranchen = raw;
+                persistenceStorage.setItem('depot_tranchen', raw);
+                persistenceStorage.setItem('rs_profiles_v1', JSON.stringify(registry));
+                await PersistenceFacade.flush();
+            }, { kind, profileId, quoteAsOf });
+            await page.reload({ waitUntil: 'load' });
+            await waitForWealthBrowserStartup(page);
+            await waitForWealthBrowserIdle(page);
+        };
+        await setQuoteState('old');
+        const old = await importCsv(4, true, 'sind älter als 7 Tage.');
+        assert(old.length === 2 && (await readBalanceBrowserState(page)).wealthHistory.entries.length === 2, 'Alter realer Kurs meldet Hinweis ohne Write');
+        await setQuoteState('unknown');
+        await importCsv(5, false, 'Kursdatum unbekannt');
+        assert((await readBalanceBrowserState(page)).wealthHistory.entries.length === 2, 'Fehlende Zeit verhindert Verlaufwrite');
+        await setQuoteState('none');
+        await importCsv(6, true, 'Vermögensstand gesichert (keine kursabhängigen Bestände).');
+        assert((await readBalanceBrowserState(page)).wealthHistory.entries.find(entry => entry.reason === 'manual').aktienEtf === 0, 'Kursfreier produktiver Bestand wird gesichert');
+        const beforeFault = JSON.stringify((await readBalanceBrowserState(page)).wealthHistory);
+        await page.evaluate(async () => {
+            const { PersistenceFacade } = await import('./app/shared/persistence-facade.js');
+            const original = PersistenceFacade.replaceRecordsTransactional;
+            PersistenceFacade.replaceRecordsTransactional = async () => { throw new Error('Gezielter Verlauf-Schreibfehler'); };
+            window.__restoreCaptureWrite = () => { PersistenceFacade.replaceRecordsTransactional = original; };
+        });
+        await importCsv(7, false, 'Ausgaben importiert; Vermögensstand nicht bestätigt:');
+        assert(await page.locator('[data-scope="expenses-wealth"]').count() === 1, 'Optionaler Fehler bleibt als Ausgabenaktionsfehler stehen');
+        assert(JSON.stringify((await readBalanceBrowserState(page)).wealthHistory) === beforeFault, 'Schreibfehler bestätigt keinen neuen Stand');
+        await page.evaluate(() => window.__restoreCaptureWrite());
+        const beforeReject = JSON.stringify((await readBalanceBrowserState(page)).wealthHistory);
+        await importCsv(8, false, 'CSV-Import abgebrochen', 'Kategorie;Betrag\nAusgabe;ungueltig');
+        assert(JSON.stringify((await readBalanceBrowserState(page)).wealthHistory) === beforeReject, 'Ungültige CSV startet keine Erfassung');
+        smoke.assertNoErrors();
+    } finally { await smoke.close(); }
+}
+
 async function runBalanceExpensesHistory(browser, baseUrl) {
     const storage = createBalanceStorage(2026);
     const store = { version: 1, activeYear: 2026, years: {
@@ -931,9 +1067,10 @@ async function runBalanceExpensesHistory(browser, baseUrl) {
         await page.evaluate(() => { window.__releaseExpensesFileText(); window.__restoreExpensesFileText(); });
         store.years['2026'].months['3'] = { profiles: { [profileId]: { categories: { Ausgabe: -250 } } } };
         await page.waitForFunction(index => window.__browserSmokeMessages.slice(index).includes('CSV importiert.'), messageIndex);
+        await page.waitForFunction(index => window.__browserSmokeMessages.slice(index).some(text => text.includes('Kursdatum unbekannt')), messageIndex);
         await assertExpensesBrowserTable(page, store);
         assert(await page.locator('#tab-wealth').isVisible(), 'Importabschluss erhält aktive Auswertung');
-        assert(JSON.stringify((await readBalanceBrowserState(page)).wealthHistory) === JSON.stringify(beforeImport), 'Lesende Integration erfasst beim Import noch keinen Vermögensstand');
+        assert(JSON.stringify((await readBalanceBrowserState(page)).wealthHistory) === JSON.stringify(beforeImport), 'Undatierte synthetische ETF-Bestände verhindern automatische Sicherung');
         await page.reload({ waitUntil: 'load' });
         await waitForWealthBrowserStartup(page);
         await assertWealthBrowserVisibility(page, false, 0);
@@ -4462,6 +4599,7 @@ async function main() {
             ['Balance membership reload', runBalanceMembershipReload],
             ['Balance wealth history', runBalanceWealthHistory],
             ['Balance expenses history', runBalanceExpensesHistory],
+            ['Balance automatic expenses capture', runBalanceExpensesWealthCapture],
             ['Balance shared tranche ids', runBalanceSharedTrancheIds],
             ['Balance engine gate', runBalanceEngineGate],
             ['Balance annual preflight', runBalanceAnnualPreflight],

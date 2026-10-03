@@ -1,3 +1,13 @@
+import { initTranchenManagerPage } from '../app/tranches/tranchen-manager-page.js';
+import { loadTranchesFromStorage } from '../app/tranches/tranchen-manager-state.js';
+import { PersistenceFacade, persistenceStorage } from '../app/shared/persistence-facade.js';
+import { createBalanceWealthHistoryService, createManualWealthHistoryController } from '../app/balance/balance-wealth-history.js';
+import { createExpensesWealthCaptureController, readExpensesWealthQuoteEvidence, evaluateExpensesWealthQuoteFreshness } from '../app/balance/balance-expenses-wealth-capture.js';
+import { UIReader, initUIReader } from '../app/balance/balance-reader.js';
+import { createProfilverbundHandlers } from '../app/balance/balance-main-profilverbund.js';
+import { loadProfilverbundProfiles } from '../app/profile/profilverbund-balance.js';
+import { CONFIG } from '../app/balance/balance-config.js';
+import { EngineAPI } from '../engine/index.mjs';
 import { UIRenderer } from '../app/balance/balance-renderer.js';
 import { UIUtils } from '../app/balance/balance-utils.js';
 import { initExpensesTab, updateExpensesBudget, rollExpensesYear } from '../app/balance/balance-expenses.js';
@@ -240,6 +250,9 @@ class MockElement {
 }
 
 class MockDocument {
+    constructor() { this.elements = new Map(); }
+    getElementById(id) { return this.elements.get(id) || null; }
+    addEventListener() {}
     createElement(tagName) {
         return new MockElement(tagName);
     }
@@ -531,6 +544,7 @@ try {
     overviewActive = true;
     refreshOverview();
     const changed = new Promise(resolve => { completeChange = resolve; });
+    await Promise.resolve();
     releaseText();
     await changed;
     completeChange = null;
@@ -703,6 +717,203 @@ try {
         'Nach bestaetigtem Reset wird der gesperrte Recovery-Bereich verlassen'
     );
 
+    // 7) Produktive Kette: undatierte Altdaten -> echter Kurslistener -> bestätigter
+    // Speicher/Reload -> echte Eingabeprojektion/Engine-PREVIEW -> CSV-Listener.
+    {
+        const key = CONFIG.STORAGE.LS_KEY;
+        const savedInputs = { aktuellesAlter: 67, floorBedarf: 12000, flexBedarf: 24000,
+            minimumFlexAnnual: 0, tagesgeld: 100000, geldmarktEtf: 0, depotwertAlt: 0, depotwertNeu: 0,
+            inflation: 2, endeVJ: 100, endeVJ_1: 95, endeVJ_2: 90, endeVJ_3: 85,
+            ath: 105, jahreSeitAth: 1, marketCapeRatio: 25, capeRatio: 25 };
+        const balanceRaw = JSON.stringify({ inputs: savedInputs, lastState: { cumulativeInflationFactor: 1 },
+            annualPeriodMetadata: { schemaVersion: 1, lastCommittedPeriod: null, pendingCommit: null } });
+        const trancheRaw = JSON.stringify([{ schemaVersion: 2, trancheId: 'quote-integration',
+            name: 'ETF', ticker: 'FLOW.DE', shares: 1000, purchasePrice: 80, currentPrice: 100,
+            purchaseDate: '2020-01-01', category: 'equity', type: 'aktien_neu', tqf: 0.3, taxExempt: false }]);
+        const meta = id => ({ id, name: id, createdAt: '2026-01-01T00:00:00Z',
+            updatedAt: new Date().toISOString(), belongsToHousehold: true });
+        const backend = new Map([[key, balanceRaw], ['depot_tranchen', trancheRaw],
+            ['profile_tagesgeld', '100000'], ['profile_aktuelles_alter', '67'],
+            ['rs_current_profile', 'default'], ['rs_active_profile', 'default'],
+            ['rs_profiles_v1', JSON.stringify({ version: 1, profiles: {
+                default: { meta: meta('default'), data: { [key]: balanceRaw, depot_tranchen: trancheRaw,
+                    profile_tagesgeld: '100000', profile_aktuelles_alter: '67' } }
+            } })], [STORAGE_KEY, JSON.stringify({ version: 1, activeYear: 2025, years: {} })]]);
+        let fault = '', failExpenseFlush = false, historyBatches = 0;
+        const adapter = { name: 'import-quote-memory', async open() {},
+            async loadAll() { return Object.fromEntries(backend); },
+            async saveBatch(batch) {
+                if (failExpenseFlush && batch.upserts.some(([k]) => k === STORAGE_KEY)) throw new Error('Importflush fehlgeschlagen');
+                if (fault === 'write' && batch.upserts.some(([k]) => k === key)) throw new Error('Verlaufwrite fehlgeschlagen');
+                if (batch.upserts.some(([k, v]) => k === key && JSON.parse(v).wealthHistory)) historyBatches++;
+                batch.deletes.forEach(k => backend.delete(k));
+                batch.upserts.forEach(([k, v]) => backend.set(k, String(v)));
+            } };
+        PersistenceFacade.resetPersistenceForTests(adapter);
+        await PersistenceFacade.init();
+        const documentRef = new MockDocument();
+        for (const id of ['updatePricesBtn', 'priceUpdateStatus', 'tranchePersistenceStatus', 'stats', 'tranchenTable']) {
+            const element = new MockElement(id === 'updatePricesBtn' ? 'button' : 'div');
+            element.id = id; documentRef.elements.set(id, element);
+        }
+        global.document = documentRef;
+        global.window = { localStorage: global.localStorage, EngineAPI };
+        const refs = createDomRefs();
+        refs.inputs = Object.fromEntries(Object.entries(savedInputs).map(([id, value]) => {
+            const element = new MockElement('input'); element.value = String(value); return [id, element];
+        }));
+        initUIReader(refs);
+        const profileHandlers = createProfilverbundHandlers({ dom: refs, PROFILVERBUND_STORAGE_KEYS: { mode: 'profilverbund_mode' } });
+        let previews = 0, attempts = 0;
+        const update = options => {
+            previews++;
+            assertEqual(options.mode, 'preview', 'Echter Import fordert eine PREVIEW an');
+            if (fault === 'preview') throw new Error('Vorschau fehlgeschlagen');
+            const inputData = UIReader.readAllInputs();
+            profileHandlers.updateProfilverbundGlobals(loadProfilverbundProfiles(), inputData);
+            const modelResult = EngineAPI.simulateSingleYear(inputData, { cumulativeInflationFactor: 1 });
+            if (modelResult.error) throw modelResult.error;
+            return { ok: true, inputData, modelResult };
+        };
+        const service = createBalanceWealthHistoryService();
+        const originalCapture = service.captureManual;
+        service.captureManual = options => { attempts++; return originalCapture(options); };
+        const messages = [], errors = [];
+        const originalToast = UIRenderer.toast;
+        UIRenderer.toast = (text, type) => { messages.push({ text, type }); };
+        const controller = createExpensesWealthCaptureController({ service, update,
+            toast: (text, type) => UIRenderer.toast(text, type),
+            reportError: (error, scope) => errors.push({ error, scope }) });
+        const initImport = extra => initExpensesTab(refs, { storage: persistenceStorage,
+            onImportSuccess: () => controller.afterImport(), ...extra });
+        const choose = month => refs.expenses.table.listeners.click[0]({ target: {
+            closest: () => ({ dataset: { action: 'import', month: String(month), profile: 'default' } }) } });
+        const importCsv = async (month, text = 'Kategorie;Betrag\nAusgabe;-250') => {
+            choose(month);
+            return refs.expenses.csvInput.listeners.change.at(-1)({ target: {
+                files: [{ text: async () => text }], value: 'ausgaben.csv' } });
+        };
+        try {
+            const before = update({ mode: 'preview' }).inputData;
+            assertEqual(evaluateExpensesWealthQuoteFreshness(readExpensesWealthQuoteEvidence(before), new Date()).status,
+                'unknown', 'Produktiver Leser erkennt undatierte Manager-Altdaten');
+            initImport();
+            await importCsv(1);
+            assertEqual(attempts, 0, 'Undatierter Bestand verhindert produktiv die Sicherung');
+            assertEqual(messages.at(-1).type, 'info', 'Unbekannter realer Kurs meldet info');
+            const quoteAsOf = Math.floor(Date.now() / 1000);
+            const oldFetch = global.fetch;
+            global.fetch = async () => ({ ok: true, status: 200,
+                json: async () => ({ symbol: 'FLOW.DE', price: 120, currency: 'EUR', asOf: quoteAsOf, source: 'yahoo-chart' }) });
+            try {
+                await initTranchenManagerPage({ profileId: 'default' });
+                await documentRef.getElementById('updatePricesBtn').listeners.click[0]();
+            } finally { if (oldFetch === undefined) delete global.fetch; else global.fetch = oldFetch; }
+            assertEqual(JSON.parse(backend.get('depot_tranchen'))[0].asOf, quoteAsOf, 'Managerlistener bestätigt quote.asOf im Backend');
+            assertEqual(JSON.parse(JSON.parse(backend.get('rs_profiles_v1')).profiles.default.data.depot_tranchen)[0].currentPrice,
+                120, 'Managerpreis ist in aktiver Registry bestätigt');
+            assertEqual(loadTranchesFromStorage(persistenceStorage).tranches[0].asOf, quoteAsOf, 'Reload erhält Preiszeit');
+            const previewBefore = previews;
+            const messageIndex = messages.length;
+            await importCsv(2);
+            assertEqual(previews - previewBefore, 1, 'Erfolgreicher realer Import fährt genau eine PREVIEW');
+            assertEqual(attempts, 1, 'Frischer Managerkurs gibt genau einen Versuch frei');
+            assertEqual(historyBatches, 1, 'Genau eine bestätigte Verlaufstransaktion');
+            const captured = JSON.parse(backend.get(key)).wealthHistory.entries[0];
+            assertEqual(captured.depotwertNeu, 120000, 'Erfassung verwendet den produktiv gespeicherten Managerpreis');
+            assertEqual(captured.reason, 'manual', 'Unverändertes Legacy-Speicherformat');
+            assertEqual(captured.periodId, null, 'Kein Periodencommit beim Import');
+            assertEqual(messages[messageIndex].text, 'CSV importiert.', 'Importbestätigung kommt vor Sicherung');
+            assertEqual(errors.length, 0, `Kein Sicherungsfehler: ${errors.at(-1)?.error?.message}`);
+            assert(messages[messageIndex + 1].text.startsWith('Vermögensstand gesichert (Kurse vom'), 'Gespeicherter Kurs erzeugt Erfolg');
+            assert(JSON.parse(backend.get(STORAGE_KEY)).years['2025'].months['2'].profiles.default, 'Import bleibt unabhängig gespeichert');
+            const manual = createManualWealthHistoryController({ service, update, refresh: () => {} });
+            await manual.capture();
+            assertEqual(JSON.stringify(JSON.parse(backend.get(key)).wealthHistory.entries[0]), JSON.stringify(captured),
+                'Manuelle und automatische echte Vorschau erzeugen identische Komponenten');
+            assertEqual(JSON.parse(backend.get('rs_profiles_v1')).profiles.default.data[key], backend.get(key), 'Readback hält Live-State und Registry synchron');
+            const stable = backend.get(key);
+            const baseAttempts = attempts;
+            // Ablehnungen starten keinerlei Sicherung.
+            await importCsv(3, 'Kategorie;Betrag\nAusgabe;ungueltig');
+            choose(3); await refs.expenses.csvInput.listeners.change.at(-1)({ target: { files: [], value: '' } });
+            choose(3); await refs.expenses.csvInput.listeners.change.at(-1)({ target: { files: [{ text: async () => { throw new Error('Lesefehler'); } }], value: '' } });
+            let failStore = false;
+            initImport({ storage: { getItem: k => persistenceStorage.getItem(k), setItem: (k, v) => { if (failStore) throw new Error('Storefehler'); persistenceStorage.setItem(k, v); } } });
+            failStore = true;
+            await importCsv(3);
+            initImport();
+            failExpenseFlush = true;
+            await importCsv(3);
+            failExpenseFlush = false;
+            await PersistenceFacade.flush();
+            assertEqual(attempts, baseAttempts, 'Parser-, Datei-, Store- und Flushfehler sowie leere Auswahl ohne Sicherungsversuch');
+            // Optionale Vorschau-/Schreibfehler bestätigen den Import weiterhin.
+            for (const optionalFault of ['preview', 'write']) {
+                fault = optionalFault;
+                const index = messages.length;
+                await importCsv(4);
+                assertEqual(messages[index].text, 'CSV importiert.', 'Optionaler Fehler erhält Importbestätigung');
+                assertEqual(errors.at(-1).scope, 'expenses-wealth', 'Optionaler Fehler ist kein CSV-Importfehler');
+                assertEqual(backend.get(key), stable, 'Optionaler Fehler bewahrt bestätigten Verlauf');
+                assert(JSON.parse(backend.get(STORAGE_KEY)).years['2025'].months['4'].profiles.default, 'Import trotz Sicherungsfehler gespeichert');
+                fault = '';
+            }
+            // Mehrere reale Verbundprofile: frisch im aktiven Profil reicht nicht.
+            const registry = JSON.parse(persistenceStorage.getItem('rs_profiles_v1'));
+            registry.profiles.partner = { meta: meta('partner'), data: { [key]: balanceRaw, depot_tranchen: trancheRaw } };
+            persistenceStorage.setItem('rs_profiles_v1', JSON.stringify(registry)); await PersistenceFacade.flush();
+            let data = update({ mode: 'preview' }).inputData;
+            assertEqual(data.detailledTranches.length, 2, 'Reale PREVIEW enthält beide beitragenden Profile');
+            assertEqual(evaluateExpensesWealthQuoteFreshness(readExpensesWealthQuoteEvidence(data), new Date()).status,
+                'unknown', 'Undatierter beitragender Partner blockiert trotz frischem aktiven Kurs');
+            const beforePartnerAttempts = attempts;
+            await importCsv(5);
+            assertEqual(attempts, beforePartnerAttempts, 'Realer Import mit undatiertem Partner startet keinen Sicherungsversuch');
+            const partnerLots = JSON.parse(trancheRaw); partnerLots[0].asOf = quoteAsOf - 604801;
+            registry.profiles.partner.data.depot_tranchen = JSON.stringify(partnerLots);
+            persistenceStorage.setItem('rs_profiles_v1', JSON.stringify(registry)); await PersistenceFacade.flush();
+            data = update({ mode: 'preview' }).inputData;
+            assertEqual(evaluateExpensesWealthQuoteFreshness(readExpensesWealthQuoteEvidence(data), new Date()).status,
+                'old', 'Alter beitragender Partnerkurs blockiert produktiv');
+            await importCsv(5);
+            assertEqual(attempts, beforePartnerAttempts, 'Realer Import mit altem Partner startet keinen Sicherungsversuch');
+            partnerLots[0].asOf = quoteAsOf;
+            registry.profiles.partner.data.depot_tranchen = JSON.stringify(partnerLots);
+            persistenceStorage.setItem('rs_profiles_v1', JSON.stringify(registry)); await PersistenceFacade.flush();
+            await importCsv(5);
+            assertEqual(JSON.parse(backend.get(key)).wealthHistory.entries[0].depotwertNeu, 220000, 'Alle frisch bewerteten Verbundbestände werden erfasst');
+            registry.profiles.default.data.depot_tranchen = '[]';
+            registry.profiles.partner.data.depot_tranchen = '[]';
+            // Aktive Registrykopie darf nicht auf den alten Stand vor Erfassung zurückgesetzt werden.
+            registry.profiles.default.data[key] = persistenceStorage.getItem(key);
+            persistenceStorage.setItem('depot_tranchen', '[]');
+            persistenceStorage.setItem('rs_profiles_v1', JSON.stringify(registry)); await PersistenceFacade.flush();
+            await importCsv(6);
+            assertEqual(messages.at(-1).text, 'Vermögensstand gesichert (keine kursabhängigen Bestände).',
+                'Produktiver Import ohne ETF-Bestände wird direkt bestätigt');
+            assertEqual(JSON.parse(backend.get(key)).wealthHistory.entries[0].aktienEtf, 0, 'Produktive kursfreie Vorschau erfasst keine ETF-Werte');
+
+            const beforeRecoveryAttempts = attempts;
+            const expensesRaw = persistenceStorage.getItem(STORAGE_KEY);
+            persistenceStorage.setItem(STORAGE_KEY, '{korrupt'); await PersistenceFacade.flush();
+            initImport(); await importCsv(6);
+            assertEqual(attempts, beforeRecoveryAttempts, 'Reale Recovery-Sperre startet null Sicherungsversuche');
+            persistenceStorage.setItem(STORAGE_KEY, expensesRaw); await PersistenceFacade.flush();
+            initImport();
+            // Auch zwei unmittelbar gestartete Dateivorgänge werden bestätigt je einmal bearbeitet.
+            const beforeQuick = attempts;
+            await Promise.all([importCsv(7), importCsv(8)]);
+            assertEqual(attempts - beforeQuick, 2, 'Zwei schnelle reale Imports verlieren keine Erfassung');
+            assert(JSON.parse(backend.get(STORAGE_KEY)).years['2025'].months['7'].profiles.default
+                && JSON.parse(backend.get(STORAGE_KEY)).years['2025'].months['8'].profiles.default,
+                'Beide schnellen Imports bleiben gespeichert');
+
+        } finally {
+            UIRenderer.toast = originalToast;
+            PersistenceFacade.resetPersistenceForTests();
+        }
+    }
     console.log('✅ Balance expenses tests passed');
 } finally {
     UIRenderer.handleActionError = prevActionError;

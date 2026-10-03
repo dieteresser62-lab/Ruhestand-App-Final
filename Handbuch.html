@@ -1486,6 +1486,23 @@
                             und bestätigter Recovery-Reset aktualisieren die aktive Übersicht sofort. Inaktiv bleiben
                             alle vier dynamischen Container leer. Beschädigte Ausgabendaten zeigen einen Hinweis
                             auf Recovery im Ausgaben-Check, ohne Rohdaten oder automatisches Zurücksetzen.</p>
+                        <p><strong>Automatisch nach Ausgabenimport:</strong> Nach bestätigter Speicherung eines CSV-Imports
+                            versucht die App genau einmal, den aktuellen Vermögensstand zu sichern. Der lokale Importtag
+                            zählt, nicht der importierte Monat: ein weiterer Import desselben Tages ersetzt den
+                            unterjährigen Stand, ein anderer Tag ergänzt ihn. Die Bestände entsprechen der frischen
+                            manuellen Vorschau, einschließlich aller beitragenden Verbundprofile; gespeichert wird
+                            beim aktiven Profil, weiterhin mit dem Anlass <code>manual</code> („Unterjährig“).</p>
+                        <p>Alle beitragenden Aktien- und Geldmarkt-ETF brauchen belegte, höchstens sieben Tage alte Kurse.
+                            <strong>„Kurse aktualisieren“ im Profil-Assets-Manager</strong> speichert das Kursdatum jeder
+                            erfolgreich bewerteten Tranche. Altdaten ohne Datum oder manuell geänderte Preise sind bis
+                            zu einem erfolgreichen Kursupdate unbekannt. Das Datum des Strategie-ETF ersetzt diesen
+                            Nachweis nicht. Tagesgeld wird nicht auf Aktualität geprüft; ohne kursabhängige Bestände
+                            wird direkt gesichert. Bei alten oder unbekannten Kursen zeigt die App einen Hinweis:
+                            Kurse im Manager aktualisieren und danach bei Bedarf <strong>„Stand jetzt erfassen“</strong>.</p>
+                        <p>Der Ausgabenimport bleibt unabhängig vom optionalen Sicherungsschritt gültig.
+                            Vorschau- oder Speicherfehler bleiben als Ausgaben-Aktionsfehler stehen;
+                            nur bestätigte Vermögensstände erscheinen im Verlauf. Erfolg, Hinweis und Fehler behalten
+                            den aktiven Tab bei. Die manuelle Erfassung bleibt ohne automatische Frischeprüfung verfügbar.</p>
                         <p>Beim Drucken der Balance-Seite wird die Auswertung nicht ausgegeben.</p>
                         <p>Im Tab „Auswertung“ speichert <strong>„Stand jetzt erfassen“</strong> die aktuellen,
                             frisch geprüften Balance-Bestände. Ein erneuter Klick am selben lokalen Kalendertag

@@ -46,6 +46,8 @@ const state = {
 let pendingImport = null;
 let recoveryOptions = null;
 let onChange = null;
+let onImportSuccess = null;
+let importTail = Promise.resolve();
 
 function notifyExpensesChange() {
     // Die lesende Darstellung darf erfolgreiche Speicheraktionen nicht rückgängig machen.
@@ -377,7 +379,7 @@ function openDetails(month, profileId) {
     });
 }
 
-async function handleCsvImport(file, month, profileId) {
+async function handleCsvImport(file, month, profileId, year, options, afterImport) {
     if (state.corruption) {
         renderCorruptExpensesState();
         return;
@@ -391,17 +393,30 @@ async function handleCsvImport(file, month, profileId) {
         renderCorruptExpensesState();
         return;
     }
-    const yearData = getExpensesYearData(store, state.year);
+    const yearData = getExpensesYearData(store, year);
     const monthData = getExpensesMonthData(yearData, month);
     monthData.profiles[profileId] = {
         categories,
         updatedAt: new Date().toISOString()
     };
-    saveExpensesStore(store, recoveryOptions?.storage);
+    saveExpensesStore(store, options.storage);
+    await options.flush();
 
-    refreshTableValues();
+    // Importbestätigung gehört vor den optionalen Schritt. UI-/Sicherungsfehler
+    // machen die bereits bestätigten Ausgaben nicht zu einem CSV-Fehler.
+    try { UIRenderer.toast('CSV importiert.'); } catch { /* Bestätigter Import bleibt gültig. */ }
+    let capture, captureError;
+    // Kontext und Tag an der bestätigten Grenze erfassen, vor UI-Rückrufen.
+    try { capture = afterImport?.(); } catch (error) { captureError = error; }
+    try { refreshTableValues(); } catch { /* Bestätigter Import bleibt gültig. */ }
     notifyExpensesChange();
-    UIRenderer.toast('CSV importiert.');
+    try {
+        if (captureError) throw captureError;
+        await capture;
+    }
+    catch (error) {
+        UIRenderer.handleActionError(new Error(`Ausgaben importiert; Vermögensstand nicht bestätigt: ${error.message || error}`), 'expenses-wealth');
+    }
 }
 
 function deleteMonthData(month, profileId) {
@@ -460,11 +475,15 @@ function handleFileChange(e) {
     const { month, profileId } = pendingImport;
     pendingImport = null;
 
-    handleCsvImport(file, month, profileId).catch(err => {
+    const year = state.year, options = recoveryOptions, afterImport = onImportSuccess;
+    const operation = importTail.then(() => handleCsvImport(file, month, profileId, year, options, afterImport));
+    const completed = operation.catch(err => {
         UIRenderer.handleActionError(err, 'expenses-import');
     }).finally(() => {
         e.target.value = '';
     });
+    importTail = completed;
+    return completed;
 }
 
 function bindEvents() {
@@ -494,6 +513,7 @@ export function initExpensesTab(domRefs, options = {}) {
     dom = domRefs;
     recoveryOptions = createDefaultRecoveryOptions(options);
     onChange = typeof options.onChange === 'function' ? options.onChange : null;
+    onImportSuccess = typeof options.onImportSuccess === 'function' ? options.onImportSuccess : null;
     pendingImport = null;
     state.profileIds = [];
     state.recoveryExported = false;

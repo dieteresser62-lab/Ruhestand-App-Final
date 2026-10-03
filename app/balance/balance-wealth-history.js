@@ -51,10 +51,12 @@ export function createBalanceWealthHistoryService({
         return result;
     }
 
-    async function persistEntry({ context, entry, metadata, expectedPending }) {
+    async function persistEntry({ context, entry, metadata, expectedPending, validateSource = () => {} }) {
         assertContext(context);
+        validateSource();
         await persistence.flush();
         assertContext(context);
+        validateSource();
         // Erst nach dem Warten lesen: keine Historie aus einem veralteten Candidate übernehmen.
         const state = loadState();
         const history = readWealthHistory(state);
@@ -90,6 +92,7 @@ export function createBalanceWealthHistoryService({
         // vor dem Replace den Kontext und die beiden betroffenen Cache-Records.
         const allowKey = key => {
             assertContext(context);
+            validateSource({ state: nextState, registry: nextRegistry });
             for (const affected of [stateKey, registryKey]) {
                 const raw = storage.getItem(affected);
                 if (raw !== previous[affected] && raw !== records[affected]) {
@@ -102,6 +105,7 @@ export function createBalanceWealthHistoryService({
             allowKey,
             postValidate: confirmed => {
                 assertContext(context);
+                validateSource({ state: nextState, registry: nextRegistry });
                 if (confirmed[stateKey] !== serialized || confirmed[registryKey] !== records[registryKey]) {
                     throw new Error('Der Vermögensverlauf konnte nicht dauerhaft bestätigt werden.');
                 }
@@ -115,6 +119,12 @@ export function createBalanceWealthHistoryService({
     return {
         captureContext,
         assertContext,
+        assertManualReady() {
+            if (coordinator.annual) throw new Error('Der Jahresabschluss läuft bereits.');
+            if (loadState().annualPeriodMetadata?.pendingCommit) {
+                throw new Error('Vor einer manuellen Erfassung muss der Jahresabschluss wiederhergestellt werden.');
+            }
+        },
         runAnnual(operation) {
             const context = captureContext();
             coordinator.annual += 1;
@@ -129,14 +139,23 @@ export function createBalanceWealthHistoryService({
             const entry = createAnnualWealthHistoryEntry(result.inputData, targetYear);
             return persistEntry({ context, entry, metadata, expectedPending });
         },
-        captureManual({ result, asOf }) {
+        captureManual({ result, asOf, context = captureContext(), validateSource }) {
             if (coordinator.annual) return Promise.reject(new Error('Der Jahresabschluss läuft bereits.'));
-            const context = captureContext();
+            assertContext(context);
             if (!result?.ok) return Promise.reject(result?.error || new Error('Aktuelle gültige Balance-Eingaben fehlen.'));
             const entry = createManualWealthHistoryEntry(result.inputData, asOf);
-            return enqueue(() => persistEntry({ context, entry }));
+            return enqueue(() => persistEntry({ context, entry, validateSource }));
         }
     };
+}
+
+/** Beide unterjährigen Auslöser lesen genau dieselbe frische PREVIEW. */
+export function previewWealthHistory({ service, update, context }) {
+    service.assertContext(context);
+    const result = update({ mode: BALANCE_UPDATE_MODE.PREVIEW });
+    service.assertContext(context);
+    if (!result?.ok) throw result?.error || new Error('Aktuelle gültige Balance-Eingaben fehlen.');
+    return result;
 }
 
 /** UI-Koordination hält Klickdatum und frische Vorschau vor dem ersten Warten fest. */
@@ -158,10 +177,8 @@ export function createManualWealthHistoryController({ service, update, refresh, 
             try {
                 const asOf = formatLocalWealthHistoryDate(now());
                 const context = service.captureContext();
-                const result = update({ mode: BALANCE_UPDATE_MODE.PREVIEW });
-                service.assertContext(context);
-                if (!result?.ok) throw result?.error || new Error('Aktuelle gültige Balance-Eingaben fehlen.');
-                await service.captureManual({ result, asOf });
+                const result = previewWealthHistory({ service, update, context });
+                await service.captureManual({ result, asOf, context });
                 service.assertContext(context);
                 refresh();
                 message('Stand gesichert');

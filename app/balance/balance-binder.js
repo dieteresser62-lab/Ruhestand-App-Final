@@ -26,6 +26,7 @@ import { BALANCE_UPDATE_MODE } from './balance-update-pipeline.js';
 import { createBalanceWealthHistoryService, createManualWealthHistoryController } from './balance-wealth-history.js';
 import { refreshBalanceExpensesHistory } from './balance-expenses-history-renderer.js';
 import { refreshBalanceWealthHistory } from './balance-wealth-history-renderer.js';
+import { createExpensesWealthCaptureController } from './balance-expenses-wealth-capture.js';
 
 // Module-level references
 let dom = null;
@@ -102,10 +103,24 @@ export function initUIBinder(domRefs, state, updateFn, debouncedUpdateFn) {
         toast: text => UIRenderer.toast(text)
     });
     if (captureButton) wealthControllers.set(captureButton, manual);
-    handlers = { annual, imports, diagnosis, snapshots, wealthHistory, manual };
+    const expensesWealth = createExpensesWealthCaptureController({
+        service: wealthHistory,
+        update: options => update(options),
+        refresh: () => {
+            refreshBalanceWealthHistory(dom.wealthHistory);
+            refreshBalanceExpensesHistory(dom.expensesHistory);
+        },
+        toast: (text, type) => UIRenderer.toast(text, type),
+        clearError: scope => UIRenderer.clearActionError(scope),
+        reportError: (error, scope) => UIRenderer.handleActionError(error, scope)
+    });
+    handlers = { annual, imports, diagnosis, snapshots, wealthHistory, manual, expensesWealth };
 }
 
 export const UIBinder = {
+    handleExpensesImported() {
+        return handlers.expensesWealth.afterImport();
+    },
     bindUI() {
         if (uiBound) return;
         const captureButton = dom.controls.captureWealthBtn;
