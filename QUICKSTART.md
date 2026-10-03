@@ -85,7 +85,7 @@ Alle Profildaten werden im localStorage gespeichert und stehen bei jedem Start z
 3. Tab "Jahres-Update":
    - **Vermögen prüen:** Die Werte (Depot, Tagesgeld) sind schreibgeschützt und kommen direkt aus dem Profil.
    - **Jahres-Update starten:** Button klicken für Online-Daten und Jahreswechsel.
-3. Tab "Grundeinstellungen & Strategie":
+3. Tab "Einstellungen & Strategie":
    - **Bedarf anpassen:** Floor (Grundbedarf) und Flex (optional) hier einstellen.
 4. Tab "Ausgaben-Check":
    - **Monat importieren:** Pro Profil und Monat CSV einlesen.

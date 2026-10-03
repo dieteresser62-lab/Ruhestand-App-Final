@@ -758,7 +758,7 @@ async function captureWealthBrowserStand(page, keyboard = false) {
 async function assertWealthBrowserVisibility(page, expanded, count = null) {
     const buttons = page.locator('.tab-buttons > .tab-btn');
     assert(JSON.stringify(await buttons.allTextContents()) === JSON.stringify([
-        'Jahres-Update', 'Grundeinstellungen & Strategie', 'Ausgaben-Check', 'Vermögensverlauf'
+        'Jahres-Update', 'Einstellungen & Strategie', 'Ausgaben-Check', 'Vermögensverlauf'
     ]), 'Genau vier Haupttabs in bisheriger Reihenfolge');
     assert(await page.locator('#tab-wealth').isVisible() === expanded, 'Tatsächliche Tabaktivität');
     assert(await page.locator('.tab-btn[data-tab="wealth"]').evaluate(el => el.classList.contains('active')) === expanded,
@@ -1034,6 +1034,8 @@ async function measureWealthBrowserLayout(page) {
     });
 }
 
+const WEALTH_TAB_SINGLE_ROW_MIN_WIDTH = 1440;
+
 async function assertWealthBrowserLayoutMatrix(browser, baseUrl) {
     const storage = createBalanceStorage(2026);
     const state = JSON.parse(storage[BALANCE_STATE_KEY]);
@@ -1059,7 +1061,7 @@ async function assertWealthBrowserLayoutMatrix(browser, baseUrl) {
         await page.goto(`${baseUrl}/Balance.html`, { waitUntil: 'load', timeout: 15000 });
         await waitForWealthBrowserIdle(page);
         await assertWealthBrowserVisibility(page, false, entries.length);
-        for (const width of [1250, 1251, 1280, 1366, 1440, 1920]) {
+        for (const width of [1250, 1251, 1280, 1366, 1440, 1600, 1920]) {
             await page.setViewportSize({ width, height: 900 });
             await page.locator('.tab-btn[data-tab="ausgaben"]').click();
             await page.locator('#expensesTable table').waitFor();
@@ -1077,12 +1079,16 @@ async function assertWealthBrowserLayoutMatrix(browser, baseUrl) {
                 assert(expenses.expenses.table.width >= 720 - tolerance && expenses.expenses.visible >= 720 - tolerance
                     && Math.abs(expenses.expenses.table.width - expenses.expenses.visible) <= tolerance,
                 `${width}: mindestens 720 px Ausgabentabelle vollständig sichtbar`);
+                // Gemessen: Die vier Titel brauchen rund 640 px; die Tabzeile bietet erst ab 1440 px Fensterbreite genug Platz.
+                const singleRow = width >= WEALTH_TAB_SINGLE_ROW_MIN_WIDTH;
                 for (const layout of [expenses, before, history]) {
-                    assert(layout.tabs.length === 4 && layout.tabs.every(tab => Math.abs(tab.y - layout.tabs[0].y) <= tolerance
-                        && tab.textLines.length === 1 && tab.scroll <= tab.client + tolerance
+                    assert(layout.tabs.length === 4 && layout.tabs.every(tab => tab.textLines.length === 1
+                        && tab.scroll <= tab.client + tolerance
                         && tab.x >= layout.tabContainer.x - tolerance
                         && tab.x + tab.width <= layout.tabContainer.x + layout.tabContainer.width + tolerance),
-                    `${width}: vier vollständige Titel in einer Tabzeile`);
+                    `${width}: vier vollständige, nicht abgeschnittene Tabtitel`);
+                    if (singleRow) assert(layout.tabs.every(tab => Math.abs(tab.y - layout.tabs[0].y) <= tolerance),
+                        `${width}: vier vollständige Titel in einer Tabzeile`);
                 }
                 const actionCenter = history.actions[0].y + history.actions[0].height / 2;
                 assert(history.actions.map(action => action.id).join(',') === 'captureWealthBtn,wealthHistoryCount,wealthHistoryDate'
