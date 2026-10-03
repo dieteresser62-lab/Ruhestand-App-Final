@@ -1881,7 +1881,7 @@ async function runBalanceImportRestoration(browser, baseUrl) {
             const { UIReader } = await import('./app/balance/balance-reader.js');
             const { UIRenderer } = await import('./app/balance/balance-renderer.js');
             const { ValidationError } = await import('./app/balance/balance-config.js');
-            UIRenderer.handleError(new ValidationError([{ field: 'minimumFlexAnnual', message: 'Synthetischer bestehender Berechnungsfehler' }]));
+            UIRenderer.handleError(new ValidationError([{ fieldId: 'minimumFlexAnnual', message: 'Synthetischer bestehender Berechnungsfehler' }]));
             const before = document.getElementById('error-container').textContent;
             const marks = () => [...document.querySelectorAll('.input-error')].map(el => el.id).sort();
             const markedBefore = marks();
