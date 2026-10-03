@@ -639,6 +639,8 @@ export const StorageManager = {
             }
             await this._idbHelper.set('snapshotDirHandle', handle);
             appState.snapshotHandle = handle;
+            // Dialogabbruch und fehlgeschlagene Verbindung erhalten den bisherigen Fehler.
+            UIRenderer.clearActionError('snapshots');
             UIRenderer.toast('Snapshot-Ordner erfolgreich verbunden.');
             this.renderSnapshots(dom.outputs.snapshotList, dom.controls.snapshotStatus, appState.snapshotHandle);
         } catch (err) {

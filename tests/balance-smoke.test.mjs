@@ -422,6 +422,58 @@ engineFailure = null;
 const actionContainer = document.getElementById('action-error-container');
 const scopedEntry = scope => actionContainer.children.find(entry => entry.dataset.scope === scope);
 const actionText = scope => scopedEntry(scope)?.children[0].textContent || '';
+// Tatsächliche Main-/Knopfbindung mit echtem connectFolder und echtem Renderer.
+{
+    const previousPicker = window.showDirectoryPicker;
+    const previousClear = UIRenderer.clearActionError;
+    const previousToast = UIRenderer.toast;
+    const previousHandleSet = StorageManager._idbHelper.set;
+    let rejectPicker;
+    const picker = new Promise((_, reject) => { rejectPicker = reject; });
+    let clears = 0, toasts = 0;
+    try {
+        UIRenderer.handleActionError(new Error('Snapshotfehler vor Ordnerwahl'), 'snapshots');
+        const oldEntry = scopedEntry('snapshots');
+        const oldText = actionText('snapshots');
+        const foreignEntry = scopedEntry('expenses-import');
+        window.showDirectoryPicker = () => picker;
+        UIRenderer.clearActionError = function (...args) { clears++; return previousClear.apply(this, args); };
+        UIRenderer.toast = function (...args) { toasts++; return previousToast.apply(this, args); };
+        const folderButton = document.getElementById('connectFolderBtn');
+        assertEqual(folderButton.listeners.click.length, 1, 'Echter Main bindet den Ordnerknopf genau einmal');
+        const pending = folderButton.listeners.click[0]({ type: 'click', target: folderButton });
+        assertEqual(scopedEntry('snapshots'), oldEntry, 'Offener Ordnerdialog erhält den echten Meldungseintrag');
+        assertEqual(actionText('snapshots'), oldText, 'Offener Ordnerdialog erhält den Meldungstext');
+        assertEqual(clears, 0, 'Offener Ordnerdialog bereinigt keinen Bereich');
+        assertEqual(toasts, 0, 'Offener Ordnerdialog erzeugt keinen Erfolg');
+        rejectPicker(Object.assign(new Error('Ordnerwahl abgebrochen'), { name: 'AbortError' }));
+        assertEqual(await pending, undefined, 'Abgebrochene echte Knopfaktion behält void-Rückgabe');
+        assertEqual(scopedEntry('snapshots'), oldEntry, 'AbortError erhält dieselbe echte Meldung');
+        assertEqual(actionText('snapshots'), oldText, 'AbortError erhält den Meldungstext');
+        assertEqual(scopedEntry('expenses-import'), foreignEntry, 'AbortError erhält fremden Meldungseintrag');
+        assertEqual(clears, 0, 'AbortError ruft clearActionError nicht auf');
+        assertEqual(toasts, 0, 'AbortError erzeugt keine Erfolgsmeldung');
+        for (const outcome of ['denied', 'storage-error']) {
+            const before = scopedEntry('snapshots');
+            window.showDirectoryPicker = async () => ({
+                requestPermission: async () => outcome === 'denied' ? 'denied' : 'granted'
+            });
+            StorageManager._idbHelper.set = async () => { throw new Error('Synthetischer Handle-Speicherfehler'); };
+            await folderButton.listeners.click[0]({ type: 'click', target: folderButton });
+            assert(scopedEntry('snapshots') !== before, `${outcome}: echter Renderer ersetzt bisherigen Snapshotfehler`);
+            assert(actionText('snapshots').includes('Ordner konnte nicht verbunden werden.'), `${outcome}: bestehender Snapshot-Aktionsfehler sichtbar`);
+            assertEqual(scopedEntry('expenses-import'), foreignEntry, `${outcome}: fremder Meldungseintrag bleibt identisch`);
+            assertEqual(toasts, 0, `${outcome}: kein Erfolgstoast bei fehlgeschlagener Verbindung`);
+        }
+        assertEqual(clears, 2, 'Nur der echte Fehlerersatz bereinigt seinen Bereich, ohne vorzeitiges Löschen');
+    } finally {
+        if (previousPicker === undefined) delete window.showDirectoryPicker;
+        else window.showDirectoryPicker = previousPicker;
+        UIRenderer.clearActionError = previousClear;
+        UIRenderer.toast = previousToast;
+        StorageManager._idbHelper.set = previousHandleSet;
+    }
+}
 const inputRefs = Object.fromEntries(document.querySelectorAll('input, select').map(el => [el.id, el]));
 const handlerDom = { inputs: inputRefs, outputs: { snapshotList: document.getElementById('snapshotList') },
     controls: {}, expenses: {} };

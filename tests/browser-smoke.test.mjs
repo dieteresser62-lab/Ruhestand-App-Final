@@ -1601,6 +1601,93 @@ async function runBalanceImportReject(browser, baseUrl) {
     await smoke.close();
 }
 
+async function runBalanceFolderAbort(browser, baseUrl) {
+    const smoke = await openSmokePage(browser, baseUrl, 'Balance.html', {
+        storage: createBalanceStorage(2025), observeWealthUpdates: true
+    });
+    const { page } = smoke;
+    try {
+        await page.locator('#profilverbund-profile-list input').waitFor({ state: 'visible' });
+        await waitForWealthBrowserIdle(page);
+        await page.locator('.tab-btn[data-tab="settings"]').click();
+        await page.locator('#snapshot-management').evaluate(element => {
+            element.open = true;
+            element.querySelector('details').open = true;
+        });
+        await page.evaluate(async () => {
+            const { UIRenderer } = await import('./app/balance/balance-renderer.js');
+            const { StorageManager } = await import('./app/balance/balance-storage.js');
+            const picker = window.showDirectoryPicker;
+            const connect = StorageManager.connectFolder;
+            const clear = UIRenderer.clearActionError;
+            const toast = UIRenderer.toast;
+            UIRenderer.handleActionError(new Error('Snapshotfehler vor Ordnerwahl'), 'snapshots');
+            UIRenderer.handleActionError(new Error('Unabhängiger Importfehler'), 'balance-import');
+            const observer = window.__folderAbort = {
+                opened: false, settled: false, completed: false, clears: [], toasts: [],
+                entry: document.querySelector('#action-error-container [data-scope="snapshots"]'),
+                foreign: document.querySelector('#action-error-container [data-scope="balance-import"]')
+            };
+            observer.text = observer.entry.textContent;
+            observer.restore = () => {
+                if (picker === undefined) delete window.showDirectoryPicker;
+                else window.showDirectoryPicker = picker;
+                StorageManager.connectFolder = connect;
+                UIRenderer.clearActionError = clear;
+                UIRenderer.toast = toast;
+                delete window.__folderAbort;
+            };
+            // Nur den Betriebssystemdialog ersetzen; Knopf und Storage-Ablauf bleiben echt.
+            window.showDirectoryPicker = () => {
+                observer.opened = true;
+                return new Promise((_, reject) => {
+                    observer.abort = () => {
+                        observer.settled = true;
+                        reject(new DOMException('Ordnerwahl abgebrochen', 'AbortError'));
+                    };
+                });
+            };
+            StorageManager.connectFolder = async function (...args) {
+                try { return await connect.apply(this, args); }
+                finally { observer.completed = true; }
+            };
+            UIRenderer.clearActionError = function (scope) {
+                observer.clears.push(scope);
+                return clear.call(this, scope);
+            };
+            UIRenderer.toast = function (...args) {
+                observer.toasts.push(args);
+                return toast.apply(this, args);
+            };
+        });
+        await page.locator('#connectFolderBtn').click();
+        await page.waitForFunction(() => window.__folderAbort.opened);
+        const unchanged = () => {
+            const observer = window.__folderAbort;
+            return document.querySelector('#action-error-container [data-scope="snapshots"]') === observer.entry
+                && observer.entry.textContent === observer.text
+                && document.querySelector('#action-error-container [data-scope="balance-import"]') === observer.foreign
+                && observer.clears.length === 0 && observer.toasts.length === 0;
+        };
+        assert(await page.evaluate(unchanged), 'Offener Ordnerdialog erhält identische Meldungen ohne Bereinigung oder Erfolg');
+        const messageIndex = await page.evaluate(() => {
+            const index = window.__browserSmokeMessages.length;
+            window.__folderAbort.abort();
+            return index;
+        });
+        await page.waitForFunction(() => window.__folderAbort.settled && window.__folderAbort.completed);
+        await page.waitForFunction(unchanged);
+        await page.locator('#action-error-container [data-scope="snapshots"]').waitFor({ state: 'visible' });
+        assert(await page.evaluate(unchanged), 'Abgeschlossener AbortError erhält Meldungsidentität und fremde Bereiche');
+        assert(await page.evaluate(index => window.__browserSmokeMessages.length === index, messageIndex),
+            'Abbruch erzeugt weder neue Fehlermeldung noch Erfolgsmeldung');
+        smoke.assertNoErrors();
+    } finally {
+        await page.evaluate(() => window.__folderAbort?.restore());
+        await smoke.close();
+    }
+}
+
 // Ohne Modul-Closure auch direkt über page.evaluate verwendbar.
 function readBalanceImportResults() {
     return Object.fromEntries(['displayDepotwert', 'monatlicheEntnahme', 'miniSummary', 'handlungContent']
@@ -4059,6 +4146,7 @@ async function main() {
             ['Simulator ghost profile context', runSimulatorGhostProfileContextSmoke],
             ['Handbuch.html', runManualSmoke],
             ['Balance import reject', runBalanceImportReject],
+            ['Balance folder abort', runBalanceFolderAbort],
             ['Balance import restoration', runBalanceImportRestoration],
             ['Balance CSV import roundtrip', runBalanceCsvImportRoundtrip],
             ['Balance annual commit', runBalanceAnnualCommit]

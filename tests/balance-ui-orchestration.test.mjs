@@ -16,7 +16,7 @@ import { createProfilverbundHandlers } from '../app/balance/balance-main-profilv
 import { CONFIG, ValidationError, StorageError } from '../app/balance/balance-config.js';
 import { UIReader, initUIReader } from '../app/balance/balance-reader.js';
 import { UIRenderer } from '../app/balance/balance-renderer.js';
-import { StorageManager } from '../app/balance/balance-storage.js';
+import { initStorageManager, StorageManager } from '../app/balance/balance-storage.js';
 import {
     BALANCE_UPDATE_MODE,
     BALANCE_UPDATE_STATUS,
@@ -1846,6 +1846,119 @@ async function runBalanceUiOrchestrationTests() {
         const successResult = createUpdateSuccessResult({ marker: true });
         assertEqual(successResult.status, BALANCE_UPDATE_STATUS.SUCCESS, 'Erfolgreiches Update liefert success');
         assertEqual(successResult.ok, true, 'Success-Status bleibt mit bestehendem ok-Contract kompatibel');
+    }
+
+    console.log('Ordnerknopf: echter Storage-Handler erhält Fehler bis zur bestätigten Verbindung');
+    {
+        const documentRef = new MockDocument();
+        installBrowserGlobals(documentRef, createLocalStorageMock());
+        const dom = createDomRefs(documentRef);
+        const state = { snapshotHandle: { name: 'bisheriger-ordner' } };
+        const savedClear = UIRenderer.clearActionError;
+        const savedToast = UIRenderer.toast;
+        const savedError = UIRenderer.handleActionError;
+        const savedSet = StorageManager._idbHelper.set;
+        const savedRender = StorageManager.renderSnapshots;
+        const savedConnect = StorageManager.connectFolder;
+        const deferred = () => {
+            let resolve, reject;
+            const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+            return { promise, resolve, reject };
+        };
+        try {
+            StorageManager.connectFolder = prevConnectFolder;
+            initStorageManager(dom, state, UIRenderer);
+            initUIBinder(dom, state, () => {}, () => {});
+            UIBinder.bindUI();
+            const click = dom.controls.connectFolderBtn.listeners.click[0];
+            for (const outcome of ['abort', 'denied', 'storage-error', 'success']) {
+                const oldHandle = state.snapshotHandle;
+                const oldError = { message: 'Bisheriger Snapshotfehler' };
+                const foreignError = { message: 'Fremder Importfehler' };
+                const errors = new Map([['snapshots', oldError], ['balance-import', foreignError]]);
+                const clears = [], toasts = [], writes = [], renders = [];
+                const picker = deferred(), permission = deferred(), storage = deferred();
+                const permissionStarted = deferred(), storageStarted = deferred();
+                const handle = { requestPermission: options => {
+                    assertEqual(options.mode, 'readwrite', `${outcome}: bestehender Berechtigungsmodus`);
+                    permissionStarted.resolve();
+                    return permission.promise;
+                } };
+                window.showDirectoryPicker = () => picker.promise;
+                UIRenderer.clearActionError = scope => { clears.push(scope); errors.delete(scope); };
+                UIRenderer.toast = message => { toasts.push(message); };
+                UIRenderer.handleActionError = (error, scope) => { errors.set(scope, error); };
+                StorageManager._idbHelper.set = (key, value) => {
+                    writes.push({ key, value });
+                    storageStarted.resolve();
+                    return storage.promise;
+                };
+                StorageManager.renderSnapshots = (...args) => { renders.push(args); };
+                const pending = click();
+                const assertPending = phase => {
+                    assertEqual(errors.get('snapshots'), oldError, `${outcome}/${phase}: Fehleridentität erhalten`);
+                    assertEqual(clears.length, 0, `${outcome}/${phase}: kein clearActionError`);
+                    assertEqual(toasts.length, 0, `${outcome}/${phase}: keine Erfolgsmeldung`);
+                    assertEqual(state.snapshotHandle, oldHandle, `${outcome}/${phase}: altes Handle erhalten`);
+                };
+                assertPending('Dialog offen');
+                if (outcome === 'abort') {
+                    picker.reject(Object.assign(new Error('Auswahl abgebrochen'), { name: 'AbortError' }));
+                } else {
+                    picker.resolve(handle);
+                    await permissionStarted.promise;
+                    assertPending('Berechtigung offen');
+                    permission.resolve(outcome === 'denied' ? 'denied' : 'granted');
+                    if (outcome !== 'denied') {
+                        await storageStarted.promise;
+                        assertPending('Speicherung offen');
+                        if (outcome === 'storage-error') storage.reject(new Error('Handle-Speicherfehler'));
+                        else storage.resolve();
+                    }
+                }
+                assertEqual(await pending, undefined, `${outcome}: Knopfbindung behält void-Rückgabe`);
+                assertEqual(errors.get('balance-import'), foreignError, `${outcome}: fremder Bereich bleibt erhalten`);
+                if (outcome === 'success') {
+                    assertEqual(errors.has('snapshots'), false, 'Bestätigte Verbindung entfernt Snapshotfehler');
+                    assertEqual(clears.join(','), 'snapshots', 'Erfolg bereinigt ausschließlich Snapshotbereich');
+                    assertEqual(toasts.join(','), 'Snapshot-Ordner erfolgreich verbunden.', 'Bestehender Erfolgstext erhalten');
+                    assertEqual(state.snapshotHandle, handle, 'Bestätigtes Handle im State');
+                    assertEqual(renders.length, 1, 'Erfolg rendert Snapshotliste einmal');
+                    assertEqual(renders[0][0], dom.outputs.snapshotList, 'Bestehendes Listenziel');
+                    assertEqual(renders[0][1], dom.controls.snapshotStatus, 'Bestehendes Statusziel');
+                    assertEqual(renders[0][2], handle, 'Liste erhält bestätigtes Handle');
+                } else {
+                    assertEqual(clears.length, 0, `${outcome}: kein vorzeitiges Bereinigen`);
+                    assertEqual(toasts.length, 0, `${outcome}: kein Erfolg`);
+                    assertEqual(renders.length, 0, `${outcome}: keine neue Snapshotliste`);
+                    assertEqual(state.snapshotHandle, oldHandle, `${outcome}: Handle unverändert`);
+                    if (outcome === 'abort') assertEqual(errors.get('snapshots'), oldError, 'AbortError erhält identischen Fehler');
+                    else {
+                        assert(errors.get('snapshots') instanceof StorageError, `${outcome}: bestehender StorageError-Vertrag`);
+                        assertEqual(errors.get('snapshots').message, 'Ordner konnte nicht verbunden werden.', `${outcome}: bestehender Fehlertext`);
+                        assertEqual(errors.get('snapshots').context.originalError.message,
+                            outcome === 'denied' ? 'Zugriff auf den Ordner wurde nicht gewährt.' : 'Handle-Speicherfehler',
+                            `${outcome}: ursprüngliche Ursache erhalten`);
+                    }
+                }
+                assertEqual(writes.length, ['success', 'storage-error'].includes(outcome) ? 1 : 0, `${outcome}: bestehender Speicherablauf`);
+                if (writes.length) {
+                    assertEqual(writes[0].key, 'snapshotDirHandle', `${outcome}: bestehender Persistenzschlüssel`);
+                    assertEqual(writes[0].value, handle, `${outcome}: unverändertes Handle gespeichert`);
+                }
+            }
+            assertEqual(await StorageManager.connectFolder(), undefined, 'Echtes connectFolder behält Promise<void> bei Erfolg');
+            window.showDirectoryPicker = async () => { throw Object.assign(new Error('Abbruch'), { name: 'AbortError' }); };
+            assertEqual(await StorageManager.connectFolder(), undefined, 'Echtes connectFolder behält Promise<void> bei Abbruch');
+        } finally {
+            UIRenderer.clearActionError = savedClear;
+            UIRenderer.toast = savedToast;
+            UIRenderer.handleActionError = savedError;
+            StorageManager._idbHelper.set = savedSet;
+            StorageManager.renderSnapshots = savedRender;
+            StorageManager.connectFolder = savedConnect;
+            initStorageManager(null, null, null);
+        }
     }
 
     console.log('Balance UI orchestration tests passed');

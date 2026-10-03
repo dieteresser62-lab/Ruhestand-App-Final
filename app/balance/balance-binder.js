@@ -146,7 +146,6 @@ export const UIBinder = {
         dom.controls.csvFileInput.addEventListener('change', this.handleCsvImport.bind(this));
         dom.controls.jahresabschlussBtn.addEventListener('click', this.handleJahresabschluss.bind(this));
         dom.controls.connectFolderBtn.addEventListener('click', async () => {
-            UIRenderer.clearActionError('snapshots');
             try { await StorageManager.connectFolder(); }
             catch (error) { UIRenderer.handleActionError(error, 'snapshots'); }
         });
