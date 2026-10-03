@@ -153,7 +153,8 @@ try {
         global.localStorage = createLocalStorageMock();
         seedBalanceState();
         global.confirm = () => true;
-        UIRenderer.toast = message => { calls.push(`toast:${message}`); };
+        const toasts = [];
+        UIRenderer.toast = (text, type = true) => { calls.push(`toast:${text}`); toasts.push({ text, type }); };
         UIRenderer.handleActionError = error => { throw error; };
         SnapshotArchive.listSnapshots = async () => [];
         SnapshotArchive.readSnapshot = async id => ({ id, records: { balance: '{}' } });
@@ -209,8 +210,13 @@ try {
             'Fachlicher Candidate wird erst nach den Jahreswrites periodengebunden committed'
         );
         assertEqual(calls[calls.length - 1], 'render', 'Snapshot-Liste wird erst nach erfolgreichem Commit gerendert');
+        assert(toasts.some(toast => toast.text.includes('Jahresabschluss-Snapshot') && toast.type === true),
+            'Bestätigter Recovery-Snapshot bleibt Erfolg');
+        assertEqual(toasts.at(-1).type, true, 'Bestätigter Jahresabschluss bleibt Erfolg');
 
         const duplicate = await handlers.handleJahresabschluss();
+        assertEqual(toasts.at(-1).text, `Die Jahresperiode ${TARGET_YEAR} wurde bereits abgeschlossen.`, 'Perioden-No-op bleibt wortgleich');
+        assertEqual(toasts.at(-1).type, 'info', 'Perioden-No-op ist Hinweis');
         assertEqual(duplicate.status, 'already_committed', 'Wiederholung derselben Periode ist idempotent');
         assertEqual(calls.filter(call => call === 'wealth-confirmed').length, 1, 'Nur neuer bestätigter Jahresstand meldet Erfolg');
         assertEqual(calls.filter(call => call === 'snapshot').length, 1, 'Wiederholung erzeugt keinen zweiten Snapshot');
@@ -315,18 +321,20 @@ try {
         assertEqual(calls.filter(call => call === 'snapshot').length, 1, 'Recovery-Sperre erzeugt keinen weiteren Snapshot');
     }
 
-    console.log('Test 6: in-flight guard rejects a double click');
+    console.log('Test 6: UI-Jahresabschluss weist Doppelklick ab');
     {
         global.localStorage = createLocalStorageMock();
         seedBalanceState();
         global.confirm = () => true;
-        UIRenderer.toast = () => {};
+        const toasts = [];
+        UIRenderer.toast = (text, type = true) => { toasts.push({ text, type }); };
         UIRenderer.handleActionError = () => {};
         SnapshotArchive.listSnapshots = async () => [];
         SnapshotArchive.readSnapshot = async id => ({ id, records: { balance: '{}' } });
         StorageManager.createSnapshot = async () => ({ id: 'snapshot-in-flight' });
         StorageManager.renderSnapshots = async () => {};
         let releaseUpdate;
+        let commitCount = 0;
         const updateGate = new Promise(resolve => { releaseUpdate = resolve; });
         const dom = createAnnualDom();
         const handlers = createSnapshotHandlers({
@@ -344,18 +352,21 @@ try {
             applyAnnualInflation: () => {},
             rollExpensesYearFn: () => NEXT_YEAR,
             flushLiveState: async () => {},
-            commitLiveState: async () => COMMIT_RESULT
+            commitLiveState: async () => { commitCount++; return COMMIT_RESULT; }
         });
         const first = handlers.handleJahresabschluss();
         await Promise.resolve();
         await Promise.resolve();
         const second = await handlers.handleJahresabschluss();
         assertEqual(second.status, 'in_flight', 'Doppelklick wird waehrend laufendem Commit abgewiesen');
+        assertEqual(toasts.at(-1).text, 'Der Jahresprozess laeuft bereits.', 'Doppelklickhinweis bleibt wortgleich');
+        assertEqual(toasts.at(-1).type, 'info', 'Laufender UI-Jahresabschluss meldet Hinweis');
         releaseUpdate();
         await first;
+        assertEqual(commitCount, 1, 'Doppelklick führt genau einen Jahrescommit aus');
     }
 
-    console.log('Test 7: laufende Direktabrufe werden im verschachtelten Jahresupdate als Schrittfehler erfasst');
+    console.log('Test 7: interne Direktabrufe werden im verschachtelten Jahresupdate als Schrittfehler erfasst');
     for (const step of ['Inflation', 'ETF & Nachrücken']) {
         global.localStorage = createLocalStorageMock();
         seedBalanceState();
@@ -421,9 +432,13 @@ try {
             assertEqual(fetchCalls, 1, `${step}: Direktabruf läuft mit genau einem Fetch`);
             assertEqual(resets.join(','), 'annual', `${step}: Nur der erste Direktabruf bereinigt den Annualbereich`);
             annualError = 'Bestehender Annualfehler';
-            await directHandler();
-            assertEqual(fetchCalls, 1, `${step}: Doppelklick startet keinen zweiten Fetch`);
-            assertEqual(annualError, 'Bestehender Annualfehler', `${step}: Doppelklick erhält den Annualfehler`);
+            assertEqual(await directHandler(), undefined, `${step}: Interne Sperre behält ihre leere Rückgabe`);
+            let nestedError;
+            try { await directHandler({ nested: true }); } catch (error) { nestedError = error; }
+            assertEqual(nestedError?.context?.code, isInflation ? 'inflation_fetch_in_flight' : 'etf_fetch_in_flight',
+                `${step}: Interner nested-Fehler behält seinen Code`);
+            assertEqual(fetchCalls, 1, `${step}: Paralleler interner Direktaufruf startet keinen zweiten Fetch`);
+            assertEqual(annualError, 'Bestehender Annualfehler', `${step}: Paralleler interner Direktaufruf erhält den Annualfehler`);
 
             const result = await orchestrator.handleJahresUpdate({ failOnStepError: true, nested: true });
             assertEqual(result.ok, false, `${step}: Laufender Direktabruf verhindert ein erfolgreiches Jahresupdate`);
@@ -464,6 +479,40 @@ try {
         await directHandler();
         assertEqual(fetchCalls, 2, `${step}: Nach Abschluss ist ein neuer Direktabruf möglich`);
         assertEqual(resets.length, 2, `${step}: Neuer ausführbarer Direktabruf bereinigt seinen Fehlerbereich`);
+    }
+
+    console.log('Interner Orchestratorvertrag: Start, CAPE-Warnung, Erfolg und Reentranz');
+    for (const capeFetchStatus of ['ok_primary', 'ok_fallback_mirror', 'ok_fallback_stored', 'warn_stale_source', '']) {
+        global.localStorage = createLocalStorageMock();
+        seedBalanceState();
+        global.setTimeout = fn => { fn(); return 0; };
+        const toasts = [];
+        UIRenderer.toast = (text, type = true) => { toasts.push({ text, type }); };
+        let releaseInflation;
+        const gate = new Promise(resolve => { releaseInflation = resolve; });
+        const orchestrator = createAnnualOrchestrator({
+            dom: createAnnualDom(), debouncedUpdate: () => {},
+            handleFetchInflation: () => gate,
+            handleNachrueckenMitETF: async () => ({ price: 140 }),
+            handleFetchCapeAuto: async () => ({ capeFetchStatus, capeAsOf: '2026-12-31' }),
+            showUpdateResultModal: () => { throw new Error('Unerwartetes Fehlermodal'); },
+            setLastUpdateResults: () => {}
+        });
+        const first = orchestrator.handleJahresUpdate();
+        assertEqual(toasts[0].text, 'Starte Jahres-Update...', 'Start bleibt wortgleich');
+        assertEqual(toasts[0].type, 'info', 'Jahresupdate-Start ist Hinweis');
+        const duplicate = await orchestrator.handleJahresUpdate();
+        assertEqual(JSON.stringify(duplicate), JSON.stringify({ ok: false, status: 'in_flight' }),
+            'Interne Orchestratorsperre behält ihre Rückgabe');
+        assertEqual(toasts.length, 1, 'Abgewiesener interner Aufruf erzeugt keinen zusätzlichen Toast');
+        releaseInflation({ rate: 2 });
+        assertEqual((await first).ok, true, 'Hinweistyp ändert nicht das Jahresupdate-Ergebnis');
+        const warning = capeFetchStatus === 'ok_fallback_stored' || capeFetchStatus === 'warn_stale_source';
+        const expectedText = warning
+            ? `⚠️ ETF aktualisiert, CAPE aus lokalem Stand (${new Date('2026-12-31').toLocaleDateString('de-DE')}).`
+            : capeFetchStatus ? '✅ ETF + CAPE aktualisiert.' : '✅ Jahres-Update erfolgreich abgeschlossen.';
+        assertEqual(toasts.at(-1).text, expectedText, 'CAPE-Abschluss behält Originaltext samt Symbol');
+        assertEqual(toasts.at(-1).type, warning ? 'info' : true, 'Nur CAPE-Warnung wird Hinweis');
     }
 
     console.log('Balance annual workflow contract tests passed');

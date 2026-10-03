@@ -1379,6 +1379,24 @@ async function runBalanceAnnualCommit(browser, baseUrl) {
     await runBalanceAnnualCommitBeforeWealthHistory(browser, baseUrl);
 }
 
+async function assertBalanceBrowserToast(page, expectedText, expectedType) {
+    const expected = {
+        info: { label: 'Hinweis: ', icon: 'i', className: 'toast-info' },
+        success: { label: 'Erfolg: ', icon: '✓', className: 'toast-success' }
+    }[expectedType];
+    await page.waitForFunction(text => document.querySelector('#toast-container .toast-text')?.textContent === text, expectedText);
+    const toast = page.locator('#toast-container');
+    const actual = await toast.evaluate(container => ({
+        text: container.querySelector('.toast-text')?.textContent,
+        label: container.querySelector('.toast-type')?.textContent,
+        icon: container.querySelector('.toast-icon')?.textContent,
+        className: container.className
+    }));
+    assert(await toast.isVisible() && actual.text === expectedText, 'Jahresprozess zeigt den bytegleichen Originaltext');
+    assert(actual.label === expected.label && actual.icon === expected.icon && actual.className === expected.className,
+        `Jahresprozess zeigt ${expectedType} mit eigenem Typ, Symbol und Formklasse`);
+}
+
 async function runBalanceAnnualCommitBeforeWealthHistory(browser, baseUrl) {
     const smoke = await openSmokePage(browser, baseUrl, 'Balance.html', {
         storage: createBalanceStorage(2025), annualFixtures: { targetYear: 2025 },
@@ -1418,14 +1436,29 @@ async function runBalanceAnnualCommitScenario(browser, baseUrl, open) {
     await assertWealthBrowserVisibility(smoke.page, false, 0);
     if (open) await activateWealthBrowserTab(smoke.page, true);
     const closeButton = smoke.page.locator('#jahresabschlussBtn');
+    let releaseInflationFetch;
+    const inflationFetchGate = new Promise(resolve => { releaseInflationFetch = resolve; });
+    await smoke.page.route(url => url.hostname === 'data-api.ecb.europa.eu', async route => {
+        await inflationFetchGate;
+        await route.fallback();
+    });
     let releaseAnnualFetch;
+    let annualFetchStarted = false;
     const annualFetchGate = new Promise(resolve => { releaseAnnualFetch = resolve; });
     await smoke.page.route(url => url.hostname === '127.0.0.1' && url.port === '8787' && url.pathname === '/chart', async route => {
+        annualFetchStarted = true;
         await annualFetchGate;
         await route.fallback();
     });
     const commitMessageIndex = await smoke.page.evaluate(() => window.__browserSmokeMessages.length);
     await closeButton.click({ force: true });
+    try {
+        // Echter Jahresprozess; der kontrollierte Inflationsabruf hält den Fortschritt sichtbar.
+        await assertBalanceBrowserToast(smoke.page, 'Starte Jahres-Update...', 'info');
+    } finally {
+        releaseInflationFetch();
+    }
+    await waitForBrowserValue(async () => annualFetchStarted, started => started, 'Kontrollierter ETF-Abruf erreicht');
     await smoke.page.waitForFunction(() => document.getElementById('captureWealthBtn').disabled);
     assert(await closeButton.isDisabled() && await smoke.page.locator('#btnJahresUpdate').isDisabled(),
         'Der laufende Abschluss sperrt beide Jahresknöpfe und die manuelle Erfassung');
@@ -1455,11 +1488,13 @@ async function runBalanceAnnualCommitScenario(browser, baseUrl, open) {
         `Verlauf ${open ? 'aktiv' : 'inaktiv'}: neuer Abschluss bestätigt genau einmal den gesicherten Vermögensstand`);
     const commitToast = smoke.page.locator('#toast-container .toast-text');
     const expectedCommitText = 'Ausgaben-Check auf 2027 umgestellt. Vermögensstand gesichert.';
+    await assertBalanceBrowserToast(smoke.page, expectedCommitText, 'success');
     // Reguläre Timer bleiben aktiv; gemessen wird die aktuelle Oberfläche, nicht das Protokoll.
     for (const [delay, elapsed] of [[1000, 1], [2000, 3]]) {
         await smoke.page.waitForTimeout(delay);
         assert(await commitToast.isVisible() && await commitToast.textContent() === expectedCommitText,
             `Verlauf ${open ? 'aktiv' : 'inaktiv'}: Abschlussbestätigung nach ${elapsed} s sichtbar und wortgleich`);
+        await assertBalanceBrowserToast(smoke.page, expectedCommitText, 'success');
     }
     const committedAge = await smoke.page.locator('#aktuellesAlter').inputValue();
     assert(committedAge === '68', `Erfolgreicher Commit muss das Alter genau einmal erhoehen (Ist: ${committedAge})`);
@@ -1496,6 +1531,7 @@ async function runBalanceAnnualCommitScenario(browser, baseUrl, open) {
     await smoke.page.waitForFunction(index => window.__browserSmokeMessages.slice(index)
         .some(message => message.includes('Die Jahresperiode 2026 wurde bereits abgeschlossen.')), repeatMessageIndex);
     await smoke.page.waitForFunction(() => !document.getElementById('captureWealthBtn').disabled);
+    await assertBalanceBrowserToast(smoke.page, 'Die Jahresperiode 2026 wurde bereits abgeschlossen.', 'info');
     assert(await smoke.page.locator('#wealthHistoryStatus').textContent() === '', 'Wiederholungs-No-op ohne neue Erfassungsbestätigung');
     const repeatMessages = await smoke.page.evaluate(index => window.__browserSmokeMessages.slice(index), repeatMessageIndex);
     assert(repeatMessages.some(message => message.includes('Die Jahresperiode 2026 wurde bereits abgeschlossen.')),

@@ -99,7 +99,7 @@ export function createSnapshotHandlers({
     return {
         async handleJahresabschluss() {
             if (annualCloseInFlight) {
-                UIRenderer.toast('Der Jahresprozess laeuft bereits.', false);
+                UIRenderer.toast('Der Jahresprozess laeuft bereits.', 'info');
                 return { status: 'in_flight' };
             }
 
@@ -147,7 +147,7 @@ export function createSnapshotHandlers({
 
                 if (planning.status === ANNUAL_PERIOD_STATUS.ALREADY_COMMITTED) {
                     UIRenderer.clearActionError('annual');
-                    UIRenderer.toast(`Die Jahresperiode ${targetYear} wurde bereits abgeschlossen.`, false);
+                    UIRenderer.toast(`Die Jahresperiode ${targetYear} wurde bereits abgeschlossen.`, 'info');
                     return planning;
                 }
                 if (planning.status !== ANNUAL_PERIOD_STATUS.READY || !planning.plan) {

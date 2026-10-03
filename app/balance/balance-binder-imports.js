@@ -1388,7 +1388,7 @@ export function createImportExportHandlers({ dom, debouncedUpdate, update }) {
                 const warning = dataToExport.validationWarnings?.[0];
                 UIRenderer.toast(warning
                     ? `Export erstellt mit Validierungshinweis [${warning.code}]: ${warning.message}`
-                    : 'Export erstellt.');
+                    : 'Export erstellt.', warning ? 'info' : true);
             } catch (error) {
                 const code = error?.code || 'export_failed';
                 const message = error?.message || 'Der Balance-Zustand kann nicht als JSON exportiert werden.';

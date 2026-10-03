@@ -107,7 +107,8 @@ const previous = {
 const actionResets = [];
 try {
     UIRenderer.clearActionError = scope => { actionResets.push(scope); };
-    UIRenderer.toast = () => {};
+    const toasts = [];
+    UIRenderer.toast = (text, type = true) => { toasts.push({ text, type }); };
     UIRenderer.handleActionError = () => {};
 
     console.log('Test 1: period id creates a stable UTC year-end request window');
@@ -246,6 +247,7 @@ try {
         seedAnnualState('calendar-year:2025', previousMeta);
         const dom = createDom();
         const appState = {};
+        dom.controls.btnNachrueckenMitETF = { innerHTML: 'ETF', disabled: false };
         const { handlers, calls } = createHandlers(dom, appState);
         let requestedUrl = null;
         global.fetch = async url => {
@@ -253,7 +255,12 @@ try {
             return okJsonResponse(yahooChart([unix('2025-12-30T16:30:00Z')], [140.4]));
         };
 
+        toasts.length = 0;
         const result = await handlers.handleNachrueckenMitETF({ nested: true });
+        assertEqual(toasts[0].text, 'Rufe VWCE.DE Jahresendkurs fuer 2025 ab...', 'Interner Abrufstart bleibt wortgleich');
+        assertEqual(toasts[0].type, 'info', 'Interner ETF-Abrufstart ist Hinweis');
+        assertEqual(toasts[1].type, true, 'Bestätigtes Nachrücken bleibt Erfolg');
+        assert(toasts[1].text.startsWith('✅ Nachrücken mit ETF abgeschlossen!\n'), 'Erfolg behält Wortlaut und Originalsymbol');
         assertEqual(actionResets.length, 0, 'Verschachtelter Jahresschritt löscht keine Annualfehler');
         const request = createAnnualMarketDataRequest('calendar-year:2025');
         const requested = new URL(requestedUrl);

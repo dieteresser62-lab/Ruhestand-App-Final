@@ -157,7 +157,8 @@ const actionResets = [];
 try {
     UIRenderer.clearActionError = scope => { actionResets.push(scope); };
     global.localStorage = createLocalStorageMock();
-    UIRenderer.toast = () => {};
+    const toasts = [];
+    UIRenderer.toast = (text, type = true) => { toasts.push({ text, type }); };
     UIRenderer.handleActionError = () => {};
     console.error = () => {};
 
@@ -399,6 +400,34 @@ try {
         assertEqual(updateRequests.length, 1, 'Need mutation triggers exactly one update');
         assertEqual(updateRequests[0].mode, BALANCE_UPDATE_MODE.PERSIST_INPUTS,
             'Need mutation never relies on the update default');
+    }
+
+    console.log('Interner Handlervertrag: Abrufstart und bereits angewendete Inflation sind Hinweise');
+    {
+        localStorage.clear();
+        const dom = createDom();
+        dom.controls.btnFetchInflation = { innerHTML: 'Inflation', disabled: false };
+        const handlers = createHandlers(dom, { fetchImpl: async () => createResponse(createEcbPayload()) });
+        toasts.length = 0;
+        const result = await handlers.handleFetchInflation();
+        assertEqual(toasts[0].text, 'Versuche Inflationsdaten fuer 2025 abzurufen...', 'Abrufstart bleibt wortgleich');
+        assertEqual(toasts[0].type, 'info', 'Interner Abrufstart ist Hinweis');
+        assertEqual(toasts[1].type, true, 'Bestätigter Abruf bleibt Erfolg');
+        assert(toasts[1].text.startsWith('✅ Inflation 2025:'), 'Erfolg behält sein Originalsymbol');
+        assertEqual(result.year, 2025, 'Hinweistyp ändert nicht das Ergebnis');
+
+        localStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify({
+            lastState: { cumulativeInflationFactor: 1, lastInflationAppliedAtAge: 60 }
+        }));
+        const before = localStorage.getItem(CONFIG.STORAGE.LS_KEY);
+        toasts.length = 0;
+        handlers.applyAnnualInflation();
+        assertEqual(toasts[0].text, 'Inflation fuer Alter 60 wurde bereits angewendet.', 'No-op bleibt wortgleich');
+        assertEqual(toasts[0].type, 'info', 'Bereits angewendete Inflation ist Hinweis');
+        assertEqual(localStorage.getItem(CONFIG.STORAGE.LS_KEY), before, 'No-op schreibt weiterhin keinen State');
+        dom.inputs.aktuellesAlter.value = '61';
+        handlers.applyAnnualInflation();
+        assertEqual(toasts[1].type, true, 'Bestätigte Inflationsfortschreibung bleibt Erfolg');
     }
 
     console.log('Balance annual inflation tests passed');

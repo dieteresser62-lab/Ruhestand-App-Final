@@ -405,6 +405,7 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button {
     overflow-wrap: anywhere;
 }
 #toast-container.toast-success { color: var(--success-color); }
+#toast-container.toast-info { color: var(--text-color); border-style: dotted; }
 #toast-container.toast-error { color: var(--danger-color); border-style: dashed; }
 #toast-container .toast-icon {
     flex: 0 0 1.4em;
@@ -413,6 +414,7 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button {
     font-weight: bold;
 }
 #toast-container.toast-success .toast-icon { border-radius: 50%; }
+#toast-container.toast-info .toast-icon { border-radius: 50% 50% 2px 2px; }
 #toast-container.toast-error .toast-icon { border-radius: 2px; }
 #toast-container .toast-text { min-width: 0; }
 #toast-container .toast-type {

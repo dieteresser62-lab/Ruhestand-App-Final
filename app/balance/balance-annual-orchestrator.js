@@ -23,6 +23,8 @@ export function createAnnualOrchestrator({
     showUpdateResultModal,
     setLastUpdateResults
 }) {
+    // Interne Absicherung direkter Orchestratoraufrufe, kein zusätzlicher UI-Vertrag.
+    // Beide Jahresknöpfe behalten die annualCloseInFlight-Sperre im Snapshot-Handler.
     let inFlight = false;
     const handleJahresUpdate = async ({ failOnStepError = false, nested = false } = {}) => {
         if (inFlight) return { ok: false, status: 'in_flight' };
@@ -46,7 +48,7 @@ export function createAnnualOrchestrator({
             btn.disabled = true;
             btn.innerHTML = '⏳ Lädt...';
 
-            UIRenderer.toast('Starte Jahres-Update...');
+            UIRenderer.toast('Starte Jahres-Update...', 'info');
 
             // Schritt 1: Alter um 1 Jahr erhoehen (ein Jahr ist vergangen)
             const currentAge = parseInt(dom.inputs.aktuellesAlter.value) || 0;
@@ -124,7 +126,7 @@ export function createAnnualOrchestrator({
                     const asOf = results.cape?.capeAsOf
                         ? new Date(results.cape.capeAsOf).toLocaleDateString('de-DE')
                         : 'unbekannt';
-                    UIRenderer.toast(`⚠️ ETF aktualisiert, CAPE aus lokalem Stand (${asOf}).`);
+                    UIRenderer.toast(`⚠️ ETF aktualisiert, CAPE aus lokalem Stand (${asOf}).`, 'info');
                 } else {
                     UIRenderer.toast('✅ Jahres-Update erfolgreich abgeschlossen.');
                 }

@@ -129,24 +129,25 @@ export const UIRenderer = {
      * Zeigt Nutzerfeedback an.
      *
      * @param {string} msg - Meldungstext.
-     * @param {boolean} [isSuccess=true] - Farbe/Typ der Meldung.
+     * @param {boolean|'info'} [isSuccess=true] - Bisheriger Erfolg/Fehler oder expliziter Hinweis.
      */
     toast(msg, isSuccess = true) {
         const container = dom?.containers?.toast;
         if (!container) return;
         if (toastTimer !== null) clearTimeout(toastTimer);
         const revision = ++toastRevision;
+        const isInfo = isSuccess === 'info';
         const icon = document.createElement('span');
         icon.className = 'toast-icon';
         icon.setAttribute('aria-hidden', 'true');
-        icon.textContent = isSuccess ? '✓' : '!';
+        icon.textContent = isInfo ? 'i' : isSuccess ? '✓' : '!';
         const type = document.createElement('span');
         type.className = 'toast-type';
-        type.textContent = isSuccess ? 'Erfolg: ' : 'Fehler: ';
+        type.textContent = isInfo ? 'Hinweis: ' : isSuccess ? 'Erfolg: ' : 'Fehler: ';
         const text = document.createElement('span');
         text.className = 'toast-text';
         text.textContent = msg;
-        container.className = isSuccess ? 'toast-success' : 'toast-error';
+        container.className = isInfo ? 'toast-info' : isSuccess ? 'toast-success' : 'toast-error';
         container.replaceChildren(icon, type, text);
         toastTimer = setTimeout(() => {
             if (revision !== toastRevision || container !== dom?.containers?.toast) return;

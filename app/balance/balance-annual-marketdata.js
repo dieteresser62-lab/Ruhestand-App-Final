@@ -481,6 +481,8 @@ export function createMarketdataHandlers({
         );
     };
 
+    // Interne Absicherung direkter Handleraufrufe, kein zusätzlicher Balance-Nutzerpfad.
+    // Rückgabe und nested-Fehlergrenze des Jahresschritts bleiben erhalten.
     let etfInFlight = false;
     const handleNachrueckenMitETF = async ({ nested = false } = {}) => {
         if (etfInFlight) {
@@ -507,7 +509,7 @@ export function createMarketdataHandlers({
             const { request } = readActiveAnnualMarketDataContext();
 
             if (btn) {
-                UIRenderer.toast(`Rufe VWCE.DE Jahresendkurs fuer ${request.targetYear} ab...`);
+                UIRenderer.toast(`Rufe VWCE.DE Jahresendkurs fuer ${request.targetYear} ab...`, 'info');
             }
 
             // 1. ETF-Kurs abrufen
