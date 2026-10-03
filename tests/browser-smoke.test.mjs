@@ -875,8 +875,11 @@ async function runBalanceExpensesWealthCapture(browser, baseUrl) {
     initialState.wealthHistory = { schemaVersion: 1, entries: [annual] };
     storage[BALANCE_STATE_KEY] = JSON.stringify(initialState);
     const profileId = 'import-quote';
+    const tranchesRaw = createWealthBrowserTranches();
+    // Wie beim echten Profilwechsel liegt der aktive Bestand auch im Live-Schlüssel, den der Manager liest.
+    storage.depot_tranchen = tranchesRaw;
     Object.assign(storage, createBrowserProfileStorage({ [profileId]: { name: 'Importprofil',
-        balanceStateRaw: storage[BALANCE_STATE_KEY], tranchesRaw: createWealthBrowserTranches() },
+        balanceStateRaw: storage[BALANCE_STATE_KEY], tranchesRaw },
         'import-quote-empty': { name: 'Ohne ETF', tranchesRaw: '[]', tagesgeld: '0',
             balanceStateRaw: JSON.stringify({ ...initialState, inputs: { ...initialState.inputs,
                 tagesgeld: 0, depotwertAlt: 0, depotwertNeu: 0, floorBedarf: 0, flexBedarf: 0 } }) }
@@ -1234,9 +1237,13 @@ async function assertWealthBrowserTable(page, entries) {
         return JSON.stringify(JSON.parse(registry.profiles[current].data[BALANCE_STATE_KEY]).wealthHistory?.entries);
     }, registryEntries => registryEntries === JSON.stringify(entries),
     'Dargestellte Daten entsprechen auch der bestätigten aktiven Registrykopie');
+    // Tabelle und Diagramm zeigen chronologisch (Darstellungsvertrag), gespeichert wird in Schreibreihenfolge.
+    const shown = [...entries].sort((a, b) => a.asOf.localeCompare(b.asOf)
+        || (a.reason === 'annual_close' ? 0 : 1) - (b.reason === 'annual_close' ? 0 : 1)
+        || a.id.localeCompare(b.id));
     const rows = page.locator('#wealthHistoryTable tbody tr');
-    assert(await rows.count() === entries.length, 'Die Verlaufstabelle zeigt genau die gespeicherten Stände');
-    for (const [index, entry] of entries.entries()) {
+    assert(await rows.count() === shown.length, 'Die Verlaufstabelle zeigt genau die gespeicherten Stände');
+    for (const [index, entry] of shown.entries()) {
         const cells = await rows.nth(index).locator('th, td').allTextContents();
         assert(cells[0] === entry.asOf.split('-').reverse().join('.'), 'Die Tabelle zeigt den gespeicherten Stichtag');
         assert(cells[1].includes(entry.reason === 'manual' ? '◇ Unterjährig' : '■ Jahresabschluss'),
@@ -1253,8 +1260,8 @@ async function assertWealthBrowserTable(page, entries) {
     assert(await description.count() === 1, 'Das SVG besitzt genau ein referenziertes Beschreibungselement');
     assert(await description.textContent() === 'Gestapelte Säulen für Liquidität, Geldmarkt-ETF und Aktien-ETF. Jahresabschluss: Quadrat und durchgezogener Rahmen. Unterjährig: Raute und gestrichelter Rahmen. Alle Werte und beide Teildepots stehen in der folgenden Tabelle.',
         'Die vollständige Langbeschreibung ist erhalten');
-    assert(await chart.locator('g').count() === entries.length, 'Jeder Stand besitzt eine eigene Säule');
-    for (const [index, entry] of entries.entries()) {
+    assert(await chart.locator('g').count() === shown.length, 'Jeder Stand besitzt eine eigene Säule');
+    for (const [index, entry] of shown.entries()) {
         const title = await chart.locator('g > title').nth(index).textContent();
         assert(title.includes(entry.asOf.split('-').reverse().join('.')) && title.includes(formatCurrency(entry.total)),
             'Diagramm zeigt Datum und Summe aus derselben bestätigten Datenbasis wie die Tabelle');
