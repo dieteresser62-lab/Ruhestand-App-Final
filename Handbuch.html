@@ -1328,6 +1328,20 @@
                 <div class="manual-grid" style="margin-top: 1.5rem;">
                     <div class="detail-block" id="balance-jahresupdate">
                         <h3>Jahres-Update</h3>
+                        <p><strong>Kurzmeldungen und Aktionsfehler:</strong> Kurzmeldungen in Balance bleiben
+                            sechs Sekunden sichtbar. Eine neue Kurzmeldung ersetzt die vorherige und beginnt eine
+                            eigene Frist; Erfolg und Fehler unterscheiden sich durch Symbol und Form sowie eine
+                            zugängliche Typkennzeichnung. Fehler aus Import, Export, Jahresprozess, Snapshotaktionen
+                            und Ausgaben-Recovery bleiben je Bereich bis zum nächsten tatsächlich begonnenen passenden
+                            Vorgang oder bis <strong>„Schließen“</strong> stehen. Mehrere Bereiche können gleichzeitig
+                            einen Fehler anzeigen. Eingabeänderungen, Berechnungen, Tabwechsel und Erfolgsmeldungen
+                            anderer Bereiche entfernen diese Fehler nicht. Eine Dateiauswahl ohne Importdatei, eine abgebrochene
+                            Bestätigung oder ein abgewiesener Doppelklick setzt sie nicht zurück.</p>
+                        <p><strong>Schließen bestätigt nur das Lesen:</strong> Es repariert keine Daten und führt
+                            keine Wiederherstellung oder Berechnung aus. Befolgen Sie weiterhin den angezeigten
+                            Recovery-Hinweis. Meldungen werden nicht gespeichert und verschwinden nach Reload;
+                            eine erforderliche Recovery ist dadurch nicht erledigt. Berechnungs- und
+                            Eingabevalidierungsfehler mit Feldmarkierungen behalten ihren bisherigen Lebenszyklus.</p>
                         <p>„🌐 Jahres-Update“ und „⭐ Jahresabschluss“ führen in denselben fail-safe,
                             periodengebundenen Abschluss. Der Prozess darf für ein Kalenderjahr nur einmal
                             erfolgreich abgeschlossen werden.</p>
@@ -1428,7 +1442,8 @@
                             Rollback. Im aktiven Verlauf erscheinen die bestätigten Werte sofort; inaktiv aktualisieren
                             sich nur Anzahl und Datum, ohne Diagramm und Tabelle zu erzeugen.
                             <strong>„Stand gesichert“</strong> bestätigt erst dauerhaft gespeicherte manuelle Erfassung
-                            oder einen neuen Jahresstand. Fehler werden im Verlaufspanel gemeldet; ein wiederholter
+                            oder einen neuen Jahresstand. Fehler der Verlaufserfassung werden im Verlaufspanel gemeldet;
+                            ein wiederholter
                             Jahresabschluss bestätigt keinen neuen Stand. Ein Dateidialog ohne Auswahl verändert nichts.
                             Die Tabaktivität wird weder gespeichert noch exportiert.</p>
                         <p>Tabs und Capturetaste lassen sich mit Klick, Enter und Leertaste bedienen. Inaktive Regionen

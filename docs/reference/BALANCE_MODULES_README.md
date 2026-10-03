@@ -137,21 +137,31 @@ interpretiert.
 ---
 
 ## 5. `balance-renderer.js`
-Renderlogik für KPIs, Guardrails, Diagnose, Toasts und Theme-Umschaltung.
+Fassade für KPIs, Guardrails, Diagnose und getrennte Meldungsbereiche.
 
 **Exports:**
 - `initUIRenderer(domRefs, storageManager)`
 - `UIRenderer`
   - `render(ui)` – Hauptdarstellung
-  - `renderMiniSummary(ui)` / `renderDiagnosis(diagnosis)` / `buildDecisionTree(treeData)`
-  - `renderEntnahme(spending)` / `buildEntnahmeDetails(details, kuerzungQuelle)`
-  - `renderMarktstatus(market)` / `buildGuardrails(guardrailData)`
-  - `renderLiquidityBar(percent)` / `renderBedarfAnpassungUI(...)`
-  - `toast(msg, isSuccess)` / `handleError(error)` / `clearError()`
-  - `applyTheme(mode)`
-  - Hilfsfunktionen wie `buildChips`, `buildKeyParams`, `determineInternalCashRebalance`
+  - `renderBedarfAnpassungUI(inputData, persistentState)`
+  - `renderDiagnosis(diagnosis)` / `formatDiagnosisPayload(raw)`
+  - `toast(msg, isSuccess = true)`
+  - `handleError(error)` / `clearError()`
+  - `handleActionError(error, scope)` / `clearActionError(scope)`
 
-**Dependencies:** `balance-utils.js`, `balance-config.js`
+**Dependencies:** `balance-config.js`, `balance-renderer-summary.js`, `balance-renderer-action.js`, `balance-renderer-diagnosis.js`
+
+**Anzeigevertrag:** Die benachbarten Container in `Balance.html` trennen drei Zuständigkeiten:
+
+- `#error-container` (`dom.containers.error`) bleibt für Berechnungs-/Validierungs-, Engine-/Update- und Initialisierungsfehler zuständig. `handleError()` formatiert auch Validierungslisten und markiert Berechnungsfelder; `clearError()` entfernt nur diesen Fehler samt Feldmarkierungen.
+- `#toast-container` (`dom.containers.toast`, `role="status"`, `aria-live="polite"`, `aria-atomic="true"`) zeigt sechssekündige Kurzmeldungen. `.toast-text` enthält den unveränderten Originaltext. Symbol/Form und zugängliche Typkennzeichnung unterscheiden Erfolg und Fehler zusätzlich zur Farbe. Ein neuer Toast ersetzt den bisherigen, storniert seinen Timer und erhält auch bei identischem Text eine neue 6000-ms-Frist. Identität und Containerreferenz schützen vor veralteten Callbacks; ein fehlender Toastcontainer hat keinen Fallback auf den Fehlerkanal.
+- `#action-error-container` (`dom.containers.actionError`, `role="alert"`, `aria-live="assertive"`, `aria-relevant="additions text"`) hält je `scope` einen Eintrag mit `.action-error-text` und zugänglich benanntem `type="button"`-Schließenknopf. Verschiedene Bereiche bleiben gleichzeitig sichtbar; `clearError()`, Updates und Toastablauf entfernen sie nicht. Die gemeinsame Fehlerformatierung erhält Präfixe, Listen, Codes und Recoverytexte. Die Aufrufherkunft entscheidet über den Kanal; Aktionsvalidierung markiert keine Berechnungsfelder.
+
+**Bereichszuständigkeiten:** `balance-import` und `market-csv-import` gehören den Importhandlern, `balance-export` dem JSON-Export; neue Importe setzen ihren Bereich erst mit Datei zurück. `annual` umfasst beide Jahresknöpfe und direkt gestartete Jahres-/Inflations-/ETF-/CAPE-Datenaktionen; angenommene Aktionen setzen ihn nach erforderlicher Bestätigung zurück, ein bereits abgeschlossener Jahres-No-op ebenfalls. Verschachtelte Schritte (`nested`) bereinigen nicht nochmals. `snapshots` umfasst Ordnerverbindung und bestätigtes Restore/Löschen. `expenses-import` beginnt nur mit Datei und gültigem Monats-/Profilziel ohne Korruptionssperre; `expenses-recovery` mit ausführbarem Recovery-Export oder nach Export bestätigtem Reset. Die detaillierten Grenzen stehen in [TECHNICAL.md](TECHNICAL.md#balance-meldungen-anzeige--und-aktionsgrenzen).
+
+Dateiauswahl ohne Importdatei, abgebrochene Bestätigung, irrelevanter Snapshotlistenklick oder abgewiesene Reentranz löschen keinen Fehler. Schließen entfernt nur seinen Eintrag ohne Speicherzugriff, Berechnung oder Recovery; veraltete Knöpfe entfernen keine neueren Fehler. Meldungen sind reiner Text, lange Texte umbrechen mobil, Toasts und Aktionsfehler sind im Druck ausgeblendet. Timer, Toastidentität und Aktionsfehler-Map sind flüchtig; `initUIRenderer()` storniert Timer und leert alte/neue Meldungscontainer sowie die Map. Kein Meldungszustand wird gespeichert oder exportiert. Profil-Recovery in `balance-expenses.js` bleibt im bisherigen Fehlerkanal; `#wealthHistoryStatus` bleibt eine eigene Verlaufsmeldung.
+
+**Dateievent-Guard:** `UIBinder.handleFormInput()` und `handleFormChange()` in `balance-binder.js` ignorieren `target.type === 'file'` vor Metadaten, Eingabe-Side-Effects und `debouncedUpdate()`. Importhandler behalten ihre bestehenden Import-/Registry-/Rollbackwirkungen; normale Eingaben bleiben entprellt. Es entsteht kein neues Fachmodul, und Engine, Datenmodell sowie andere Seiten ändern sich dadurch nicht.
 
 **Helper-Module (ausgelagert):**
 - `balance-renderer-summary.js` – KPIs, Marktstatus, Liquiditätsbalken
