@@ -1470,14 +1470,17 @@
                         <p>Tabs und Capturetaste lassen sich mit Klick, Enter und Leertaste bedienen. Inaktive Regionen
                             fehlen aus Tab-Reihenfolge und Zugänglichkeitsbaum; im aktiven Verlauf folgen Diagramm und
                             Tabelle direkt auf die Capturetaste und scrollen intern, ohne die Formularspalte zu verbreitern.
-                            Ab 1366 px Fensterbreite stehen alle vier Haupttabs vollständig in einer Zeile; in schmaleren Fenstern
+                            Ab 1366 CSS-Pixeln Fensterbreite stehen alle vier Haupttabs vollständig in einer Zeile; in schmaleren Fenstern
                             umbrechen sie als ganze Tabs, und die Capturetaste bleibt erreichbar.
                             Die Ausgabentabelle behält ihre Mindestbreite von 720 px.</p>
                         <p><strong>Ausgaben je Jahr:</strong> Die lesende Übersicht zeigt Jahressumme,
                             Monate mit Daten und Ø pro Monat über alle gespeicherten Profile, unabhängig von der
-                            aktuellen Verbundauswahl. Monate mit Daten sind Monate mit positiven Ausgaben;
-                            Nullimporte zählen nicht, bleiben aber als Nulljahr sichtbar. Reine Auswahljahre
-                            ohne Importe erscheinen nicht. Das laufende Teiljahr ist textlich markiert.
+                            aktuellen Verbundauswahl. Jeder Kalendermonat mit positiven Ausgaben zählt einmal,
+                            auch bei Importen mehrerer Profile. Ø pro Monat ist die Jahressumme geteilt durch
+                            diese Monatszahl, bei null Datenmonaten 0. Nullimporte zählen nicht, bleiben aber
+                            als Nulljahr sichtbar. Reine Auswahljahre ohne Importe erscheinen nicht.
+                            Nur das aktuelle Kalenderjahr mit weniger als zwölf Datenmonaten ist als
+                            „laufendes Teiljahr“ textlich markiert.
                             Vergleichen Sie unvollständige Jahre anhand von Ø pro Monat, ohne Hochrechnung.
                             Historische Jahresbudgets werden nicht gespeichert und sind nicht verlässlich
                             rekonstruierbar; deshalb gibt es keine Budget- oder Abweichungsspalten.</p>
@@ -1493,8 +1496,11 @@
                             manuellen Vorschau, einschließlich aller beitragenden Verbundprofile; gespeichert wird
                             beim aktiven Profil, weiterhin mit dem Anlass <code>manual</code> („Unterjährig“).</p>
                         <p>Alle beitragenden Aktien- und Geldmarkt-ETF brauchen belegte, höchstens sieben Tage alte Kurse.
-                            <strong>„Kurse aktualisieren“ im Profil-Assets-Manager</strong> speichert das Kursdatum jeder
-                            erfolgreich bewerteten Tranche. Altdaten ohne Datum oder manuell geänderte Preise sind bis
+                            <strong>„Kurse aktualisieren“ im Profil-Assets-Manager</strong> speichert den vom Kursdienst
+                            gelieferten Kurszeitpunkt (<code>asOf</code>) zusammen mit dem Preis jeder erfolgreich
+                            bewerteten Tranche. Erst bestätigte Speicherung macht den Nachweis nach Rückkehr zur
+                            Balance und nach Reload verfügbar; ein Teilupdate genügt nur, wenn alle beitragenden
+                            ETF-Kurse belegt und frisch sind. Altdaten ohne Datum oder manuell geänderte Preise sind bis
                             zu einem erfolgreichen Kursupdate unbekannt. Das Datum des Strategie-ETF ersetzt diesen
                             Nachweis nicht. Tagesgeld wird nicht auf Aktualität geprüft; ohne kursabhängige Bestände
                             wird direkt gesichert. Bei alten oder unbekannten Kursen zeigt die App einen Hinweis:
@@ -1503,7 +1509,9 @@
                             Vorschau- oder Speicherfehler bleiben als Ausgaben-Aktionsfehler stehen;
                             nur bestätigte Vermögensstände erscheinen im Verlauf. Erfolg, Hinweis und Fehler behalten
                             den aktiven Tab bei. Die manuelle Erfassung bleibt ohne automatische Frischeprüfung verfügbar.</p>
-                        <p>Beim Drucken der Balance-Seite wird die Auswertung nicht ausgegeben.</p>
+                        <p>Auf schmalen Ansichten bleiben alle Tabs, „Stand jetzt erfassen“ und die internen
+                            Scrollregionen erreichbar; der Diagnose-Drawer lässt sich wie bisher öffnen und schließen.
+                            Beim Drucken der Balance-Seite wird die Auswertung mit der Formularspalte nicht ausgegeben.</p>
                         <p>Im Tab „Auswertung“ speichert <strong>„Stand jetzt erfassen“</strong> die aktuellen,
                             frisch geprüften Balance-Bestände. Ein erneuter Klick am selben lokalen Kalendertag
                             ersetzt den manuellen Stand; an einem anderen Tag kommt ein Stand hinzu. Normale
