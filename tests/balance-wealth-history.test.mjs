@@ -9,7 +9,7 @@ import { StorageManager } from '../app/balance/balance-storage.js';
 import { UIRenderer } from '../app/balance/balance-renderer.js';
 import { UIReader } from '../app/balance/balance-reader.js';
 import { createBalanceExportDocument } from '../app/balance/balance-binder-imports.js';
-import { refreshBalanceWealthHistory } from '../app/balance/balance-wealth-history-renderer.js';
+import { refreshBalanceWealthHistory, toggleBalanceWealthHistory } from '../app/balance/balance-wealth-history-renderer.js';
 import { PROFILE_STORAGE_KEYS } from '../app/profile/profile-state.js';
 import {
     PersistenceFacade, persistenceStorage, resetPersistenceForTests,
@@ -24,6 +24,16 @@ const SOURCE = { tagesgeld: 12000, geldmarktEtf: 23000, depotwertAlt: 34000, dep
 const RESULT = { ok: true, inputData: SOURCE, modelResult: { newState: { tagesgeld: 999999 } } };
 const manual = createManualWealthHistoryEntry(SOURCE, '2026-06-01');
 const reference = new Date(2027, 0, 15, 12);
+
+function historyDom(open = false) {
+    return {
+        details: { hidden: !open },
+        toggle: { textContent: '', setAttribute() {} },
+        count: { textContent: '' }, chart: { innerHTML: '' }, table: { innerHTML: '' },
+        hint: { textContent: '' }, status: { textContent: '' }
+    };
+}
+
 
 function deferred() {
     let resolve;
@@ -96,9 +106,10 @@ async function setup() {
         expenses: { yearSelect: { value: '2026' } },
         outputs: { snapshotList: {} }, controls: { snapshotStatus: {} }
     };
-    const counts = { commits: 0, updates: 0, renders: 0 };
+    const counts = { commits: 0, updates: 0, renders: 0, confirmations: 0 };
     const createHandlers = (overrides = {}) => createSnapshotHandlers({
         dom, appState: { snapshotHandle: null }, wealthHistory: service,
+        onAnnualWealthSaved: () => { counts.confirmations += 1; },
         getReferenceDate: () => reference,
         getLegacyDecision: () => 'not_committed',
         validateLiveState: () => RESULT,
@@ -264,6 +275,7 @@ try {
         const dom = {
             ...env.dom,
             controls: Object.fromEntries(['resetBtn', 'copyAction', 'btnJahresUpdate', 'btnNachruecken', 'btnUndoNachruecken', 'btnCsvImport', 'csvFileInput', 'jahresabschlussBtn', 'connectFolderBtn', 'captureWealthBtn'].map(key => [key, element()])),
+            wealthHistory: { ...historyDom(), toggle: { ...element(), setAttribute() {} } },
             outputs: { snapshotList: element() },
             containers: { form: element(), tabButtons: element(), bedarfAnpassung: element() },
             diagnosis: Object.fromEntries(['drawer', 'overlay', 'openBtn', 'closeBtn', 'copyBtn', 'filterToggle'].map(key => [key, element()]))
@@ -276,6 +288,13 @@ try {
         initialize(); UIBinder.bindUI(); UIBinder.bindUI();
         initialize(); UIBinder.bindUI();
         assertEqual(dom.controls.captureWealthBtn.listeners.click.length, 1, 'Genau ein Capture-Listener trotz erneuter Bindung');
+        assertEqual(dom.wealthHistory.toggle.listeners.click.length, 1, 'Genau ein Toggle-Listener trotz erneuter Bindung');
+        const persistedBeforeToggle = env.store.get(STATE);
+        dom.wealthHistory.toggle.listeners.click[0]();
+        dom.wealthHistory.toggle.listeners.click[0]();
+        assert(dom.wealthHistory.details.hidden, 'Zweiter Klick schließt');
+        assertEqual(previews, 0, 'Umschalten startet kein Engineupdate');
+        assertEqual(env.store.get(STATE), persistedBeforeToggle, 'Umschalten ohne Write');
         binderState.debounceTimer = setTimeout(() => { throw new Error('Der alte Timer darf nicht laufen'); }, 10000);
         await dom.controls.captureWealthBtn.listeners.click[0]();
         assertEqual(previews, 1, 'Ein Klick erzeugt nur eine Erfassung');
@@ -283,30 +302,52 @@ try {
         assertEqual(debounceResumed, 1, 'Inputpersistenz nach bestätigter Erfassung wieder eingeplant');
     }
 
-    console.log('Realer Import ohne Historie und Import-Rollback aktualisieren die Ansicht aus dem aktuellen State');
-    for (const rollback of [false, true]) {
+    console.log('Reale Importe schließen vor dem Lesen, auch bei Ablehnung und Rollback');
+    for (const kind of ['legacy', 'history', 'reject', 'rollback']) {
         const env = await setup();
-        env.dom.wealthHistory = { chart: { innerHTML: '' }, table: { innerHTML: '' }, hint: { textContent: '' }, status: { textContent: 'Früherer Erfolg' } };
+        env.dom.wealthHistory = historyDom(true);
         refreshBalanceWealthHistory(env.dom.wealthHistory);
         const previousChart = env.dom.wealthHistory.chart.innerHTML;
-        assert(previousChart.includes('<svg'), 'Import startet mit dargestellter Profilhistorie');
+        const errors = [];
+        UIRenderer.handleError = error => { errors.push(error); };
         UIReader.applyStoredInputs = () => {};
         initUIBinder(env.dom, {}, request => {
+            assert(env.dom.wealthHistory.details.hidden, 'Importupdate erhält geschlossene Ansicht');
             refreshBalanceWealthHistory(env.dom.wealthHistory);
-            return rollback && request.mode === BALANCE_UPDATE_MODE.PERSIST_INPUTS ? { ok: false } : RESULT;
+            return kind === 'rollback' && request.mode === BALANCE_UPDATE_MODE.PERSIST_INPUTS ? { ok: false } : RESULT;
         }, () => {});
-        const doc = createBalanceExportDocument({ inputs: { aktuellesAlter: 67, floorBedarf: 24000, flexBedarf: 12000, ...SOURCE }, lastState: { cumulativeInflationFactor: 1 } });
-        await UIBinder.handleImport({ target: { value: 'datei', files: [{ text: async () => JSON.stringify(doc) }] } });
-        if (rollback) {
-            assertEqual(env.dom.wealthHistory.chart.innerHTML, previousChart, 'Rollback stellt auch den sichtbaren Verlauf wieder her');
-            assertEqual(StorageManager.loadState().wealthHistory.entries.length, 1, 'Rollback bewahrt bisherigen Verlauf');
+        await UIBinder.handleImport({ target: { files: [] } });
+        assert(!env.dom.wealthHistory.details.hidden, 'Dateidialog ohne Auswahl wirkungslos');
+        const imported = createManualWealthHistoryEntry({ ...SOURCE, tagesgeld: 42 }, '2026-08-01');
+        const doc = createBalanceExportDocument({
+            inputs: { aktuellesAlter: 67, floorBedarf: 24000, flexBedarf: 12000, ...SOURCE },
+            lastState: { cumulativeInflationFactor: 1 },
+            ...(kind === 'history' ? { wealthHistory: { schemaVersion: 1, entries: [imported] } } : {})
+        });
+        await UIBinder.handleImport({ target: { value: 'datei', files: [{ text: async () => {
+            assert(env.dom.wealthHistory.details.hidden, 'Vor erstem Dateilesen geschlossen');
+            return kind === 'reject' ? '{ungueltig' : JSON.stringify(doc);
+        } }] } });
+        assert(env.dom.wealthHistory.details.hidden, 'Import bleibt bei jedem Ergebnis geschlossen');
+        assertEqual(env.dom.wealthHistory.chart.innerHTML + env.dom.wealthHistory.table.innerHTML, '', 'Import hinterlässt keine alten Inhalte');
+        assertEqual(env.dom.wealthHistory.status.textContent, '', 'Vorherige Erfassungsbestätigung entfernt');
+        if (kind === 'rollback' || kind === 'reject') {
+            assertEqual(StorageManager.loadState().wealthHistory.entries.length, 1, 'Fehler bewahrt bisherigen Verlauf');
+            assert(errors.length > 0, 'Importfehler bleibt gemeldet');
+            toggleBalanceWealthHistory(env.dom.wealthHistory);
+            assertEqual(env.dom.wealthHistory.chart.innerHTML, previousChart, 'Wiederöffnen zeigt endgültige Rollbackdaten');
+        } else if (kind === 'history') {
+            assertEqual(env.dom.wealthHistory.count.textContent, '1 Stand', 'Importierte Anzahl aktualisiert');
+            toggleBalanceWealthHistory(env.dom.wealthHistory);
+            assert(env.dom.wealthHistory.table.innerHTML.includes('01.08.2026'), 'Wiederöffnen zeigt nur importierte Historie');
+            assertEqual(JSON.stringify(StorageManager.loadState().wealthHistory.entries), JSON.stringify([imported]), 'Replace übernimmt exakt den Import');
         } else {
-            assertEqual(env.dom.wealthHistory.chart.innerHTML + env.dom.wealthHistory.table.innerHTML, '', 'Import ohne Historie entfernt Chart und Tabelle tatsächlich');
-            assert(env.dom.wealthHistory.hint.textContent.includes('Noch keine Stände'), 'Import zeigt Legacy-Leerhinweis');
-            assert(!Object.hasOwn(StorageManager.loadState(), 'wealthHistory'), 'Import mischt keine alte Historie in den neuen State');
+            assert(!Object.hasOwn(StorageManager.loadState(), 'wealthHistory'), 'Legacy mischt keine alte Historie bei');
+            toggleBalanceWealthHistory(env.dom.wealthHistory);
+            assert(env.dom.wealthHistory.hint.textContent.includes('Noch keine Stände'), 'Legacy-Leerhinweis nach Öffnen');
         }
-        assertEqual(env.dom.wealthHistory.status.textContent, '', 'Import entfernt eine vorherige Erfassungsbestätigung');
     }
+    UIRenderer.handleError = () => {};
     UIReader.applyStoredInputs = previous.applyInputs;
 
     console.log('Reale Verbund-/Tranchenaggregation liefert die Quelle trotz abweichender Felder und Simulation');
@@ -383,6 +424,7 @@ try {
         });
         const failed = await handler.handleJahresabschluss();
         assertEqual(failed.status, 'incomplete_recovery', `${fault}: kein falscher Erfolg`);
+        assertEqual(env.counts.confirmations, 0, 'Fehlgeschlagener Abschluss bestätigt keinen Stand');
         const state = StorageManager.loadState();
         assertEqual(JSON.stringify(state.wealthHistory), JSON.stringify(env.initialState.wealthHistory), `${fault}: vorheriger Verlauf erhalten`);
         assertEqual(state.annualPeriodMetadata.lastCommittedPeriod, null, `${fault}: kein finaler Periodenmarker`);
@@ -425,6 +467,7 @@ try {
         gate.resolve();
         assertEqual((await first).status, 'already_committed', 'Erster Knopf schließt ab');
         assertEqual((await handler.handleJahresabschluss()).status, 'already_committed', 'Zweiter Knopf bleibt ein No-op');
+        assertEqual(env.counts.confirmations, 1, 'No-op bestätigt keinen neuen Stand');
         assertEqual(env.counts.commits, 1, 'Beide Knöpfe erzeugen nur einen Engine-Commit');
     }
 
@@ -504,6 +547,48 @@ try {
         assertEqual(persistenceStorage.getItem(STATE), foreign, 'Manueller Write lässt fremden Live-State unverändert');
     }
 
+    console.log('Offene und geschlossene Erfassung aktualisieren die bestätigte Datenbasis ohne Zustandswechsel');
+    for (const open of [false, true]) {
+        const env = await setup();
+        const view = historyDom(open);
+        let current = { ...SOURCE, tagesgeld: 42 };
+        const ui = manualController(env, {
+            status: view.status,
+            update: () => ({ ...RESULT, inputData: current }),
+            refresh: () => refreshBalanceWealthHistory(view)
+        });
+        for (const amount of [42, 99]) {
+            current = { ...SOURCE, tagesgeld: amount };
+            await ui.controller.capture();
+            assertEqual(view.status.textContent, 'Stand gesichert', 'Kurze Bestätigung nach Readback');
+            assertEqual(view.details.hidden, !open, 'Erfassung erhält Sichtbarkeit');
+            assertEqual(view.count.textContent, '2 Stände', 'Tagesersetzung zählt nicht doppelt');
+            if (open) assert(view.table.innerHTML.includes(amount.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })), 'Offene Tabelle zeigt neuen Tageswert');
+            else assertEqual(view.chart.innerHTML + view.table.innerHTML, '', 'Geschlossene Erfassung ohne Inhalte');
+        }
+        const tomorrow = manualController(env, { now: () => new Date(2027, 0, 1), refresh: () => refreshBalanceWealthHistory(view) });
+        await tomorrow.controller.capture();
+        const annual = env.createHandlers({ onAnnualWealthSaved: () => {
+            assertEqual(env.store.get(STATE), JSON.parse(env.store.get(REGISTRY)).profiles.a.data[STATE], 'Bestätigung erst nach State-/Registry-Readback');
+            view.status.textContent = 'Stand gesichert';
+        } });
+        await ui.controller.withAnnual(() => annual.handleJahresabschluss());
+        assertEqual(view.details.hidden, !open, 'Jahresabschluss erhält Sichtbarkeit');
+        assertEqual(view.count.textContent, '4 Stände', 'Zusätzlicher Tag und Jahresstand gezählt');
+        if (open) assert(view.chart.innerHTML.includes('Jahresabschluss') && view.table.innerHTML.includes('01.01.2027'), 'Offene Darstellung zeigt Tag und Jahresstand');
+        else assertEqual(view.chart.innerHTML + view.table.innerHTML, '', 'Geschlossener Jahresabschluss ohne Inhalte');
+        await ui.controller.withAnnual(() => annual.handleJahresabschluss());
+        assertEqual(view.status.textContent, '', 'Jahres-No-op ohne neue Erfolgsmeldung');
+    }
+    {
+        const env = await setup();
+        const handler = env.createHandlers({ onAnnualWealthSaved: () => { throw new Error('UI-Rückruf fehlgeschlagen'); } });
+        assertEqual((await handler.handleJahresabschluss()).status, 'already_committed', 'UI-Rückruffehler nach Readback bleibt abgeschlossener Commit');
+        assertEqual(StorageManager.loadState().annualPeriodMetadata.pendingCommit, null, 'Kein falscher Recoverymarker');
+        assertEqual((await handler.handleJahresabschluss()).status, 'already_committed', 'Wiederholung bleibt No-op');
+        assertEqual(env.counts.commits, 1, 'Kein zweiter Commit nach UI-Rückruffehler');
+    }
+
     console.log('Abschluss vor 2026 behält seinen Vertrag ohne Record; Renderfehler ändern bestätigten Erfolg nicht');
     {
         const env = await setup();
@@ -512,6 +597,7 @@ try {
             rollExpensesYearFn: () => 2026
         });
         assertEqual((await handler.handleJahresabschluss()).status, 'already_committed', 'Legacy-Jahr weiterhin abschließbar');
+        assertEqual(env.counts.confirmations, 0, 'Vor 2026 keine Verlaufsbestätigung');
         assertEqual(StorageManager.loadState().wealthHistory.entries.length, 1, 'Vor 2026 kein Jahresrecord');
         assertEqual(StorageManager.loadState().annualPeriodMetadata.lastCommittedPeriod, 'calendar-year:2025', 'Legacy-Periodenvertrag erhalten');
     }

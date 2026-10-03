@@ -21,6 +21,9 @@
 
 /* Base Layout */
 .wealth-history { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border-color); min-width: 0; }
+.wealth-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.wealth-actions .btn { max-width: 100%; white-space: normal; }
+#wealthHistoryDetails[hidden] { display: none !important; }
 .wealth-history p { font-size: .9rem; line-height: 1.5; }
 .wealth-legend { display: flex; flex-wrap: wrap; gap: 12px; list-style: none; padding: 0; font-size: .85rem; }
 .wealth-swatch { display: inline-block; width: 12px; height: 12px; margin-right: 5px; }

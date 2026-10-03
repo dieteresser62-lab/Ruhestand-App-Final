@@ -30,7 +30,7 @@ import { getPersistenceStatus, init as initPersistence } from '../shared/persist
 import { PROFILE_VALUE_KEYS } from '../profile/profile-state.js';
 import { postprocessBalanceAction } from './balance-action-postprocessor.js';
 import { ANNUAL_MARKET_DATA_META_KEY } from './balance-annual-marketdata.js';
-import { refreshBalanceWealthHistory } from './balance-wealth-history-renderer.js';
+import { initializeBalanceWealthHistory, refreshBalanceWealthHistory } from './balance-wealth-history-renderer.js';
 import {
     BALANCE_UPDATE_MODE,
     BALANCE_UPDATE_STATUS,
@@ -131,6 +131,9 @@ const dom = {
         keyParams: document.getElementById('diag-key-params')
     },
     wealthHistory: {
+        details: document.getElementById('wealthHistoryDetails'),
+        toggle: document.getElementById('toggleWealthHistoryBtn'),
+        count: document.getElementById('wealthHistoryCount'),
         chart: document.getElementById('wealthHistoryChart'),
         table: document.getElementById('wealthHistoryTable'),
         hint: document.getElementById('wealthHistoryHint'),
@@ -491,6 +494,8 @@ export async function init() {
     document.querySelectorAll('input, select').forEach(el => {
         if (el.id) dom.inputs[el.id] = el;
     });
+
+    initializeBalanceWealthHistory(dom.wealthHistory);
 
     // 4. Initialize all modules with their dependencies
     // Dependency Injection Pattern: Jedes Modul erhält seine Abhängigkeiten

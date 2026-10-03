@@ -164,7 +164,7 @@ export function createManualWealthHistoryController({ service, update, refresh, 
                 await service.captureManual({ result, asOf });
                 service.assertContext(context);
                 refresh();
-                message('Aktueller Stand dauerhaft gespeichert.');
+                message('Stand gesichert');
                 toast('Aktueller Vermögensstand gespeichert.');
                 return { status: 'saved' };
             } catch (error) {

@@ -69,6 +69,7 @@ export function createSnapshotHandlers({
     runAnnualUpdate = async () => ({ ok: true }),
     validateLiveState = () => ({ ok: true }),
     wealthHistory = createBalanceWealthHistoryService(),
+    onAnnualWealthSaved = () => {},
     getReferenceDate = () => new Date(),
     getTargetYear = () => {
         const selectedYear = Number(dom.expenses?.yearSelect?.value);
@@ -219,6 +220,8 @@ export function createSnapshotHandlers({
                     }
                 }
                 completedResult = completed;
+                // UI-Fehler nach bestätigtem Write dürfen keine Recovery behaupten.
+                if (planning.plan.targetYear >= 2026) onAnnualWealthSaved();
 
                 UIRenderer.toast(`Ausgaben-Check auf ${nextYear} umgestellt.`);
                 await StorageManager.renderSnapshots(dom.outputs.snapshotList, dom.controls.snapshotStatus, appState.snapshotHandle);

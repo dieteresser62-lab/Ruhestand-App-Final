@@ -24,7 +24,7 @@ import { createSnapshotHandlers } from './balance-binder-snapshots.js';
 import { PersistenceFacade } from '../shared/persistence-facade.js';
 import { BALANCE_UPDATE_MODE } from './balance-update-pipeline.js';
 import { createBalanceWealthHistoryService, createManualWealthHistoryController } from './balance-wealth-history.js';
-import { refreshBalanceWealthHistory } from './balance-wealth-history-renderer.js';
+import { closeBalanceWealthHistory, toggleBalanceWealthHistory, refreshBalanceWealthHistory } from './balance-wealth-history-renderer.js';
 
 // Module-level references
 let dom = null;
@@ -59,6 +59,9 @@ export function initUIBinder(domRefs, state, updateFn, debouncedUpdateFn) {
     const wealthHistory = createBalanceWealthHistoryService();
     const snapshots = createSnapshotHandlers({
         wealthHistory,
+        onAnnualWealthSaved: () => {
+            if (dom.wealthHistory?.status) dom.wealthHistory.status.textContent = 'Stand gesichert';
+        },
         dom,
         appState,
         debouncedUpdate,
@@ -107,6 +110,11 @@ export const UIBinder = {
         if (captureButton && !wealthButtonsBound.has(captureButton)) {
             captureButton.addEventListener('click', () => this.handleCaptureWealth());
             wealthButtonsBound.add(captureButton);
+        }
+        const toggleButton = dom.wealthHistory?.toggle;
+        if (toggleButton && !wealthButtonsBound.has(toggleButton)) {
+            toggleButton.addEventListener('click', () => toggleBalanceWealthHistory(dom.wealthHistory));
+            wealthButtonsBound.add(toggleButton);
         }
         // Keyboard shortcuts
         document.addEventListener('keydown', this.handleKeyboardShortcuts.bind(this));
@@ -241,8 +249,11 @@ export const UIBinder = {
     },
 
     async handleImport(e) {
+        if (!e?.target?.files?.[0]) return;
+        closeBalanceWealthHistory(dom.wealthHistory);
         try { return await handlers.imports.handleImport(e); }
         finally {
+            closeBalanceWealthHistory(dom.wealthHistory);
             if (dom.wealthHistory?.status) dom.wealthHistory.status.textContent = '';
             refreshBalanceWealthHistory(dom.wealthHistory);
         }
