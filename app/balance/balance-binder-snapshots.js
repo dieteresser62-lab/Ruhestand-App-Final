@@ -107,6 +107,7 @@ export function createSnapshotHandlers({
             let metadata;
             let commitStarted = false;
             let completedResult;
+            let annualWealthSaved = false;
             let context;
             let targetYear;
             let referenceDate;
@@ -211,6 +212,7 @@ export function createSnapshotHandlers({
                         metadata: completed.metadata,
                         expectedPending: metadata
                     });
+                    annualWealthSaved = true;
                 } else {
                     try {
                         await persistMetadata(completed.metadata, context);
@@ -221,9 +223,8 @@ export function createSnapshotHandlers({
                 }
                 completedResult = completed;
                 // UI-Fehler nach bestätigtem Write dürfen keine Recovery behaupten.
-                if (planning.plan.targetYear >= 2026) onAnnualWealthSaved();
-
-                UIRenderer.toast(`Ausgaben-Check auf ${nextYear} umgestellt.`);
+                UIRenderer.toast(`Ausgaben-Check auf ${nextYear} umgestellt.${annualWealthSaved ? ' Vermögensstand gesichert.' : ''}`);
+                if (annualWealthSaved) onAnnualWealthSaved();
                 await StorageManager.renderSnapshots(dom.outputs.snapshotList, dom.controls.snapshotStatus, appState.snapshotHandle);
                 return completed;
             };

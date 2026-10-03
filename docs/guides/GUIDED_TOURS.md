@@ -93,7 +93,7 @@
 ### Schritt 5: Bedarf festlegen
 
 1. Öffne **Balance.html** (Klick auf "Balance-App" in der Navigation)
-2. Gehe zum Tab **"Grundeinstellungen & Strategie"**
+2. Gehe zum Tab **"Einstellungen & Strategie"**
 3. Erfasse:
 
 | Feld | Beschreibung | Beispiel |
@@ -226,7 +226,7 @@ Mit aktiviertem Profilverbund zeigt die Balance-App:
 
 ### Schritt 4: Entnahme-Verteilung wählen
 
-Im Tab **"Grundeinstellungen & Strategie"**:
+Im Tab **"Einstellungen & Strategie"**:
 
 | Modus | Beschreibung | Wann sinnvoll |
 |-------|--------------|---------------|

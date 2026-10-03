@@ -1413,23 +1413,32 @@
                     </div>
                     <div class="detail-block" id="balance-vermoegensverlauf">
                         <h3>Vermögensverlauf</h3>
-                        <p>Der Bereich startet <strong>zugeklappt</strong>. Neben „Stand jetzt erfassen“ steht
-                            <strong>„Verlauf anzeigen“</strong> und bei vorhandenen Ständen deren Anzahl.
-                            Anzeigen öffnet Beschreibung, Legende, Diagramm und Tabelle aus den aktuellen
-                            gespeicherten Daten, ohne einen Stand zu erfassen. „Verlauf ausblenden“ schließt
-                            die Details. Auch eine leere Historie lässt sich öffnen und zeigt einen erklärenden Hinweis.</p>
-                        <p>Erfassen behält den Anzeigezustand bei: Offen erscheinen die neuen bestätigten Werte,
-                            geschlossen aktualisiert sich nur die Anzahl. <strong>„Stand gesichert“</strong>
-                            bestätigt erst die dauerhaft gespeicherte manuelle Erfassung oder einen neuen Jahresstand.
-                            Fehler bleiben auch zugeklappt sichtbar; ein wiederholter Jahresabschluss bestätigt keinen
-                            neuen Stand. Reload, Profilwechsel und Balance-Import mit ausgewählter Datei schließen
-                            die Ansicht, auch bei Ablehnung oder erfolgreichem Rollback. Ein Dateidialog ohne Auswahl
-                            verändert die Ansicht nicht. Der Aufklappzustand wird weder gespeichert noch exportiert.</p>
-                        <p>Beide Knöpfe lassen sich mit Klick, Enter und Leertaste bedienen. Geschlossene Details
-                            fehlen aus Tab-Reihenfolge und Zugänglichkeitsbaum; offen folgen Diagramm und Tabelle
-                            auf den Umschaltknopf. Wird bei einem Import geschlossen, kehrt ein Fokus aus dem
-                            Detailbereich zum Umschaltknopf zurück. Bei schmalen Ansichten brechen die Knöpfe um.</p>
-                        <p>Im Ergebnisbereich speichert <strong>„Stand jetzt erfassen“</strong> die aktuellen,
+                        <p><strong>„Vermögensverlauf“ ist der vierte Haupttab</strong> nach „Jahres-Update“,
+                            „Einstellungen &amp; Strategie“ und „Ausgaben-Check“. Start, Reload und Profilwechsel
+                            öffnen immer „Jahres-Update“. Aktivieren zeigt Beschreibung, Legende, Diagramm und Tabelle
+                            aus den aktuellen gespeicherten Daten, ohne einen Stand zu erfassen. Verlassen entfernt
+                            die dynamischen Inhalte. Auch eine leere Historie zeigt beim Öffnen einen erklärenden Hinweis.</p>
+                        <p>Im Verlaufstab bilden „Stand jetzt erfassen“, die Anzahl und das Datum eine gemeinsame
+                            Aktionszeile, die auf schmalen Ansichten umbrechen darf. Das Datum lautet
+                            <strong>„Zuletzt erfasst am TT.MM.JJJJ“</strong> für den größten gespeicherten Stichtag.
+                            Fehlende oder leere Historie zeigt exakt <strong>„Noch keine Stände erfasst“</strong>.
+                            Das Datum folgt dem Stichtag, nicht der letzten Bedienung; eine spätere Erfassung mit älterem
+                            Stichtag verringert es nicht. Beschädigte Historie hinterlässt kein altes Datum.</p>
+                        <p>Erfassen und Balance-Importe behalten den aktiven Tab bei, auch bei Ablehnung oder erfolgreichem
+                            Rollback. Im aktiven Verlauf erscheinen die bestätigten Werte sofort; inaktiv aktualisieren
+                            sich nur Anzahl und Datum, ohne Diagramm und Tabelle zu erzeugen.
+                            <strong>„Stand gesichert“</strong> bestätigt erst dauerhaft gespeicherte manuelle Erfassung
+                            oder einen neuen Jahresstand. Fehler werden im Verlaufspanel gemeldet; ein wiederholter
+                            Jahresabschluss bestätigt keinen neuen Stand. Ein Dateidialog ohne Auswahl verändert nichts.
+                            Die Tabaktivität wird weder gespeichert noch exportiert.</p>
+                        <p>Tabs und Capturetaste lassen sich mit Klick, Enter und Leertaste bedienen. Inaktive Regionen
+                            fehlen aus Tab-Reihenfolge und Zugänglichkeitsbaum; im aktiven Verlauf folgen Diagramm und
+                            Tabelle direkt auf die Capturetaste und scrollen intern, ohne die Formularspalte zu verbreitern.
+                            Ab 1440 px Fensterbreite stehen alle vier Haupttabs vollständig in einer Zeile; in schmaleren Fenstern
+                            umbrechen sie als ganze Tabs, und die Capturetaste bleibt erreichbar.
+                            Die Ausgabentabelle behält ihre Mindestbreite von 720 px.</p>
+                        <p>Beim Drucken der Balance-Seite wird der Vermögensverlauf nicht ausgegeben.</p>
+                        <p>Im Verlaufstab speichert <strong>„Stand jetzt erfassen“</strong> die aktuellen,
                             frisch geprüften Balance-Bestände. Ein erneuter Klick am selben lokalen Kalendertag
                             ersetzt den manuellen Stand; an einem anderen Tag kommt ein Stand hinzu. Normale
                             Eingabeänderungen und Vorschauen erfassen nichts automatisch. Die Erfassung führt
@@ -1449,6 +1458,15 @@
                             Balance-Beständen. Ein wiederholter Abschluss erzeugt keinen zweiten Stand. Der Verlauf
                             beginnt 2026: Manuelle Stände sind ab 2026 möglich, der erste automatische Stand für
                             2026 entsteht beim Abschluss 2027. Frühere Jahre werden nicht rückgerechnet.</p>
+                        <p>Nur ein neuer Jahresstand ab 2026 ergänzt die Kurzmeldung um
+                            <strong>„Vermögensstand gesichert.“</strong>, zum Beispiel
+                            „Ausgaben-Check auf 2027 umgestellt. Vermögensstand gesichert.“.
+                            Die Meldung folgt erst dem erfolgreichen Zurücklesen des dauerhaft gespeicherten
+                            Balance-Stands und seiner aktiven Profilkopie und erscheint vor der Rückmeldung im
+                            Verlauf, auch wenn dieser Tab inaktiv ist. Wiederholung, fehlgeschlagene Finalisierung
+                            und Jahre vor 2026 erhalten keinen Zusatz. Fehler der anschließenden Anzeige lassen
+                            den bestätigten Abschluss bestehen und erlauben keinen zweiten Abschluss;
+                            bei einem Fehler der Kurzmeldung selbst kann diese sichtbar ausbleiben.</p>
                         <p><strong>Sicherung und Recovery:</strong> Balance-JSON, Profilbundle, Komplettbackup und
                             interne Snapshots enthalten den Verlauf. Unterstützte ältere Importe ohne Verlauf
                             ersetzen ihn durch eine leere Historie. Restore setzt ihn auf den damaligen Snapshotstand
