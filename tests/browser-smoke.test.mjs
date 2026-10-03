@@ -202,11 +202,15 @@ async function createPage(browser, label, options = {}) {
         window.prompt = () => 'offen';
         window.__browserSmokeMessages = [];
         addEventListener('DOMContentLoaded', () => {
-            const target = document.getElementById('error-container');
-            if (!target) return;
-            new MutationObserver(() => {
-                if (target.textContent) window.__browserSmokeMessages.push(target.textContent);
-            }).observe(target, { childList: true, subtree: true, characterData: true });
+            for (const id of ['error-container', 'toast-container']) {
+                const target = document.getElementById(id);
+                if (!target) continue;
+                new MutationObserver(() => {
+                    const text = id === 'toast-container'
+                        ? target.querySelector('.toast-text')?.textContent : target.textContent;
+                    if (text) window.__browserSmokeMessages.push(text);
+                }).observe(target, { childList: true, subtree: true, characterData: true });
+            }
         });
     }, options.storage || {});
     if (options.observeWealthUpdates) {
@@ -1343,6 +1347,33 @@ async function runBalanceWealthHistory(browser, baseUrl) {
 async function runBalanceAnnualCommit(browser, baseUrl) {
     // Zwei frisch initialisierte Profile: jeweils ein echter neuer Jahresabschluss.
     for (const open of [false, true]) await runBalanceAnnualCommitScenario(browser, baseUrl, open);
+    await runBalanceAnnualCommitBeforeWealthHistory(browser, baseUrl);
+}
+
+async function runBalanceAnnualCommitBeforeWealthHistory(browser, baseUrl) {
+    const smoke = await openSmokePage(browser, baseUrl, 'Balance.html', {
+        storage: createBalanceStorage(2025), annualFixtures: { targetYear: 2025 },
+        observeWealthUpdates: true, fixedTime: '2026-01-15T12:00:00+01:00'
+    });
+    await smoke.page.locator('#profilverbund-profile-list input').waitFor({ state: 'visible' });
+    await waitForWealthBrowserIdle(smoke.page);
+    const messageIndex = await smoke.page.evaluate(() => window.__browserSmokeMessages.length);
+    await smoke.page.locator('#jahresabschlussBtn').click({ force: true });
+    const expectedText = 'Ausgaben-Check auf 2026 umgestellt.';
+    await smoke.page.waitForFunction(({ index, text }) => window.__browserSmokeMessages.slice(index).includes(text),
+        { index: messageIndex, text: expectedText });
+    const toast = smoke.page.locator('#toast-container .toast-text');
+    assert(await toast.isVisible() && await toast.textContent() === expectedText,
+        'Jahresabschluss vor 2026 bleibt sichtbar ohne Vermögenszusatz');
+    const messages = await smoke.page.evaluate(index => window.__browserSmokeMessages.slice(index), messageIndex);
+    assert(!messages.some(message => message.includes('Vermögensstand gesichert.')),
+        'Jahre vor 2026 erhalten auch im neuen Kanal keinen Vermögenszusatz');
+    const state = await readBalanceBrowserState(smoke.page);
+    assert(state.annualPeriodMetadata.lastCommittedPeriod === 'calendar-year:2025',
+        'Der Fall vor 2026 erreicht einen echten bestätigten Jahresabschluss');
+    assert(!state.wealthHistory?.entries?.length, 'Jahresabschluss vor 2026 erzeugt keinen Vermögensstand');
+    smoke.assertNoErrors();
+    await smoke.close();
 }
 
 async function runBalanceAnnualCommitScenario(browser, baseUrl, open) {
@@ -1392,6 +1423,14 @@ async function runBalanceAnnualCommitScenario(browser, baseUrl, open) {
     const commitMessages = await smoke.page.evaluate(index => window.__browserSmokeMessages.slice(index), commitMessageIndex);
     assert(commitMessages.filter(message => message.includes('Vermögensstand gesichert.')).length === 1,
         `Verlauf ${open ? 'aktiv' : 'inaktiv'}: neuer Abschluss bestätigt genau einmal den gesicherten Vermögensstand`);
+    const commitToast = smoke.page.locator('#toast-container .toast-text');
+    const expectedCommitText = 'Ausgaben-Check auf 2027 umgestellt. Vermögensstand gesichert.';
+    // Reguläre Timer bleiben aktiv; gemessen wird die aktuelle Oberfläche, nicht das Protokoll.
+    for (const [delay, elapsed] of [[1000, 1], [2000, 3]]) {
+        await smoke.page.waitForTimeout(delay);
+        assert(await commitToast.isVisible() && await commitToast.textContent() === expectedCommitText,
+            `Verlauf ${open ? 'aktiv' : 'inaktiv'}: Abschlussbestätigung nach ${elapsed} s sichtbar und wortgleich`);
+    }
     const committedAge = await smoke.page.locator('#aktuellesAlter').inputValue();
     assert(committedAge === '68', `Erfolgreicher Commit muss das Alter genau einmal erhoehen (Ist: ${committedAge})`);
     const row = await readIndexedDb(smoke.page, 'kv', BALANCE_STATE_KEY);
@@ -1518,12 +1557,13 @@ async function runBalanceCsvImportRoundtrip(browser, baseUrl) {
         `30.12.${csvTargetYear - 1};120`,
         `30.12.${csvTargetYear};130`
     ].join('\n');
+    const csvMessageIndex = await page.evaluate(() => window.__browserSmokeMessages.length);
     await page.locator('#csvFileInput').setInputFiles({
         name: csvSourceFileName,
         mimeType: 'text/csv',
         buffer: Buffer.from(csv, 'utf8')
     });
-    const csvImportStatus = page.locator('#error-container')
+    const csvImportStatus = page.locator('#toast-container .toast-text')
         .filter({ hasText: 'CSV importiert' });
     await csvImportStatus.waitFor({
         state: 'visible',
@@ -1534,6 +1574,11 @@ async function runBalanceCsvImportRoundtrip(browser, baseUrl) {
         csvImportStatusText.includes('CSV importiert'),
         `CSV-Roundtrip muss erfolgreich abschliessen; Status war: ${csvImportStatusText}`
     );
+    await page.waitForFunction(({ index, text }) => window.__browserSmokeMessages.slice(index).includes(text),
+        { index: csvMessageIndex, text: csvImportStatusText });
+    assert(await page.evaluate(({ index, text }) => window.__browserSmokeMessages.slice(index).includes(text),
+        { index: csvMessageIndex, text: csvImportStatusText }),
+    'Der Markt-CSV-Erfolg erzeugt seit der Aktion einen neuen wortgleichen Protokolleintrag');
 
     const row = await readIndexedDb(page, 'kv', BALANCE_STATE_KEY);
     const imported = JSON.parse(row.value);

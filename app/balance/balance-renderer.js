@@ -25,6 +25,14 @@ let StorageManager = null;
 let summaryRenderer = null;
 let actionRenderer = null;
 let diagnosisRenderer = null;
+let toastTimer = null;
+let toastRevision = 0;
+
+function clearToast(container) {
+    if (!container) return;
+    container.replaceChildren();
+    container.className = '';
+}
 
 /**
  * Initialisiert den UIRenderer mit den notwendigen Abhängigkeiten.
@@ -33,6 +41,12 @@ let diagnosisRenderer = null;
  * @param {Object} storageManager - Storage-Adapter für Fallbacks.
  */
 export function initUIRenderer(domRefs, storageManager) {
+    // Auch bereits bereitgestellte Callbacks verlieren bei Neuinitialisierung ihre Identität.
+    toastRevision++;
+    if (toastTimer !== null) clearTimeout(toastTimer);
+    toastTimer = null;
+    clearToast(dom?.containers?.toast);
+    clearToast(domRefs?.containers?.toast);
     dom = domRefs;
     StorageManager = storageManager;
     summaryRenderer = new SummaryRenderer(domRefs, storageManager);
@@ -95,12 +109,27 @@ export const UIRenderer = {
      * @param {boolean} [isSuccess=true] - Farbe/Typ der Meldung.
      */
     toast(msg, isSuccess = true) {
-        const container = dom?.containers?.error;
+        const container = dom?.containers?.toast;
         if (!container) return;
-        container.classList.remove('error-warn');
-        container.style.color = isSuccess ? 'var(--success-color)' : 'var(--danger-color)';
-        container.textContent = msg;
-        setTimeout(() => { container.textContent = ''; }, 3500);
+        if (toastTimer !== null) clearTimeout(toastTimer);
+        const revision = ++toastRevision;
+        const icon = document.createElement('span');
+        icon.className = 'toast-icon';
+        icon.setAttribute('aria-hidden', 'true');
+        icon.textContent = isSuccess ? '✓' : '!';
+        const type = document.createElement('span');
+        type.className = 'toast-type';
+        type.textContent = isSuccess ? 'Erfolg: ' : 'Fehler: ';
+        const text = document.createElement('span');
+        text.className = 'toast-text';
+        text.textContent = msg;
+        container.className = isSuccess ? 'toast-success' : 'toast-error';
+        container.replaceChildren(icon, type, text);
+        toastTimer = setTimeout(() => {
+            if (revision !== toastRevision || container !== dom?.containers?.toast) return;
+            clearToast(container);
+            toastTimer = null;
+        }, 6000);
     },
 
     /**

@@ -110,6 +110,7 @@ const dom = {
     },
     containers: {
         error: document.getElementById('error-container'),
+        toast: document.getElementById('toast-container'),
         bedarfAnpassung: document.getElementById('bedarfAnpassungContainer'),
         tabButtons: document.querySelector('.tab-buttons'),
         tabPanels: document.querySelectorAll('.tab-panel'),

@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { initUIRenderer, UIRenderer } from '../app/balance/balance-renderer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -83,6 +84,7 @@ class MockElement {
     }
 
     replaceChildren(...children) {
+        this.textContent = '';
         this.children = [];
         this.append(...children);
     }
@@ -188,6 +190,12 @@ const localStorageMock = {
     get length() { return localStorageData.size; }
 };
 
+const savedGlobals = Object.fromEntries(['window', 'document', 'localStorage', 'Event']
+    .map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+const originalConsoleError = console.error;
+const originalConsoleInfo = console.info;
+
+try {
 global.window = {
     addEventListener: () => { },
     localStorage: localStorageMock,
@@ -272,8 +280,6 @@ const compatibleEngine = {
 global.window.EngineAPI = compatibleEngine;
 
 // Mock console
-const originalConsoleError = console.error;
-const originalConsoleInfo = console.info;
 console.error = (...args) => {
     // Suppress expected errors during init if mocks aren't perfect
     // or log them if critical
@@ -319,6 +325,12 @@ assertEqual(document.engineScript.src, 'engine.js', 'Engine script source should
 
 // --- 5. Test Interaction ---
 console.log("Testing Input Change Trigger...");
+const visibleToastText = () => document.getElementById('toast-container').children
+    .find(child => child.className === 'toast-text')?.textContent || '';
+const notification = 'Ausgaben-Check auf 2027 umgestellt. Vermögensstand gesichert.';
+UIRenderer.toast(notification);
+UIRenderer.clearError();
+assertEqual(visibleToastText(), notification, 'Echter Renderer: clearError erhält den Toast');
 
 // Get an input that we served via querySelectorAll
 const inputEl = document.getElementById('p1StartAlter');
@@ -337,6 +349,7 @@ formCheck.dispatchEvent(evt);
 await new Promise(resolve => setTimeout(resolve, 310));
 
 assertEqual(simulateCallCount, 2, 'Debounced input should trigger exactly one additional engine call');
+assertEqual(visibleToastText(), notification, 'Echtes debouncedUpdate erhält den Toast');
 
 console.log("Testing machine-readable update results and fail-closed persistence...");
 
@@ -344,6 +357,7 @@ const successResult = balanceMain.update({ mode: 'preview' });
 if (!successResult.ok || successResult.status !== 'success') {
     throw new Error(`Successful update returned unexpected result: ${JSON.stringify(successResult)}`);
 }
+assertEqual(visibleToastText(), notification, 'Echtes erfolgreiches update erhält den Toast');
 
 const assertMinimumFlexReject = (rawValue, expectedMessages) => {
     const input = document.getElementById('minimumFlexAnnual');
@@ -375,6 +389,7 @@ assertMinimumFlexReject('24001', [
     'Mindest-Flex p.a. darf nicht größer als Flex-Bedarf p.a. sein.',
     'Flex-Bedarf p.a. ist die Obergrenze für Mindest-Flex.'
 ]);
+assertEqual(visibleToastText(), notification, 'Echtes Validierungsfehler-update erhält den Toast');
 document.getElementById('minimumFlexAnnual').value = '0';
 
 engineFailure = new Error('Simulierter Engine-Fehler');
@@ -384,6 +399,7 @@ assert(
     document.getElementById('error-container').textContent.includes('Simulierter Engine-Fehler'),
     'Engine error should use the normal UI error path'
 );
+assertEqual(visibleToastText(), notification, 'Enginefehler und Toast bleiben gleichzeitig sichtbar');
 engineFailure = null;
 
 let incompatibleCalls = 0;
@@ -412,6 +428,13 @@ global.window.EngineAPI = compatibleEngine;
 
 console.log("✅ Balance App Smoke Test Completed Successfully.");
 
-// Restore console
-console.error = originalConsoleError;
-console.info = originalConsoleInfo;
+} finally {
+    // Beendet den echten Toasttimer auch bei fehlgeschlagenen Assertions.
+    initUIRenderer(null, null);
+    console.error = originalConsoleError;
+    console.info = originalConsoleInfo;
+    for (const [key, descriptor] of Object.entries(savedGlobals)) {
+        if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+        else delete globalThis[key];
+    }
+}
