@@ -1,6 +1,7 @@
 // @ts-check
 import { UIUtils } from './balance-utils.js';
 import { StorageManager } from './balance-storage.js';
+import { readWealthHistory } from '../../types/wealth-history-contract.js';
 import { prepareWealthHistoryMetrics } from './balance-wealth-history-metrics.js';
 
 const EMPTY = 'Noch keine Stände erfasst. Nutzen Sie „Stand jetzt erfassen“. Automatische Jahresabschlussstände beginnen mit dem Abschlussjahr 2026.';
@@ -33,13 +34,60 @@ function tableMarkup(rows) {
     return `<table><caption>Erfasste Vermögensstände in nominalen Euro</caption><thead><tr>${headers.map(label => `<th scope="col">${label}</th>`).join('')}</tr></thead><tbody>${rows.map(row => `<tr><th scope="row">${dateLabel(row.asOf)}</th><td>${row.marker} ${row.label}</td>${['tagesgeld', 'geldmarktEtf', 'aktienEtf', 'depotwertAlt', 'depotwertNeu', 'total'].map(key => `<td>${euro(row[key])}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
 }
 
-/** Jede neue Datenbasis ersetzt beide Inhalte, auch bei Legacy- und Fehlerzuständen. */
-export function renderBalanceWealthHistory(dom, state, error = null) {
-    if (!dom) return false;
+// Sichtbarkeit gehört ausschließlich zum DOM, weder zum Profil noch zum Export.
+const displayErrors = new WeakMap();
+
+function clearDetails(dom) {
     if (dom.chart) dom.chart.innerHTML = '';
     if (dom.table) dom.table.innerHTML = '';
+    if (dom.hint) dom.hint.textContent = '';
+}
+
+function setExpanded(dom, expanded) {
+    if (dom.details) dom.details.hidden = !expanded;
+    if (dom.toggle) {
+        dom.toggle.textContent = expanded ? 'Verlauf ausblenden' : 'Verlauf anzeigen';
+        dom.toggle.setAttribute('aria-expanded', String(expanded));
+    }
+}
+
+export function closeBalanceWealthHistory(dom) {
+    if (!dom) return;
+    const focused = dom.details?.ownerDocument?.activeElement;
+    if (focused && dom.details.contains(focused)) dom.toggle?.focus();
+    setExpanded(dom, false);
+    clearDetails(dom);
+}
+
+export function initializeBalanceWealthHistory(dom, loadState = () => StorageManager.loadState()) {
+    closeBalanceWealthHistory(dom);
+    if (dom?.status) dom.status.textContent = '';
+    return refreshBalanceWealthHistory(dom, loadState);
+}
+
+export function toggleBalanceWealthHistory(dom, loadState = () => StorageManager.loadState()) {
+    if (!dom?.details) return false;
+    if (!dom.details.hidden) {
+        closeBalanceWealthHistory(dom);
+        return true;
+    }
+    setExpanded(dom, true);
+    return refreshBalanceWealthHistory(dom, loadState);
+}
+
+/** Geschlossen nur validieren/zählen; offen jede Datenbasis vollständig ersetzen. */
+export function renderBalanceWealthHistory(dom, state, error = null) {
+    if (!dom) return false;
+    clearDetails(dom);
+    if (dom.count) dom.count.textContent = '';
+    if (dom.status && dom.status.textContent === displayErrors.get(dom)) dom.status.textContent = '';
+    displayErrors.delete(dom);
     try {
         if (error) throw error;
+        const history = readWealthHistory(state);
+        if (dom.count) dom.count.textContent = history.entries.length
+            ? `${history.entries.length} ${history.entries.length === 1 ? 'Stand' : 'Stände'}` : '';
+        if (dom.details?.hidden) return true;
         const rows = prepareWealthHistoryMetrics(state);
         if (dom.hint) dom.hint.textContent = rows.length ? '' : EMPTY;
         if (rows.length) {
@@ -48,9 +96,11 @@ export function renderBalanceWealthHistory(dom, state, error = null) {
         }
         return true;
     } catch (failure) {
-        if (dom.chart) dom.chart.innerHTML = '';
-        if (dom.table) dom.table.innerHTML = '';
-        if (dom.hint) dom.hint.textContent = `Vermögensverlauf kann nicht angezeigt werden: ${failure.message || failure}`;
+        clearDetails(dom);
+        const text = `Vermögensverlauf kann nicht angezeigt werden: ${failure.message || failure}`;
+        if (dom.status) dom.status.textContent = text;
+        else if (dom.hint) dom.hint.textContent = text;
+        displayErrors.set(dom, text);
         return false;
     }
 }

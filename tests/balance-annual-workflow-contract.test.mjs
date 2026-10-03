@@ -155,6 +155,10 @@ try {
             getReferenceDate: () => REFERENCE_DATE,
             getTargetYear: () => TARGET_YEAR,
             getLegacyDecision: () => LEGACY_PERIOD_DECISION.NOT_COMMITTED,
+            onAnnualWealthSaved: () => {
+                assertEqual(StorageManager.loadState()[ANNUAL_PERIOD_METADATA_KEY].pendingCommit, null, 'Bestätigung erst nach Finalisierung');
+                calls.push('wealth-confirmed');
+            },
             validateLiveState: () => { calls.push('validate-pre'); return { ok: true }; },
             runAnnualUpdate: async () => {
                 calls.push('annual-update');
@@ -196,6 +200,7 @@ try {
 
         const duplicate = await handlers.handleJahresabschluss();
         assertEqual(duplicate.status, 'already_committed', 'Wiederholung derselben Periode ist idempotent');
+        assertEqual(calls.filter(call => call === 'wealth-confirmed').length, 1, 'Nur neuer bestätigter Jahresstand meldet Erfolg');
         assertEqual(calls.filter(call => call === 'snapshot').length, 1, 'Wiederholung erzeugt keinen zweiten Snapshot');
         assertEqual(calls.filter(call => call.startsWith('commit:')).length, 1, 'Wiederholung führt keinen zweiten Engine-Commit aus');
     }

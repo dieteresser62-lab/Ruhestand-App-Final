@@ -746,10 +746,99 @@ async function captureWealthBrowserStand(page, keyboard = false) {
     } else {
         await button.click();
     }
-    await page.locator('#wealthHistoryStatus').filter({ hasText: 'Aktueller Stand dauerhaft gespeichert.' }).waitFor();
+    await page.locator('#wealthHistoryStatus').filter({ hasText: 'Stand gesichert' }).waitFor();
+}
+
+async function assertWealthBrowserVisibility(page, expanded, count = null) {
+    const toggle = page.getByRole('button', { name: expanded ? 'Verlauf ausblenden' : 'Verlauf anzeigen', exact: true });
+    assert(await toggle.count() === 1 && await toggle.isVisible(), 'Umschaltknopf trägt den passenden zugänglichen Namen');
+    assert(await toggle.getAttribute('aria-expanded') === String(expanded), 'ARIA entspricht der Sichtbarkeit');
+    assert(await toggle.getAttribute('aria-controls') === 'wealthHistoryDetails', 'ARIA verweist auf den Detailcontainer');
+    assert(await page.locator('#wealthHistoryDetails').isVisible() === expanded, 'Tatsächliche Detailsichtbarkeit');
+    if (count !== null) {
+        await page.waitForFunction(expected => document.getElementById('wealthHistoryCount').textContent === expected,
+            count ? count + (count === 1 ? ' Stand' : ' Stände') : '');
+        assert(await page.locator('#wealthHistoryCount').textContent() === (count ? count + (count === 1 ? ' Stand' : ' Stände') : ''),
+            'Aktuelle Anzahl bleibt außerhalb der Details sichtbar');
+    }
+    if (!expanded) {
+        assert(await page.locator('#wealthHistoryChart svg, #wealthHistoryTable table').count() === 0, 'Geschlossen keine erzeugten Inhalte');
+        assert(await page.getByRole('region', { name: 'Vermögensdiagramm', exact: true }).count() === 0
+            && await page.getByRole('region', { name: 'Tabelle der Vermögensstände', exact: true }).count() === 0,
+        'Geschlossene Details fehlen aus dem Zugänglichkeitsbaum');
+        await page.locator('#wealthHistoryChart').evaluate(el => el.focus());
+        assert(await page.locator('#wealthHistoryChart').evaluate(el => el !== document.activeElement), 'Verborgene Region nicht fokussierbar');
+    } else {
+        const chart = page.getByRole('region', { name: 'Vermögensdiagramm', exact: true });
+        const table = page.getByRole('region', { name: 'Tabelle der Vermögensstände', exact: true });
+        assert(await chart.count() === 1 && await table.count() === 1,
+            'Offene Regionen mit bisherigen Namen im Zugänglichkeitsbaum vorhanden');
+        const entryCount = count ?? (await readBalanceBrowserState(page)).wealthHistory?.entries.length ?? 0;
+        if (entryCount === 0) {
+            // Leere Container haben keine Höhe; zugänglich bleiben sie trotzdem.
+            assert(await page.locator('#wealthHistoryHint').filter({ hasText: 'Noch keine Stände erfasst' }).isVisible(),
+                'Offene leere Historie zeigt den sichtbaren Leerhinweis');
+            assert(await page.locator('#wealthHistoryChart svg, #wealthHistoryTable table').count() === 0,
+                'Leere Historie erzeugt keine Diagramm- oder Tabelleninhalte');
+            for (const region of [chart, table]) {
+                await region.focus();
+                assert(await region.evaluate(el => el === document.activeElement),
+                    'Offene leere Region bleibt fokussierbar');
+            }
+        } else {
+            assert(await chart.isVisible() && await table.isVisible(),
+                'Gefüllte offene Regionen mit bisherigen Namen sichtbar');
+        }
+    }
+}
+
+async function waitForBrowserValue(read, predicate, message, timeoutMs = 10000) {
+    const deadline = Date.now() + timeoutMs;
+    let value = await read();
+    while (!predicate(value) && Date.now() < deadline) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        value = await read();
+    }
+    assert(predicate(value), message);
+    return value;
+}
+
+async function waitForWealthBrowserStartup(page) {
+    // Nach Laden und Profilwechsel ergänzt die App die Haushaltswerte des Profilverbunds
+    // asynchron (gemessen 1-3 s ohne Bedienung); erst danach taugt der persistierte
+    // State als Vorher-Stand für Umschaltvergleiche.
+    await page.locator('#profilverbund-profile-list input').first().waitFor();
+    await waitForBrowserValue(() => readBalanceBrowserState(page),
+        state => Object.hasOwn(state, 'profilverbundHouseholdInputs'),
+        'Startpersistenz des Profilverbunds abgeschlossen');
+}
+
+async function toggleWealthBrowserHistory(page, expanded, key = null) {
+    const before = await readBalanceBrowserState(page);
+    const button = page.locator('#toggleWealthHistoryBtn');
+    if (key) {
+        await button.focus();
+        await page.keyboard.press(key);
+    } else await button.click();
+    await assertWealthBrowserVisibility(page, expanded);
+    const after = await readBalanceBrowserState(page);
+    assert(JSON.stringify(Object.keys(after).sort()) === JSON.stringify(Object.keys(before).sort()),
+        'Umschalten ergänzt kein persistiertes Sichtbarkeitsflag');
+    assert(JSON.stringify(after.wealthHistory) === JSON.stringify(before.wealthHistory)
+        && JSON.stringify(after.balanceStateLifecycle) === JSON.stringify(before.balanceStateLifecycle)
+        && JSON.stringify(after.lastState) === JSON.stringify(before.lastState),
+    'Umschalten erhält Verlauf und Enginezustand ohne Erfassung');
 }
 
 async function assertWealthBrowserTable(page, entries) {
+    // Die aktive Registrykopie folgt dem Balance-State über die nächste Neuberechnung
+    // (nach einem Import gemessen 200-420 ms später).
+    await waitForBrowserValue(async () => {
+        const registry = JSON.parse((await readIndexedDb(page, 'kv', 'rs_profiles_v1')).value);
+        const current = (await readIndexedDb(page, 'kv', 'rs_current_profile')).value;
+        return JSON.stringify(JSON.parse(registry.profiles[current].data[BALANCE_STATE_KEY]).wealthHistory?.entries);
+    }, registryEntries => registryEntries === JSON.stringify(entries),
+    'Dargestellte Daten entsprechen auch der bestätigten aktiven Registrykopie');
     const rows = page.locator('#wealthHistoryTable tbody tr');
     assert(await rows.count() === entries.length, 'Die Verlaufstabelle zeigt genau die gespeicherten Stände');
     for (const [index, entry] of entries.entries()) {
@@ -770,6 +859,11 @@ async function assertWealthBrowserTable(page, entries) {
     assert(await description.textContent() === 'Gestapelte Säulen für Liquidität, Geldmarkt-ETF und Aktien-ETF. Jahresabschluss: Quadrat und durchgezogener Rahmen. Manuell: Raute und gestrichelter Rahmen. Alle Werte und beide Teildepots stehen in der folgenden Tabelle.',
         'Die vollständige Langbeschreibung ist erhalten');
     assert(await chart.locator('g').count() === entries.length, 'Jeder Stand besitzt eine eigene Säule');
+    for (const [index, entry] of entries.entries()) {
+        const title = await chart.locator('g > title').nth(index).textContent();
+        assert(title.includes(entry.asOf.split('-').reverse().join('.')) && title.includes(formatCurrency(entry.total)),
+            'Diagramm zeigt Datum und Summe aus derselben bestätigten Datenbasis wie die Tabelle');
+    }
     assert(!(await chart.innerHTML()).match(/NaN|Infinity/), 'Auch Nullstände haben endliche SVG-Koordinaten');
 }
 
@@ -784,10 +878,23 @@ async function switchWealthBrowserProfile(page, baseUrl, profileId) {
         await PersistenceFacade.flush();
     });
     await page.goto(`${baseUrl}/Balance.html`, { waitUntil: 'load' });
-    await page.locator('#profilverbund-profile-list input').first().waitFor();
+    await waitForWealthBrowserStartup(page);
 }
 
 async function runBalanceWealthHistory(browser, baseUrl) {
+    const markupContext = await browser.newContext({ javaScriptEnabled: false });
+    try {
+        await markupContext.route('**/*', async route => {
+            const host = new URL(route.request().url()).hostname;
+            if (host === '127.0.0.1' || host === 'localhost') await route.continue();
+            else await route.fulfill({ status: 200, body: '' });
+        });
+        const markupPage = await markupContext.newPage();
+        await markupPage.goto(`${baseUrl}/Balance.html`, { waitUntil: 'load' });
+        assert(!(await markupPage.locator('#wealthHistoryDetails').isVisible()), 'Details schon vor JavaScript geschlossen');
+        assert(await markupPage.getByRole('region', { name: 'Vermögensdiagramm', exact: true }).count() === 0,
+            'Ausgeliefertes Markup verbirgt die Details auch vor Initialisierung aus dem Zugänglichkeitsbaum');
+    } finally { await markupContext.close(); }
     const baseline = createBalanceStorage(2026);
     const profileState = JSON.parse(baseline[BALANCE_STATE_KEY]);
     profileState.inputs.floorBedarf = 0;
@@ -813,7 +920,11 @@ async function runBalanceWealthHistory(browser, baseUrl) {
         }
     });
     const { page } = smoke;
+    await waitForWealthBrowserStartup(page);
+    await assertWealthBrowserVisibility(page, false, 0);
+    await toggleWealthBrowserHistory(page, true, 'Enter');
     await page.locator('#wealthHistoryHint').filter({ hasText: 'Noch keine Stände erfasst' }).waitFor();
+    await toggleWealthBrowserHistory(page, false, 'Space');
     await page.waitForFunction(() => document.querySelectorAll('#profilverbund-profile-list input:checked').length === 2);
     await captureWealthBrowserStand(page, true);
     const first = (await readBalanceBrowserState(page)).wealthHistory.entries;
@@ -823,6 +934,8 @@ async function runBalanceWealthHistory(browser, baseUrl) {
         && first[0].depotwertAlt === 34000 && first[0].depotwertNeu === 45000
         && first[0].aktienEtf === 79000 && first[0].total === 116000,
     'Der echte Knopf erfasst die Profilverbund- und Tranchenwerte, keine simulierten Bestände');
+    await assertWealthBrowserVisibility(page, false, 1);
+    await toggleWealthBrowserHistory(page, true);
     await assertWealthBrowserTable(page, first);
     const registryAfterCapture = JSON.parse((await readIndexedDb(page, 'kv', 'rs_profiles_v1')).value);
     assert(JSON.stringify(JSON.parse(registryAfterCapture.profiles['wealth-a'].data[BALANCE_STATE_KEY]).wealthHistory.entries)
@@ -835,7 +948,12 @@ async function runBalanceWealthHistory(browser, baseUrl) {
     const replaced = (await readBalanceBrowserState(page)).wealthHistory.entries;
     assert(replaced.length === 1 && replaced[0].tagesgeld === 12000 && replaced[0].total === 114000,
         'Ein weiterer Klick am selben Tag ersetzt den Stand aus der frischen Profilbasis');
+    await assertWealthBrowserVisibility(page, true, 1);
+    await assertWealthBrowserTable(page, replaced);
     await page.reload({ waitUntil: 'load' });
+    await waitForWealthBrowserStartup(page);
+    await assertWealthBrowserVisibility(page, false, 1);
+    await toggleWealthBrowserHistory(page, true);
     await page.locator('#wealthHistoryTable tbody tr').waitFor();
     assert(JSON.stringify((await readBalanceBrowserState(page)).wealthHistory.entries) === JSON.stringify(replaced),
         'Reload erhält die gespeicherten Werte exakt');
@@ -843,16 +961,38 @@ async function runBalanceWealthHistory(browser, baseUrl) {
 
     await page.clock.setFixedTime(new Date('2026-10-04T12:00:00+02:00'));
     await captureWealthBrowserStand(page);
-    const nextDay = (await readBalanceBrowserState(page)).wealthHistory.entries;
+    let nextDay = (await readBalanceBrowserState(page)).wealthHistory.entries;
     assert(nextDay.length === 2 && nextDay[1].asOf === '2026-10-04', 'Ein anderer lokaler Tag ergänzt einen Stand');
+    await assertWealthBrowserVisibility(page, true, 2);
+    await assertWealthBrowserTable(page, nextDay);
+    await toggleWealthBrowserHistory(page, false);
+    await page.clock.setFixedTime(new Date('2026-10-05T12:00:00+02:00'));
+    await captureWealthBrowserStand(page);
+    nextDay = (await readBalanceBrowserState(page)).wealthHistory.entries;
+    await assertWealthBrowserVisibility(page, false, 3);
+    await toggleWealthBrowserHistory(page, true);
     await assertWealthBrowserTable(page, nextDay);
 
     await switchWealthBrowserProfile(page, baseUrl, 'wealth-b');
-    await page.locator('#wealthHistoryTable tbody tr').waitFor();
-    await assertWealthBrowserTable(page, [zeroEntry]);
+    await assertWealthBrowserVisibility(page, false, 1);
     await page.setViewportSize({ width: 375, height: 812 });
+    for (const id of ['captureWealthBtn', 'toggleWealthHistoryBtn']) {
+        const button = page.locator('#' + id);
+        await button.scrollIntoViewIfNeeded();
+        const box = await button.boundingBox();
+        assert(await button.isEnabled() && box.width > 0 && box.width <= 375, 'Beide Knöpfe bei 375 CSS-Pixeln bedienbar');
+    }
+    await page.locator('#captureWealthBtn').focus();
+    await page.keyboard.press('Tab');
+    assert(await page.locator('#toggleWealthHistoryBtn').evaluate(el => el === document.activeElement), 'Geschlossen folgt der Umschaltknopf');
+    await page.keyboard.press('Tab');
+    assert(await page.evaluate(() => !document.getElementById('wealthHistoryDetails').contains(document.activeElement)), 'Tab überspringt geschlossene Details');
+    await toggleWealthBrowserHistory(page, true, 'Space');
+    await assertWealthBrowserTable(page, [zeroEntry]);
     const capture = page.getByRole('button', { name: 'Stand jetzt erfassen', exact: true });
     await capture.focus();
+    await page.keyboard.press('Tab');
+    assert(await page.locator('#toggleWealthHistoryBtn').evaluate(el => el === document.activeElement), 'Zusätzliche Tabstation vor Diagramm');
     await page.keyboard.press('Tab');
     assert(await page.getByRole('region', { name: 'Vermögensdiagramm', exact: true }).evaluate(el => el === document.activeElement),
         'Das Diagramm ist per Tab erreichbar');
@@ -878,7 +1018,9 @@ async function runBalanceWealthHistory(browser, baseUrl) {
 
     await page.setViewportSize({ width: 1366, height: 900 });
     await switchWealthBrowserProfile(page, baseUrl, 'wealth-a');
-    await page.waitForFunction(() => document.querySelectorAll('#wealthHistoryTable tbody tr').length === 2);
+    await assertWealthBrowserVisibility(page, false, 3);
+    await toggleWealthBrowserHistory(page, true, 'Enter');
+    await page.waitForFunction(() => document.querySelectorAll('#wealthHistoryTable tbody tr').length === 3);
     await assertWealthBrowserTable(page, nextDay);
     const legacy = {
         app: await page.evaluate(async () => (await import('./app/balance/balance-config.js')).CONFIG.APP.NAME),
@@ -886,24 +1028,105 @@ async function runBalanceWealthHistory(browser, baseUrl) {
     };
     await page.locator('.tab-btn[data-tab="settings"]').click();
     await page.locator('#snapshot-management').evaluate(el => { el.open = true; });
+    const valid = { ...legacy, payload: { ...profileState, wealthHistory: { schemaVersion: 1, entries: [zeroEntry] } } };
+    // Fokus aus dem Detailbereich muss beim Import auf den Umschaltknopf zurückkehren.
+    await page.locator('#wealthHistoryTable').focus();
+    await page.locator('#importFile').setInputFiles({ name: 'synthetischer-verlauf.json',
+        mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(valid)) });
+    await page.waitForFunction(() => document.getElementById('wealthHistoryCount').textContent === '1 Stand'
+        && document.getElementById('importFile').value === '');
+    await assertWealthBrowserVisibility(page, false, 1);
+    assert(await page.locator('#toggleWealthHistoryBtn').evaluate(el => el === document.activeElement), 'Import hinterlässt keinen Fokus in versteckten Details');
+    await toggleWealthBrowserHistory(page, true);
+    await assertWealthBrowserTable(page, [zeroEntry]);
+    assert(JSON.stringify((await readBalanceBrowserState(page)).wealthHistory.entries) === JSON.stringify([zeroEntry]), 'Import ersetzt den Verlauf exakt');
+    const importedRegistry = JSON.parse((await readIndexedDb(page, 'kv', 'rs_profiles_v1')).value);
+    assert(JSON.stringify(JSON.parse(importedRegistry.profiles['wealth-a'].data[BALANCE_STATE_KEY]).wealthHistory.entries)
+        === JSON.stringify([zeroEntry]), 'Importierte Historie auch in aktiver Registry bestätigt');
+
+    await page.locator('#importFile').setInputFiles({ name: 'ungueltiger-verlauf.json',
+        mimeType: 'application/json', buffer: Buffer.from('{kein-json') });
+    await page.waitForFunction(() => document.getElementById('importFile').value === ''
+        && window.__browserSmokeMessages.some(message => message.includes('kein gültiges JSON')));
+    await assertWealthBrowserVisibility(page, false, 1);
+    await toggleWealthBrowserHistory(page, true);
+    await assertWealthBrowserTable(page, [zeroEntry]);
+
+    const beforeRollback = await readBalanceBrowserState(page);
+    await page.evaluate(async () => {
+        const { StorageManager } = await import('./app/balance/balance-storage.js');
+        const { UIReader } = await import('./app/balance/balance-reader.js');
+        const replace = StorageManager.replaceStateFromImport;
+        StorageManager.replaceStateFromImport = async (...args) => {
+            const receipt = await replace.apply(StorageManager, args);
+            StorageManager.replaceStateFromImport = replace;
+            const read = UIReader.readAllInputs;
+            UIReader.readAllInputs = () => {
+                UIReader.readAllInputs = read;
+                throw new Error('Synthetischer UI-Fehler nach Replace');
+            };
+            return receipt;
+        };
+    });
+    await page.locator('#importFile').setInputFiles({ name: 'synthetischer-rollback.json',
+        mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(legacy)) });
+    await page.waitForFunction(() => document.getElementById('importFile').value === ''
+        && window.__browserSmokeMessages.some(message => message.includes('automatisch wiederhergestellt')));
+    await assertWealthBrowserVisibility(page, false, 1);
+    assert(JSON.stringify(await readBalanceBrowserState(page)) === JSON.stringify(beforeRollback),
+        'Erfolgreicher Rollback bewahrt den endgültigen bestätigten State');
+    // Bestehendes Verhalten: Das input-Ereignis der Dateiauswahl startet ein entprelltes update(),
+    // dessen clearError() die Importmeldung nach etwa 250 ms abräumt. Erst danach steht nichts mehr aus.
+    // Ändert sich dieses Verhalten, muss dieser Wartepunkt mitgezogen werden.
+    await page.waitForFunction(() => document.getElementById('error-container').textContent === '', null, { timeout: 5000 });
+    // Das Umschalten darf weder update() noch clearError() auslösen; gezählt statt Anzeigetext verglichen,
+    // weil auch Toast-Timer den Container leeren.
+    await page.evaluate(async () => {
+        const { UIRenderer } = await import('./app/balance/balance-renderer.js');
+        const clearError = UIRenderer.clearError;
+        window.__wealthToggleClearErrorCalls = 0;
+        UIRenderer.clearError = function (...args) {
+            window.__wealthToggleClearErrorCalls += 1;
+            return clearError.apply(this, args);
+        };
+        window.__restoreWealthToggleClearError = () => { UIRenderer.clearError = clearError; };
+    });
+    await toggleWealthBrowserHistory(page, true);
+    await assertWealthBrowserTable(page, [zeroEntry]);
+    // Über die Entprellzeit von debouncedUpdate() (250 ms) hinaus zählen, damit auch ein
+    // indirekt angestoßenes Update auffällt; in diesem Fenster ruft sonst nichts clearError().
+    await page.waitForTimeout(750);
+    const toggleClearErrorCalls = await page.evaluate(() => {
+        window.__restoreWealthToggleClearError();
+        return window.__wealthToggleClearErrorCalls;
+    });
+    assert(toggleClearErrorCalls === 0, `Wiederöffnen lässt die Fehleranzeige unangetastet: clearError-Aufrufe=${toggleClearErrorCalls}`);
+
     await page.locator('#importFile').setInputFiles({ name: 'synthetischer-legacy-verlauf.json',
         mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(legacy)) });
-    await page.locator('#wealthHistoryHint').filter({ hasText: 'Noch keine Stände erfasst' }).waitFor();
+    await page.waitForFunction(() => document.getElementById('wealthHistoryCount').textContent === ''
+        && document.getElementById('importFile').value === '');
+    await assertWealthBrowserVisibility(page, false, 0);
     assert(!(await readBalanceBrowserState(page)).wealthHistory, 'Legacy-Replace übernimmt keinen alten Verlauf');
-    assert(await page.locator('#wealthHistoryChart svg, #wealthHistoryTable table').count() === 0,
-        'Legacy-Import entfernt sämtliche bisherigen Diagramm- und Tabelleninhalte');
-    await page.reload({ waitUntil: 'load' });
+    await toggleWealthBrowserHistory(page, true);
     await page.locator('#wealthHistoryHint').filter({ hasText: 'Noch keine Stände erfasst' }).waitFor();
-    assert(await page.locator('#wealthHistoryChart svg, #wealthHistoryTable table').count() === 0,
-        'Der leere Legacy-Verlauf bleibt nach Reload leer');
+    await page.reload({ waitUntil: 'load' });
+    await page.locator('#profilverbund-profile-list input').first().waitFor();
+    await assertWealthBrowserVisibility(page, false, 0);
     await switchWealthBrowserProfile(page, baseUrl, 'wealth-b');
-    await page.locator('#wealthHistoryTable tbody tr').waitFor();
+    await assertWealthBrowserVisibility(page, false, 1);
+    await toggleWealthBrowserHistory(page, true);
     await assertWealthBrowserTable(page, [zeroEntry]);
-    smoke.assertNoErrors();
+    smoke.assertNoErrors(['Synthetischer UI-Fehler nach Replace']);
     await smoke.close();
 }
 
 async function runBalanceAnnualCommit(browser, baseUrl) {
+    // Zwei frisch initialisierte Profile: jeweils ein echter neuer Jahresabschluss.
+    for (const open of [false, true]) await runBalanceAnnualCommitScenario(browser, baseUrl, open);
+}
+
+async function runBalanceAnnualCommitScenario(browser, baseUrl, open) {
     const smoke = await openSmokePage(browser, baseUrl, 'Balance.html', {
         storage: createBalanceStorage(2026), annualFixtures: { targetYear: 2026 },
         fixedTime: '2027-01-15T12:00:00+01:00'
@@ -911,6 +1134,8 @@ async function runBalanceAnnualCommit(browser, baseUrl) {
     await smoke.page.locator('#profilverbund-profile-list input').waitFor({ state: 'visible' });
     await smoke.page.locator('#aktuellesAlter').waitFor({ state: 'attached' });
     await smoke.page.waitForTimeout(750);
+    await assertWealthBrowserVisibility(smoke.page, false, 0);
+    if (open) await toggleWealthBrowserHistory(smoke.page, true);
     const closeButton = smoke.page.locator('#jahresabschlussBtn');
     let releaseAnnualFetch;
     const annualFetchGate = new Promise(resolve => { releaseAnnualFetch = resolve; });
@@ -959,6 +1184,9 @@ async function runBalanceAnnualCommit(browser, baseUrl) {
         && entries[0].depotwertAlt === 500000 && entries[0].depotwertNeu === 0
         && entries[0].aktienEtf === 500000 && entries[0].total === 600000,
     'Der Jahresstand erfasst die kontrollierten realen Eingabebestände statt simulierter Entnahmen');
+    await assertWealthBrowserVisibility(smoke.page, open, 1);
+    assert(await smoke.page.locator('#wealthHistoryStatus').textContent() === 'Stand gesichert', 'Neuer Jahresstand bestätigt nach Speicherung');
+    if (!open) await toggleWealthBrowserHistory(smoke.page, true);
     await assertWealthBrowserTable(smoke.page, entries);
     const registry = JSON.parse((await readIndexedDb(smoke.page, 'kv', 'rs_profiles_v1')).value);
     const current = (await readIndexedDb(smoke.page, 'kv', 'rs_current_profile')).value;
@@ -969,6 +1197,7 @@ async function runBalanceAnnualCommit(browser, baseUrl) {
     await smoke.page.getByRole('button', { name: 'Jahres-Update', exact: true }).click();
     await smoke.page.locator('#btnJahresUpdate').click();
     await smoke.page.waitForFunction(() => !document.getElementById('captureWealthBtn').disabled);
+    assert(await smoke.page.locator('#wealthHistoryStatus').textContent() === '', 'Wiederholungs-No-op ohne neue Erfassungsbestätigung');
     const repeatMessages = await smoke.page.evaluate(() => window.__browserSmokeMessages);
     assert(repeatMessages.some(message => message.includes('Die Jahresperiode 2026 wurde bereits abgeschlossen.')),
         'Die Wiederholung erreicht den fachlichen No-op statt an einer Vorprüfung zu scheitern');
@@ -976,6 +1205,9 @@ async function runBalanceAnnualCommit(browser, baseUrl) {
         'Der zweite Jahresknopf verändert einen bereits abgeschlossenen Jahresstand nicht');
     assert(await readIndexedDb(smoke.page, 'snapshots', null) === 1, 'Wiederholung erzeugt keinen zweiten Recovery-Snapshot');
     await smoke.page.reload({ waitUntil: 'load' });
+    await smoke.page.locator('#profilverbund-profile-list input').first().waitFor();
+    await assertWealthBrowserVisibility(smoke.page, false, 1);
+    await toggleWealthBrowserHistory(smoke.page, true);
     await smoke.page.locator('#wealthHistoryTable tbody tr').waitFor();
     await assertWealthBrowserTable(smoke.page, entries);
     smoke.assertNoErrors();

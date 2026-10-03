@@ -593,21 +593,27 @@
 
                 <section class="wealth-history" aria-labelledby="wealthHistoryTitle">
                     <h3 id="wealthHistoryTitle">Vermögensverlauf</h3>
-                    <p>Die Stände gehören zum aktiven Profil, auch bei angezeigtem Profilverbund.
-                        Enthalten sind Tagesgeld, Geldmarkt-ETF und Aktien-ETF (Alt- und Neu-Depot).
-                        Gold und separate Anleihen gehören nicht zu dieser Summe.</p>
-                    <button id="captureWealthBtn" type="button" class="btn btn-primary">Stand jetzt erfassen</button>
+                    <div class="wealth-actions">
+                        <button id="captureWealthBtn" type="button" class="btn btn-primary">Stand jetzt erfassen</button>
+                        <button id="toggleWealthHistoryBtn" type="button" class="btn btn-secondary" aria-expanded="false" aria-controls="wealthHistoryDetails">Verlauf anzeigen</button>
+                        <span id="wealthHistoryCount"></span>
+                    </div>
                     <p id="wealthHistoryStatus" role="status" aria-live="polite"></p>
-                    <p id="wealthHistoryHint" aria-live="polite"></p>
-                    <ul class="wealth-legend" aria-label="Vermögensgruppen">
-                        <li><span class="wealth-swatch wealth-tagesgeld" aria-hidden="true"></span>Liquidität (Tagesgeld)</li>
-                        <li><span class="wealth-swatch wealth-geldmarktEtf" aria-hidden="true"></span>Geldmarkt-ETF</li>
-                        <li><span class="wealth-swatch wealth-aktienEtf" aria-hidden="true"></span>Aktien-ETF</li>
-                    </ul>
-                    <p>■ Jahresabschluss: durchgezogener Rahmen · ◇ Manuell: gestrichelter Rahmen.
-                        Unregelmäßig erfasste Stände werden ohne Zwischenwerte dargestellt.</p>
-                    <div id="wealthHistoryChart" class="wealth-scroll" tabindex="0" role="region" aria-label="Vermögensdiagramm"></div>
-                    <div id="wealthHistoryTable" class="wealth-scroll" tabindex="0" role="region" aria-label="Tabelle der Vermögensstände"></div>
+                    <div id="wealthHistoryDetails" hidden>
+                        <p>Die Stände gehören zum aktiven Profil, auch bei angezeigtem Profilverbund.
+                            Enthalten sind Tagesgeld, Geldmarkt-ETF und Aktien-ETF (Alt- und Neu-Depot).
+                            Gold und separate Anleihen gehören nicht zu dieser Summe.</p>
+                        <p id="wealthHistoryHint" aria-live="polite"></p>
+                        <ul class="wealth-legend" aria-label="Vermögensgruppen">
+                            <li><span class="wealth-swatch wealth-tagesgeld" aria-hidden="true"></span>Liquidität (Tagesgeld)</li>
+                            <li><span class="wealth-swatch wealth-geldmarktEtf" aria-hidden="true"></span>Geldmarkt-ETF</li>
+                            <li><span class="wealth-swatch wealth-aktienEtf" aria-hidden="true"></span>Aktien-ETF</li>
+                        </ul>
+                        <p>■ Jahresabschluss: durchgezogener Rahmen · ◇ Manuell: gestrichelter Rahmen.
+                            Unregelmäßig erfasste Stände werden ohne Zwischenwerte dargestellt.</p>
+                        <div id="wealthHistoryChart" class="wealth-scroll" tabindex="0" role="region" aria-label="Vermögensdiagramm"></div>
+                        <div id="wealthHistoryTable" class="wealth-scroll" tabindex="0" role="region" aria-label="Tabelle der Vermögensstände"></div>
+                    </div>
                 </section>
 
                 <div id="print-footer"></div>

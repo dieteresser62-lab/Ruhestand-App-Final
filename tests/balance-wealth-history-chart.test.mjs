@@ -1,9 +1,13 @@
 import { prepareWealthHistoryMetrics } from '../app/balance/balance-wealth-history-metrics.js';
-import { renderBalanceWealthHistory, refreshBalanceWealthHistory } from '../app/balance/balance-wealth-history-renderer.js';
+import { renderBalanceWealthHistory, refreshBalanceWealthHistory, initializeBalanceWealthHistory, toggleBalanceWealthHistory, closeBalanceWealthHistory } from '../app/balance/balance-wealth-history-renderer.js';
 import { createAnnualWealthHistoryEntry, createManualWealthHistoryEntry } from '../types/wealth-history-contract.js';
 import { UIUtils } from '../app/balance/balance-utils.js';
+import { readFileSync } from 'node:fs';
 
 console.log('--- Vermögensverlauf: Aufbereitung und SVG ---');
+const html = readFileSync(new URL('../Balance.html', import.meta.url), 'utf8');
+assert(/<div id="wealthHistoryDetails" hidden>/.test(html), 'Details schon im ausgelieferten Markup geschlossen');
+assert(/id="toggleWealthHistoryBtn"[^>]*type="button"[^>]*aria-expanded="false"[^>]*aria-controls="wealthHistoryDetails"/.test(html), 'Nativer Umschaltknopf mit initial geschlossenem ARIA-Vertrag');
 const source = { tagesgeld: 12000, geldmarktEtf: 23000, depotwertAlt: 34000, depotwertNeu: 45000 };
 const annual = createAnnualWealthHistoryEntry(source, 2026);
 const manual = createManualWealthHistoryEntry(source, '2026-12-31');
@@ -77,3 +81,61 @@ for (const invalid of [{ schemaVersion: 9, entries: [] }, { schemaVersion: 1, en
 }
 assert(!refreshBalanceWealthHistory(dom, () => { throw new Error('<script>beschädigt</script>'); }), 'Ladefehler wird dargestellt');
 assert(dom.hint.textContent.includes('<script>beschädigt</script>'), 'Fehlertext wird als Text statt HTML gesetzt');
+
+
+// Der geschlossene Pfad darf nicht einmal vorübergehend Inhalte erzeugen.
+const documentFake = { activeElement: null };
+const attributes = {};
+const controlled = {
+    details: { hidden: false, ownerDocument: documentFake, contains: el => el === controlled.chart },
+    toggle: { textContent: '', setAttribute: (key, value) => { attributes[key] = value; },
+        focus: () => { documentFake.activeElement = controlled.toggle; } },
+    count: { textContent: '' }, status: { textContent: '' }, hint: { textContent: '' }
+};
+for (const key of ['chart', 'table']) {
+    let markup = 'veraltet';
+    controlled[key] = {
+        get innerHTML() { return markup; },
+        set innerHTML(value) {
+            assert(!controlled.details.hidden || value === '', 'Geschlossen niemals SVG oder Tabelle erzeugen');
+            markup = value;
+        }
+    };
+}
+let current = state;
+let reads = 0;
+const load = () => { reads += 1; return current; };
+documentFake.activeElement = controlled.chart;
+assert(initializeBalanceWealthHistory(controlled, load), 'Initialisierung schließt auch gefüllte Historie');
+assert(controlled.details.hidden, 'Details initial geschlossen');
+assertEqual(documentFake.activeElement, controlled.toggle, 'Programmatisches Schließen führt Detailfokus zurück');
+assertEqual(attributes['aria-expanded'], 'false', 'ARIA geschlossen');
+assertEqual(controlled.toggle.textContent, 'Verlauf anzeigen', 'Name geschlossen');
+assertEqual(controlled.count.textContent, '3 Stände', 'Anzahl außerhalb der Details');
+assertEqual(controlled.chart.innerHTML + controlled.table.innerHTML + controlled.hint.textContent, '', 'Keine Details beim Start');
+assert(toggleBalanceWealthHistory(controlled, load), 'Öffnen lädt aktuelle Daten');
+assert(!controlled.details.hidden && attributes['aria-expanded'] === 'true', 'Sichtbarkeit und ARIA offen');
+assertEqual(controlled.toggle.textContent, 'Verlauf ausblenden', 'Name offen');
+assertChartAccessibility(controlled.chart.innerHTML);
+assertEqual(reads, 2, 'Öffnen liest erneut');
+const outside = {};
+documentFake.activeElement = outside;
+closeBalanceWealthHistory(controlled);
+assertEqual(documentFake.activeElement, outside, 'Fokus außerhalb wird nicht gestohlen');
+current = { wealthHistory: { schemaVersion: 1, entries: [earlier] } };
+assert(refreshBalanceWealthHistory(controlled, load), 'Geschlossene neue Datenbasis gültig');
+assertEqual(controlled.count.textContent, '1 Stand', 'Aktuelle Anzahl ohne Darstellung');
+toggleBalanceWealthHistory(controlled, load);
+assert(controlled.table.innerHTML.includes('01.06.2026') && !controlled.table.innerHTML.includes('31.12.2026'), 'Wiederöffnen zeigt ausschließlich den aktuellen State');
+assertEqual(JSON.stringify(state), original, 'Umschalten mutiert die Quelle nicht');
+closeBalanceWealthHistory(controlled);
+current = { wealthHistory: { schemaVersion: 9, entries: [] } };
+assert(!refreshBalanceWealthHistory(controlled, load), 'Auch geschlossen validieren');
+assert(controlled.status.textContent.includes('kann nicht angezeigt werden'), 'Geschlossener Fehler außerhalb sichtbar');
+assertEqual(controlled.count.textContent, '', 'Fehler wird nicht als leere Anzahl ausgegeben');
+current = {};
+refreshBalanceWealthHistory(controlled, load);
+assertEqual(controlled.status.textContent, '', 'Erholter State entfernt Darstellungsfehler');
+assertEqual(controlled.hint.textContent, '', 'Leerhinweis bleibt geschlossen verborgen');
+toggleBalanceWealthHistory(controlled, load);
+assert(controlled.hint.textContent.includes('Noch keine Stände'), 'Leere Historie lässt sich öffnen');
