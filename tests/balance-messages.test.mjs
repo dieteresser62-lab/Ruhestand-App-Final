@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { initUIRenderer, UIRenderer } from '../app/balance/balance-renderer.js';
-import { ValidationError } from '../app/balance/balance-config.js';
+import { AppError, ValidationError } from '../app/balance/balance-config.js';
 import { getTestExecutionPolicy, getTestFiles } from './run-tests.mjs';
 
 // Nur benötigte DOM-Operationen; textContent folgt der echten Kindknoten-Semantik.
@@ -9,6 +9,8 @@ class Element {
         this.children = [];
         this.className = '';
         this.attributes = {};
+        this.dataset = {};
+        this.listeners = {};
         this.classList = {
             add: name => { this.className = `${this.className} ${name}`.trim(); },
             remove: name => { this.className = this.className.split(' ').filter(c => c !== name).join(' '); }
@@ -17,7 +19,10 @@ class Element {
     set textContent(value) { this.children = []; this.text = String(value); }
     get textContent() { return (this.text || '') + this.children.map(child => child.textContent).join(''); }
     setAttribute(name, value) { this.attributes[name] = value; }
-    appendChild(child) { this.children.push(child); }
+    appendChild(child) { child.parentNode = this; this.children.push(child); }
+    remove() { if (this.parentNode) this.parentNode.children = this.parentNode.children.filter(child => child !== this); }
+    addEventListener(type, callback) { this.listeners[type] = callback; }
+    click() { this.listeners.click?.(); }
     replaceChildren(...children) { this.text = ''; this.children = children; }
 }
 
@@ -51,7 +56,7 @@ class Clock {
 const savedGlobals = Object.fromEntries(['document', 'setTimeout', 'clearTimeout']
     .map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
 const clock = new Clock();
-const refs = () => ({ containers: { error: new Element(), toast: new Element() }, inputs: { field: new Element() } });
+const refs = () => ({ containers: { error: new Element(), toast: new Element(), actionError: new Element() }, inputs: { field: new Element() } });
 const toastText = dom => dom.containers.toast.children.find(child => child.className === 'toast-text')?.textContent || '';
 
 try {
@@ -63,6 +68,8 @@ try {
     const html = fs.readFileSync(new URL('../Balance.html', import.meta.url), 'utf8');
     assert(/id="error-container"[^>]*><\/div>\s*<div id="toast-container" role="status" aria-live="polite" aria-atomic="true"/.test(html),
         'Der unabhängige atomare Statusbereich steht unmittelbar neben dem Fehlerkanal');
+    assert(/id="action-error-container" role="alert" aria-live="assertive"/.test(html),
+        'Aktionsfehler besitzen eine unabhängige zugängliche Meldungsregion');
     assertEqual(getTestExecutionPolicy('balance-messages.test.mjs').mode, 'isolated', 'Die Suite isoliert DOM und Uhr');
     assert(getTestFiles(new URL('.', import.meta.url)).includes('balance-messages.test.mjs'),
         'Der bestehende Runner entdeckt die neue Testdatei');
@@ -120,11 +127,40 @@ try {
     clock.advance(6000);
     assert(dom.containers.error.textContent.includes('Gleichzeitig'), 'Toastablauf löscht keinen gleichzeitigen Fehler');
 
+    UIRenderer.handleActionError(new AppError('Import mit Recovery [rollback]'), 'balance-import');
+    UIRenderer.handleActionError(new ValidationError([{ fieldId: 'field', message: 'Aktionsdetail' }]), 'annual');
+    const actionContainer = dom.containers.actionError;
+    assertEqual(actionContainer.children.length, 2, 'Zwei Bereiche bleiben gleichzeitig sichtbar');
+    const importEntry = actionContainer.children[0];
+    const annualEntry = actionContainer.children[1];
+    assertEqual(importEntry.children[0].textContent, 'Ein interner Fehler ist aufgetreten: Import mit Recovery [rollback]',
+        'Aktionsfehler erhält den AppError-Präfix samt Code und Recoverytext');
+    assert(annualEntry.children[0].textContent.includes('Aktionsdetail'), 'ValidationError in einer Aktion behält seine Liste');
+    assertEqual(dom.inputs.field.className, '', 'Aktionsvalidierung markiert keine Berechnungsfelder');
+    UIRenderer.handleError(new ValidationError([{ fieldId: 'field', message: 'Berechnungsdetail' }]));
+    assert(dom.inputs.field.className.includes('input-error'), 'Gleichzeitige Berechnungsvalidierung markiert ihr Feld');
+    UIRenderer.toast('Weiter');
+    UIRenderer.clearError();
+    clock.advance(6000);
+    assertEqual(actionContainer.children.length, 2, 'Berechnungsbereinigung und Toastablauf erhalten beide Aktionsfehler');
+    const close = importEntry.children[1];
+    assertEqual(close.type, 'button', 'Schließen ist ein echter Knopf ohne Formularsubmit');
+    assert(close.attributes['aria-label'].includes('Import mit Recovery'), 'Schließen besitzt einen verständlichen zugänglichen Namen');
+    close.click();
+    assertEqual(actionContainer.children.length, 1, 'Schließen entfernt genau einen Bereich');
+    assertEqual(actionContainer.children[0], annualEntry, 'Anderer Bereich bleibt unverändert');
+    UIRenderer.handleActionError(new Error('Neu'), 'balance-import');
+    close.click();
+    assertEqual(actionContainer.children.length, 2, 'Ein veralteter Schließenknopf entfernt keinen neuen Fehler');
+    UIRenderer.clearActionError('annual');
+    assertEqual(actionContainer.children.length, 1, 'Gezieltes Rücksetzen lässt andere Bereiche stehen');
+
     UIRenderer.toast('Alter DOM');
     const beforeInitId = clock.nextId;
     const newDom = refs();
     initUIRenderer(newDom, null);
     assertEqual(clock.pending.size, 0, 'Neuinitialisierung storniert alte Timer');
+    assertEqual(actionContainer.children.length, 0, 'Neuinitialisierung beendet den flüchtigen Aktionszustand');
     assertEqual(toastText(dom), '', 'Neuinitialisierung entfernt alten Toastzustand');
     UIRenderer.toast('Neuer DOM');
     clock.callbacks.get(beforeInitId)();

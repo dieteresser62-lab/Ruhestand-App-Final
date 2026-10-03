@@ -341,7 +341,7 @@ const prevHTMLInputElement = global.HTMLInputElement;
 const prevURL = global.URL;
 const prevBlob = global.Blob;
 const prevToast = UIRenderer.toast;
-const prevHandleError = UIRenderer.handleError;
+const prevHandleError = UIRenderer.handleActionError;
 const prevLoadState = StorageManager.loadState;
 const prevSaveState = StorageManager.saveState;
 const prevResetState = StorageManager.resetState;
@@ -391,9 +391,20 @@ async function runBalanceUiOrchestrationTests() {
             'Depot-Zeitstempel wird bis zum expliziten persist_inputs-Lauf vorgemerkt');
 
         const debounceCallsBeforeFileChange = debouncedCalls;
-        dom.containers.form.listeners.change[0]({ target: { id: 'importFile', type: 'file' } });
-        assertEqual(debouncedCalls, debounceCallsBeforeFileChange,
-            'Dateiauswahl wird nur vom Import-Handler verarbeitet und plant keinen parallelen Persistenzlauf');
+        const metadataBefore = JSON.stringify(binderState.pendingInputMetadata);
+        for (const id of ['importFile', 'csvFileInput', 'expensesCsvInput', 'depotwertDatei']) {
+            for (const type of ['input', 'change']) {
+                dom.containers.form.listeners[type][0]({ target: { id, type: 'file' } });
+            }
+        }
+        assertEqual(debouncedCalls, debounceCallsBeforeFileChange, 'Alle Dateievents planen null Updates');
+        assertEqual(updateCalls, 0, 'Alle Dateievents lösen null direkte Updates aus');
+        assertEqual(JSON.stringify(binderState.pendingInputMetadata), metadataBefore,
+            'Dateievents verändern keine vorgemerkten Metadaten, auch bei Depot-ID');
+        dom.containers.form.listeners.input[0]({ target: { id: 'goldWert' } });
+        assert(Number.isFinite(binderState.pendingInputMetadata.depotLastUpdate), 'Gold behält seinen Zeitstempel');
+        assertEqual(debouncedCalls, debounceCallsBeforeFileChange + 1, 'Gold plant weiterhin sein Update');
+
     }
 
     console.log('Test 2: Profilverbund init preserves membership and excludes opted-out profiles');
@@ -1062,8 +1073,9 @@ async function runBalanceUiOrchestrationTests() {
         PersistenceFacade.resetPersistenceForTests();
 
         const errors = [];
+        const errorScopes = [];
         const toasts = [];
-        UIRenderer.handleError = error => { errors.push(error); };
+        UIRenderer.handleActionError = (error, scope) => { errors.push(error); errorScopes.push(scope); };
         UIRenderer.toast = message => { toasts.push(message); };
         StorageManager.saveState = () => {};
         StorageManager.loadState = () => ({ inputs: {} });
@@ -1096,11 +1108,13 @@ async function runBalanceUiOrchestrationTests() {
 
         StorageManager.loadState = () => ({});
         handlers.handleExport();
+        assertEqual(errorScopes[0], 'balance-export', 'Exportfehler gehört zum Exportbereich');
         assert(errors[0].message.includes('[invalid_inputs]'),
             'Ein strukturell unmöglicher Export reicht den maschinenlesbaren Fehlercode durch');
         assert(errors[0].message.includes('inputs'),
             'Ein strukturell unmöglicher Export nennt den konkreten fehlenden Bereich');
         errors.length = 0;
+        errorScopes.length = 0;
         StorageManager.loadState = () => ({ inputs: {} });
 
         let badJsonFileValue = 'C:\\fakepath\\invalid.json';
@@ -1126,7 +1140,8 @@ async function runBalanceUiOrchestrationTests() {
         };
         await handlers.handleCsvImport({ target: badCsvTarget });
 
-        assertEqual(errors.length, 2, 'Import- und CSV-Fehler werden ueber handleError gemeldet');
+        assertEqual(errors.length, 2, 'Import- und CSV-Fehler werden ueber handleActionError gemeldet');
+        assertEqual(errorScopes.join(','), 'balance-import,market-csv-import', 'Importfehler besitzen ihre jeweiligen Bereiche');
         assert(errors[0].message.includes('kein gültiges JSON'), 'JSON-Import nennt sichere Ursache und Handlungsoption');
         assert(errors[1].message.includes('CSV-Import fehlgeschlagen'), 'CSV-Import meldet nutzerfaehigen Fehlertext');
         assertEqual(badJsonTarget.value, '', 'JSON-Dateiauswahl wird nach Fehler zurueckgesetzt');
@@ -1744,7 +1759,7 @@ if (runRequested) {
         if (prevRollbackImportReplace === undefined) delete StorageManager.rollbackImportReplace; else StorageManager.rollbackImportReplace = prevRollbackImportReplace;
         if (prevApplyStoredInputs === undefined) delete UIReader.applyStoredInputs; else UIReader.applyStoredInputs = prevApplyStoredInputs;
         UIRenderer.toast = prevToast;
-        UIRenderer.handleError = prevHandleError;
+        UIRenderer.handleActionError = prevHandleError;
         if (prevBlob === undefined) delete global.Blob; else global.Blob = prevBlob;
         if (prevURL === undefined) delete global.URL; else global.URL = prevURL;
         if (prevHTMLInputElement === undefined) delete global.HTMLInputElement; else global.HTMLInputElement = prevHTMLInputElement;

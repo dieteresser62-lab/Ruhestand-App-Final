@@ -100,12 +100,15 @@ const previous = {
     fetch: global.fetch,
     localStorage: global.localStorage,
     toast: UIRenderer.toast,
-    handleError: UIRenderer.handleError
+    clearActionError: UIRenderer.clearActionError,
+    handleError: UIRenderer.handleActionError
 };
 
+const actionResets = [];
 try {
+    UIRenderer.clearActionError = scope => { actionResets.push(scope); };
     UIRenderer.toast = () => {};
-    UIRenderer.handleError = () => {};
+    UIRenderer.handleActionError = () => {};
 
     console.log('Test 1: period id creates a stable UTC year-end request window');
     {
@@ -250,7 +253,8 @@ try {
             return okJsonResponse(yahooChart([unix('2025-12-30T16:30:00Z')], [140.4]));
         };
 
-        const result = await handlers.handleNachrueckenMitETF();
+        const result = await handlers.handleNachrueckenMitETF({ nested: true });
+        assertEqual(actionResets.length, 0, 'Verschachtelter Jahresschritt löscht keine Annualfehler');
         const request = createAnnualMarketDataRequest('calendar-year:2025');
         const requested = new URL(requestedUrl);
         const stored = JSON.parse(localStorage.getItem(CONFIG.STORAGE.LS_KEY));
@@ -296,7 +300,9 @@ try {
             yahooChart([unix('2025-12-31T16:30:00Z')], [150])
         );
 
+        actionResets.length = 0;
         const result = await handlers.handleNachrueckenMitETF();
+        assertEqual(actionResets.join(','), 'annual', 'Direkter Jahresschritt bereinigt genau seinen Annualbereich');
         const meta = JSON.parse(localStorage.getItem(CONFIG.STORAGE.LS_KEY))[ANNUAL_MARKET_DATA_META_KEY];
         assertEqual(result.ath.isNew, false, 'ATH-Gleichstand ist kein neues Hoch');
         assertEqual(result.ath.yearsSince, 0, 'ATH-Gleichstand setzt Jahre seit ATH auf null');
@@ -481,7 +487,8 @@ try {
     console.log('Balance annual marketdata tests passed');
 } finally {
     UIRenderer.toast = previous.toast;
-    UIRenderer.handleError = previous.handleError;
+    UIRenderer.handleActionError = previous.handleError;
+    UIRenderer.clearActionError = previous.clearActionError;
     if (previous.fetch === undefined) delete global.fetch; else global.fetch = previous.fetch;
     if (previous.localStorage === undefined) delete global.localStorage; else global.localStorage = previous.localStorage;
 }

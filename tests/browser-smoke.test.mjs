@@ -202,10 +202,24 @@ async function createPage(browser, label, options = {}) {
         window.prompt = () => 'offen';
         window.__browserSmokeMessages = [];
         addEventListener('DOMContentLoaded', () => {
-            for (const id of ['error-container', 'toast-container']) {
+            for (const id of ['error-container', 'toast-container', 'action-error-container']) {
                 const target = document.getElementById(id);
                 if (!target) continue;
+                let previousActions = new Map();
                 new MutationObserver(() => {
+                    if (id === 'action-error-container') {
+                        const current = new Map();
+                        for (const entry of target.querySelectorAll('.action-error-entry')) {
+                            const text = entry.querySelector('.action-error-text')?.textContent;
+                            const previous = previousActions.get(entry.dataset.scope);
+                            if (text && (previous?.entry !== entry || previous?.text !== text)) {
+                                window.__browserSmokeMessages.push(text);
+                            }
+                            current.set(entry.dataset.scope, { entry, text });
+                        }
+                        previousActions = current;
+                        return;
+                    }
                     const text = id === 'toast-container'
                         ? target.querySelector('.toast-text')?.textContent : target.textContent;
                     if (text) window.__browserSmokeMessages.push(text);
@@ -568,7 +582,7 @@ async function runBalanceAnnualPreflight(browser, baseUrl) {
     await age.waitFor({ state: 'attached' });
     const before = await age.inputValue();
     await smoke.page.locator('#jahresabschlussBtn').click();
-    await smoke.page.locator('#error-container').filter({ hasText: 'muss fuer den Abschluss auf 2025 stehen' }).waitFor();
+    await smoke.page.locator('#action-error-container .action-error-text').filter({ hasText: 'muss fuer den Abschluss auf 2025 stehen' }).waitFor();
     assert(await age.inputValue() === before, 'Fehlgeschlagener Preflight darf das Alter nicht mutieren');
     assert(await readIndexedDb(smoke.page, 'snapshots', null) === 0, 'Fehlgeschlagener Preflight darf keinen Snapshot anlegen');
     smoke.assertNoErrors();
@@ -888,7 +902,8 @@ async function activateWealthBrowserTab(page, expanded, key = null) {
                     value: function (...args) { count(this); return original.apply(this, args); } });
             };
             for (const [object, method, counter] of [[UIReader, 'readAllInputs', 'updates'],
-                [UIRenderer, 'clearError', 'clears'], [persistenceStorage, 'setItem', 'writes']]) {
+                [UIRenderer, 'clearError', 'clears'], [UIRenderer, 'clearActionError', 'clears'],
+                [persistenceStorage, 'setItem', 'writes']]) {
                 instrument(object, method, () => { calls[counter] += 1; });
             }
             // Storage-Instanzen haben benannte Eigenschaften: Methoden am Prototyp
@@ -1292,6 +1307,20 @@ async function runBalanceWealthHistory(browser, baseUrl) {
             await page.waitForFunction(({ messageIndex, message }) => document.getElementById('importFile').value === ''
                 && window.__browserSmokeMessages.slice(messageIndex).some(text => text.includes(message)), { messageIndex, message });
             await waitForWealthBrowserIdle(page);
+            if (message === 'kein gültiges JSON' || message === 'automatisch wiederhergestellt') {
+                const visibleError = page.locator('#action-error-container .action-error-text').filter({ hasText: message });
+                await visibleError.waitFor({ state: 'visible' });
+                const text = await visibleError.textContent();
+                await page.waitForTimeout(2000);
+                assert(await visibleError.isVisible() && await visibleError.textContent() === text,
+                    `${name}: Aktionsfehler bleibt bei ${active ? 'offenem' : 'geschlossenem'} Verlauf nach 2 s sichtbar`);
+                assert((await page.evaluate(index => window.__browserSmokeMessages.slice(index), messageIndex)).includes(text),
+                    `${name}: Das Protokoll enthält den unveränderten Text ohne Schließenbeschriftung`);
+                await activateWealthBrowserTab(page, !active);
+                assert(await visibleError.isVisible() && await visibleError.textContent() === text, `${name}: Tabwechsel erhält den Fehler`);
+                await activateWealthBrowserTab(page, active);
+                assert(await visibleError.isVisible() && await visibleError.textContent() === text, `${name}: Rückwechsel erhält den Fehler`);
+            }
         };
         await runImport('synthetischer-verlauf.json', JSON.stringify(valid), 'erfolgreich');
         await assertWealthBrowserVisibility(page, active, 1);
@@ -1411,6 +1440,7 @@ async function runBalanceAnnualCommitScenario(browser, baseUrl, open) {
             age: document.getElementById('aktuellesAlter')?.value,
             year: document.getElementById('expensesYearSelect')?.value,
             error: document.getElementById('error-container')?.textContent,
+            actionError: document.getElementById('action-error-container')?.textContent,
             messages: window.__browserSmokeMessages
         }));
         const stateRow = await readIndexedDb(smoke.page, 'kv', BALANCE_STATE_KEY);
@@ -1499,11 +1529,18 @@ async function runBalanceImportReject(browser, baseUrl) {
         input.files = transfer.files;
         input.dispatchEvent(new Event('change', { bubbles: true }));
     });
-    await smoke.page.waitForTimeout(1000);
+    await smoke.page.waitForFunction(() => document.getElementById('importFile').value === ''
+        && window.__browserSmokeMessages.some(text => text.includes('kein gültiges JSON')));
+    const visibleError = smoke.page.locator('#action-error-container .action-error-text').filter({ hasText: 'kein gültiges JSON' });
+    await visibleError.waitFor({ state: 'visible' });
+    const errorBeforeWait = await visibleError.textContent();
+    await smoke.page.waitForTimeout(2000);
+    assert(await visibleError.isVisible() && await visibleError.textContent() === errorBeforeWait,
+        'Import-Reject bleibt nach abgeschlossener Verarbeitung noch nach 2 s sichtbar');
     const messages = await smoke.page.evaluate(() => window.__browserSmokeMessages);
     const diagnostics = await smoke.page.evaluate(() => ({
         files: Array.from(document.getElementById('importFile')?.files || []).map(file => file.name),
-        error: document.getElementById('error-container')?.textContent
+        error: document.getElementById('action-error-container')?.textContent
     }));
     assert(
         messages.some(message => message.includes('kein gültiges JSON')),

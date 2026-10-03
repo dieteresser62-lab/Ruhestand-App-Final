@@ -27,6 +27,26 @@ let actionRenderer = null;
 let diagnosisRenderer = null;
 let toastTimer = null;
 let toastRevision = 0;
+const actionErrors = new Map();
+
+function renderError(container, error, markFields = false) {
+    container.className = 'error-warn';
+    if (error instanceof ValidationError) {
+        container.textContent = error.message;
+        const ul = document.createElement('ul');
+        error.errors.forEach(({ fieldId, message }) => {
+            const li = document.createElement('li');
+            li.textContent = message;
+            ul.appendChild(li);
+            if (markFields) dom.inputs?.[fieldId]?.classList.add('input-error');
+        });
+        container.appendChild(ul);
+    } else if (error instanceof AppError) {
+        container.textContent = `Ein interner Fehler ist aufgetreten: ${error.message}`;
+    } else {
+        container.textContent = `Ein unerwarteter Anwendungsfehler ist aufgetreten: ${error.message || 'Unbekannter Fehler'}`;
+    }
+}
 
 function clearToast(container) {
     if (!container) return;
@@ -47,6 +67,9 @@ export function initUIRenderer(domRefs, storageManager) {
     toastTimer = null;
     clearToast(dom?.containers?.toast);
     clearToast(domRefs?.containers?.toast);
+    dom?.containers?.actionError?.replaceChildren();
+    domRefs?.containers?.actionError?.replaceChildren();
+    actionErrors.clear();
     dom = domRefs;
     StorageManager = storageManager;
     summaryRenderer = new SummaryRenderer(domRefs, storageManager);
@@ -140,27 +163,36 @@ export const UIRenderer = {
     handleError(error) {
         const container = dom?.containers?.error;
         if (!container) return;
-        container.className = 'error-warn';
+        renderError(container, error, true);
+    },
 
-        if (error instanceof ValidationError) {
-            // Highlight field-level errors and show a compact list.
-            container.textContent = error.message;
-            const ul = document.createElement('ul');
-            error.errors.forEach(({ fieldId, message }) => {
-                const li = document.createElement('li');
-                li.textContent = message;
-                ul.appendChild(li);
-                const inputEl = dom.inputs[fieldId];
-                if (inputEl) {
-                    inputEl.classList.add('input-error');
-                }
-            });
-            container.appendChild(ul);
-        } else if (error instanceof AppError) {
-            container.textContent = `Ein interner Fehler ist aufgetreten: ${error.message}`;
-        } else {
-            container.textContent = `Ein unerwarteter Anwendungsfehler ist aufgetreten: ${error.message || 'Unbekannter Fehler'}`;
-        }
+    handleActionError(error, scope) {
+        const container = dom?.containers?.actionError;
+        if (!container) return;
+        this.clearActionError(scope);
+        const entry = document.createElement('div');
+        entry.className = 'action-error-entry';
+        entry.dataset.scope = scope;
+        const text = document.createElement('div');
+        renderError(text, error);
+        text.classList.add('action-error-text');
+        const close = document.createElement('button');
+        close.type = 'button';
+        close.textContent = 'Schließen';
+        close.setAttribute('aria-label', `Fehlermeldung schließen: ${text.textContent}`);
+        close.addEventListener('click', () => {
+            // Ein alter Knopf darf keinen späteren Fehler desselben Bereichs entfernen.
+            if (actionErrors.get(scope) === entry) this.clearActionError(scope);
+        });
+        entry.appendChild(text);
+        entry.appendChild(close);
+        actionErrors.set(scope, entry);
+        container.appendChild(entry);
+    },
+
+    clearActionError(scope) {
+        actionErrors.get(scope)?.remove();
+        actionErrors.delete(scope);
     },
 
     /**

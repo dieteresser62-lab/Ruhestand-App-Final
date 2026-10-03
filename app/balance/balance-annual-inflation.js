@@ -412,7 +412,19 @@ export function createInflationHandlers({
         }
     };
 
-    const handleFetchInflation = async () => {
+    let fetchInFlight = false;
+    const handleFetchInflation = async ({ nested = false } = {}) => {
+        if (fetchInFlight) {
+            if (nested) {
+                throw new AppError(
+                    'Der Inflationsdaten-Abruf läuft bereits. Der Jahresschritt kann nicht parallel ausgeführt werden.',
+                    { code: 'inflation_fetch_in_flight' }
+                );
+            }
+            return;
+        }
+        fetchInFlight = true;
+        if (!nested) UIRenderer.clearActionError('annual');
         const btn = dom.controls.btnFetchInflation;
         const originalText = btn?.innerHTML;
 
@@ -469,9 +481,10 @@ export function createInflationHandlers({
             return validatedResult;
         } catch (err) {
             console.error('Inflation API Fehler:', err);
-            UIRenderer.handleError(new AppError('Inflationsdaten-Abruf fehlgeschlagen.', { originalError: err }));
+            UIRenderer.handleActionError(new AppError('Inflationsdaten-Abruf fehlgeschlagen.', { originalError: err }), 'annual');
             throw err;
         } finally {
+            fetchInFlight = false;
             if (btn) {
                 btn.disabled = false;
                 btn.innerHTML = originalText;

@@ -1,3 +1,4 @@
+import { UIRenderer } from '../app/balance/balance-renderer.js';
 import { initExpensesTab, updateExpensesBudget, rollExpensesYear } from '../app/balance/balance-expenses.js';
 import {
     EXPENSE_CSV_IMPORT_SUMMARY,
@@ -298,6 +299,12 @@ const prevLocalStorage = global.localStorage;
 const prevWindow = global.window;
 const prevDocument = global.document;
 const prevConfirm = global.confirm;
+const prevActionError = UIRenderer.handleActionError;
+const prevClearActionError = UIRenderer.clearActionError;
+const actionErrors = [];
+const actionClears = [];
+UIRenderer.handleActionError = (error, scope) => { actionErrors.push({ error, scope }); };
+UIRenderer.clearActionError = scope => { actionClears.push(scope); };
 
 try {
     // 0) Extrahierte DOM-freie Module: CSV, Metriken und Storage-Shape
@@ -591,7 +598,9 @@ try {
     let recoveryPanel = recoveryDom.expenses.table.querySelector('[data-expenses-recovery="corrupt"]');
     const resetBeforeExport = recoveryPanel.querySelector('[data-action="expenses-recovery-reset"]');
     assertEqual(resetBeforeExport.disabled, true, 'Reset bleibt vor einem Recovery-Export sichtbar, aber gesperrt');
+    const clearsBeforeBlocked = actionClears.length;
     resetBeforeExport.click();
+    assertEqual(actionClears.length, clearsBeforeBlocked, 'Gesperrter Recoveryreset entfernt keinen Aktionsfehler');
     assertEqual(resetPrompts.length, 0, 'Gesperrter Reset fragt nicht nach Bestaetigung');
     assertEqual(global.localStorage.getItem(STORAGE_KEY), corruptRaw, 'Gesperrter Reset ueberschreibt keine Daten');
 
@@ -603,7 +612,9 @@ try {
     const resetAfterExport = recoveryPanel.querySelector('[data-action="expenses-recovery-reset"]');
     assertEqual(resetAfterExport.disabled, false, 'Erfolgreicher Recovery-Export schaltet Reset frei');
 
+    const clearsBeforeCancel = actionClears.length;
     resetAfterExport.click();
+    assertEqual(actionClears.length, clearsBeforeCancel, 'Abgebrochene Recoverybestätigung entfernt keinen Aktionsfehler');
     assertEqual(resetPrompts.length, 1, 'Reset verlangt eine explizite Bestaetigung');
     assertEqual(global.localStorage.getItem(STORAGE_KEY), corruptRaw, 'Abgelehnter Reset laesst Rohinhalt unveraendert');
     approveReset = true;
@@ -615,6 +626,8 @@ try {
         'Quota-/Flush-Fehler bleibt im sichtbaren Recovery-Zustand'
     );
 
+    assertEqual(actionErrors.at(-1)?.scope, 'expenses-recovery', 'Fehlgeschlagener Reset gehört zum Recoverybereich');
+    assert(actionErrors.at(-1)?.error.message.includes('nicht zurueckgesetzt'), 'Recoveryfehler behält seinen sicheren Wortlaut');
     failResetFlush = false;
     recoveryDom.expenses.table.querySelector('[data-action="expenses-recovery-reset"]').click();
     await new Promise(resolve => setTimeout(resolve, 0));
@@ -630,6 +643,8 @@ try {
 
     console.log('✅ Balance expenses tests passed');
 } finally {
+    UIRenderer.handleActionError = prevActionError;
+    UIRenderer.clearActionError = prevClearActionError;
     if (prevDocument === undefined) delete global.document; else global.document = prevDocument;
     if (prevWindow === undefined) delete global.window; else global.window = prevWindow;
     if (prevLocalStorage === undefined) delete global.localStorage; else global.localStorage = prevLocalStorage;

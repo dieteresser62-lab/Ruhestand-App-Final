@@ -345,6 +345,7 @@ export function createMarketdataHandlers({
     };
 
     const handleNachruecken = () => {
+        UIRenderer.clearActionError('annual');
         const state = StorageManager.loadState() || {};
         captureAnnualMarketDataMetaForUndo(state);
         delete state[ANNUAL_MARKET_DATA_META_KEY];
@@ -371,6 +372,7 @@ export function createMarketdataHandlers({
     };
 
     const handleUndoNachruecken = () => {
+        UIRenderer.clearActionError('annual');
         if (appState.lastMarktData) {
             Object.entries(appState.lastMarktData).forEach(([k, v]) => {
                 dom.inputs[k].value = v;
@@ -479,7 +481,19 @@ export function createMarketdataHandlers({
         );
     };
 
-    const handleNachrueckenMitETF = async () => {
+    let etfInFlight = false;
+    const handleNachrueckenMitETF = async ({ nested = false } = {}) => {
+        if (etfInFlight) {
+            if (nested) {
+                throw new AppError(
+                    'Der ETF-Abruf läuft bereits. Der Jahresschritt kann nicht parallel ausgeführt werden.',
+                    { code: 'etf_fetch_in_flight' }
+                );
+            }
+            return;
+        }
+        etfInFlight = true;
+        if (!nested) UIRenderer.clearActionError('annual');
         const btn = dom.controls.btnNachrueckenMitETF;  // Kann undefined sein (wenn von Jahres-Update aufgerufen)
         const originalText = btn?.innerHTML;
         let rollbackContext = null;
@@ -657,9 +671,10 @@ export function createMarketdataHandlers({
                 }
             }
             console.error('Nachrücken mit ETF fehlgeschlagen:', err);
-            UIRenderer.handleError(err);
+            UIRenderer.handleActionError(err, 'annual');
             throw err; // Re-throw für Jahres-Update
         } finally {
+            etfInFlight = false;
             if (btn) {
                 btn.disabled = false;
                 btn.innerHTML = originalText;
@@ -714,7 +729,8 @@ export function createMarketdataHandlers({
         };
     };
 
-    const handleFetchCapeAuto = async () => {
+    const handleFetchCapeAuto = async ({ nested = false } = {}) => {
+        if (!nested) UIRenderer.clearActionError('annual');
         const nowIso = new Date().toISOString();
         const errors = [];
         const stored = readStoredCapeMeta();

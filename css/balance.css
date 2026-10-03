@@ -376,6 +376,24 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button {
 
 #error-container ul { padding-left: 20px; margin: 5px 0 0 0; }
 
+#action-error-container .action-error-entry {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-top: 10px;
+    padding: 12px;
+    border: 2px solid var(--danger-color);
+    border-radius: 6px;
+    color: var(--danger-color);
+    overflow-wrap: anywhere;
+}
+#action-error-container .action-error-text { flex: 1; min-width: 0; }
+#action-error-container ul { padding-left: 20px; margin: 5px 0 0; }
+#action-error-container button { flex-shrink: 0; cursor: pointer; }
+@media (max-width: 480px) {
+    #action-error-container .action-error-entry { flex-direction: column; }
+}
+
 #toast-container:not(:empty) {
     display: flex;
     align-items: flex-start;
@@ -1341,7 +1359,7 @@ html[data-density=compact] .result-item { padding: 12px; }
     .form-column { display: none; }
     .results-column { position: static; box-shadow: none; border: 1px solid #ccc; }
     #handlungsanweisung { padding: 15px; }
-    .btn, input[type=file], .reset-button, #copyAction, .tab-buttons, .mini-summary, #openDiagnosisBtn, #toast-container { display: none; }
+    .btn, input[type=file], .reset-button, #copyAction, .tab-buttons, .mini-summary, #openDiagnosisBtn, #toast-container, #action-error-container { display: none; }
     #toast-container:not(:empty) { display: none; }
     .tab-panel { display: block !important; }
     h1 small { display: none; }

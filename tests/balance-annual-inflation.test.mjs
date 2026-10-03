@@ -148,14 +148,17 @@ function readNeeds(dom) {
 const previous = {
     localStorage: global.localStorage,
     toast: UIRenderer.toast,
-    handleError: UIRenderer.handleError,
+    clearActionError: UIRenderer.clearActionError,
+    handleError: UIRenderer.handleActionError,
     consoleError: console.error
 };
 
+const actionResets = [];
 try {
+    UIRenderer.clearActionError = scope => { actionResets.push(scope); };
     global.localStorage = createLocalStorageMock();
     UIRenderer.toast = () => {};
-    UIRenderer.handleError = () => {};
+    UIRenderer.handleActionError = () => {};
     console.error = () => {};
 
     console.log('Test 1: positive inflation compounds over ten annual applications');
@@ -254,7 +257,8 @@ try {
             clearTimeoutImpl: id => { cleared.push(id); }
         });
 
-        const result = await handlers.handleFetchInflation();
+        const result = await handlers.handleFetchInflation({ nested: true });
+        assertEqual(actionResets.length, 0, 'Verschachtelter Jahresschritt löscht keine Annualfehler');
         assertEqual(result.year, TARGET_YEAR, 'Inflation result should expose the exact target year');
         assertEqual(result.metric, INFLATION_RESULT_METRIC, 'Inflation result should expose the shared metric');
         assertEqual(result.fetchStatus, 'ok_primary_ecb', 'Inflation result should expose the primary fetch status');
@@ -279,7 +283,9 @@ try {
             }
         });
 
+        actionResets.length = 0;
         const result = await handlers.handleFetchInflation();
+        assertEqual(actionResets.join(','), 'annual', 'Direkter Jahresschritt bereinigt genau seinen Annualbereich');
         assertEqual(calls.length, 2, 'Wrong-year ECB data should trigger exactly one fallback');
         assertEqual(result.source, 'World Bank (CPI)', 'World Bank should resolve the rejected ECB response');
         assertEqual(result.fetchStatus, 'ok_fallback_world_bank', 'Fallback path should be explicit');
@@ -398,7 +404,8 @@ try {
     console.log('Balance annual inflation tests passed');
 } finally {
     console.error = previous.consoleError;
-    UIRenderer.handleError = previous.handleError;
+    UIRenderer.handleActionError = previous.handleError;
+    UIRenderer.clearActionError = previous.clearActionError;
     UIRenderer.toast = previous.toast;
     if (previous.localStorage === undefined) delete global.localStorage;
     else global.localStorage = previous.localStorage;

@@ -125,7 +125,7 @@ export function createSnapshotHandlers({
                             message: `Der Ausgaben-Check muss fuer den Abschluss auf ${expectedTargetYear} stehen.`
                         }]
                     };
-                    UIRenderer.handleError(new Error(formatPeriodErrors(result)));
+                    UIRenderer.handleActionError(new Error(formatPeriodErrors(result)), 'annual');
                     return result;
                 }
                 const state = StorageManager.loadState();
@@ -146,16 +146,18 @@ export function createSnapshotHandlers({
                 }
 
                 if (planning.status === ANNUAL_PERIOD_STATUS.ALREADY_COMMITTED) {
+                    UIRenderer.clearActionError('annual');
                     UIRenderer.toast(`Die Jahresperiode ${targetYear} wurde bereits abgeschlossen.`, false);
                     return planning;
                 }
                 if (planning.status !== ANNUAL_PERIOD_STATUS.READY || !planning.plan) {
-                    UIRenderer.handleError(new Error(formatPeriodErrors(planning)));
+                    UIRenderer.handleActionError(new Error(formatPeriodErrors(planning)), 'annual');
                     return planning;
                 }
 
                 if (!confirm(`Soll die Jahresperiode ${targetYear} ${label ? `fuer "${label}" ` : ''}jetzt abgeschlossen werden?\n\nDabei werden Alter (+1), Inflation und Marktdaten aktualisiert und der Ausgaben-Check auf ${planning.plan.expenses.nextYear} umgestellt. Vor der ersten Aenderung wird ein Recovery-Snapshot erstellt.`)) return;
 
+                UIRenderer.clearActionError('annual');
                 const validation = await validateLiveState();
                 checkContext();
                 if (!validation?.ok) throw validation?.error || new Error('Die Balance-Vorpruefung ist fehlgeschlagen.');
@@ -178,7 +180,7 @@ export function createSnapshotHandlers({
                 };
                 await persistMetadata(metadata, context);
 
-                const annualUpdate = await runAnnualUpdate({ failOnStepError: true });
+                const annualUpdate = await runAnnualUpdate({ failOnStepError: true, nested: true });
                 checkContext();
                 if (!annualUpdate?.ok) {
                     throw annualUpdate?.error || new Error('Das Jahres-Update wurde nicht vollstaendig ausgefuehrt.');
@@ -237,7 +239,7 @@ export function createSnapshotHandlers({
                     : await execute(null);
             } catch (err) {
                 if (completedResult) {
-                    UIRenderer.handleError(err);
+                    UIRenderer.handleActionError(err, 'annual');
                     return completedResult;
                 }
                 if (commitStarted) {
@@ -245,10 +247,10 @@ export function createSnapshotHandlers({
                         `Der Jahresprozess ist unvollstaendig. Stellen Sie zuerst den Recovery-Snapshot `
                         + `"${metadata.pendingCommit?.snapshotId || 'unbekannt'}" wieder her. Ursache: ${err.message || err}`
                     );
-                    UIRenderer.handleError(recoveryError);
+                    UIRenderer.handleActionError(recoveryError, 'annual');
                     return { status: ANNUAL_PERIOD_STATUS.INCOMPLETE_RECOVERY, error: recoveryError };
                 }
-                UIRenderer.handleError(err);
+                UIRenderer.handleActionError(err, 'annual');
                 return { status: ANNUAL_PERIOD_STATUS.INVALID, error: err };
             } finally {
                 annualCloseInFlight = false;
@@ -263,17 +265,19 @@ export function createSnapshotHandlers({
                     const key = restoreBtn.dataset.key;
                     const snapshotName = key.replace('.json', '');
                     if (confirm(`Snapshot "${snapshotName}" wiederherstellen?\n\nStandard-Restore setzt das aktive Profil und die Balance-Daten auf den Snapshot-Stand. Andere Profile, technische Einstellungen und die Snapshot-Historie bleiben erhalten.`)) {
+                        UIRenderer.clearActionError('snapshots');
                         await StorageManager.restoreSnapshot(key, appState.snapshotHandle);
                     }
                 }
                 if (deleteBtn) {
                     const key = deleteBtn.dataset.key;
                     if (confirm(`Diesen Snapshot wirklich endgültig löschen?`)) {
+                        UIRenderer.clearActionError('snapshots');
                         await StorageManager.deleteSnapshot(key, appState.snapshotHandle);
                     }
                 }
             } catch (err) {
-                UIRenderer.handleError(new StorageError("Snapshot-Aktion fehlgeschlagen.", { originalError: err }));
+                UIRenderer.handleActionError(new StorageError("Snapshot-Aktion fehlgeschlagen.", { originalError: err }), 'snapshots');
             }
         }
     };
